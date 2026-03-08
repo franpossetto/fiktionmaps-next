@@ -1,0 +1,5 @@
+export type { Fiction } from "./fiction.model"
+export type { IFictionRepository } from "./fiction.repository"
+export { FictionService } from "./fiction.service"
+export { MockFictionRepository } from "./fiction.mock"
+export { ApiFictionRepository } from "./fiction.api"

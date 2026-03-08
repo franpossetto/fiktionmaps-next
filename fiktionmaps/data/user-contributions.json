@@ -1,0 +1,33 @@
+{
+  "contributedLocationIds": [
+    "notting-hill-bookshop",
+    "platform-934",
+    "borough-market"
+  ],
+  "contributedFictionIds": [
+    "notting-hill",
+    "harry-potter"
+  ],
+  "contributedPhotos": [
+    {
+      "id": "photo-1",
+      "locationId": "notting-hill-bookshop",
+      "userId": "user-001",
+      "timestamp": "2024-02-20T09:00:00.000Z",
+      "photoUrl": "/locations/notting-hill-bookshop.jpg",
+      "caption": "Sunset at Travel Bookshop",
+      "liked": false,
+      "likeCount": 8
+    },
+    {
+      "id": "photo-2",
+      "locationId": "empire-state",
+      "userId": "user-001",
+      "timestamp": "2024-02-18T18:30:00.000Z",
+      "photoUrl": "/locations/empire-state.jpg",
+      "caption": "NYC skyline from the top",
+      "liked": false,
+      "likeCount": 15
+    }
+  ]
+}

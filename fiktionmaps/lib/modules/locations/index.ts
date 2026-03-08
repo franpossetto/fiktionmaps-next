@@ -1,0 +1,5 @@
+export type { Location } from "./location.model"
+export type { ILocationRepository } from "./location.repository"
+export { LocationService } from "./location.service"
+export { MockLocationRepository } from "./location.mock"
+export { ApiLocationRepository } from "./location.api"

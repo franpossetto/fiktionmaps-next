@@ -1,0 +1,58 @@
+{
+  "id": "user-001",
+  "username": "FilmExplorer",
+  "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=FilmExplorer",
+  "bio": "Wandering through fictional worlds and filming locations. One frame at a time.",
+  "interests": ["romance", "fantasy", "adventure", "drama"],
+  "joinedDate": "2023-06-15T00:00:00.000Z",
+  "visitedLocations": [
+    "notting-hill-bookshop",
+    "platform-934",
+    "empire-state",
+    "tiffany-store",
+    "cafe-des-deux-moulins",
+    "shakespeare-and-co"
+  ],
+  "checkIns": [
+    {
+      "id": "checkin-1",
+      "locationId": "notting-hill-bookshop",
+      "userId": "user-001",
+      "timestamp": "2024-02-15T14:30:00.000Z",
+      "photoUrl": "/locations/notting-hill-bookshop.jpg",
+      "caption": "Finally at the real Travel Bookshop! Just like the movie",
+      "liked": true,
+      "likeCount": 24
+    },
+    {
+      "id": "checkin-2",
+      "locationId": "cafe-des-deux-moulins",
+      "userId": "user-001",
+      "timestamp": "2024-01-28T10:15:00.000Z",
+      "photoUrl": "/locations/cafe-des-deux-moulins.jpg",
+      "caption": "Cafe des Deux Moulins - Amelie's workplace. Magic everywhere",
+      "liked": true,
+      "likeCount": 18
+    },
+    {
+      "id": "checkin-3",
+      "locationId": "shakespeare-and-co",
+      "userId": "user-001",
+      "timestamp": "2024-01-10T16:45:00.000Z",
+      "photoUrl": "/locations/shakespeare-and-co.jpg",
+      "caption": "Shakespeare and Company bookstore - a literary dream",
+      "liked": false,
+      "likeCount": 12
+    }
+  ],
+  "favoriteLocations": ["notting-hill-bookshop", "cafe-des-deux-moulins", "empire-state"],
+  "socialLinks": {
+    "instagram": "filmexplorer_",
+    "twitter": "@filmexplorer"
+  },
+  "stats": {
+    "totalVisits": 12,
+    "locationsExplored": 6,
+    "frictionsConnected": 4
+  }
+}
