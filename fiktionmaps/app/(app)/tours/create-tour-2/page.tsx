@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/context/auth-context"
 import { CreateTourWizardV2 } from "@/components/tours/create-tour-wizard-v2"
 
 export default function CreateTour2Page() {

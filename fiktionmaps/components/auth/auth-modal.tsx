@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/context/auth-context"
 import {
   Dialog,
   DialogContent,
@@ -71,10 +71,10 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div>
-              <label className="text-sm font-medium text-foreground">Name</label>
+              <label className="text-sm font-medium text-foreground">Full name</label>
               <Input
                 type="text"
-                placeholder="Your name"
+                placeholder="Your full name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={isLoading}

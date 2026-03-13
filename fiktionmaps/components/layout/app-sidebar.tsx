@@ -4,8 +4,6 @@ import { useState } from "react"
 import {
   Map,
   Clapperboard,
-  Settings,
-  CheckCircle2,
   Film,
   LayoutGrid,
   User,
@@ -16,7 +14,7 @@ import { UserMenu } from "@/components/layout/user-menu"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/context/auth-context"
 
 export type AppView = "map" | "scenes" | "fictions" | "admin" | "profile"
 
@@ -86,31 +84,33 @@ export function AppSidebar() {
             </div>
           )
         })}
-        <div className="relative">
-          <Link
-            href="/tours"
-            onMouseEnter={() => setHoveredItem("Tours")}
-            onMouseLeave={() => setHoveredItem(null)}
-            className={cn(
-              "flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200",
-              isActive("/tours")
-                ? "bg-chrome-active text-foreground shadow-[inset_0_0_0_1px_hsl(var(--chrome-border))]"
-                : "text-chrome-muted hover:bg-chrome-hover hover:text-foreground",
+        {user && (
+          <div className="relative">
+            <Link
+              href="/tours"
+              onMouseEnter={() => setHoveredItem("Tours")}
+              onMouseLeave={() => setHoveredItem(null)}
+              className={cn(
+                "flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200",
+                isActive("/tours")
+                  ? "bg-chrome-active text-foreground shadow-[inset_0_0_0_1px_hsl(var(--chrome-border))]"
+                  : "text-chrome-muted hover:bg-chrome-hover hover:text-foreground",
+              )}
+              aria-label="Tours"
+              title="Tours"
+            >
+              <Route className="h-[20px] w-[20px]" />
+            </Link>
+            {isActive("/tours") && (
+              <div className="absolute -left-[14px] top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-primary" />
             )}
-            aria-label="Tours"
-            title="Tours"
-          >
-            <Route className="h-[20px] w-[20px]" />
-          </Link>
-          {isActive("/tours") && (
-            <div className="absolute -left-[14px] top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-primary" />
-          )}
-          {hoveredItem === "Tours" && (
-            <div className="absolute left-[52px] top-1/2 -translate-y-1/2 rounded-md bg-chrome-tooltip px-2.5 py-1 text-xs font-medium text-foreground shadow-lg whitespace-nowrap z-50 border border-chrome-border">
-              Tours
-            </div>
-          )}
-        </div>
+            {hoveredItem === "Tours" && (
+              <div className="absolute left-[52px] top-1/2 -translate-y-1/2 rounded-md bg-chrome-tooltip px-2.5 py-1 text-xs font-medium text-foreground shadow-lg whitespace-nowrap z-50 border border-chrome-border">
+                Tours
+              </div>
+            )}
+          </div>
+        )}
       </nav>
 
       <div className="flex-1" />
@@ -138,29 +138,6 @@ export function AppSidebar() {
         </div>
       ) : (
         <div className="flex flex-col items-center gap-1 pb-1">
-          {[
-            { icon: User, label: "Profile", href: "/profile" },
-            { icon: Settings, label: "Settings", href: "/settings" },
-            { icon: CheckCircle2, label: "Visited", href: "#" },
-          ].map((item) => (
-            <div key={item.label} className="relative">
-              <Link
-                href={item.href}
-                onMouseEnter={() => setHoveredItem(item.label)}
-                onMouseLeave={() => setHoveredItem(null)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl text-chrome-muted transition-all duration-200 hover:bg-chrome-hover hover:text-foreground"
-                aria-label={item.label}
-              >
-                <item.icon className="h-[18px] w-[18px]" />
-              </Link>
-              {hoveredItem === item.label && (
-                <div className="absolute left-[48px] top-1/2 -translate-y-1/2 rounded-md bg-chrome-tooltip px-2.5 py-1 text-xs font-medium text-foreground shadow-lg whitespace-nowrap z-50 border border-chrome-border">
-                  {item.label}
-                </div>
-              )}
-            </div>
-          ))}
-
           <div className="border-t border-chrome-border w-full mt-2 pt-2">
             <UserMenu />
           </div>

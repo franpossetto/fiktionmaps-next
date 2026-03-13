@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/context/auth-context"
 import { AuthPage } from "@/components/auth/auth-page"
 import { useEffect } from "react"
 

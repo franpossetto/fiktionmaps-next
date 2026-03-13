@@ -20,7 +20,7 @@ import type { City } from "@/lib/modules/cities"
 import type { Fiction } from "@/lib/modules/fictions"
 import type { Place, TourDraft, TourStopWithPlace } from "@/lib/modules/tours"
 import { useApi } from "@/lib/api"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/context/auth-context"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import { ToursMap } from "@/components/tours/tours-map"
 

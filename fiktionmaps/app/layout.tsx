@@ -2,7 +2,7 @@ import React from "react"
 import type { Metadata, Viewport } from "next"
 import { Inter, Space_Grotesk } from "next/font/google"
 import { ThemeSettingsProvider } from "@/lib/theme-settings-context"
-import { AuthProvider } from "@/lib/auth-context"
+import { AuthProvider } from "@/context/auth-context"
 import { ApiProvider } from "@/lib/api/provider"
 
 import "./globals.css"

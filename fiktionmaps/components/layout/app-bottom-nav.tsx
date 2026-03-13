@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/context/auth-context"
 
 const navItems: { id: string; href: string; label: string; icon: React.ElementType }[] = [
   { id: "map", href: "/map", label: "Map", icon: Map },

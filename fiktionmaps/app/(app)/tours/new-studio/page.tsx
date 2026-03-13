@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/context/auth-context"
 import { ToursWorkbenchStudio } from "@/components/tours/tours-workbench-studio"
 
 export default function NewTourStudioPage() {

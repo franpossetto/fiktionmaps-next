@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react"
 import Image from "next/image"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/context/auth-context"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ArrowDown, ArrowLeft, Compass } from "lucide-react"

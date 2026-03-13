@@ -14,7 +14,7 @@ import type { Fiction } from "@/lib/modules/fictions"
 import { useApi } from "@/lib/api"
 import { ToursMap } from "@/components/tours/tours-map"
 import { PageStickyBar } from "@/components/layout/page-sticky-bar"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/context/auth-context"
 
 interface PublicTourViewerProps {
   slug: string

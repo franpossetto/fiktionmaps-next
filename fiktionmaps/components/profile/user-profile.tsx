@@ -13,12 +13,27 @@ import { ProfileHeader } from "./profile-header"
 import { VisitedPlaces } from "./visited-places"
 import { ContributorData } from "./contributor-data"
 import { PageStickyBar } from "@/components/layout/page-sticky-bar"
-import { ImageIcon, Share2, Upload, Route } from "lucide-react"
-import { useAuth } from "@/lib/auth-context"
+import { ImageIcon, Share2, Upload, Route, ChevronRight, Sparkles } from "lucide-react"
+import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
+import { getCurrentUserProfileAction, type ProfileWithOnboarding } from "@/lib/auth/profile.actions"
 
 interface UserProfileProps {
   profile?: UserProfileType
+}
+
+// Onboarding progress: 4 conceptual steps so the bar feels more meaningful.
+// We only infer 2 of them from the profile (username + avatar), each worth 2 steps.
+const ONBOARDING_STEPS = 4
+const DEFAULT_AVATAR = "/logo-icon.png"
+
+function onboardingProgress(profile: { username?: string; avatar?: string }): { completed: number; percent: number } {
+  const hasUsername = (profile.username?.trim().length ?? 0) >= 3
+  const hasAvatar = !!(profile.avatar && profile.avatar !== DEFAULT_AVATAR)
+  // Username and avatar each count as 2 conceptual steps (out of 4 total).
+  const completed = (hasUsername ? 2 : 0) + (hasAvatar ? 2 : 0)
+  const percent = (Math.min(completed, ONBOARDING_STEPS) / ONBOARDING_STEPS) * 100
+  return { completed, percent }
 }
 
 type TabView = "gallery" | "contributor" | "tours"
@@ -34,7 +49,7 @@ export function UserProfileComponent({ profile }: UserProfileProps) {
   const { cities: cityService, locations, tours, users } = useApi()
   const [allCities, setAllCities] = useState<City[]>([])
   const [locationMap, setLocationMap] = useState<Map<string, Location>>(new Map())
-  const [loadedProfile, setLoadedProfile] = useState<UserProfileType | undefined>(profile)
+  const [loadedProfile, setLoadedProfile] = useState<ProfileWithOnboarding | UserProfileType | undefined>(profile)
   const [contributedLocations, setContributedLocations] = useState<Location[]>([])
   const [contributedFictions, setContributedFictions] = useState<Fiction[]>([])
   const [contributedPhotos, setContributedPhotos] = useState<CheckIn[]>([])
@@ -49,15 +64,62 @@ export function UserProfileComponent({ profile }: UserProfileProps) {
     locations.getAll().then((locs) => setLocationMap(new Map(locs.map((l) => [l.id, l]))))
   }, [cityService, locations])
 
+  const refetchProfile = useCallback(() => {
+    if (!user?.id) return
+    getCurrentUserProfileAction().then((result) => {
+      if (result.data) setLoadedProfile(result.data)
+    })
+  }, [user?.id])
+
+  // Prefer Supabase profile when using Supabase auth; fallback to API/mock or minimal profile
   useEffect(() => {
     if (!user?.id) return
-    if (!profile) {
-      users.getProfile(user.id).then(setLoadedProfile)
-    }
+    let cancelled = false
+    getCurrentUserProfileAction().then((result) => {
+      if (cancelled) return
+      if (result.data) {
+        setLoadedProfile(result.data)
+        return
+      }
+      // No Supabase profile: try API/mock, or show minimal profile so we don't hang on "Loading profile…"
+      if (!profile) {
+        const fallbackProfile: ProfileWithOnboarding = {
+          id: user.id,
+          username: user.name || user.email?.split("@")[0] || "",
+          avatar: user.avatar || "/logo-icon.png",
+          bio: "",
+          interests: [],
+          joinedDate: new Date().toISOString(),
+          visitedLocations: [],
+          checkIns: [],
+          favoriteLocations: [],
+          stats: {
+            totalVisits: 0,
+            locationsExplored: 0,
+            frictionsConnected: 0,
+          },
+          onboardingCompleted: false,
+        }
+        users
+          .getProfile(user.id)
+          .then((p) => {
+            if (!cancelled) setLoadedProfile(p ?? fallbackProfile)
+          })
+          .catch(() => {
+            if (!cancelled) setLoadedProfile(fallbackProfile)
+          })
+      }
+    })
     users.getContributedLocations(user.id).then(setContributedLocations)
     users.getContributedFictions(user.id).then(setContributedFictions)
     users.getContributedPhotos(user.id).then(setContributedPhotos)
-  }, [user?.id, profile, users])
+    const onFocus = () => refetchProfile()
+    window.addEventListener("focus", onFocus)
+    return () => {
+      cancelled = true
+      window.removeEventListener("focus", onFocus)
+    }
+  }, [user?.id, user?.name, user?.email, user?.avatar, profile, users, refetchProfile])
 
   const activeProfile = profile ?? loadedProfile
   const cityNameById = useMemo(() => new Map(allCities.map((city) => [city.id, city.name])), [allCities])
@@ -129,14 +191,21 @@ export function UserProfileComponent({ profile }: UserProfileProps) {
     )
   }
 
+  // Prefer profile.username; if empty, fall back to auth user display name (from Supabase auth)
+  const displayName =
+    activeProfile.username ||
+    user?.name ||
+    user?.email?.split("@")[0] ||
+    ""
+
   const visitedLocations = activeProfile.visitedLocations
     .map((id) => locationMap.get(id))
     .filter((loc): loc is Location => loc !== undefined)
 
   const handleShare = (checkIn?: CheckIn) => {
     const text = checkIn
-      ? `${activeProfile.username} checked in at: ${locationMap.get(checkIn.locationId)?.name}\n"${checkIn.caption}"`
-      : `Check out my film location profile: ${activeProfile.username}`
+      ? `${displayName} checked in at: ${locationMap.get(checkIn.locationId)?.name}\n"${checkIn.caption}"`
+      : `Check out my film location profile: ${displayName}`
     if (navigator.share) {
       navigator.share({ title: "Film Location Explorer", text })
     }
@@ -153,7 +222,7 @@ export function UserProfileComponent({ profile }: UserProfileProps) {
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap flex-shrink-0 text-sm border ${
               isActive
-                ? "bg-cyan-600/20 text-cyan-300 border-cyan-500/50"
+                ? "bg-black text-white border-black"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/30 border-transparent"
             }`}
           >
@@ -165,26 +234,61 @@ export function UserProfileComponent({ profile }: UserProfileProps) {
     </div>
   )
 
+  const onboarding =
+    "onboardingCompleted" in activeProfile && activeProfile.onboardingCompleted === false
+      ? onboardingProgress(activeProfile)
+      : null
+
   return (
     <div ref={scrollRef} className="w-full h-full overflow-y-auto overflow-x-hidden bg-background">
 
-      {/* Hero — inline, scrolls away */}
-      <div ref={heroRef} className="px-8 pt-8 pb-4">
+      {/* Hero — full-bleed banner */}
+      <div ref={heroRef} className="-mx-8 pt-8 pb-4">
         <ProfileHeader
-          profile={activeProfile}
+          profile={{ ...activeProfile, username: displayName }}
           onShare={() => handleShare()}
-          contributionStats={{
-            fictions: contributedFictions.length,
-            places: contributedLocations.length,
-            scenes: contributedPhotos.length,
-          }}
         />
       </div>
+
+      {/* Completar onboarding — compact banner, disappears cuando se completa */}
+      {onboarding && (
+        <div className="px-8 pb-5">
+          <Link
+            href="/onboarding?from=profile"
+            className="group flex w-full max-w-md items-center gap-4 rounded-2xl border border-border bg-card px-5 py-4 text-sm text-foreground shadow-sm transition-colors hover:bg-muted"
+          >
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-black/5 text-black group-hover:bg-black/10">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-2">
+              <p className="flex items-center gap-2 text-sm font-semibold text-black group-hover:text-foreground">
+                Your profile is 76% you
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Finish onboarding so FiktionMaps can get to know you and your stories better.
+              </p>
+              {activeProfile.interests && activeProfile.interests.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {activeProfile.interests.slice(0, 4).map((interest) => (
+                    <span
+                      key={interest}
+                      className="rounded-full border border-border bg-background/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground group-hover:border-muted-foreground/70"
+                    >
+                      {interest}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+          </Link>
+        </div>
+      )}
 
       {/* Sticky top bar (appears after hero scrolls out) */}
       {stickyHeader && (
         <PageStickyBar
-          title={<span className="text-base font-bold text-foreground">{activeProfile.username}</span>}
+          title={<span className="text-base font-bold text-foreground">{displayName}</span>}
           trailing={
             <button
               onClick={() => handleShare()}

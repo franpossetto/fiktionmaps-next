@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Image from "next/image"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/context/auth-context"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ArrowDown, ArrowLeft } from "lucide-react"
@@ -74,7 +74,10 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
       if (view === "login") {
         await login(email, password)
       } else if (view === "signup") {
-        if (!name.trim()) { setError("Please enter your name"); return }
+        if (!name.trim()) {
+          setError("Please enter your full name")
+          return
+        }
         await signup(email, password, name)
       } else {
         await new Promise((r) => setTimeout(r, 900))
@@ -156,10 +159,10 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
           <div className="w-full max-w-[360px]">
             <form onSubmit={handleSubmit} className="space-y-4">
               {view === "signup" && (
-                <Field label="Name">
+                <Field label="Full name">
                   <Input
                     type="text"
-                    placeholder="Your name"
+                    placeholder="Your full name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     disabled={isLoading}
@@ -172,7 +175,7 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
               <Field label="Email address">
                 <Input
                   type="email"
-                  placeholder=""
+                  placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
@@ -197,7 +200,7 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
               >
                 <Input
                   type="password"
-                  placeholder=""
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}

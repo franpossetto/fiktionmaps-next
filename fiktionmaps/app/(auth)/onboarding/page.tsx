@@ -1,13 +1,16 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
-import { Onboarding } from "@/components/auth/onboarding"
 import { useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useAuth } from "@/context/auth-context"
+import { Onboarding } from "@/components/auth/onboarding"
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, needsOnboarding } = useAuth()
+
+  const fromProfile = searchParams.get("from") === "profile"
 
   useEffect(() => {
     if (!user) {
@@ -19,5 +22,5 @@ export default function OnboardingPage() {
 
   if (!user || !needsOnboarding) return null
 
-  return <Onboarding />
+  return <Onboarding forceStartAtZero={fromProfile} />
 }

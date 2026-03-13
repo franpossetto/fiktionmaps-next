@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Image from "next/image"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/context/auth-context"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { AuthModal } from "@/components/auth/auth-modal"
-import { LogOut, User } from "lucide-react"
+import { LogOut, User, Settings } from "lucide-react"
+import Link from "next/link"
 
 export function UserMenu() {
   const { user, logout } = useAuth()
@@ -53,9 +54,21 @@ export function UserMenu() {
           )}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="right" align="end" className="w-48">
+      <DropdownMenuContent side="right" align="end" className="z-[1100] min-w-[240px] w-auto max-w-[min(320px,90vw)]">
         <DropdownMenuItem className="text-xs text-muted-foreground" disabled>
           {user.email}
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/profile">
+            <User className="mr-2 h-4 w-4" />
+            Profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/settings">
+            <Settings className="mr-2 h-4 w-4" />
+            Settings
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={logout}>
           <LogOut className="mr-2 h-4 w-4" />

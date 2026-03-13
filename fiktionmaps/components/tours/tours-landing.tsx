@@ -18,7 +18,7 @@ import type { City } from "@/lib/modules/cities"
 import type { Fiction } from "@/lib/modules/fictions"
 import type { ResolvedTour } from "@/lib/modules/tours"
 import { useApi } from "@/lib/api"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/context/auth-context"
 import { PageStickyBar } from "@/components/layout/page-sticky-bar"
 
 function formatDate(date: string): string {
