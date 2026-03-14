@@ -24,11 +24,13 @@ const fictionsService = createFictionsService({
 
 export const getAllFictions = fictionsService.getAll
 export const getFictionById = fictionsService.getById
+export const createFiction = fictionsService.create
 export const updateFiction = fictionsService.update
+export const deleteFiction = fictionsService.delete
 export const getFictionCities = fictionsService.getFictionCities
 
 export type { Fiction } from "@/modules/fictions/fiction.domain"
-export type { UpdateFictionData } from "@/modules/fictions/fiction.dtos"
+export type { CreateFictionData, UpdateFictionData } from "@/modules/fictions/fiction.dtos"
 
 const citiesService = createCitiesService({
   citiesRepo: citiesSupabaseAdapter,
@@ -36,8 +38,10 @@ const citiesService = createCitiesService({
 
 export const getAllCities = citiesService.getAll
 export const getCityById = citiesService.getById
+export const createCity = citiesService.create
 export const updateCity = citiesService.update
+export const deleteCity = citiesService.delete
 export const getCityFictions = citiesService.getCityFictions
 
 export type { City } from "@/modules/cities/city.domain"
-export type { UpdateCityData } from "@/modules/cities/city.dtos"
+export type { CreateCityData, UpdateCityData } from "@/modules/cities/city.dtos"

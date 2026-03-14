@@ -65,8 +65,6 @@ export function LocationsTab() {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [mapError, setMapError] = useState("")
-  const ctaClass =
-    "gap-2 border border-cyan-500/30 bg-cyan-500/5 text-cyan-600 hover:bg-cyan-500/10"
   const wizardSteps = [
     { title: "Fiction", description: "Pick the story" },
     { title: "City", description: "Set the map focus" },
@@ -245,7 +243,7 @@ export function LocationsTab() {
                 Pin real places and attach them to your stories.
               </p>
             </div>
-            <Button onClick={handleStartWorkflow} variant="outline" className={ctaClass}>
+            <Button onClick={handleStartWorkflow} variant="cta" className="gap-2">
               <Plus className="h-4 w-4" />
               Create Location
             </Button>
@@ -258,13 +256,13 @@ export function LocationsTab() {
                 placeholder="Search locations..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-500 transition-colors"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors"
               />
             </div>
             <select
               value={fictionFilter}
               onChange={(e) => setFictionFilter(e.target.value)}
-              className="w-full sm:w-56 px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm focus:outline-none focus:border-cyan-500 transition-colors"
+              className="w-full sm:w-56 px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm focus:outline-none focus:border-foreground transition-colors"
             >
               <option value="all">All fictions</option>
               {fictions.map((fiction) => (
@@ -284,7 +282,7 @@ export function LocationsTab() {
             return (
               <div
                 key={loc.id}
-                className="group rounded-xl border border-border hover:border-cyan-500/30 hover:bg-card/50 transition-all overflow-hidden"
+                className="group rounded-xl border border-border hover:border-foreground/30 hover:bg-card/50 transition-all overflow-hidden"
               >
                 <div className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
@@ -302,7 +300,7 @@ export function LocationsTab() {
                   <p className="text-xs text-muted-foreground line-clamp-2">{loc.address || loc.description}</p>
 
                   <div className="flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity gap-2">
-                    <button className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors">
+                    <button className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors">
                       <Edit2 className="h-3 w-3" />
                       Edit
                     </button>
@@ -347,7 +345,7 @@ export function LocationsTab() {
               <button
                 key={fiction.id}
                 onClick={() => handleSelectFiction(fiction.id)}
-                className="w-full text-left p-4 rounded-xl border border-border hover:border-cyan-500/40 hover:bg-card/60 transition-all group"
+                className="w-full text-left p-4 rounded-xl border border-border hover:border-foreground/40 hover:bg-card/60 transition-all group"
               >
                 <div className="flex items-center gap-4">
                   <div className="relative h-[96px] w-[64px] shrink-0 overflow-hidden rounded-lg border border-border/60 bg-muted/20">
@@ -369,7 +367,7 @@ export function LocationsTab() {
                       {fiction.synopsis}
                     </p>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-cyan-500 transition-colors" />
+                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </div>
               </button>
             ))}
@@ -410,12 +408,12 @@ export function LocationsTab() {
                   setWorkflowStep("address")
                 }}
                 className={cn(
-                  "w-full rounded-xl border border-border p-4 text-left transition-all hover:border-cyan-500/40 hover:bg-card/60",
-                  selectedCityId === city.id && "border-cyan-500/60 bg-cyan-500/5",
+                  "w-full rounded-xl border border-border p-4 text-left transition-all hover:border-foreground/40 hover:bg-card/60",
+                  selectedCityId === city.id && "border-foreground/60 bg-foreground/5",
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-cyan-500/10 text-cyan-600 flex items-center justify-center">
+                  <div className="h-10 w-10 rounded-lg bg-foreground/10 text-foreground flex items-center justify-center">
                     <Building2 className="h-5 w-5" />
                   </div>
                   <div>
@@ -530,19 +528,19 @@ export function LocationsTab() {
           <div className="space-y-2">
             <h2 className="text-lg font-bold text-foreground mb-2">Step 4: Place Data</h2>
             <p className="text-sm text-muted-foreground">Name it, describe it, and add a screenshot.</p>
-            <div className="flex items-center gap-2 mt-4 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
-              <CheckCircle2 className="h-4 w-4 text-cyan-600" />
-              <span className="text-xs font-medium text-cyan-600">Fiction: {selectedFiction?.title}</span>
+            <div className="flex items-center gap-2 mt-4 p-3 rounded-lg bg-foreground/10 border border-foreground/30">
+              <CheckCircle2 className="h-4 w-4 text-foreground" />
+              <span className="text-xs font-medium text-foreground">Fiction: {selectedFiction?.title}</span>
             </div>
             {selectedCity && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
-                <CheckCircle2 className="h-4 w-4 text-cyan-600" />
-                <span className="text-xs font-medium text-cyan-600">City: {selectedCity.name}</span>
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-foreground/10 border border-foreground/30">
+                <CheckCircle2 className="h-4 w-4 text-foreground" />
+                <span className="text-xs font-medium text-foreground">City: {selectedCity.name}</span>
               </div>
             )}
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
-              <CheckCircle2 className="h-4 w-4 text-cyan-600" />
-              <span className="text-xs font-medium text-cyan-600">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-foreground/10 border border-foreground/30">
+              <CheckCircle2 className="h-4 w-4 text-foreground" />
+              <span className="text-xs font-medium text-foreground">
                 Address: {formData.address || "Not set"}
               </span>
             </div>
@@ -558,7 +556,7 @@ export function LocationsTab() {
                   setFormData({ ...formData, name: e.target.value })
                 }}
                 placeholder="e.g., Platform 9¾"
-                className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all"
+                className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground/20 transition-all"
               />
             </FormField>
           </div>
@@ -569,7 +567,7 @@ export function LocationsTab() {
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Location description..."
               rows={3}
-              className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all resize-none"
+              className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground/20 transition-all resize-none"
             />
           </FormField>
 

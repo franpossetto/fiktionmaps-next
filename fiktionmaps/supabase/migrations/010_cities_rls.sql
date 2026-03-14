@@ -2,6 +2,8 @@ ALTER TABLE public.cities ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.cities FORCE ROW LEVEL SECURITY;
 
+GRANT DELETE ON public.cities TO authenticated;
+
 CREATE POLICY "cities: anyone can read"
   ON public.cities
   FOR SELECT
@@ -20,3 +22,9 @@ CREATE POLICY "cities: authenticated can update"
   TO authenticated
   USING (true)
   WITH CHECK (true);
+
+CREATE POLICY "cities: authenticated can delete"
+  ON public.cities
+  FOR DELETE
+  TO authenticated
+  USING (true);

@@ -11,16 +11,19 @@ const KEYS = {
   navCollapsed: `${PREFIX}nav-collapsed`,
   placeSelectorCollapsed: `${PREFIX}place-selector-collapsed`,
   selectedCityId: `${PREFIX}selected-city-id`,
+  adminViewMode: `${PREFIX}admin-view-mode`,
 } as const
 
 export type MapStyleValue = "day" | "dawn" | "dusk" | "night"
 export type ThemeValue = "dark" | "light"
+export type AdminViewMode = "cards" | "table"
 
 const DEFAULT_MAP_STYLE: MapStyleValue = "night"
 const DEFAULT_THEME: ThemeValue = "dark"
 const DEFAULT_NAV_COLLAPSED = false
 const DEFAULT_PLACE_SELECTOR_COLLAPSED = false
 const DEFAULT_SELECTED_CITY_ID: string | null = null
+const DEFAULT_ADMIN_VIEW_MODE: AdminViewMode = "cards"
 
 function isClient(): boolean {
   return typeof window !== "undefined"
@@ -51,6 +54,11 @@ function parseBoolean(raw: string | null, defaultValue: boolean): boolean {
   if (raw === "false") return false
   if (raw === "0") return false
   return defaultValue
+}
+
+function parseAdminViewMode(raw: string | null): AdminViewMode {
+  if (raw === "table") return "table"
+  return DEFAULT_ADMIN_VIEW_MODE
 }
 
 function parseMapStyle(raw: string | null): MapStyleValue {
@@ -141,6 +149,19 @@ export const selectedCityIdStorage = {
   },
 }
 
+/** Admin content view mode for all tabs (cards or table). */
+export const adminViewModeStorage = {
+  get(): AdminViewMode {
+    return parseAdminViewMode(getItem(KEYS.adminViewMode))
+  },
+  set(value: AdminViewMode): void {
+    setItem(KEYS.adminViewMode, value)
+  },
+  getDefault(): AdminViewMode {
+    return DEFAULT_ADMIN_VIEW_MODE
+  },
+}
+
 /** Single entry point for all UI local storage. */
 export const localStorageService = {
   mapStyle: mapStyleStorage,
@@ -148,4 +169,5 @@ export const localStorageService = {
   navCollapsed: navCollapsedStorage,
   placeSelectorCollapsed: placeSelectorCollapsedStorage,
   selectedCityId: selectedCityIdStorage,
+  adminViewMode: adminViewModeStorage,
 }

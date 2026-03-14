@@ -3,7 +3,12 @@
 import { getCurrentUserProfile, updateCurrentUserProfile } from "@/lib/users-service"
 import type { UserProfile } from "@/lib/modules/users"
 
-export type ProfileWithOnboarding = UserProfile & { onboardingCompleted: boolean }
+export type ProfileWithOnboarding = UserProfile & {
+  onboardingCompleted: boolean
+  gender?: string
+  phone?: string
+  dateOfBirth?: string
+}
 
 /**
  * Maps Supabase public.profiles row to the UI UserProfile shape.
@@ -14,6 +19,9 @@ function profileToUserProfile(p: {
   username: string | null
   avatar_url: string | null
   bio: string | null
+  gender?: string | null
+  phone?: string | null
+  date_of_birth?: string | null
   created_at: string
   onboarding_completed: boolean
 }): ProfileWithOnboarding {
@@ -33,6 +41,9 @@ function profileToUserProfile(p: {
       frictionsConnected: 0,
     },
     onboardingCompleted: p.onboarding_completed,
+    gender: p.gender ?? undefined,
+    phone: p.phone ?? undefined,
+    dateOfBirth: p.date_of_birth ?? undefined,
   }
 }
 

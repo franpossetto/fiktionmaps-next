@@ -128,7 +128,7 @@ function AddressSearch({
           }}
           placeholder="Type the full address and press Enter"
           autoComplete="off"
-          className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:border-cyan-500 transition-colors"
+          className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:border-foreground transition-colors"
         />
         <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
           Press Enter
@@ -201,13 +201,13 @@ export function InteractiveMap({
                     position={{ lat: loc.lat, lng: loc.lng }}
                     title={loc.name}
                   >
-                    <div className="h-2.5 w-2.5 rounded-full bg-cyan-500/80 border border-cyan-200 shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-foreground/80 border border-border shadow-[0_0_8px_rgba(0,0,0,0.3)]" />
                   </MapMarker>
                 ))}
 
                 {selected && (
                   <MapMarker position={selected} title="Selected location">
-                    <div className="h-4 w-4 rounded-full bg-cyan-500 border-2 border-white shadow-lg" />
+                    <div className="h-4 w-4 rounded-full bg-foreground border-2 border-white shadow-lg" />
                   </MapMarker>
                 )}
               </MapContainer>
@@ -217,11 +217,11 @@ export function InteractiveMap({
               <div className="grid grid-cols-2 gap-3">
                 <div className="px-3 py-2 rounded-lg border border-border bg-background">
                   <p className="text-[10px] text-muted-foreground font-semibold mb-1 uppercase">Latitude</p>
-                  <p className="text-sm font-mono text-cyan-600">{selected.lat.toFixed(5)}</p>
+                  <p className="text-sm font-mono text-foreground">{selected.lat.toFixed(5)}</p>
                 </div>
                 <div className="px-3 py-2 rounded-lg border border-border bg-background">
                   <p className="text-[10px] text-muted-foreground font-semibold mb-1 uppercase">Longitude</p>
-                  <p className="text-sm font-mono text-cyan-600">{selected.lng.toFixed(5)}</p>
+                  <p className="text-sm font-mono text-foreground">{selected.lng.toFixed(5)}</p>
                 </div>
               </div>
             )}

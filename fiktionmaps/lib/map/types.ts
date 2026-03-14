@@ -5,6 +5,14 @@ export interface LatLng {
   lng: number
 }
 
+export interface MapControlHandle {
+  panTo(position: LatLng): void
+  setZoom(zoom: number): void
+  flyTo(options: { center: LatLng; zoom?: number; duration?: number }): void
+  getCenter?(): LatLng
+  setCenter?(pos: LatLng): void
+}
+
 export interface MapContainerProps {
   id?: string
   mapKey?: string
@@ -20,6 +28,10 @@ export interface MapContainerProps {
   children?: ReactNode
   onClick?: (position: LatLng) => void
   onCenterChange?: (center: LatLng) => void
+  /** Called when the map has loaded, with a handle to control it (pan, zoom, fly). Use this when useMapControl is unreliable. */
+  onMapReady?: (control: MapControlHandle) => void
+  /** Called when the map zoom changes (e.g. via scroll). Rounded to integer. */
+  onZoomChange?: (zoom: number) => void
   controls?: {
     zoom?: boolean
     fullscreen?: boolean

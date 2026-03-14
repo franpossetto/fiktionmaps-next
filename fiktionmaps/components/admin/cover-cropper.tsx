@@ -152,7 +152,7 @@ export function CoverCropper({
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="text-xs font-semibold text-cyan-600 hover:text-cyan-500 transition-colors"
+              className="text-xs font-semibold text-foreground hover:opacity-80 transition-colors"
             >
               Replace cover
             </button>
@@ -219,7 +219,7 @@ export function CoverCropper({
                   }),
                 )
               }
-              className="flex-1 accent-cyan-500"
+              className="flex-1 accent-foreground"
             />
             <span className="text-xs text-muted-foreground w-12 text-right">
               {Math.round(zoomValue * 100)}%

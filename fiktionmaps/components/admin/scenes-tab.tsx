@@ -40,8 +40,6 @@ export function ScenesTab() {
     quote: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const ctaClass =
-    "gap-2 border border-cyan-500/30 bg-cyan-500/5 text-cyan-600 hover:bg-cyan-500/10"
   const wizardSteps = [
     { title: "Fiction", description: "Choose the story" },
     { title: "Location", description: "Select the place" },
@@ -148,7 +146,7 @@ export function ScenesTab() {
                 Organize moments by location and timeline.
               </p>
             </div>
-            <Button onClick={handleStartWorkflow} variant="outline" className={ctaClass}>
+            <Button onClick={handleStartWorkflow} variant="cta" className="gap-2">
               <Plus className="h-4 w-4" />
               Create Scene
             </Button>
@@ -162,13 +160,13 @@ export function ScenesTab() {
                 placeholder="Search scenes..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-500 transition-colors"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors"
               />
             </div>
             <select
               value={fictionFilter}
               onChange={(e) => setFictionFilter(e.target.value)}
-              className="w-full sm:w-56 px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm focus:outline-none focus:border-cyan-500 transition-colors"
+              className="w-full sm:w-56 px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm focus:outline-none focus:border-foreground transition-colors"
             >
               <option value="all">All fictions</option>
               {fictions.map((fiction) => (
@@ -188,7 +186,7 @@ export function ScenesTab() {
             return (
               <div
                 key={scene.id}
-                className="group rounded-xl border border-border hover:border-cyan-500/30 hover:bg-card/50 transition-all overflow-hidden"
+                className="group rounded-xl border border-border hover:border-foreground/30 hover:bg-card/50 transition-all overflow-hidden"
               >
                 <div className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
@@ -211,7 +209,7 @@ export function ScenesTab() {
                   <p className="text-xs text-muted-foreground line-clamp-2">{scene.description}</p>
 
                   <div className="flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity gap-2">
-                    <button className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors">
+                    <button className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors">
                       <Edit2 className="h-3 w-3" />
                       Edit
                     </button>
@@ -253,14 +251,14 @@ export function ScenesTab() {
               <button
                 key={fiction.id}
                 onClick={() => handleSelectFiction(fiction.id)}
-                className="w-full text-left p-4 rounded-lg border border-border hover:border-cyan-500/50 hover:bg-card/50 transition-all group"
+                className="w-full text-left p-4 rounded-lg border border-border hover:border-foreground/50 hover:bg-card/50 transition-all group"
               >
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-foreground">{fiction.title}</p>
                     <p className="text-xs text-muted-foreground mt-1">{fiction.year}</p>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-cyan-500 transition-colors flex-shrink-0" />
+                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
                 </div>
               </button>
             ))}
@@ -305,14 +303,14 @@ export function ScenesTab() {
                 <button
                   key={location.id}
                   onClick={() => handleSelectLocation(location.id)}
-                  className="w-full text-left p-4 rounded-lg border border-border hover:border-cyan-500/50 hover:bg-card/50 transition-all group"
+                  className="w-full text-left p-4 rounded-lg border border-border hover:border-foreground/50 hover:bg-card/50 transition-all group"
                 >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-semibold text-foreground">{location.name}</p>
                       <p className="text-xs text-muted-foreground mt-1">{location.description}</p>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-cyan-500 transition-colors flex-shrink-0" />
+                    <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
                   </div>
                 </button>
               ))
@@ -348,13 +346,13 @@ export function ScenesTab() {
           <h2 className="text-lg font-bold text-foreground mb-2">Step 3: Scene Details</h2>
           <p className="text-sm text-muted-foreground">Complete the information about this scene</p>
           <div className="flex flex-col gap-2 mt-4">
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
-              <CheckCircle2 className="h-4 w-4 text-cyan-600 flex-shrink-0" />
-              <span className="text-xs font-medium text-cyan-600">Fiction: {selectedFiction?.title}</span>
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-foreground/10 border border-foreground/30">
+              <CheckCircle2 className="h-4 w-4 text-foreground flex-shrink-0" />
+              <span className="text-xs font-medium text-foreground">Fiction: {selectedFiction?.title}</span>
             </div>
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
-              <CheckCircle2 className="h-4 w-4 text-cyan-600 flex-shrink-0" />
-              <span className="text-xs font-medium text-cyan-600">Location: {selectedLocation?.name}</span>
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-foreground/10 border border-foreground/30">
+              <CheckCircle2 className="h-4 w-4 text-foreground flex-shrink-0" />
+              <span className="text-xs font-medium text-foreground">Location: {selectedLocation?.name}</span>
             </div>
           </div>
         </div>
@@ -365,7 +363,7 @@ export function ScenesTab() {
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
             placeholder="e.g., Platform arrival"
-            className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all"
+            className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground/20 transition-all"
           />
         </FormField>
 
@@ -377,7 +375,7 @@ export function ScenesTab() {
               onChange={(e) => setFormData({ ...formData, timestamp: e.target.value })}
               placeholder="00:00:00"
               pattern="\d{2}:\d{2}:\d{2}"
-              className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all font-mono text-sm"
+              className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground/20 transition-all font-mono text-sm"
             />
           </FormField>
 
@@ -387,7 +385,7 @@ export function ScenesTab() {
               value={formData.chapter}
               onChange={(e) => setFormData({ ...formData, chapter: parseInt(e.target.value) })}
               min="1"
-              className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all"
+              className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground/20 transition-all"
             />
           </FormField>
         </div>
@@ -398,7 +396,7 @@ export function ScenesTab() {
             onChange={(e) => setFormData({ ...formData, quote: e.target.value })}
             placeholder="Optional memorable quote from this scene..."
             rows={3}
-            className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all resize-none"
+            className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground/20 transition-all resize-none"
           />
         </FormField>
 

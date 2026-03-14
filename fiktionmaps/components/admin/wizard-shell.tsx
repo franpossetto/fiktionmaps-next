@@ -57,7 +57,7 @@ export function WizardShell({
 
       <div className="rounded-2xl border border-border bg-card/40 p-6">
         <div className="space-y-6">
-          <WizardSteps steps={steps} currentStep={currentStep} />
+          {steps.length > 1 && <WizardSteps steps={steps} currentStep={currentStep} />}
           <div>{children}</div>
         </div>
       </div>

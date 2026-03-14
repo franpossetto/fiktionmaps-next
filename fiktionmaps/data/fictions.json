@@ -5,7 +5,6 @@
     "type": "movie",
     "year": 1999,
     "director": "Roger Michell",
-    "posterColor": "hsl(210 70% 50%)",
     "genre": "Romance",
     "coverImage": "/covers/notting-hill.jpg",
     "synopsis": "The life of a simple bookshop owner changes when he meets the most famous film star in the world. A charming romantic comedy set in the vibrant streets of London's Notting Hill neighborhood."
@@ -16,7 +15,6 @@
     "type": "movie",
     "year": 2001,
     "director": "Chris Columbus",
-    "posterColor": "hsl(45 80% 45%)",
     "genre": "Fantasy",
     "coverImage": "/covers/harry-potter.jpg",
     "synopsis": "An orphaned boy discovers he is a wizard and is invited to study at Hogwarts School of Witchcraft and Wizardry. A magical journey of friendship, courage, and the battle between good and evil."
@@ -27,7 +25,6 @@
     "type": "movie",
     "year": 2001,
     "director": "Sharon Maguire",
-    "posterColor": "hsl(340 70% 50%)",
     "genre": "Comedy",
     "coverImage": "/covers/bridget-jones.jpg",
     "synopsis": "A British woman is determined to improve herself while she looks for love in a year in which she keeps a personal diary. A hilarious and heartfelt comedy about finding yourself."
@@ -38,7 +35,6 @@
     "type": "movie",
     "year": 1998,
     "director": "John Madden",
-    "posterColor": "hsl(20 70% 45%)",
     "genre": "Drama",
     "coverImage": "/covers/shakespeare-in-love.jpg",
     "synopsis": "A young Shakespeare, out of ideas and short of cash, meets his ideal woman and is inspired to write one of his most famous plays. A witty and passionate period drama."
@@ -49,7 +45,6 @@
     "type": "tv-series",
     "year": 1994,
     "director": "David Crane",
-    "posterColor": "hsl(30 80% 50%)",
     "genre": "Comedy",
     "coverImage": "/covers/friends.jpg",
     "synopsis": "Six young New Yorkers navigate the complexities of work, life, and love while hanging out at their favorite coffee place. The iconic sitcom that defined a generation."
@@ -60,7 +55,6 @@
     "type": "movie",
     "year": 1993,
     "director": "Nora Ephron",
-    "posterColor": "hsl(200 60% 50%)",
     "genre": "Romance",
     "coverImage": "/covers/sleepless-in-seattle.jpg",
     "synopsis": "A recently widowed man's son calls a radio talk show in an attempt to find his father a partner. A touching romance that spans the distance between two cities."
@@ -71,7 +65,6 @@
     "type": "movie",
     "year": 1961,
     "director": "Blake Edwards",
-    "posterColor": "hsl(174 60% 40%)",
     "genre": "Romance",
     "coverImage": "/covers/breakfast-at-tiffanys.jpg",
     "synopsis": "A young New York socialite becomes interested in a young man who has moved into her apartment building. A timeless classic about love, identity, and belonging."
@@ -82,7 +75,6 @@
     "type": "movie",
     "year": 1989,
     "director": "Rob Reiner",
-    "posterColor": "hsl(0 70% 50%)",
     "genre": "Romance",
     "coverImage": "/covers/when-harry-met-sally.jpg",
     "synopsis": "Harry and Sally have known each other for years, and are very good friends, but they fear sex would ruin the friendship. The quintessential New York romantic comedy."
@@ -93,7 +85,6 @@
     "type": "movie",
     "year": 2001,
     "director": "Jean-Pierre Jeunet",
-    "posterColor": "hsl(120 50% 35%)",
     "genre": "Comedy",
     "coverImage": "/covers/amelie.jpg",
     "synopsis": "Amelie is an innocent and naive girl in Paris with her own sense of justice. She decides to help those around her and discovers love along the way. A whimsical tale of Montmartre magic."
@@ -104,7 +95,6 @@
     "type": "movie",
     "year": 2004,
     "director": "Richard Linklater",
-    "posterColor": "hsl(50 60% 45%)",
     "genre": "Romance",
     "coverImage": "/covers/before-sunset.jpg",
     "synopsis": "Nine years after Jesse and Celine first met, they encounter each other again on the streets of Paris. A beautifully intimate conversation unfolds in real time as they wander the city."
@@ -115,7 +105,6 @@
     "type": "movie",
     "year": 2002,
     "director": "George Lucas",
-    "posterColor": "hsl(220 70% 40%)",
     "genre": "Sci-Fi",
     "coverImage": "/covers/star-wars.jpg",
     "synopsis": "Ten years after initially meeting, Anakin Skywalker shares a forbidden romance with Padme Amidala, while Obi-Wan investigates an assassination attempt on the senator. An epic space saga."
@@ -126,7 +115,6 @@
     "type": "movie",
     "year": 2016,
     "director": "Lena Ortiz",
-    "posterColor": "hsl(190 70% 45%)",
     "genre": "Thriller",
     "coverImage": "/covers/star-wars.jpg",
     "synopsis": "A globe-spanning chase propels a small crew through London, Paris, New York, and Seville as they race to keep a stolen artifact out of the wrong hands. Every city hides a clue, and every location becomes a trap."

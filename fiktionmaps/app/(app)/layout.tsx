@@ -9,11 +9,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <MapEngineProvider engine={mapboxEngine}>
       <div className="flex h-screen w-screen overflow-hidden flex-col md:flex-row">
-        <div className="hidden md:flex md:w-[60px] md:shrink-0">
+        <div className="hidden md:flex md:w-[60px] md:min-w-[60px] md:shrink-0 md:flex-col">
           <AppSidebar />
         </div>
 
-        <main className="relative flex-1 overflow-hidden mb-[70px] md:mb-0">
+        <main className="relative flex-1 min-w-0 overflow-hidden mb-[70px] md:mb-0">
           {children}
         </main>
 

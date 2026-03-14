@@ -1,23 +1,16 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Loader2, ImageIcon, Upload } from "lucide-react"
-import type { Fiction } from "@/lib/modules/fictions"
-import { useApi } from "@/lib/api"
+import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react"
+import { motion } from "framer-motion"
+import type { Fiction } from "@/modules/fictions/fiction.domain"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
 import { FICTION_GENRES } from "@/lib/constants/fiction-genres"
-import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog"
+import { updateFictionAction } from "@/app/(app)/admin/actions"
 import Link from "next/link"
+import { cn } from "@/lib/utils"
 
 const FICTION_TYPES: { value: Fiction["type"]; label: string }[] = [
   { value: "movie", label: "Movie" },
@@ -26,72 +19,38 @@ const FICTION_TYPES: { value: Fiction["type"]; label: string }[] = [
 ]
 
 interface FictionEditViewProps {
-  fictionId: string
+  initialFiction: Fiction
 }
 
-export function FictionEditView({ fictionId }: FictionEditViewProps) {
+function toFormState(f: Fiction) {
+  return {
+    title: f.title,
+    type: f.type,
+    year: f.year,
+    director: f.type === "movie" ? (f.author ?? "") : "",
+    author: f.type !== "movie" ? (f.author ?? "") : "",
+    genre: f.genre,
+    synopsis: f.description,
+  }
+}
+
+const inputClass = cn(
+  "w-full rounded-xl border border-border bg-card px-4 py-3 text-base outline-none transition-[border-color,box-shadow]",
+  "placeholder:text-muted-foreground text-foreground focus:ring-2 focus:ring-foreground/20 focus:border-foreground"
+)
+
+const stepVariants = {
+  initial: { opacity: 0, x: 40, filter: "blur(6px)" },
+  animate: { opacity: 1, x: 0, filter: "blur(0px)" },
+  exit: { opacity: 0, x: -40, filter: "blur(6px)" },
+}
+
+export function FictionEditView({ initialFiction }: FictionEditViewProps) {
   const router = useRouter()
-  const { fictions: fictionsService } = useApi()
-  const [fiction, setFiction] = useState<Fiction | null>(null)
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [editingImage, setEditingImage] = useState<"cover" | "banner" | null>(null)
-
-  const [formData, setFormData] = useState({
-    title: "",
-    type: "movie" as Fiction["type"],
-    year: new Date().getFullYear(),
-    director: "",
-    author: "",
-    posterColor: "#1a1a2e",
-    genre: "",
-    coverImage: "",
-    bannerImage: "",
-    synopsis: "",
-  })
-
-  const coverFileInputRef = useRef<HTMLInputElement>(null)
-  const bannerFileInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    fictionsService.getById(fictionId).then((f) => {
-      setLoading(false)
-      if (f) {
-        setFiction(f)
-        setFormData({
-          title: f.title,
-          type: f.type,
-          year: f.year,
-          director: f.director ?? "",
-          author: f.author ?? "",
-          posterColor: f.posterColor,
-          genre: f.genre,
-          coverImage: f.coverImage ?? "",
-          bannerImage: f.bannerImage ?? "",
-          synopsis: f.synopsis,
-        })
-      }
-    })
-  }, [fictionId, fictionsService])
-
-  const dialogUrl = editingImage === "cover" ? formData.coverImage : formData.bannerImage
-  const setDialogUrl = (value: string) =>
-    setFormData((p) =>
-      editingImage === "cover"
-        ? { ...p, coverImage: value }
-        : { ...p, bannerImage: value }
-    )
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, kind: "cover" | "banner") => {
-    const file = e.target.files?.[0]
-    if (!file?.type.startsWith("image/")) return
-    const url = URL.createObjectURL(file)
-    setFormData((p) =>
-      kind === "cover" ? { ...p, coverImage: url } : { ...p, bannerImage: url }
-    )
-    setEditingImage(null)
-    e.target.value = ""
-  }
+  const initialForm = useMemo(() => toFormState(initialFiction), [initialFiction])
+  const [formData, setFormData] = useState(initialForm)
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}
@@ -106,209 +65,80 @@ export function FictionEditView({ fictionId }: FictionEditViewProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!fiction || !validate()) return
+    if (!validate()) return
     setSaving(true)
-    try {
-      await fictionsService.update(fiction.id, {
-        title: formData.title.trim(),
-        type: formData.type,
-        year: formData.year,
-        director: formData.director.trim() || undefined,
-        author: formData.author.trim() || undefined,
-        posterColor: formData.posterColor,
-        genre: formData.genre.trim(),
-        coverImage: formData.coverImage.trim() || undefined,
-        bannerImage: formData.bannerImage.trim() || undefined,
-        synopsis: formData.synopsis.trim(),
-      })
+    setErrors({})
+    const fd = new FormData()
+    fd.set("title", formData.title)
+    fd.set("type", formData.type)
+    fd.set("year", String(formData.year))
+    fd.set("genre", formData.genre)
+    fd.set("synopsis", formData.synopsis)
+    fd.set("director", formData.director)
+    fd.set("author", formData.author)
+    const result = await updateFictionAction(initialFiction.id, fd)
+    setSaving(false)
+    if (result.success) {
       router.push("/admin")
       router.refresh()
-    } catch {
-      setErrors({ submit: "Failed to save. Try again." })
-      setSaving(false)
+    } else {
+      setErrors({ submit: result.error })
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[320px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  if (!fiction) {
-    return (
-      <div className="space-y-4">
-        <Link
-          href="/admin"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Admin
-        </Link>
-        <p className="text-muted-foreground">Fiction not found.</p>
-      </div>
-    )
-  }
-
-  const inputClass =
-    "w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 transition-all"
-
-  const coverSrc = formData.coverImage?.trim() || null
-  const bannerSrc = formData.bannerImage?.trim() || null
-
   return (
-    <div className="space-y-8 max-w-4xl">
-      {/* Back */}
-      <Link
-        href="/admin"
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+    <>
+      <motion.div
+        key="fiction-edit"
+        variants={stepVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={{ duration: 0.35, ease: "easeOut" }}
+        className="fixed inset-0 bottom-[70px] md:bottom-0 md:left-[60px] z-[3000] bg-background flex flex-col overflow-y-auto"
       >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Admin
-      </Link>
+        {/* Header — same layout as city edit */}
+        <div className="px-4 sm:px-6 pt-6 pb-4 shrink-0">
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground mb-3"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Fictions
+          </Link>
+          <h1 className="font-sans text-2xl font-bold text-foreground">
+            Edit fiction
+          </h1>
+          <p className="font-sans text-sm text-muted-foreground mt-1">
+            {formData.title || initialFiction.title}
+          </p>
+        </div>
 
-      {/* Hero: banner or gradient + title — click banner to edit banner URL */}
-      <div
-        className="relative h-44 sm:h-52 rounded-2xl overflow-hidden border border-border/60 shadow-lg"
-        style={{ backgroundColor: formData.posterColor }}
-      >
-        <button
-          type="button"
-          onClick={() => setEditingImage("banner")}
-          className="absolute inset-0 w-full h-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
-          aria-label="Edit banner image"
+        {/* Scrollable form content */}
+        <form
+          id="fiction-edit-form"
+          onSubmit={handleSubmit}
+          className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pb-4"
         >
-          {bannerSrc ? (
-            <img
-              src={bannerSrc}
-              alt="Banner"
-              className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-              onError={(e) => {
-                e.currentTarget.style.display = "none"
-              }}
-            />
-          ) : null}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
-          <div className="absolute bottom-4 left-4 right-4 sm:left-36 sm:right-6 pointer-events-none flex flex-col justify-end items-start text-left min-h-0 sm:min-h-[120px]">
-            <h1 className="text-2xl sm:text-3xl font-bold text-white drop-shadow-md text-left">
-              {formData.title || fiction.title}
-            </h1>
-            <p className="text-sm text-white/90 mt-0.5 text-left">Click banner or cover to edit</p>
-          </div>
-        </button>
-        {/* Cover thumbnail — click to edit cover URL */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            setEditingImage("cover")
-          }}
-          className="absolute left-4 bottom-4 w-20 h-[120px] rounded-lg overflow-hidden border-2 border-white/30 shadow-xl hidden sm:block cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:border-white/60 transition-colors"
-          aria-label="Edit cover image"
-        >
-          {coverSrc ? (
-            <img
-              src={coverSrc}
-              alt="Cover"
-              className="w-full h-full object-cover pointer-events-none"
-              onError={(e) => {
-                e.currentTarget.src = DEFAULT_FICTION_COVER
-              }}
-            />
-          ) : (
-            <div
-              className="w-full h-full flex items-center justify-center bg-muted/80 pointer-events-none"
-              style={{ backgroundColor: formData.posterColor }}
-            >
-              <ImageIcon className="h-8 w-8 text-white/50" />
-            </div>
-          )}
-        </button>
-      </div>
+          <div className="max-w-lg w-full space-y-6">
+        <FormField label="Title" required error={errors.title}>
+          <input
+            type="text"
+            value={formData.title}
+            onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
+            placeholder="e.g., Midnight in Paris"
+            className={inputClass}
+          />
+        </FormField>
 
-      {/* Dialog: upload or paste URL when user clicked an image */}
-      <Dialog open={!!editingImage} onOpenChange={(open) => !open && setEditingImage(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {editingImage === "cover" ? "Change cover image" : "Change banner image"}
-            </DialogTitle>
-            <DialogDescription>
-              Upload an image or paste a URL. Cover is portrait (e.g. 2:3), banner is wide (e.g. 16:9).
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <input
-                ref={editingImage === "cover" ? coverFileInputRef : bannerFileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => editingImage && handleFileChange(e, editingImage)}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full gap-2"
-                onClick={() =>
-                  (editingImage === "cover" ? coverFileInputRef : bannerFileInputRef).current?.click()
-                }
-              >
-                <Upload className="h-4 w-4" />
-                Upload image
-              </Button>
-            </div>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase text-muted-foreground">
-                <span className="bg-background px-2">Or paste URL</span>
-              </div>
-            </div>
-            <input
-              type="url"
-              value={dialogUrl}
-              onChange={(e) => setDialogUrl(e.target.value)}
-              placeholder={
-                editingImage === "cover" ? "/covers/… or https://…" : "/banners/… or https://…"
-              }
-              className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30"
-              aria-label={editingImage === "cover" ? "Cover image URL" : "Banner image URL"}
-            />
-          </div>
-          <DialogFooter>
-            <Button type="button" onClick={() => setEditingImage(null)}>
-              Done
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Details card */}
-        <section className="rounded-2xl border border-border bg-card/50 p-5 sm:p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground mb-4">Details</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField label="Title" required error={errors.title}>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
-              placeholder="e.g., Midnight in Paris"
-              className={inputClass}
-            />
-          </FormField>
-
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Type" required>
             <select
               value={formData.type}
               onChange={(e) =>
                 setFormData((p) => ({ ...p, type: e.target.value as Fiction["type"] }))
               }
-              className={inputClass}
+              className={cn(inputClass, "text-foreground")}
             >
               {FICTION_TYPES.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -322,122 +152,98 @@ export function FictionEditView({ fictionId }: FictionEditViewProps) {
             <input
               type="number"
               value={formData.year}
-              onChange={(e) =>
-                setFormData((p) => ({ ...p, year: parseInt(e.target.value, 10) }))
-              }
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10)
+                setFormData((p) => ({ ...p, year: Number.isNaN(v) ? p.year : v }))
+              }}
               min={1900}
               max={new Date().getFullYear()}
               className={inputClass}
             />
           </FormField>
+        </div>
 
-          <FormField label="Genre" required error={errors.genre}>
-            <select
-              value={formData.genre}
-              onChange={(e) => setFormData((p) => ({ ...p, genre: e.target.value }))}
-              className={inputClass}
-            >
-              <option value="">Select genre</option>
-              {FICTION_GENRES.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-              {formData.genre &&
-                !FICTION_GENRES.includes(formData.genre as (typeof FICTION_GENRES)[number]) && (
-                  <option value={formData.genre}>{formData.genre}</option>
-                )}
-            </select>
-          </FormField>
-
-          {formData.type === "movie" && (
-            <div className="sm:col-span-2">
-              <FormField label="Director">
-                <input
-                  type="text"
-                  value={formData.director}
-                  onChange={(e) => setFormData((p) => ({ ...p, director: e.target.value }))}
-                  placeholder="Director name"
-                  className={inputClass}
-                />
-              </FormField>
-            </div>
-          )}
-
-          {(formData.type === "book" || formData.type === "tv-series") && (
-            <div className="sm:col-span-2">
-              <FormField label="Author / Creator">
-                <input
-                  type="text"
-                  value={formData.author}
-                  onChange={(e) => setFormData((p) => ({ ...p, author: e.target.value }))}
-                  placeholder="Author or show creator"
-                  className={inputClass}
-                />
-              </FormField>
-            </div>
-          )}
-
-          <FormField
-            label="Poster color"
-            hint="Accent color for badges and chips on the map, location detail, and scene viewer."
+        <FormField label="Genre" required error={errors.genre}>
+          <select
+            value={formData.genre}
+            onChange={(e) => setFormData((p) => ({ ...p, genre: e.target.value }))}
+            className={cn(inputClass, "text-foreground")}
           >
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={formData.posterColor}
-                onChange={(e) => setFormData((p) => ({ ...p, posterColor: e.target.value }))}
-                className="h-10 w-14 rounded border border-border cursor-pointer bg-card"
-              />
-              <input
-                type="text"
-                value={formData.posterColor}
-                onChange={(e) => setFormData((p) => ({ ...p, posterColor: e.target.value }))}
-                placeholder="#1a1a2e"
-                className={inputClass}
-              />
-            </div>
+            <option value="">Select genre</option>
+            {FICTION_GENRES.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+            {formData.genre &&
+              !FICTION_GENRES.includes(formData.genre as (typeof FICTION_GENRES)[number]) && (
+                <option value={formData.genre}>{formData.genre}</option>
+              )}
+          </select>
+        </FormField>
+
+        {formData.type === "movie" && (
+          <FormField label="Director">
+            <input
+              type="text"
+              value={formData.director}
+              onChange={(e) => setFormData((p) => ({ ...p, director: e.target.value }))}
+              placeholder="Director name"
+              className={inputClass}
+            />
           </FormField>
+        )}
 
-          </div>
-        </section>
+        {(formData.type === "book" || formData.type === "tv-series") && (
+          <FormField label="Author / Creator">
+            <input
+              type="text"
+              value={formData.author}
+              onChange={(e) => setFormData((p) => ({ ...p, author: e.target.value }))}
+              placeholder="Author or show creator"
+              className={inputClass}
+            />
+          </FormField>
+        )}
 
-        <section className="rounded-2xl border border-border bg-card/50 p-5 sm:p-6 shadow-sm">
         <FormField label="Synopsis" required error={errors.synopsis}>
           <textarea
             value={formData.synopsis}
             onChange={(e) => setFormData((p) => ({ ...p, synopsis: e.target.value }))}
             placeholder="Short description of the fiction..."
             rows={5}
-            className={`${inputClass} resize-none`}
+            className={cn(inputClass, "resize-none")}
           />
         </FormField>
-        </section>
-
-        {errors.submit && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600">
-            {errors.submit}
           </div>
-        )}
+        </form>
+      </motion.div>
 
-        <div className="flex flex-wrap items-center gap-3 pt-2">
-          <Button
-            type="submit"
-            disabled={saving}
-            className="gap-2 border border-cyan-500/30 bg-cyan-500/10 text-cyan-600 hover:bg-cyan-500/20"
-          >
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : null}
-            Save changes
-          </Button>
+      {/* Fixed bottom bar — same as city edit */}
+      <div className="fixed bottom-[70px] left-0 right-0 md:bottom-0 md:left-[60px] z-[3001] border-t border-border bg-background px-4 sm:px-6 py-4">
+        {errors.submit && (
+          <p className="mb-3 text-center text-sm text-destructive">{errors.submit}</p>
+        )}
+        <div className="flex items-center justify-between gap-4">
           <Link href="/admin">
-            <Button type="button" variant="outline">
+            <Button type="button" variant="outline" className="rounded-xl px-6">
+              <ArrowLeft className="h-4 w-4 mr-2" />
               Cancel
             </Button>
           </Link>
+          <Button
+            type="submit"
+            form="fiction-edit-form"
+            disabled={saving}
+            variant="cta"
+            className="gap-2 rounded-xl px-6"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Save changes
+            <ArrowRight className="h-4 w-4" />
+          </Button>
         </div>
-      </form>
-    </div>
+      </div>
+    </>
   )
 }

@@ -5,6 +5,7 @@ import {
   localStorageService,
   type MapStyleValue,
   type ThemeValue,
+  type AdminViewMode,
 } from "./local-storage-service"
 
 /**
@@ -85,6 +86,23 @@ export function useSelectedCityIdStorage(): [string | null, (v: string | null) =
   const setValue = useCallback((v: string | null) => {
     setValueState(v)
     localStorageService.selectedCityId.set(v)
+  }, [])
+
+  return [value, setValue]
+}
+
+export function useAdminViewModeStorage(): [AdminViewMode, (v: AdminViewMode) => void] {
+  const [value, setValueState] = useState<AdminViewMode>(
+    localStorageService.adminViewMode.getDefault,
+  )
+
+  useEffect(() => {
+    setValueState(localStorageService.adminViewMode.get())
+  }, [])
+
+  const setValue = useCallback((v: AdminViewMode) => {
+    setValueState(v)
+    localStorageService.adminViewMode.set(v)
   }, [])
 
   return [value, setValue]

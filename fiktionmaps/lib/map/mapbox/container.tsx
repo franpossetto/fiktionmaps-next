@@ -8,7 +8,9 @@ import {
   FullscreenControl,
 } from "react-map-gl/mapbox"
 import "mapbox-gl/dist/mapbox-gl.css"
+import type { Map as MapboxMap } from "mapbox-gl"
 import type { MapContainerProps } from "../types"
+import type { MapControlHandle } from "../types"
 import { MapLoadedProvider } from "../map-loaded-context"
 import { MAPBOX_ACCESS_TOKEN, MAPBOX_DAY_STYLE, MAPBOX_DAWN_STYLE, MAPBOX_DUSK_STYLE, MAPBOX_NIGHT_STYLE } from "./styles"
 import { MapboxBuildings3D } from "./buildings"
@@ -26,10 +28,37 @@ export function MapboxContainer({
   children,
   onClick,
   onCenterChange,
+  onMapReady,
+  onZoomChange,
   controls,
 }: MapContainerProps) {
   const [mapLoaded, setMapLoaded] = useState(false)
-  const onLoad = useCallback(() => setMapLoaded(true), [])
+  const onLoad = useCallback(
+    (e: { target: MapboxMap }) => {
+      setMapLoaded(true)
+      const map = e.target
+      if (onMapReady) {
+        const handle: MapControlHandle = {
+          panTo: (pos) => map.panTo([pos.lng, pos.lat]),
+          setZoom: (z) => map.setZoom(z),
+          flyTo: (opts) =>
+            map.flyTo({
+              center: [opts.center.lng, opts.center.lat],
+              zoom: opts.zoom ?? map.getZoom(),
+              duration: opts.duration ?? 600,
+              essential: true,
+            }),
+          getCenter: () => {
+            const c = map.getCenter()
+            return { lat: c.lat, lng: c.lng }
+          },
+          setCenter: (pos) => map.setCenter([pos.lng, pos.lat]),
+        }
+        onMapReady(handle)
+      }
+    },
+    [onMapReady],
+  )
 
   /* 4 map styles: day, dawn, dusk, night — 1:1 with env vars (DAWN_URL→dawn, DUSK_URL→dusk) */
   const style = mapStyle
@@ -79,6 +108,11 @@ export function MapboxContainer({
                   lat: e.viewState.latitude,
                   lng: e.viewState.longitude,
                 })
+            : undefined
+        }
+        onZoomEnd={
+          onZoomChange
+            ? (e) => onZoomChange(Math.round(e.viewState.zoom))
             : undefined
         }
         style={{ width: "100%", height: "100%" }}

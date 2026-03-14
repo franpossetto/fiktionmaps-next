@@ -5,11 +5,10 @@ export interface Fiction {
   year: number
   director?: string
   author?: string
-  posterColor: string
   genre: string
-  /** Poster/cover image URL (portrait, e.g. 2:3). */
+  /** Optional; not stored until storage buckets exist. UI uses placeholder when absent. */
   coverImage?: string
-  /** Wide banner/hero image URL (e.g. 16:9). Used on fiction detail when set. */
+  /** Optional; not stored until storage buckets exist. */
   bannerImage?: string
   synopsis: string
 }

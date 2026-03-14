@@ -24,13 +24,13 @@ export function ContributorData({
 
   if (totalContributions === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-cyan-500/30 bg-cyan-500/5 p-12 text-center">
-        <Upload className="h-12 w-12 text-cyan-400/50 mx-auto mb-4" />
+      <div className="rounded-lg border border-dashed border-border bg-muted/30 p-12 text-center">
+        <Upload className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
         <h3 className="text-lg font-bold text-foreground mb-2">Start Contributing</h3>
         <p className="text-sm text-muted-foreground mb-4">
           Upload fictions, places, and scenes to build the community library
         </p>
-        <button className="px-4 py-2 rounded-lg bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600/30 transition-colors text-sm font-medium border border-cyan-500/30 flex items-center gap-2 mx-auto">
+        <button className="px-4 py-2 rounded-lg bg-muted text-foreground hover:bg-muted/80 transition-colors text-sm font-medium border border-border flex items-center gap-2 mx-auto">
           <Upload className="h-4 w-4" />
           Upload Data
         </button>
@@ -55,7 +55,7 @@ export function ContributorData({
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
               className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors border ${
                 isActive
-                  ? "bg-cyan-600/20 text-cyan-300 border-cyan-500/50"
+                  ? "bg-muted text-foreground border-border"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/30 border-transparent"
               }`}
             >
@@ -111,14 +111,14 @@ export function ContributorData({
       {activeTab === "places" && uploadedLocations.length > 0 && (
         <div>
           <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-cyan-400" />
+            <MapPin className="h-5 w-5 text-foreground" />
             Places You Added
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {uploadedLocations.map((location) => (
               <div
                 key={location.id}
-                className="group rounded-lg border border-border bg-card/50 overflow-hidden hover:border-cyan-500/50 transition-all"
+                className="group rounded-lg border border-border bg-card/50 overflow-hidden hover:border-foreground/50 transition-all"
               >
                 <div className="relative h-40 w-full overflow-hidden bg-muted">
                   <Image

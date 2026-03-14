@@ -213,7 +213,7 @@ export function LocationImageCropper({
                 }),
               )
             }
-            className="flex-1 accent-cyan-500"
+            className="flex-1 accent-foreground"
           />
           <span className="text-xs text-muted-foreground w-12 text-right">
             {Math.round(zoomValue * 100)}%

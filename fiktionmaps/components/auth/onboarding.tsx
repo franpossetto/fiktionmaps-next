@@ -1,10 +1,8 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import Image from "next/image"
 import { AnimatePresence, motion } from "framer-motion"
-import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
-import { Check, ArrowRight, MapPin, Film, Star, Globe, User } from "lucide-react"
+import { ArrowRight, MapPin, Film, Star, Globe, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { City } from "@/lib/modules/cities"
 import type { Fiction } from "@/lib/modules/fictions"
@@ -14,17 +12,26 @@ import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentUserProfileAction } from "@/lib/auth/profile.actions"
 import onboardingData from "@/data/onboarding.json"
+import {
+  OnboardingStepWelcome,
+  OnboardingStepAvatar,
+  OnboardingStepAbout,
+  OnboardingStepGenres,
+  OnboardingStepFictions,
+  OnboardingStepCities,
+  OnboardingStepDone,
+} from "@/components/auth/onboarding/index"
 
 const DEFAULT_AVATAR = "/logo-icon.png"
 
-/** Primer paso pendiente según lo que ya tiene el perfil (retomar, no re-pedir lo ya ok). */
+/** First pending step based on what the profile already has (resume, don't re-ask what's already ok). */
 function firstPendingStep(profile: { username?: string; avatar?: string } | null): number {
   if (!profile) return 0
   const hasUsername = (profile.username?.trim().length ?? 0) >= 3
   const hasAvatar = !!(profile.avatar && profile.avatar !== DEFAULT_AVATAR)
   if (!hasUsername) return 0
   if (!hasAvatar) return 1
-  return 2 // géneros, ficciones, ciudades
+  return 2 // genres, fictions, cities
 }
 
 const GENRES = onboardingData.genres
@@ -35,9 +42,10 @@ const MAX_SELECTION = 10
 const STEPS = [
   { id: "welcome", icon: Star, title: "Welcome to FiktionMaps" },
   { id: "avatar", icon: User, title: "Choose your avatar" },
-  { id: "genres", icon: Film, title: "What genres do you love?" },
-  { id: "fictions", icon: Star, title: "Pick your favorite fictions" },
-  { id: "cities", icon: MapPin, title: "Choose your cities" },
+  { id: "about", icon: User, title: "Tell us about you" },
+  { id: "genres", icon: Film, title: "Tell us what you love?" },
+  { id: "fictions", icon: Star, title: "What worlds do you want to explore?" },
+  { id: "cities", icon: MapPin, title: "What places fascinate you?" },
   { id: "done", icon: Globe, title: "You're all set" },
 ]
 
@@ -48,7 +56,7 @@ const stepVariants = {
 }
 
 interface OnboardingProps {
-  /** Si viene desde el profile queremos empezar siempre en el paso de username. */
+  /** When coming from profile we want to always start at the username step. */
   forceStartAtZero?: boolean
 }
 
@@ -66,11 +74,16 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
   const [usernameSaving, setUsernameSaving] = useState(false)
   const [skipNextDebounce, setSkipNextDebounce] = useState(false)
   const [selectedAvatar, setSelectedAvatar] = useState<string>(user?.avatar ?? "")
+  const [aboutBio, setAboutBio] = useState("")
+  const [aboutGender, setAboutGender] = useState("")
+  const [aboutPhone, setAboutPhone] = useState("")
+  const [aboutDateOfBirth, setAboutDateOfBirth] = useState("")
   const [selectedGenres, setSelectedGenres] = useState<string[]>([])
   const [selectedFictions, setSelectedFictions] = useState<string[]>([])
   const [selectedCities, setSelectedCities] = useState<string[]>([])
   const [completeError, setCompleteError] = useState<string | null>(null)
   const [completing, setCompleting] = useState(false)
+  const [aboutSaving, setAboutSaving] = useState(false)
   const resumeApplied = useRef(false)
 
   useEffect(() => {
@@ -151,9 +164,9 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
     }
   }, [user, username])
 
-  // Retomar: empezar en el primer paso pendiente y prellenar lo que ya está ok.
-  // Si venimos desde el profile (forceStartAtZero), siempre arrancamos en el paso 0
-  // pero igual prellenamos username/avatar desde el perfil.
+  // Resume: start at the first pending step and prefill what's already ok.
+  // When coming from profile (forceStartAtZero), we always start at step 0
+  // but still prefill username/avatar from the profile.
   useEffect(() => {
     if (!user?.id || resumeApplied.current) return
     getCurrentUserProfileAction().then((result) => {
@@ -163,10 +176,14 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
       setStep(startStep)
       if (profile?.username?.trim()) setUsername(profile.username.trim())
       if (profile?.avatar && profile.avatar !== DEFAULT_AVATAR) setSelectedAvatar(profile.avatar)
+      if (profile?.bio) setAboutBio(profile.bio)
+      if (profile?.gender) setAboutGender(profile.gender)
+      if (profile?.phone) setAboutPhone(profile.phone)
+      if (profile?.dateOfBirth) setAboutDateOfBirth(profile.dateOfBirth)
     })
   }, [user?.id, forceStartAtZero])
 
-  // Si no venimos desde el profile y aún no sabemos el paso inicial, mostramos un pequeño loading.
+  // When not coming from profile and we don't know the initial step yet, show a short loading.
   if (!forceStartAtZero && step === null) {
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-background text-foreground">
@@ -176,10 +193,6 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
   }
 
   const totalSteps = STEPS.length
-
-  const toggle = <T extends string>(arr: T[], val: T, set: (v: T[]) => void) => {
-    set(arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val])
-  }
 
   const toggleWithMax = <T extends string>(arr: T[], val: T, set: (v: T[]) => void, max: number) => {
     if (arr.includes(val)) {
@@ -238,9 +251,10 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
   const hasSelectionInStep =
     step === 0 ? canAdvance()
     : step === 1 ? avatarSelected
-    : step === 2 ? selectedGenres.length > 0
-    : step === 3 ? selectedFictions.length > 0
-    : step === 4 ? selectedCities.length > 0
+    : step === 2 ? true // about: optional, can always continue
+    : step === 3 ? selectedGenres.length > 0
+    : step === 4 ? selectedFictions.length > 0
+    : step === 5 ? selectedCities.length > 0
     : true
   const buttonVariant = hasSelectionInStep ? "default" : "outline"
 
@@ -290,8 +304,28 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
       }
     }
 
-    if (step < totalSteps - 1) {
-      setStep((s) => s + 1)
+    if (step === 2 && user) {
+      setAboutSaving(true)
+      try {
+        const supabase = createClient()
+        await supabase
+          .from("profiles")
+          .update({
+            bio: aboutBio.trim() || null,
+            gender: aboutGender.trim() || null,
+            phone: aboutPhone.trim() || null,
+            date_of_birth: aboutDateOfBirth.trim() || null,
+          })
+          .eq("id", user.id)
+        setStep(3)
+      } finally {
+        setAboutSaving(false)
+      }
+      return
+    }
+
+    if (step != null && step < totalSteps - 1) {
+      setStep((s) => (s ?? 0) + 1)
     } else {
       setCompleting(true)
       setCompleteError(null)
@@ -327,57 +361,19 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
             transition={{ duration: 0.35, ease: "easeOut" }}
             className="flex w-full max-w-lg flex-col items-center"
           >
-          <div className="mb-12 w-full text-center">
-            <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-              Hola, hermosura!
-            </h1>
-            <p className="mt-4 text-lg text-muted-foreground sm:text-xl">
-              The map is waiting. Pick the name you’ll leave on it.
-            </p>
-          </div>
-          <div className="w-full space-y-2">
-            <label className="sr-only" htmlFor="onboarding-username">
-              Username
-            </label>
-            <div className="relative">
-              <input
-                id="onboarding-username"
-                type="text"
-                value={username}
-                onChange={(e) => {
-                  setUsername(e.target.value)
-                  setUsernameError(null)
-                  setUsernameAvailable(null)
-                }}
-                placeholder="your_username"
-                className={cn(
-                  "w-full rounded-xl border bg-card pl-4 pr-28 py-3.5 text-base outline-none transition-[border-color,box-shadow,color] placeholder:text-muted-foreground focus:ring-2",
-                  usernameError
-                    ? "border-destructive focus:border-destructive focus:ring-destructive/30"
-                    : usernameAvailable === true
-                    ? "border-emerald-500 text-emerald-600 focus:border-emerald-500 focus:ring-emerald-500/30"
-                    : "border-border focus:border-foreground focus:ring-foreground/20"
-                )}
-              />
-              {usernameChecking && (
-                <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-xs font-medium text-muted-foreground">
-                  Checking…
-                </span>
-              )}
-              {!usernameChecking && usernameAvailable === true && !usernameError && (
-                <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-xs font-medium text-emerald-500">
-                  Looks great
-                </span>
-              )}
-            </div>
-            <p className="text-center text-xs text-muted-foreground">
-              Letters, numbers, dots (.) and hyphens (-). Min 3 characters.
-            </p>
-            {usernameError && (
-              <p className="text-center text-sm text-destructive">{usernameError}</p>
-            )}
-          </div>
-        </motion.div>
+            <OnboardingStepWelcome
+              username={username}
+              usernameError={usernameError}
+              usernameAvailable={usernameAvailable}
+              usernameChecking={usernameChecking}
+              onUsernameChange={(value: string) => {
+                setUsername(value)
+                setUsernameError(null)
+                setUsernameAvailable(null)
+              }}
+            />
+
+          </motion.div>
         )}
 
         {/* Steps 1–5: same design as step 0 — big headline, subtitle, content (no card) */}
@@ -391,203 +387,59 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
           transition={{ duration: 0.35, ease: "easeOut" }}
           className={cn(
             "flex w-full flex-col items-center",
-            step === 1 || step === 3 ? "max-w-4xl" : "max-w-lg"
+            step === 1 || step === 4 ? "max-w-4xl" : "max-w-lg"
           )}
         >
 
-        {/* Step 1: Avatar — Netflix-style: 2 rows of 4, scroll on small screens */}
         {step === 1 && (
-          <div className="flex w-full flex-col items-center">
-            <div className="mb-12 w-full text-center">
-              <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-                Choose your avatar
-              </h1>
-              <p className="mt-4 text-lg text-muted-foreground sm:text-xl">
-                Pick the one that feels like you. None fit? Change it anytime — you&apos;re one of a kind.
-              </p>
-            </div>
-            <div className="w-full grid grid-cols-4 gap-3 sm:gap-4 max-h-[280px] sm:max-h-none overflow-y-auto overflow-x-hidden overscroll-contain">
-              {AVATARS.map((avatar) => {
-                const active = selectedAvatar === avatar.url
-                return (
-                  <button
-                    key={avatar.id}
-                    type="button"
-                    onClick={() => setSelectedAvatar(avatar.url)}
-                    aria-label={`Select avatar ${avatar.label}`}
-                    className={cn(
-                      "relative flex aspect-square w-full min-w-0 items-center justify-center overflow-hidden rounded-xl border-2 transition-all ring-offset-2 ring-offset-background",
-                      active
-                        ? "border-cyan-500 ring-2 ring-cyan-500 bg-cyan-500/5"
-                        : "border-border bg-muted hover:border-muted-foreground/50 hover:scale-[1.02]"
-                    )}
-                  >
-                    <Image
-                      src={avatar.url}
-                      alt={avatar.label}
-                      fill
-                      sizes="(max-width: 640px) 25vw, 25vw"
-                      className="object-cover"
-                      unoptimized
-                    />
-                    {active && (
-                      <div className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500 shadow-md">
-                        <Check className="h-3.5 w-3.5 text-white" />
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <OnboardingStepAvatar
+            avatars={AVATARS}
+            selectedAvatar={selectedAvatar}
+            onSelectAvatar={setSelectedAvatar}
+          />
         )}
 
-        {/* Step 2: Genres */}
         {step === 2 && (
-          <div className="flex w-full flex-col items-center">
-            <div className="mb-12 w-full text-center">
-              <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-                What genres do you love?
-              </h1>
-              <p className="mt-4 text-lg text-muted-foreground sm:text-xl">
-                Select all that apply.
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {selectedGenres.length === 0
-                  ? "No has seleccionado nada"
-                  : `Has seleccionado ${selectedGenres.length}`}
-                {" · "}
-                <span className="font-medium text-foreground">{selectedGenres.length}/{MAX_SELECTION}</span>
-              </p>
-            </div>
-            <div className="w-full flex flex-wrap gap-2 justify-center">
-              {GENRES.map((genre) => {
-                const active = selectedGenres.includes(genre)
-                return (
-                  <button
-                    key={genre}
-                    onClick={() => toggleWithMax(selectedGenres, genre, setSelectedGenres, MAX_SELECTION)}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-all border",
-                      active
-                        ? "bg-cyan-500/10 border-cyan-500 text-cyan-500"
-                        : "bg-muted border-border text-muted-foreground"
-                    )}
-                  >
-                    {active && <Check className="h-3 w-3" />}
-                    {genre}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <OnboardingStepAbout
+            bio={aboutBio}
+            gender={aboutGender}
+            phone={aboutPhone}
+            dateOfBirth={aboutDateOfBirth}
+            onBioChange={setAboutBio}
+            onGenderChange={setAboutGender}
+            onPhoneChange={setAboutPhone}
+            onDateOfBirthChange={setAboutDateOfBirth}
+          />
         )}
 
-        {/* Step 3: Fictions */}
         {step === 3 && (
-          <div className="flex w-full flex-col items-center">
-            <div className="mb-12 w-full text-center">
-              <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-                Tell us the fictions you love
-              </h1>
-              <p className="mt-4 text-lg text-muted-foreground sm:text-xl max-w-xl mx-auto">
-                Some worlds feel like home — choose yours.
-              </p>
-            </div>
-            <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 max-h-[65vh] min-h-[240px] overflow-y-auto overflow-x-hidden pr-1 pb-2 overscroll-contain">
-              {allFictions.map((fiction) => {
-                const active = selectedFictions.includes(fiction.id)
-                return (
-                  <button
-                    key={fiction.id}
-                    onClick={() => toggleWithMax(selectedFictions, fiction.id, setSelectedFictions, MAX_SELECTION)}
-                    className={cn(
-                      "group flex flex-col rounded-xl overflow-hidden text-left transition-all border",
-                      active
-                        ? "ring-2 ring-cyan-500 border-cyan-500 bg-cyan-500/5"
-                        : "border-border bg-card hover:border-muted-foreground/40"
-                    )}
-                    title={`${fiction.title}${fiction.year ? ` (${fiction.year})` : ""}`}
-                  >
-                    <div className="relative w-full aspect-[2/3] overflow-hidden bg-muted">
-                      <Image
-                        src={fiction.coverImage?.trim() || DEFAULT_FICTION_COVER}
-                        alt={fiction.title}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, 16vw"
-                      />
-                      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-2 opacity-0 transition-opacity group-hover:opacity-100">
-                        <p className="truncate text-xs font-semibold text-white">{fiction.title}</p>
-                        {fiction.year != null && fiction.year !== "" && (
-                          <p className="text-[11px] text-white/80">{fiction.year}</p>
-                        )}
-                      </div>
-                      {active && (
-                        <div className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500 shadow-md">
-                          <Check className="h-3.5 w-3.5 text-white" />
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <OnboardingStepGenres
+            genres={GENRES}
+            selectedGenres={selectedGenres}
+            maxSelection={MAX_SELECTION}
+            onToggleGenre={(genre: string) => toggleWithMax(selectedGenres, genre, setSelectedGenres, MAX_SELECTION)}
+          />
         )}
 
-        {/* Step 4: Cities — tag-style selection similar to genres */}
         {step === 4 && (
-          <div className="flex w-full flex-col items-center">
-            <div className="mb-12 w-full text-center">
-              <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-                Choose your cities
-              </h1>
-              <p className="mt-4 text-lg text-muted-foreground sm:text-xl">
-                Which cities would you like to explore?
-              </p>
-            </div>
-            <div className="w-full flex flex-wrap gap-2 justify-center">
-              {allCities.map((city) => {
-                const active = selectedCities.includes(city.id)
-                return (
-                  <button
-                    key={city.id}
-                    onClick={() => toggleWithMax(selectedCities, city.id, setSelectedCities, MAX_SELECTION)}
-                    className={cn(
-                      "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all border",
-                      active
-                        ? "bg-cyan-500/10 border-cyan-500 text-cyan-500"
-                        : "bg-muted border-border text-muted-foreground"
-                    )}
-                    title={`${city.name}${city.country ? `, ${city.country}` : ""}`}
-                  >
-                    <MapPin className={cn("h-4 w-4", active ? "text-cyan-500" : "text-muted-foreground")} />
-                    <span className="truncate max-w-[10rem]">
-                      {city.name}
-                      {city.country ? `, ${city.country}` : ""}
-                    </span>
-                    {active && <Check className="h-3 w-3" />}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <OnboardingStepFictions
+            fictions={allFictions}
+            selectedFictions={selectedFictions}
+            maxSelection={MAX_SELECTION}
+            onToggleFiction={(id: string) => toggleWithMax(selectedFictions, id, setSelectedFictions, MAX_SELECTION)}
+          />
         )}
 
-        {/* Step 5: Done */}
         {step === 5 && (
-          <div className="flex w-full flex-col items-center text-center">
-            <div className="mb-12 w-full text-center">
-              <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-                You&apos;re all set!
-              </h1>
-              <p className="mt-4 text-lg text-muted-foreground sm:text-xl">
-                Your preferences have been saved. The map will now highlight the locations most relevant to you.
-              </p>
-            </div>
-          </div>
+          <OnboardingStepCities
+            cities={allCities}
+            selectedCities={selectedCities}
+            maxSelection={MAX_SELECTION}
+            onToggleCity={(id: string) => toggleWithMax(selectedCities, id, setSelectedCities, MAX_SELECTION)}
+          />
         )}
+
+        {step === 6 && <OnboardingStepDone />}
         </motion.div>
         )}
       </AnimatePresence>
@@ -596,12 +448,12 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
       <div
         className={cn(
           "mt-6 flex w-full items-center justify-between",
-          step === 1 || step === 3 ? "max-w-4xl" : "max-w-lg"
+          step != null && (step === 1 || step === 4) ? "max-w-4xl" : "max-w-lg"
         )}
       >
-        {step > 0 && step < totalSteps - 1 ? (
+        {step != null && step > 0 && step < totalSteps - 1 ? (
           <button
-            onClick={() => setStep((s) => s - 1)}
+            onClick={() => setStep((s) => (s ?? 0) - 1)}
             className="text-sm text-muted-foreground transition-opacity hover:opacity-70"
           >
             Back
@@ -611,34 +463,38 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
         )}
 
         <div className="flex items-center gap-3">
-          {(step === 2 || step === 3 || step === 4) && (
+          {step != null && (step === 3 || step === 4 || step === 5) && (
             <div className="text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">
-                {step === 2 && `${selectedGenres.length}/${MAX_SELECTION}`}
-                {step === 3 && `${selectedFictions.length}/${MAX_SELECTION}`}
-                {step === 4 && `${selectedCities.length}/${MAX_SELECTION}`}
+                {step === 3 && `${selectedGenres.length}/${MAX_SELECTION}`}
+                {step === 4 && `${selectedFictions.length}/${MAX_SELECTION}`}
+                {step === 5 && `${selectedCities.length}/${MAX_SELECTION}`}
               </span>
             </div>
           )}
 
           <Button
             onClick={handleNext}
-            disabled={!canAdvance() || completing}
+            disabled={!canAdvance() || completing || aboutSaving}
             className={cn(
               "flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold",
-              hasSelectionInStep
-                ? "bg-black text-white hover:bg-black/90 hover:text-white"
-                : "border border-border bg-background text-foreground hover:bg-muted"
+              step === 0 && hasSelectionInStep
+                ? ""
+                : hasSelectionInStep
+                  ? "bg-muted text-foreground border border-border hover:bg-muted/80"
+                  : "border border-border bg-background text-foreground hover:bg-muted"
             )}
-            variant="outline"
+            variant={step === 0 && hasSelectionInStep ? "default" : "outline"}
           >
             {step === 0
-              ? "Get started"
+              ? "Next"
               : step === totalSteps - 1
                 ? completing
                   ? "Saving…"
                   : "Start exploring"
-                : "Continue"}
+                : step === 2 && aboutSaving
+                  ? "Saving…"
+                  : "Continue"}
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>

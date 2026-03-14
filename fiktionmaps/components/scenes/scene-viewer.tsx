@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Volume2, VolumeX, Play, Pause, Film } from "
 import type { City } from "@/lib/modules/cities"
 import type { Fiction } from "@/lib/modules/fictions"
 import type { Location } from "@/lib/modules/locations"
+import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
 import { useApi } from "@/lib/api"
 import { CitySelector } from "@/components/map/city-selector"
 import { FictionSelector } from "@/components/map/fiction-selector"
@@ -260,7 +261,7 @@ export function SceneViewer() {
             <div className="flex items-center gap-2">
               <span
                 className="rounded px-2 py-0.5 text-[11px] font-semibold"
-                style={{ backgroundColor: fiction.posterColor, color: "#fff" }}
+                style={{ backgroundColor: DEFAULT_FICTION_ACCENT, color: "#fff" }}
               >
                 {fiction.title}
               </span>

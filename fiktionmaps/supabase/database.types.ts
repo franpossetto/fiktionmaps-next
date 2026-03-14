@@ -28,6 +28,9 @@ export type Database = {
           full_name: string | null
           avatar_url: string | null
           bio: string | null
+          gender: string | null
+          phone: string | null
+          date_of_birth: string | null
           onboarding_completed: boolean
           created_at: string
           updated_at: string
@@ -38,6 +41,9 @@ export type Database = {
           full_name?: string | null
           avatar_url?: string | null
           bio?: string | null
+          gender?: string | null
+          phone?: string | null
+          date_of_birth?: string | null
           onboarding_completed?: boolean
           created_at?: string
           updated_at?: string
@@ -48,6 +54,9 @@ export type Database = {
           full_name?: string | null
           avatar_url?: string | null
           bio?: string | null
+          gender?: string | null
+          phone?: string | null
+          date_of_birth?: string | null
           onboarding_completed?: boolean
           created_at?: string
           updated_at?: string
@@ -69,11 +78,9 @@ export type Database = {
           type: string
           year: number
           author: string | null
-          poster_color: string
           genre: string
-          cover_image: string | null
-          banner_image: string | null
           description: string
+          active: boolean
           created_at: string
           updated_at: string
         }
@@ -83,11 +90,9 @@ export type Database = {
           type: string
           year: number
           author?: string | null
-          poster_color: string
           genre: string
-          cover_image?: string | null
-          banner_image?: string | null
           description: string
+          active?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -97,11 +102,9 @@ export type Database = {
           type?: string
           year?: number
           author?: string | null
-          poster_color?: string
           genre?: string
-          cover_image?: string | null
-          banner_image?: string | null
           description?: string
+          active?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -145,7 +148,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_username_available: {
+        Args: { p_username: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

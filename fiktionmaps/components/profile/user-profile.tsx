@@ -222,7 +222,7 @@ export function UserProfileComponent({ profile }: UserProfileProps) {
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap flex-shrink-0 text-sm border ${
               isActive
-                ? "bg-black text-white border-black"
+                ? "bg-muted text-foreground border-border"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/30 border-transparent"
             }`}
           >
@@ -240,17 +240,17 @@ export function UserProfileComponent({ profile }: UserProfileProps) {
       : null
 
   return (
-    <div ref={scrollRef} className="w-full h-full overflow-y-auto overflow-x-hidden bg-background">
+    <div ref={scrollRef} className="w-full h-full min-w-0 overflow-y-auto overflow-x-hidden bg-background">
 
-      {/* Hero — full-bleed banner */}
-      <div ref={heroRef} className="-mx-8 pt-8 pb-4">
+      {/* Hero — image at top, no black space */}
+      <div ref={heroRef} className="w-full pb-4">
         <ProfileHeader
           profile={{ ...activeProfile, username: displayName }}
           onShare={() => handleShare()}
         />
       </div>
 
-      {/* Completar onboarding — compact banner, disappears cuando se completa */}
+      {/* Complete onboarding — compact banner, disappears when completed */}
       {onboarding && (
         <div className="px-8 pb-5">
           <Link
@@ -285,9 +285,22 @@ export function UserProfileComponent({ profile }: UserProfileProps) {
         </div>
       )}
 
-      {/* Sticky top bar (appears after hero scrolls out) */}
+      {/* Sticky top bar (avatar + name on scroll, like the rest of the site) */}
       {stickyHeader && (
         <PageStickyBar
+          leading={
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                <Image
+                  src={activeProfile.avatar || DEFAULT_AVATAR}
+                  alt=""
+                  width={36}
+                  height={36}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            </div>
+          }
           title={<span className="text-base font-bold text-foreground">{displayName}</span>}
           trailing={
             <button

@@ -129,8 +129,8 @@ export function ProfileHeader({ profile, onEdit, onShare }: ProfileHeaderProps) 
 
   return (
     <div className="space-y-0">
-      {/* Hero — curated image, cinematic height, draggable crop */}
-      <div className="relative h-[220px] sm:h-[280px] lg:h-[340px] w-full overflow-hidden rounded-2xl border border-border/40 bg-muted">
+      {/* Hero — full-width image, no rounded corners */}
+      <div className="relative h-[220px] sm:h-[280px] lg:h-[340px] w-full overflow-hidden bg-muted">
         <Image
           src={heroUrl}
           alt=""
@@ -140,7 +140,8 @@ export function ProfileHeader({ profile, onEdit, onShare }: ProfileHeaderProps) 
           className="object-cover"
           style={{ objectPosition: `${heroPosition.x}% ${heroPosition.y}%` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
+        {/* Degradado suave a fondo (light/dark) sin línea dura */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
         <button
           type="button"
           onClick={() => setShowHeroPicker(true)}
@@ -212,18 +213,18 @@ export function ProfileHeader({ profile, onEdit, onShare }: ProfileHeaderProps) 
         </>
       )}
 
-      {/* Profile content — calm hierarchy */}
-      <div className="px-2 pt-6 space-y-6">
+      {/* Profile content — calm hierarchy, alineado al mismo margen izquierdo */}
+      <div className="pl-6 pr-4 pt-6 space-y-6">
         <div className="flex items-end justify-between gap-4">
           <div className="flex items-end gap-5">
             {/* Avatar: the one chosen in onboarding */}
             <div className="relative -mt-14 shrink-0">
-              <div className="h-24 w-24 overflow-hidden rounded-2xl border-[3px] border-background bg-muted shadow-xl ring-1 ring-black/5">
+              <div className="h-28 w-28 overflow-hidden rounded-2xl border-[3px] border-background bg-muted shadow-xl ring-1 ring-black/5">
                 <Image
                   src={avatarUrl}
                   alt={profile.username}
-                  width={96}
-                  height={96}
+                  width={112}
+                  height={112}
                   className="h-full w-full object-cover"
                 />
               </div>

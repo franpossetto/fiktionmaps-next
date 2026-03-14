@@ -7,6 +7,7 @@ import type { Fiction } from "@/lib/modules/fictions"
 import { useApi } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
 import Image from "next/image"
 
 interface LocationDetailProps {
@@ -54,7 +55,7 @@ export function LocationDetail({ location, onClose, onViewPlace, onView3D }: Loc
             <div className="absolute bottom-3 left-4">
               <Badge
                 className="text-xs border-0"
-                style={{ backgroundColor: fiction.posterColor, color: "#fff" }}
+                style={{ backgroundColor: DEFAULT_FICTION_ACCENT, color: "#fff" }}
               >
                 <Film className="mr-1 h-3 w-3" />
                 {fiction.title}
@@ -165,7 +166,7 @@ export function LocationDetail({ location, onClose, onViewPlace, onView3D }: Loc
                 <div className="flex items-center gap-3">
                   <div
                     className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg"
-                    style={{ backgroundColor: fiction.posterColor }}
+                    style={{ backgroundColor: DEFAULT_FICTION_ACCENT }}
                   >
                     <Film className="h-6 w-6 text-foreground" />
                   </div>

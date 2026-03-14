@@ -4,13 +4,15 @@ import { useMemo } from "react"
 import { useMap } from "react-map-gl/mapbox"
 import type { MapControl, LatLng } from "../types"
 import type { LngLatBoundsLike } from "mapbox-gl"
+import { useMapLoaded } from "../map-loaded-context"
 
 export function useMapboxMapControl(id?: string): MapControl | null {
   const maps = useMap()
-  const mapRef = id ? maps[id] : maps.current
+  const mapRef = id ? maps?.[id] : maps?.current
+  const mapLoaded = useMapLoaded()
 
   return useMemo(() => {
-    if (!mapRef) return null
+    if (!mapRef || !mapLoaded) return null
 
     let map: mapboxgl.Map
     try {
@@ -81,5 +83,5 @@ export function useMapboxMapControl(id?: string): MapControl | null {
         } catch { /* map not ready */ }
       },
     }
-  }, [mapRef])
+  }, [mapRef, mapLoaded])
 }

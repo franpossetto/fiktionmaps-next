@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation"
+import { getFictionById } from "@/lib/users-service"
 import { FictionEditView } from "@/components/admin/fiction-edit-view"
 
 interface AdminFictionEditPageProps {
@@ -6,11 +8,12 @@ interface AdminFictionEditPageProps {
 
 export default async function AdminFictionEditPage({ params }: AdminFictionEditPageProps) {
   const { id } = await params
+  const fiction = await getFictionById(id)
+  if (!fiction) notFound()
+
   return (
-    <div className="h-full min-h-0 overflow-y-auto">
-      <div className="p-6 max-w-6xl mx-auto w-full pb-8">
-        <FictionEditView fictionId={id} />
-      </div>
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground">
+      <FictionEditView initialFiction={fiction} />
     </div>
   )
 }

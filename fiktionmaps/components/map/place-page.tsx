@@ -21,6 +21,7 @@ import type { Location } from "@/lib/modules/locations"
 import type { Scene } from "@/lib/modules/scenes"
 import type { Fiction } from "@/lib/modules/fictions"
 import type { City } from "@/lib/modules/cities"
+import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
 import { useApi } from "@/lib/api"
 
 interface PlacePageProps {
@@ -180,7 +181,7 @@ export function PlacePage({ location, onBack }: PlacePageProps) {
               {fiction && (
                 <Badge
                   className="border-0 text-[11px]"
-                  style={{ backgroundColor: fiction.posterColor + "33", color: fiction.posterColor }}
+                  style={{ backgroundColor: DEFAULT_FICTION_ACCENT + "33", color: DEFAULT_FICTION_ACCENT }}
                 >
                   {fiction.title}
                 </Badge>
@@ -294,7 +295,7 @@ export function PlacePage({ location, onBack }: PlacePageProps) {
             fiction ? (
               <Badge
                 className="text-[11px] border-0"
-                style={{ backgroundColor: fiction.posterColor, color: "#fff" }}
+                style={{ backgroundColor: DEFAULT_FICTION_ACCENT, color: "#fff" }}
               >
                 {fiction.title}
               </Badge>
@@ -335,7 +336,7 @@ export function PlacePage({ location, onBack }: PlacePageProps) {
             <div className="flex items-center gap-2">
               <Badge
                 className="text-xs border-0"
-                style={{ backgroundColor: fiction.posterColor + "33", color: fiction.posterColor }}
+                style={{ backgroundColor: DEFAULT_FICTION_ACCENT + "33", color: DEFAULT_FICTION_ACCENT }}
               >
                 {fiction.type === "tv-series" ? (
                   <Tv className="mr-1 h-3 w-3" />

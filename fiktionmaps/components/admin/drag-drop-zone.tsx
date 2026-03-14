@@ -103,10 +103,10 @@ export function DragDropZone({
         className={cn(
           "relative rounded-lg border-2 border-dashed transition-all cursor-pointer p-8 text-center",
           isDragging
-            ? "border-cyan-500 bg-cyan-500/10"
+            ? "border-foreground bg-foreground/10"
             : selectedFiles.length > 0
               ? "border-green-500 bg-green-500/5"
-              : "border-border bg-muted/30 hover:border-cyan-500/50 hover:bg-muted/50"
+              : "border-border bg-muted/30 hover:border-foreground/50 hover:bg-muted/50"
         )}
       >
         <input

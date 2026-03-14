@@ -32,15 +32,15 @@ export function WizardSteps({ steps, currentStep }: WizardStepsProps) {
               key={step.title}
               className={cn(
                 "flex min-w-[160px] flex-1 items-center gap-3 rounded-lg border px-3 py-2 transition-colors",
-                isActive && "border-cyan-500/40 bg-cyan-500/5",
-                isDone && "border-cyan-500/20 bg-cyan-500/10",
+                isActive && "border-foreground/40 bg-foreground/5",
+                isDone && "border-foreground/20 bg-foreground/10",
               )}
             >
               <div
                 className={cn(
                   "flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold",
-                  isActive && "bg-cyan-500 text-white",
-                  isDone && "bg-cyan-500/20 text-cyan-500",
+                  isActive && "bg-black text-white",
+                  isDone && "bg-foreground/20 text-foreground",
                   !isActive && !isDone && "bg-muted text-muted-foreground",
                 )}
               >
