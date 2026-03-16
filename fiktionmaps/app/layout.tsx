@@ -1,9 +1,6 @@
 import React from "react"
 import type { Metadata, Viewport } from "next"
 import { Inter, Space_Grotesk } from "next/font/google"
-import { ThemeSettingsProvider } from "@/lib/theme-settings-context"
-import { AuthProvider } from "@/context/auth-context"
-import { ApiProvider } from "@/lib/api/provider"
 
 import "./globals.css"
 
@@ -12,7 +9,8 @@ const _spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-spac
 
 export const metadata: Metadata = {
   title: "FiktionMaps - Discover Movie & Book Locations",
-  description: "Explore real-world locations from your favorite movies and books on an interactive map.",
+  description:
+    "Explore real-world locations from your favorite movies and books on an interactive map.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -43,12 +41,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${_inter.variable} ${_spaceGrotesk.variable} font-sans antialiased overflow-hidden`}>
-        <ThemeSettingsProvider>
-            <ApiProvider>
-              <AuthProvider>{children}</AuthProvider>
-            </ApiProvider>
-        </ThemeSettingsProvider>
+      <body
+        className={`${_inter.variable} ${_spaceGrotesk.variable} font-sans antialiased overflow-hidden`}
+      >
+        {children}
       </body>
     </html>
   )

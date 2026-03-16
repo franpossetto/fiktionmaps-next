@@ -2,12 +2,13 @@
 
 import Image from "next/image"
 import { Check } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
-import type { Fiction } from "@/lib/modules/fictions"
+import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
 
 export interface OnboardingStepFictionsProps {
-  fictions: Fiction[]
+  fictions: FictionWithMedia[]
   selectedFictions: string[]
   maxSelection: number
   onToggleFiction: (id: string) => void
@@ -19,14 +20,16 @@ export function OnboardingStepFictions({
   maxSelection,
   onToggleFiction,
 }: OnboardingStepFictionsProps) {
+  const t = useTranslations("Onboarding")
+
   return (
     <div className="flex w-full flex-col items-center">
       <div className="mb-12 w-full text-center">
         <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-          What worlds do you want to explore?
+          {t("step5Title")}
         </h1>
         <p className="mt-4 text-lg text-muted-foreground sm:text-xl max-w-xl mx-auto">
-          Tell us which stories or worlds you like.
+          {t("step5Subtitle")}
         </p>
       </div>
       <div className="w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 max-h-[65vh] min-h-[240px] overflow-y-auto overflow-x-hidden pr-1 pb-2 overscroll-contain">

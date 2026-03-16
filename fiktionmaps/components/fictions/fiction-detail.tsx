@@ -4,9 +4,9 @@ import { useState, useMemo, useEffect, useRef } from "react"
 import Image from "next/image"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import { useApi } from "@/lib/api"
-import type { Fiction } from "@/lib/modules/fictions"
-import type { Location } from "@/lib/modules/locations"
-import type { City } from "@/lib/modules/cities"
+import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { Location } from "@/src/locations"
+import type { City } from "@/src/cities/city.domain"
 import { Badge } from "@/components/ui/badge"
 import { LocationCard } from "@/components/locations/location-card"
 import { LocationDetailPanel } from "@/components/locations/location-detail-panel"
@@ -14,7 +14,7 @@ import { PageStickyBar } from "@/components/layout/page-sticky-bar"
 import { MapPin, ArrowLeft, Clock } from "lucide-react"
 
 export interface FictionDetailProps {
-  fiction: Fiction
+  fiction: FictionWithMedia
   onBack: () => void
   onViewPlace?: (location: Location) => void
 }
@@ -45,8 +45,11 @@ export function FictionDetail({ fiction, onBack, onViewPlace }: FictionDetailPro
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const heroSrc =
-    !coverError && (fiction.bannerImage?.trim() || fiction.coverImage?.trim())
-      ? (fiction.bannerImage?.trim() || fiction.coverImage?.trim())!
+    !coverError &&
+    (fiction.bannerImage?.trim() || fiction.coverImageLarge?.trim() || fiction.coverImage?.trim())
+      ? (fiction.bannerImage?.trim() ||
+          fiction.coverImageLarge?.trim() ||
+          fiction.coverImage?.trim())!
       : DEFAULT_FICTION_COVER
   const coverSrc =
     !coverError && fiction.coverImage?.trim()
@@ -109,7 +112,7 @@ export function FictionDetail({ fiction, onBack, onViewPlace }: FictionDetailPro
           title={
             <div className="min-w-0">
               <h2 className="truncate text-sm font-semibold text-foreground">{fiction.title}</h2>
-              <p className="line-clamp-1 text-xs text-muted-foreground">{fiction.synopsis}</p>
+              <p className="line-clamp-1 text-xs text-muted-foreground">{fiction.description}</p>
             </div>
           }
         />
@@ -137,38 +140,60 @@ export function FictionDetail({ fiction, onBack, onViewPlace }: FictionDetailPro
           <ArrowLeft className="h-4 w-4" />
         </button>
 
-        {/* Info overlay */}
+        {/* Info overlay: cover poster + title, meta, description */}
         <div className="absolute bottom-0 left-0 right-0 z-10 px-8 pb-8">
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="text-xs">
-              {fiction.type === "tv-series" ? "TV Series" : "Movie"}
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {fiction.genre}
-            </Badge>
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-end">
+            {/* Cover poster (as before - visible from DB or placeholder) */}
+            <div className="relative h-[200px] w-[133px] flex-shrink-0 overflow-hidden rounded-lg border border-border/60 shadow-xl md:h-[240px] md:w-[160px]">
+              <Image
+                src={coverSrc}
+                alt={fiction.title}
+                fill
+                className="object-cover"
+                sizes="160px"
+                onError={() => setCoverError(true)}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="text-xs">
+                  {fiction.type === "tv-series" ? "TV Series" : fiction.type === "book" ? "Book" : "Movie"}
+                </Badge>
+                <Badge variant="outline" className="text-xs">
+                  {fiction.genre}
+                </Badge>
+              </div>
+              <h1 className="mt-2 font-sans text-4xl font-bold tracking-tight text-foreground md:text-5xl">
+                {fiction.title}
+              </h1>
+              <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  {fiction.year}
+                </span>
+                {fiction.author && (
+                  <span>
+                    {fiction.type === "movie"
+                      ? "Directed by "
+                      : fiction.type === "tv-series"
+                        ? "Created by "
+                        : "By "}
+                    <span className="text-foreground">{fiction.author}</span>
+                  </span>
+                )}
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5" />
+                  {allLocations.length} location{allLocations.length > 1 ? "s" : ""} in{" "}
+                  {fictionCities.length} cit{fictionCities.length > 1 ? "ies" : "y"}
+                </span>
+              </div>
+              {fiction.description && (
+                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                  {fiction.description}
+                </p>
+              )}
+            </div>
           </div>
-          <h1 className="mt-2 font-sans text-4xl font-bold tracking-tight text-foreground md:text-5xl">
-            {fiction.title}
-          </h1>
-          <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" />
-              {fiction.year}
-            </span>
-            {fiction.director && (
-              <span>
-                Directed by <span className="text-foreground">{fiction.director}</span>
-              </span>
-            )}
-            <span className="flex items-center gap-1">
-              <MapPin className="h-3.5 w-3.5" />
-              {allLocations.length} location{allLocations.length > 1 ? "s" : ""} in{" "}
-              {fictionCities.length} cit{fictionCities.length > 1 ? "ies" : "y"}
-            </span>
-          </div>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            {fiction.synopsis}
-          </p>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { Check } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 
 export interface OnboardingStepGenresProps {
@@ -16,16 +17,18 @@ export function OnboardingStepGenres({
   maxSelection,
   onToggleGenre,
 }: OnboardingStepGenresProps) {
+  const t = useTranslations("Onboarding")
+
   return (
     <div className="flex w-full flex-col items-center">
       <div className="mb-12 w-full text-center">
         <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-          Tell us what you love?
+          {t("step4Title")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {selectedGenres.length === 0
-            ? "None selected"
-            : `Selected ${selectedGenres.length}`}
+            ? t("step4NoneSelected")
+            : t("step4SelectedCount", { count: selectedGenres.length })}
           {" · "}
           <span className="font-medium text-foreground">{selectedGenres.length}/{maxSelection}</span>
         </p>

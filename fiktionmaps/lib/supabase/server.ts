@@ -1,3 +1,4 @@
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import type { Database } from "@/supabase/database.types"
@@ -19,6 +20,15 @@ function getSupabaseEnv() {
     )
   }
   return { url, key }
+}
+
+/**
+ * Supabase client that does not use cookies(). Use only inside unstable_cache()
+ * or other cache scopes where dynamic data (cookies) is not allowed.
+ */
+export function createAnonymousClient() {
+  const { url, key } = getSupabaseEnv()
+  return createSupabaseClient<Database>(url, key)
 }
 
 export async function createClient() {

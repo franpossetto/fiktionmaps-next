@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { useAuth } from "@/context/auth-context"
 import {
   Dialog,
@@ -18,6 +19,8 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ open, onOpenChange }: AuthModalProps) {
+  const t = useTranslations("Auth")
+  const tCommon = useTranslations("Common")
   const { login, signup, isLoading } = useAuth()
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState("")
@@ -34,14 +37,14 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
         await login(email, password)
       } else {
         if (!name.trim()) {
-          setError("Please enter your name")
+          setError(t("pleaseEnterYourName"))
           return
         }
         await signup(email, password, name)
       }
       onOpenChange(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      setError(err instanceof Error ? err.message : tCommon("error"))
     }
   }
 
@@ -60,21 +63,19 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
     }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isLogin ? "Sign In" : "Create Account"}</DialogTitle>
+          <DialogTitle>{isLogin ? t("signInTitle") : t("createAccountTitle")}</DialogTitle>
           <DialogDescription>
-            {isLogin
-              ? "Welcome back to FiktionMaps"
-              : "Join FiktionMaps to start exploring"}
+            {isLogin ? t("welcomeBack") : t("joinFiktionMaps")}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div>
-              <label className="text-sm font-medium text-foreground">Full name</label>
+              <label className="text-sm font-medium text-foreground">{t("fullName")}</label>
               <Input
                 type="text"
-                placeholder="Your full name"
+                placeholder={t("fullNamePlaceholder")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={isLoading}
@@ -84,10 +85,10 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
           )}
 
           <div>
-            <label className="text-sm font-medium text-foreground">Email</label>
+            <label className="text-sm font-medium text-foreground">{t("emailLabel")}</label>
             <Input
               type="email"
-              placeholder="you@example.com"
+              placeholder={t("emailPlaceholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
@@ -97,10 +98,10 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
           </div>
 
           <div>
-            <label className="text-sm font-medium text-foreground">Password</label>
+            <label className="text-sm font-medium text-foreground">{t("password")}</label>
             <Input
               type="password"
-              placeholder="••••••••"
+              placeholder={t("passwordPlaceholder")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
@@ -116,13 +117,13 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
             disabled={isLoading || !email || !password || (!isLogin && !name)}
             className="w-full"
           >
-            {isLoading ? "Loading..." : isLogin ? "Sign In" : "Create Account"}
+            {isLoading ? tCommon("loading") : isLogin ? t("signInTitle") : t("createAccountTitle")}
           </Button>
         </form>
 
         <div className="border-t border-border pt-4 text-center text-sm">
           <p className="text-muted-foreground">
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
+            {isLogin ? t("dontHaveAccount") : t("alreadyHaveAccount")}
             <button
               type="button"
               onClick={() => {
@@ -131,7 +132,7 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
               }}
               className="font-medium text-primary hover:underline"
             >
-              {isLogin ? "Sign Up" : "Sign In"}
+              {isLogin ? t("signUpTitle") : t("signInTitle")}
             </button>
           </p>
         </div>

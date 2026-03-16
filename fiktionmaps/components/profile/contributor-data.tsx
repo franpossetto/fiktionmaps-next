@@ -1,16 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import type { Location } from "@/lib/modules/locations"
-import type { Fiction } from "@/lib/modules/fictions"
-import type { CheckIn } from "@/lib/modules/users"
+import type { Location } from "@/src/locations"
+import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { CheckIn } from "@/src/users"
 import { Upload, MapPin, Film } from "lucide-react"
 import Image from "next/image"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 
 interface ContributorDataProps {
   uploadedLocations: Location[]
-  uploadedFictions: Fiction[]
+  uploadedFictions: FictionWithMedia[]
   contributedPhotos: CheckIn[]
 }
 

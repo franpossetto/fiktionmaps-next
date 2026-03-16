@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useRef, useEffect } from "react"
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, Play, Pause, Film } from "lucide-react"
-import type { City } from "@/lib/modules/cities"
-import type { Fiction } from "@/lib/modules/fictions"
-import type { Location } from "@/lib/modules/locations"
+import type { City } from "@/src/cities/city.domain"
+import type { Fiction } from "@/src/fictions/fiction.domain"
+import type { Location } from "@/src/locations"
 import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
 import { useApi } from "@/lib/api"
 import { CitySelector } from "@/components/map/city-selector"

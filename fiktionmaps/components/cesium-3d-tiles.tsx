@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import type { City } from "@/lib/modules/cities"
-import type { Location } from "@/lib/modules/locations"
+import type { City } from "@/src/cities/city.domain"
+import type { Location } from "@/src/locations"
 import { X, AlertCircle } from "lucide-react"
 
 interface Cesium3DTilesProps {

@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 
 export interface OnboardingStepWelcomeProps {
@@ -17,19 +18,21 @@ export function OnboardingStepWelcome({
   usernameChecking,
   onUsernameChange,
 }: OnboardingStepWelcomeProps) {
+  const t = useTranslations("Onboarding")
+
   return (
     <div className="flex w-full max-w-lg flex-col items-center">
       <div className="mb-12 w-full text-center">
         <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-          Hello there!
+          {t("step1Greeting")}
         </h1>
         <p className="mt-4 text-lg text-muted-foreground sm:text-xl">
-          Choose the name you&apos;ll go by on the platform.
+          {t("step1Subtitle")}
         </p>
       </div>
       <div className="w-full space-y-2">
         <label className="sr-only" htmlFor="onboarding-username">
-          Username
+          {t("step1UsernameLabel")}
         </label>
         <div className="relative">
           <input
@@ -37,7 +40,7 @@ export function OnboardingStepWelcome({
             type="text"
             value={username}
             onChange={(e) => onUsernameChange(e.target.value)}
-            placeholder="your_username"
+            placeholder={t("step1Placeholder")}
             className={cn(
               "w-full rounded-xl border bg-card pl-4 pr-28 py-3.5 text-base outline-none transition-[border-color,box-shadow,color] placeholder:text-muted-foreground focus:ring-2",
               usernameError
@@ -49,17 +52,17 @@ export function OnboardingStepWelcome({
           />
           {usernameChecking && (
             <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-xs font-medium text-muted-foreground">
-              Checking…
+              {t("step1Checking")}
             </span>
           )}
           {!usernameChecking && usernameAvailable === true && !usernameError && (
             <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-xs font-medium text-emerald-500">
-              Looks great
+              {t("step1LooksGreat")}
             </span>
           )}
         </div>
         <p className="text-center text-xs text-muted-foreground">
-          Letters, numbers, dots (.) and hyphens (-). Min 3 characters.
+          {t("step1Rules")}
         </p>
         {usernameError && (
           <p className="text-center text-sm text-destructive">{usernameError}</p>

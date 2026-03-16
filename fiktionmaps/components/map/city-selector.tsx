@@ -1,7 +1,7 @@
 "use client"
 
 import { MapPin, Search } from "lucide-react"
-import type { City } from "@/lib/modules/cities"
+import type { City } from "@/src/cities/city.domain"
 import { useApi } from "@/lib/api"
 import {
   Dialog,

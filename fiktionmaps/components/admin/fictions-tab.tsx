@@ -1,13 +1,15 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Plus, MoreVertical, Edit2, Trash2, Book, Search, Loader2, CheckCircle, CircleOff, ArrowLeft, ArrowRight } from "lucide-react"
-import type { Fiction } from "@/modules/fictions/fiction.domain"
+import { useEffect, useState, useRef } from "react"
+import Image from "next/image"
+import { useRouter } from "@/i18n/navigation"
+import { Plus, MoreVertical, Edit2, Trash2, Book, Search, Loader2, CheckCircle, CircleOff, ArrowLeft, ArrowRight, ImagePlus, Film } from "lucide-react"
+import type { Fiction, FictionWithMedia } from "@/src/fictions/fiction.domain"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
 import { FICTION_GENRES } from "@/lib/constants/fiction-genres"
-import { createFictionAction, deleteFictionAction, setFictionActiveAction } from "@/app/(app)/admin/actions"
+import { createFictionAction, deleteFictionAction, setFictionActiveAction, uploadFictionImageAction } from "@/app/(app)/admin/actions"
+import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,14 +46,14 @@ interface FictionFormData {
 type ViewMode = "cards" | "table"
 
 interface FictionsTabProps {
-  initialFictions?: Fiction[]
+  initialFictions?: FictionWithMedia[]
   onOpenFiction?: (fictionId: string) => void
   viewMode?: ViewMode
 }
 
 export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards" }: FictionsTabProps) {
   const router = useRouter()
-  const [fictions, setFictions] = useState<Fiction[]>(initialFictions ?? [])
+  const [fictions, setFictions] = useState<FictionWithMedia[]>(initialFictions ?? [])
   const [showWizard, setShowWizard] = useState(false)
   const [wizardStep, setWizardStep] = useState(0)
   const [searchTerm, setSearchTerm] = useState("")
@@ -71,10 +73,38 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
   const [deleting, setDeleting] = useState(false)
   const [togglingActiveId, setTogglingActiveId] = useState<string | null>(null)
   const [fictionToDeactivate, setFictionToDeactivate] = useState<Fiction | null>(null)
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null)
+  const [bannerFile, setBannerFile] = useState<File | null>(null)
+  const [bannerPreviewUrl, setBannerPreviewUrl] = useState<string | null>(null)
+  const coverInputRef = useRef<HTMLInputElement>(null)
+  const bannerInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setFictions(initialFictions ?? [])
   }, [initialFictions])
+
+  useEffect(() => {
+    if (!coverFile) {
+      if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl)
+      setCoverPreviewUrl(null)
+      return
+    }
+    const url = URL.createObjectURL(coverFile)
+    setCoverPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [coverFile])
+
+  useEffect(() => {
+    if (!bannerFile) {
+      if (bannerPreviewUrl) URL.revokeObjectURL(bannerPreviewUrl)
+      setBannerPreviewUrl(null)
+      return
+    }
+    const url = URL.createObjectURL(bannerFile)
+    setBannerPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [bannerFile])
 
   const resetForm = () => {
     setFormData({
@@ -85,6 +115,10 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
       synopsis: "",
       active: true,
     })
+    setCoverFile(null)
+    setCoverPreviewUrl(null)
+    setBannerFile(null)
+    setBannerPreviewUrl(null)
   }
 
   const openWizard = () => {
@@ -92,6 +126,18 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
     setErrors({})
     setWizardStep(0)
     setShowWizard(true)
+  }
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    setCoverFile(file ?? null)
+    e.target.value = ""
+  }
+
+  const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    setBannerFile(file ?? null)
+    e.target.value = ""
   }
 
   const closeWizard = () => {
@@ -124,15 +170,39 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
     fd.set("synopsis", formData.synopsis)
     fd.set("active", formData.active ? "true" : "false")
     const result = await createFictionAction(fd)
-    setSubmitting(false)
-    if (result.success) {
-      closeWizard()
-      resetForm()
-      router.refresh()
-      if (result.fiction.id && onOpenFiction) onOpenFiction(result.fiction.id)
-    } else {
+    if (!result.success) {
+      setSubmitting(false)
       setSubmitError(result.error)
+      return
     }
+    if (result.success && result.fiction.id) {
+      if (coverFile) {
+        const coverFd = new FormData()
+        coverFd.set("file", coverFile)
+        const coverResult = await uploadFictionImageAction(result.fiction.id, "cover", coverFd)
+        if (!coverResult.success) {
+          setSubmitError(coverResult.error)
+          setSubmitting(false)
+          return
+        }
+      }
+      if (bannerFile) {
+        const bannerFd = new FormData()
+        bannerFd.set("file", bannerFile)
+        const bannerResult = await uploadFictionImageAction(result.fiction.id, "banner", bannerFd)
+        if (!bannerResult.success) {
+          setSubmitError(bannerResult.error)
+          setSubmitting(false)
+          return
+        }
+      }
+    }
+    setSubmitting(false)
+    closeWizard()
+    resetForm()
+    router.refresh()
+    const newId = result.success ? result.fiction?.id : undefined
+    if (newId && onOpenFiction) onOpenFiction(newId)
   }
 
   const filteredFictions = fictions.filter((fiction) =>
@@ -141,11 +211,12 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
   )
 
   const openFiction = (id: string) => {
+    if (!id) return
     if (onOpenFiction) onOpenFiction(id)
     else router.push(`/admin/fiction/${id}`)
   }
 
-  const openDeleteModal = (e: React.MouseEvent, fiction: Fiction) => {
+  const openDeleteModal = (e: React.MouseEvent, fiction: FictionWithMedia) => {
     e.stopPropagation()
     setFictionToDelete(fiction)
     setDeleteConfirmTitle("")
@@ -171,7 +242,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
   const deleteTitleMatches =
     fictionToDelete !== null && deleteConfirmTitle === fictionToDelete.title
 
-  const handleSetActive = async (fiction: Fiction, active: boolean) => {
+  const handleSetActive = async (fiction: FictionWithMedia, active: boolean) => {
     setTogglingActiveId(fiction.id)
     setFictionToDeactivate(null)
     const result = await setFictionActiveAction(fiction.id, active)
@@ -193,36 +264,31 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
   if (showWizard) {
     return (
       <>
-        <div className="fixed inset-0 bottom-[70px] md:bottom-0 md:left-[60px] z-[3000] bg-background flex flex-col overflow-y-auto">
-          {/* Header — same layout as Create City */}
-          <div className="px-4 sm:px-6 pt-6 pb-4 flex items-start justify-between gap-4 shrink-0">
-            <div>
-              <button
-                type="button"
-                onClick={closeWizard}
-                className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Fictions
-              </button>
-              <h2 className="text-2xl font-bold text-foreground">Create Fiction</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Add the fiction details. Images can be added later when storage is available.
-              </p>
-            </div>
-            <span className="mt-1 text-sm font-medium text-muted-foreground shrink-0">
-              Step 1 of 1
-            </span>
-          </div>
+        <div className="fixed inset-0 bottom-[70px] md:bottom-0 md:left-[60px] z-[3000] bg-background flex flex-col overflow-hidden">
+          {/* Top header — height matches sidebar (60px), never scrolls */}
+          <header className="h-[60px] shrink-0 flex items-center gap-3 px-4 sm:px-6 border-b border-border bg-background">
+            <button
+              type="button"
+              onClick={closeWizard}
+              className="flex items-center justify-center h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              aria-label="Back to Fictions"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <Film className="h-5 w-5 text-muted-foreground shrink-0" />
+            <h1 className="text-lg font-semibold text-foreground truncate">Create Fiction</h1>
+          </header>
 
-          <form id="fiction-create-form" onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pb-28">
-              <div className="max-w-2xl space-y-4">
+          <form id="fiction-create-form" onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-8 sm:pt-10 pb-28">
+              <div className="max-w-2xl space-y-8">
                 {submitError && (
                   <p className="text-sm text-red-500 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2">
                     {submitError}
                   </p>
                 )}
+
+                {/* 4 inputs first */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField label="Title" required error={errors.title}>
                     <input
@@ -233,7 +299,6 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                       className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground/20 transition-all"
                     />
                   </FormField>
-
                   <FormField label="Type" required>
                     <select
                       value={formData.type}
@@ -252,7 +317,6 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                       ))}
                     </select>
                   </FormField>
-
                   <FormField label="Year" required error={errors.year}>
                     <input
                       type="number"
@@ -265,7 +329,6 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                       className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground/20 transition-all"
                     />
                   </FormField>
-
                   <FormField label="Genre" required error={errors.genre}>
                     <select
                       value={formData.genre}
@@ -280,19 +343,109 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                       ))}
                     </select>
                   </FormField>
-
-                  <FormField label="Visibility">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.active}
-                        onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-                        className="rounded border-border bg-card text-foreground focus:ring-foreground/20"
-                      />
-                      <span className="text-sm text-foreground">Active (visible in search)</span>
-                    </label>
-                  </FormField>
                 </div>
+
+                {/* Images, then description texts below */}
+                <section className="space-y-3">
+                  <input
+                    ref={coverInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={handleCoverChange}
+                  />
+                  <input
+                    ref={bannerInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={handleBannerChange}
+                  />
+                  <div className="flex flex-col sm:flex-row gap-4 sm:h-[200px]">
+                    <button
+                      type="button"
+                      onClick={() => coverInputRef.current?.click()}
+                      className="group relative w-[120px] sm:w-[140px] h-[180px] sm:h-full rounded-xl border border-border overflow-hidden bg-muted/30 flex items-center justify-center text-muted-foreground hover:border-foreground/30 hover:bg-muted/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
+                    >
+                      {coverPreviewUrl ? (
+                        <>
+                          <Image
+                            src={coverPreviewUrl}
+                            alt="Cover preview"
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                          <span className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end justify-center pb-2">
+                            <span className="text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow">Change</span>
+                          </span>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => { e.stopPropagation(); setCoverFile(null) }}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCoverFile(null) } }}
+                            className="absolute top-1.5 right-1.5 rounded bg-black/60 text-white text-[10px] px-1.5 py-0.5 hover:bg-black/80"
+                          >
+                            Remove
+                          </span>
+                        </>
+                      ) : (
+                        <ImagePlus className="h-10 w-10" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => bannerInputRef.current?.click()}
+                      className="group relative flex-1 min-w-0 h-[180px] sm:h-full rounded-xl border border-border overflow-hidden bg-muted/30 flex items-center justify-center text-muted-foreground hover:border-foreground/30 hover:bg-muted/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {bannerPreviewUrl ? (
+                        <>
+                          <Image
+                            src={bannerPreviewUrl}
+                            alt="Banner preview"
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                          <span className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                            <span className="text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow">Change</span>
+                          </span>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => { e.stopPropagation(); setBannerFile(null) }}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setBannerFile(null) } }}
+                            className="absolute top-1.5 right-1.5 rounded bg-black/60 text-white text-[10px] px-1.5 py-0.5 hover:bg-black/80"
+                          >
+                            Remove
+                          </span>
+                        </>
+                      ) : (
+                        <ImagePlus className="h-10 w-10" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      <strong className="text-foreground">Cover (optional):</strong> Ratio 2:3 portrait. JPG, PNG, WebP, GIF. Max 10 MB. We generate sm (300px) and lg (800px) WebP.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong className="text-foreground">Banner (optional):</strong> Ratio 21:9 wide. JPG, PNG, WebP, GIF. Max 10 MB. We generate lg (800px) WebP.
+                    </p>
+                  </div>
+                </section>
+
+                <FormField label="Visibility">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.active}
+                      onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+                      className="rounded border-border bg-card text-foreground focus:ring-foreground/20"
+                    />
+                    <span className="text-sm text-foreground">Active (visible in search)</span>
+                  </label>
+                </FormField>
 
                 <FormField label="Description" required error={errors.synopsis}>
                   <textarea
@@ -321,7 +474,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
           </form>
         </div>
 
-        {/* Fixed bottom bar — same as Create City */}
+        {/* Fixed bottom bar — Cancel left, Create right */}
         <div className="fixed bottom-[70px] left-0 right-0 md:bottom-0 md:left-[60px] z-[3001] border-t border-border bg-background px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between gap-4">
             <Button type="button" variant="outline" onClick={closeWizard} className="rounded-xl px-6">

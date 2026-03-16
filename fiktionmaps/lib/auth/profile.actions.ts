@@ -1,7 +1,7 @@
 "use server"
 
-import { getCurrentUserProfile, updateCurrentUserProfile } from "@/lib/users-service"
-import type { UserProfile } from "@/lib/modules/users"
+import { getCurrentUserProfile, updateCurrentUserProfile } from "@/lib/app-services"
+import type { UserProfile } from "@/src/users"
 
 export type ProfileWithOnboarding = UserProfile & {
   onboardingCompleted: boolean

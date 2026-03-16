@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import type { Location } from "@/lib/modules/locations"
-import type { City } from "@/lib/modules/cities"
+import type { Location } from "@/src/locations"
+import type { City } from "@/src/cities/city.domain"
 import { useApi } from "@/lib/api"
 import { MapPin, ZoomIn, ZoomOut, Navigation, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"

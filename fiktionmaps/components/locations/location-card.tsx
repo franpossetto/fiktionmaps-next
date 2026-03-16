@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import { ArrowRight } from "lucide-react"
-import type { Location } from "@/lib/modules/locations"
+import type { Location } from "@/src/locations"
 
 interface LocationCardProps {
   location: Location

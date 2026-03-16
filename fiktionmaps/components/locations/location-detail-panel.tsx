@@ -1,4 +1,4 @@
-import type { Location } from "@/lib/modules/locations"
+import type { Location } from "@/src/locations"
 
 interface LocationDetailPanelProps {
   location: Location

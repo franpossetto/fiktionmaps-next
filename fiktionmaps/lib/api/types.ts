@@ -1,30 +1,18 @@
-import type { CityService } from "@/lib/modules/cities/city.service"
-import type { FictionService } from "@/lib/modules/fictions/fiction.service"
-import type { LocationService } from "@/lib/modules/locations/location.service"
-import type { SceneService } from "@/lib/modules/scenes/scene.service"
-import type { TourService } from "@/lib/modules/tours/tour.service"
-import type { UserService } from "@/lib/modules/users/user.service"
-import type { ICityRepository } from "@/lib/modules/cities/city.repository"
-import type { IFictionRepository } from "@/lib/modules/fictions/fiction.repository"
-import type { ILocationRepository } from "@/lib/modules/locations/location.repository"
-import type { ISceneRepository } from "@/lib/modules/scenes/scene.repository"
-import type { ITourRepository } from "@/lib/modules/tours/tour.repository"
-import type { IUserRepository } from "@/lib/modules/users/user.repository"
+import type { createCitiesService } from "@/src/cities/city.services"
+import type { createFictionsService } from "@/src/fictions/fiction.services"
+import type { createLocationsService } from "@/src/locations/location.services"
+import type { createScenesService } from "@/src/scenes/scene.services"
+import type { UsersApiService } from "@/src/users/user.mock-api"
 
-export interface Repositories {
-  city: ICityRepository
-  fiction: IFictionRepository
-  location: ILocationRepository
-  scene: ISceneRepository
-  tour: ITourRepository
-  user: IUserRepository
-}
+export type CitiesService = ReturnType<typeof createCitiesService>
+export type FictionsService = ReturnType<typeof createFictionsService>
+export type LocationsService = ReturnType<typeof createLocationsService>
+export type ScenesService = ReturnType<typeof createScenesService>
 
 export interface ApiServices {
-  cities: CityService
-  fictions: FictionService
-  locations: LocationService
-  scenes: SceneService
-  tours: TourService
-  users: UserService
+  cities: CitiesService
+  fictions: FictionsService
+  locations: LocationsService
+  scenes: ScenesService
+  users: UsersApiService
 }

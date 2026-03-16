@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import type { CheckIn } from "@/lib/modules/users"
-import type { Location } from "@/lib/modules/locations"
-import type { Fiction } from "@/lib/modules/fictions"
+import type { CheckIn } from "@/src/users"
+import type { Location } from "@/src/locations"
+import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
 import { useApi } from "@/lib/api"
 import { Heart, MessageCircle, Share2 } from "lucide-react"
 import Image from "next/image"
@@ -16,7 +16,7 @@ interface CheckInsGalleryProps {
 export function CheckInsGallery({ checkIns, onShare }: CheckInsGalleryProps) {
   const { locations, fictions } = useApi()
   const [locationMap, setLocationMap] = useState<Map<string, Location>>(new Map())
-  const [fictionMap, setFictionMap] = useState<Map<string, Fiction>>(new Map())
+  const [fictionMap, setFictionMap] = useState<Map<string, FictionWithMedia>>(new Map())
 
   useEffect(() => {
     Promise.all([locations.getAll(), fictions.getAll()]).then(([locs, fics]) => {

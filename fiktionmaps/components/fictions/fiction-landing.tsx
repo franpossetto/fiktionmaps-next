@@ -2,8 +2,8 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback, useTransition, startTransition } from "react"
 import { useApi } from "@/lib/api"
-import type { Fiction } from "@/lib/modules/fictions"
-import type { Location } from "@/lib/modules/locations"
+import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { Location } from "@/src/locations"
 import { FictionCard } from "@/components/fictions/fiction-card"
 import { FictionDetail } from "@/components/fictions/fiction-detail"
 import { PageHero } from "@/components/layout/page-hero"
@@ -23,33 +23,48 @@ const emptyState = (
 )
 
 interface FictionLandingProps {
+  /** Fictions from DB (server). When provided, no client fetch for list. */
+  initialFictions?: FictionWithMedia[]
   onViewPlace?: (location: Location) => void
   focusFictionId?: string | null
   onFocusHandled?: () => void
 }
 
 export function FictionLanding({
+  initialFictions,
   onViewPlace,
   focusFictionId,
   onFocusHandled,
 }: FictionLandingProps) {
   const { fictions: fictionService, locations: locationService } = useApi()
-  const [allFictions, setAllFictions] = useState<Fiction[]>([])
+  const [allFictions, setAllFictions] = useState<FictionWithMedia[]>(initialFictions ?? [])
   const [locationCountMap, setLocationCountMap] = useState<Map<string, number>>(new Map())
 
   useEffect(() => {
+    if (initialFictions !== undefined) {
+      setAllFictions(initialFictions)
+    }
+  }, [initialFictions])
+
+  useEffect(() => {
     async function load() {
-      const fictions = await fictionService.getAll()
-      setAllFictions(fictions)
+      let list: FictionWithMedia[]
+      if (initialFictions !== undefined) {
+        list = initialFictions
+      } else {
+        const fictions = await fictionService.getAll()
+        setAllFictions(fictions)
+        list = fictions
+      }
       const counts = new Map<string, number>()
-      await Promise.all(fictions.map(async (f) => {
+      await Promise.all(list.map(async (f) => {
         const locs = await locationService.getByFictionId(f.id)
         counts.set(f.id, locs.length)
       }))
       setLocationCountMap(counts)
     }
     load()
-  }, [fictionService, locationService])
+  }, [fictionService, locationService, initialFictions])
 
   const [view, setView] = useState<FictionLandingView>("browse")
   const [selectedFiction, setSelectedFiction] = useState<Fiction | null>(null)
@@ -86,7 +101,7 @@ export function FictionLanding({
       (f) =>
         f.title.toLowerCase().includes(q) ||
         f.genre.toLowerCase().includes(q) ||
-        f.director?.toLowerCase().includes(q),
+        (f.author?.toLowerCase().includes(q) ?? false),
     )
   }, [search, allFictions])
 
@@ -176,10 +191,7 @@ export function FictionLanding({
                   key={fiction.id}
                   fiction={fiction}
                   locationCount={locationCountMap.get(fiction.id) ?? 0}
-                  onClick={() => {
-                    setSelectedFiction(fiction)
-                    setView("detail")
-                  }}
+                  href={`/fictions/${fiction.id}`}
                 />
               ))}
             </div>

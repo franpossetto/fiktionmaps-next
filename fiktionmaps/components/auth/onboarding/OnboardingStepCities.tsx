@@ -1,8 +1,9 @@
 "use client"
 
 import { Check, MapPin } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
-import type { City } from "@/lib/modules/cities"
+import type { City } from "@/src/cities/city.domain"
 
 export interface OnboardingStepCitiesProps {
   cities: City[]
@@ -17,14 +18,16 @@ export function OnboardingStepCities({
   maxSelection,
   onToggleCity,
 }: OnboardingStepCitiesProps) {
+  const t = useTranslations("Onboarding")
+
   return (
     <div className="flex w-full flex-col items-center">
       <div className="mb-12 w-full text-center">
         <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-          What places fascinate you?
+          {t("step6Title")}
         </h1>
         <p className="mt-4 text-lg text-muted-foreground sm:text-xl">
-          Pick the cities that grabbed you in fiction.
+          {t("step6Subtitle")}
         </p>
       </div>
       <div className="w-full flex flex-wrap gap-2 justify-center">

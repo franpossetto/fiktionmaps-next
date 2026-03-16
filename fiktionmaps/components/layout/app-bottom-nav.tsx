@@ -1,22 +1,25 @@
 "use client"
 
 import { Map, Clapperboard, Film, LayoutGrid, User, Settings } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { Link, usePathname } from "@/i18n/navigation"
 import { useAuth } from "@/context/auth-context"
 
-const navItems: { id: string; href: string; label: string; icon: React.ElementType }[] = [
-  { id: "map", href: "/map", label: "Map", icon: Map },
-  { id: "fictions", href: "/fictions", label: "Fictions", icon: Film },
-  { id: "scenes", href: "/scenes", label: "Scenes", icon: Clapperboard },
-  { id: "settings", href: "/settings", label: "Settings", icon: Settings },
-  { id: "profile", href: "/profile", label: "Profile", icon: User },
-  { id: "admin", href: "/admin", label: "Admin", icon: LayoutGrid },
+type NavKey = "map" | "fictions" | "scenes" | "settings" | "profile" | "admin" | "login"
+
+const navItems: { id: string; href: string; labelKey: NavKey; icon: React.ElementType }[] = [
+  { id: "map", href: "/map", labelKey: "map", icon: Map },
+  { id: "fictions", href: "/fictions", labelKey: "fictions", icon: Film },
+  { id: "scenes", href: "/scenes", labelKey: "scenes", icon: Clapperboard },
+  { id: "settings", href: "/settings", labelKey: "settings", icon: Settings },
+  { id: "profile", href: "/profile", labelKey: "profile", icon: User },
+  { id: "admin", href: "/admin", labelKey: "admin", icon: LayoutGrid },
 ]
 
 export function AppBottomNav() {
+  const t = useTranslations("Nav")
   const pathname = usePathname()
   const { user } = useAuth()
 
@@ -25,7 +28,7 @@ export function AppBottomNav() {
         ...navItems.filter(
           (item) => item.id !== "admin" && item.id !== "profile" && item.id !== "settings",
         ),
-        { id: "login", href: "/login", label: "Login", icon: User },
+        { id: "login", href: "/login", labelKey: "login" as NavKey, icon: User },
       ]
     : navItems
 
@@ -36,7 +39,7 @@ export function AppBottomNav() {
       <Link
         href="/map"
         className="flex h-12 w-12 items-center justify-center rounded-lg transition-transform hover:scale-110 active:scale-95 flex-shrink-0"
-        aria-label="FiktionMaps home"
+        aria-label={t("homeLabel")}
       >
         <Image
           src="/logo-icon.png"
@@ -62,11 +65,11 @@ export function AppBottomNav() {
                   ? "bg-chrome-active text-foreground shadow-[inset_0_0_0_1px_hsl(var(--chrome-border))]"
                   : "text-chrome-muted hover:bg-chrome-hover hover:text-foreground",
               )}
-              aria-label={item.label}
-              title={item.label}
+              aria-label={t(item.labelKey)}
+              title={t(item.labelKey)}
             >
               <Icon className="h-5 w-5" />
-              <span className="text-[10px] font-medium mt-0.5">{item.label}</span>
+              <span className="text-[10px] font-medium mt-0.5">{t(item.labelKey)}</span>
             </Link>
           )
         })}

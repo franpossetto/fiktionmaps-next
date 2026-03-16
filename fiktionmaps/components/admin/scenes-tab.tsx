@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { Plus, Edit2, Trash2, ChevronRight, Clapperboard, CheckCircle2, Search } from "lucide-react"
-import type { Fiction } from "@/lib/modules/fictions"
-import type { Location } from "@/lib/modules/locations"
-import type { Scene } from "@/lib/modules/scenes"
+import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { Location } from "@/src/locations"
+import type { Scene } from "@/src/scenes"
 import { useApi } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
@@ -25,7 +25,7 @@ type WorkflowStep = "list" | "select-fiction" | "select-location" | "details"
 
 export function ScenesTab() {
   const { fictions: fictionsService, locations: locationsService, scenes: scenesService } = useApi()
-  const [fictions, setFictions] = useState<Fiction[]>([])
+  const [fictions, setFictions] = useState<FictionWithMedia[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [scenes, setScenes] = useState<Scene[]>([])
   const [workflowStep, setWorkflowStep] = useState<WorkflowStep>("list")

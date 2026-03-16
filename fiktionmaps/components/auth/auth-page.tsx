@@ -2,18 +2,20 @@
 
 import { useState } from "react"
 import Image from "next/image"
+import { useTranslations } from "next-intl"
 import { useAuth } from "@/context/auth-context"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ArrowDown, ArrowLeft } from "lucide-react"
+import { LocaleSwitcher } from "@/components/layout/locale-switcher"
 
 type AuthView = "login" | "signup" | "forgot-password"
 
-function FiktionLogo({ size = 140 }: { size?: number }) {
+function FiktionLogo({ size = 140, alt }: { size?: number; alt: string }) {
   return (
     <Image
       src="/logo-icon.png"
-      alt="FiktionMaps logo"
+      alt={alt}
       width={size}
       height={size}
       loading="eager"
@@ -50,6 +52,8 @@ function Field({
 /*  Auth Page                                                           */
 /* ------------------------------------------------------------------ */
 export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
+  const t = useTranslations("Auth")
+  const tCommon = useTranslations("Common")
   const { login, signup, isLoading } = useAuth()
   const [view, setView] = useState<AuthView>("login")
   const [email, setEmail] = useState("")
@@ -75,17 +79,17 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
         await login(email, password)
       } else if (view === "signup") {
         if (!name.trim()) {
-          setError("Please enter your full name")
+          setError(t("pleaseEnterFullName"))
           return
         }
         await signup(email, password, name)
       } else {
         await new Promise((r) => setTimeout(r, 900))
-        setSuccess("Reset link sent — check your inbox.")
+        setSuccess(t("resetLinkSent"))
         setTimeout(() => { setView("login"); resetForm() }, 2500)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      setError(err instanceof Error ? err.message : tCommon("error"))
     }
   }
 
@@ -94,14 +98,14 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
     <div className="relative flex min-h-screen w-full bg-background">
       {/* Left panel – logo + tagline (hidden on small screens) */}
       <div className="hidden md:flex flex-1 flex-col items-center justify-center gap-8 border-r border-border">
-        <FiktionLogo size={160} />
+        <FiktionLogo size={160} alt={t("logoAlt")} />
         <div className="text-center px-8">
           <h1 className="text-6xl font-black tracking-tight leading-none text-foreground">
-            fiktion maps
+            {t("brandName")}
             <sup className="ml-1 align-super text-sm font-normal opacity-50">™</sup>
           </h1>
           <p className="mt-4 text-xs font-medium tracking-widest uppercase text-muted-foreground">
-            Navigate stories by place, not just title
+            {t("tagline")}
           </p>
         </div>
       </div>
@@ -111,9 +115,9 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
 
         {/* Mobile logo */}
         <div className="mb-8 flex flex-col items-center gap-3 md:hidden">
-          <FiktionLogo size={72} />
+          <FiktionLogo size={72} alt={t("logoAlt")} />
           <span className="text-2xl font-black text-foreground">
-            fiktion maps<sup className="text-xs font-normal opacity-50">™</sup>
+            {t("brandName")}<sup className="text-xs font-normal opacity-50">™</sup>
           </span>
         </div>
 
@@ -125,17 +129,17 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
               className="mb-8 flex items-center gap-1.5 text-sm text-muted-foreground transition-opacity hover:opacity-70"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to login
+              {t("backToLogin")}
             </button>
-            <h2 className="mb-1 text-xl font-bold text-foreground">Reset password</h2>
+            <h2 className="mb-1 text-xl font-bold text-foreground">{t("resetPassword")}</h2>
             <p className="mb-6 text-sm text-muted-foreground">
-              Enter your email and we will send you a reset link.
+              {t("resetPasswordDescription")}
             </p>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <Field label="Email address">
+              <Field label={t("emailAddress")}>
                 <Input
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder={t("emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
@@ -150,19 +154,20 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
                 disabled={isLoading || !email}
                 className="h-11 w-full font-semibold border border-border bg-secondary text-foreground hover:bg-secondary/80"
               >
-                {isLoading ? "Sending…" : "Send reset link"}
+                {isLoading ? tCommon("sending") : t("sendResetLink")}
               </Button>
             </form>
+            <LocaleSwitcher />
           </div>
         ) : (
           /* Login / Signup view */
           <div className="w-full max-w-[360px]">
             <form onSubmit={handleSubmit} className="space-y-4">
               {view === "signup" && (
-                <Field label="Full name">
+                <Field label={t("fullName")}>
                   <Input
                     type="text"
-                    placeholder="Your full name"
+                    placeholder={t("fullNamePlaceholder")}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     disabled={isLoading}
@@ -172,10 +177,10 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
                 </Field>
               )}
 
-              <Field label="Email address">
+              <Field label={t("emailAddress")}>
                 <Input
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder={t("emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
@@ -185,7 +190,7 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
               </Field>
 
               <Field
-                label="Password"
+                label={t("password")}
                 rightSlot={
                   view === "login" ? (
                     <button
@@ -193,14 +198,14 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
                       onClick={() => { setView("forgot-password"); resetForm() }}
                       className="text-xs font-semibold text-primary transition-opacity hover:opacity-80"
                     >
-                      Forgot password?
+                      {t("forgotPassword")}
                     </button>
                   ) : undefined
                 }
               >
                 <Input
                   type="password"
-                  placeholder="••••••••"
+                  placeholder={t("passwordPlaceholder")}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
@@ -216,20 +221,22 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
                 disabled={isLoading || !email || !password || (view === "signup" && !name)}
                 className="h-11 w-full font-bold text-sm tracking-wide"
               >
-                {isLoading ? "Loading…" : view === "login" ? "Login" : "Create account"}
+                {isLoading ? t("loadingButton") : view === "login" ? t("login") : t("createAccount")}
               </Button>
             </form>
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
-              {view === "login" ? "Don't have an account? " : "Already have an account? "}
+              {view === "login" ? t("dontHaveAccount") : t("alreadyHaveAccount")}
               <button
                 type="button"
                 onClick={() => { setView(view === "login" ? "signup" : "login"); resetForm() }}
                 className="font-semibold text-primary transition-opacity hover:opacity-80"
               >
-                {view === "login" ? "Create one" : "Sign in"}
+                {view === "login" ? t("createOne") : t("signIn")}
               </button>
             </p>
+
+            <LocaleSwitcher />
 
             {onBrowseMap && <div className="h-8" />}
           </div>
@@ -242,8 +249,8 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
             type="button"
             onClick={onBrowseMap}
             className="group flex h-8 w-24 items-center justify-center text-muted-foreground transition-transform duration-200 active:scale-95"
-            aria-label="Browse map"
-            title="Browse map"
+            aria-label={tCommon("browseMap")}
+            title={tCommon("browseMap")}
           >
             <ArrowDown className="h-4 w-4 transition-transform duration-200 group-hover:translate-y-0.5" />
           </button>

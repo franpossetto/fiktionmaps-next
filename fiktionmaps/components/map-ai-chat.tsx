@@ -1,8 +1,8 @@
 "use client"
 
 import { Sparkles } from "lucide-react"
-import type { City } from "@/lib/modules/cities"
-import type { Location } from "@/lib/modules/locations"
+import type { City } from "@/src/cities/city.domain"
+import type { Location } from "@/src/locations"
 
 interface MapAIChatProps {
   onClose: () => void

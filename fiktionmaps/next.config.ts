@@ -1,4 +1,5 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from "next"
+import createNextIntlPlugin from "next-intl/plugin"
 
 const nextConfig: NextConfig = {
   typescript: {
@@ -13,6 +14,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "api.dicebear.com", pathname: "/**" },
     ],
   },
-};
+}
 
-export default nextConfig;
+const withNextIntl = createNextIntlPlugin()
+export default withNextIntl(nextConfig)

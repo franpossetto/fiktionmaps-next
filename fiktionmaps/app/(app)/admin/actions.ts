@@ -1,14 +1,59 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { createFiction, updateFiction, deleteFiction } from "@/lib/users-service"
-import { createCity, updateCity, deleteCity } from "@/lib/users-service"
-import type { Fiction } from "@/modules/fictions/fiction.domain"
-import type { City } from "@/modules/cities/city.domain"
+import { createFiction, updateFiction, deleteFiction } from "@/lib/app-services"
+import { createCity, updateCity, deleteCity } from "@/lib/app-services"
+import type { Fiction } from "@/src/fictions/fiction.domain"
+import type { City } from "@/src/cities/city.domain"
+import {
+  uploadEntityImage,
+  validateImageFile,
+} from "@/lib/asset-images/image-variant-service"
 
 export type CreateFictionResult =
   | { success: true; fiction: Fiction }
   | { success: false; error: string }
+
+export type UploadFictionImageResult =
+  | { success: true; coverImage?: string; coverImageLarge?: string; bannerImage?: string }
+  | { success: false; error: string }
+
+export async function uploadFictionImageAction(
+  fictionId: string,
+  role: "cover" | "banner",
+  formData: FormData
+): Promise<UploadFictionImageResult> {
+  const file = formData.get("file") as File | null
+  if (!file || !(file instanceof File) || file.size === 0) {
+    return { success: false, error: "No file provided" }
+  }
+  const validationError = validateImageFile(file)
+  if (validationError) return { success: false, error: validationError }
+
+  const variants: ("sm" | "lg" | "xl")[] = role === "cover" ? ["sm", "lg"] : ["lg"]
+  const result = await uploadEntityImage({
+    entityType: "fiction",
+    entityId: fictionId,
+    role,
+    variants,
+    file,
+    replace: true,
+  })
+
+  if (!result.success) return result
+
+  revalidatePath("/admin")
+  revalidatePath(`/admin/fiction/${fictionId}`)
+
+  if (role === "cover") {
+    return {
+      success: true,
+      coverImage: result.urls.sm,
+      coverImageLarge: result.urls.lg,
+    }
+  }
+  return { success: true, bannerImage: result.urls.lg }
+}
 
 export type UpdateFictionResult =
   | { success: true; fiction: Fiction }
@@ -33,6 +78,7 @@ export async function updateFictionAction(
   const description = formData.get("synopsis") as string | null
   const author = (formData.get("author") as string)?.trim() || null
   const director = (formData.get("director") as string)?.trim() || null
+  const active = formData.get("active") !== "false"
 
   if (!title?.trim()) return { success: false, error: "Title is required" }
   if (!type || !["movie", "book", "tv-series"].includes(type))
@@ -50,6 +96,7 @@ export async function updateFictionAction(
     author: type === "movie" ? director : author,
     genre: genre.trim(),
     description: description.trim(),
+    active,
   })
 
   if (!fiction) return { success: false, error: "Failed to update fiction" }

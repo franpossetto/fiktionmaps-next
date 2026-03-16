@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { Plus, Edit2, Trash2, Search, ChevronRight, MapPin, CheckCircle2, Building2 } from "lucide-react"
-import type { City } from "@/lib/modules/cities"
-import type { Fiction } from "@/lib/modules/fictions"
-import type { Location } from "@/lib/modules/locations"
+import type { City } from "@/src/cities/city.domain"
+import type { Fiction } from "@/src/fictions/fiction.domain"
+import type { Location } from "@/src/locations"
 import { useApi } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"

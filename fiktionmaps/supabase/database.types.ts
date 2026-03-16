@@ -143,6 +143,36 @@ export type Database = {
         }
         Relationships: []
       }
+      asset_images: {
+        Row: {
+          id: string
+          entity_type: string
+          entity_id: string
+          role: string
+          variant: string
+          url: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          entity_type: string
+          entity_id: string
+          role: string
+          variant: string
+          url: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          entity_type?: string
+          entity_id?: string
+          role?: string
+          variant?: string
+          url?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -251,6 +281,10 @@ export type FictionUpdate = TablesUpdate<"fictions">
 export type CityRow = Tables<"cities">
 export type CityInsert = TablesInsert<"cities">
 export type CityUpdate = TablesUpdate<"cities">
+
+export type AssetImageRow = Tables<"asset_images">
+export type AssetImageInsert = TablesInsert<"asset_images">
+export type AssetImageUpdate = TablesUpdate<"asset_images">
 
 export type Enums<
   PublicEnumNameOrOptions extends

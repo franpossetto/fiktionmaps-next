@@ -1,7 +1,7 @@
 "use client"
 
 import { Film, Check, Search } from "lucide-react"
-import type { Fiction } from "@/lib/modules/fictions"
+import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,7 @@ import Image from "next/image"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 
 interface FictionSelectorProps {
-  availableFictions: Fiction[]
+  availableFictions: FictionWithMedia[]
   selectedFictionIds: string[]
   onToggleFiction: (fictionId: string) => void
 }

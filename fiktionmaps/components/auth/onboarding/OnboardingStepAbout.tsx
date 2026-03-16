@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 
 export interface OnboardingStepAboutProps {
@@ -13,15 +14,6 @@ export interface OnboardingStepAboutProps {
   onDateOfBirthChange: (value: string) => void
 }
 
-const GENDER_OPTIONS = [
-  { value: "", label: "Select…" },
-  { value: "female", label: "Female" },
-  { value: "male", label: "Male" },
-  { value: "non_binary", label: "Non-binary" },
-  { value: "other", label: "Other" },
-  { value: "prefer_not", label: "Prefer not to say" },
-]
-
 export function OnboardingStepAbout({
   bio,
   gender,
@@ -32,26 +24,37 @@ export function OnboardingStepAbout({
   onPhoneChange,
   onDateOfBirthChange,
 }: OnboardingStepAboutProps) {
+  const t = useTranslations("Onboarding")
+
+  const GENDER_OPTIONS = [
+    { value: "", labelKey: "step3GenderSelect" as const },
+    { value: "female", labelKey: "step3Female" as const },
+    { value: "male", labelKey: "step3Male" as const },
+    { value: "non_binary", labelKey: "step3NonBinary" as const },
+    { value: "other", labelKey: "step3Other" as const },
+    { value: "prefer_not", labelKey: "step3PreferNot" as const },
+  ]
+
   return (
     <div className="flex w-full flex-col items-center">
       <div className="mb-10 w-full text-center">
         <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-          Tell us about you
+          {t("step3Title")}
         </h1>
         <p className="mt-4 text-lg text-muted-foreground sm:text-xl">
-          You can always complete this later.
+          {t("step3Subtitle")}
         </p>
       </div>
       <div className="w-full max-w-md space-y-5">
         <div>
           <label htmlFor="onboarding-bio" className="mb-1.5 block text-sm font-medium text-foreground">
-            Bio
+            {t("step3Bio")}
           </label>
           <textarea
             id="onboarding-bio"
             value={bio}
             onChange={(e) => onBioChange(e.target.value)}
-            placeholder="A bit about you..."
+            placeholder={t("step3BioPlaceholder")}
             rows={3}
             className={cn(
               "w-full rounded-xl border border-border bg-card px-4 py-3 text-base outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:ring-2 focus:ring-foreground/20"
@@ -60,7 +63,7 @@ export function OnboardingStepAbout({
         </div>
         <div>
           <label htmlFor="onboarding-gender" className="mb-1.5 block text-sm font-medium text-foreground">
-            Gender
+            {t("step3Gender")}
           </label>
           <select
             id="onboarding-gender"
@@ -72,21 +75,21 @@ export function OnboardingStepAbout({
           >
             {GENDER_OPTIONS.map((opt) => (
               <option key={opt.value || "empty"} value={opt.value}>
-                {opt.label}
+                {t(opt.labelKey)}
               </option>
             ))}
           </select>
         </div>
         <div>
           <label htmlFor="onboarding-phone" className="mb-1.5 block text-sm font-medium text-foreground">
-            Phone
+            {t("step3Phone")}
           </label>
           <input
             id="onboarding-phone"
             type="tel"
             value={phone}
             onChange={(e) => onPhoneChange(e.target.value)}
-            placeholder="+34 600 000 000"
+            placeholder={t("step3PhonePlaceholder")}
             className={cn(
               "w-full rounded-xl border border-border bg-card px-4 py-3 text-base outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:ring-2 focus:ring-foreground/20"
             )}
@@ -94,7 +97,7 @@ export function OnboardingStepAbout({
         </div>
         <div>
           <label htmlFor="onboarding-dob" className="mb-1.5 block text-sm font-medium text-foreground">
-            Date of birth
+            {t("step3DateOfBirth")}
           </label>
           <input
             id="onboarding-dob"

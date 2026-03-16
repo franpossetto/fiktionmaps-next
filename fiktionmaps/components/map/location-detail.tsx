@@ -2,8 +2,8 @@
 
 import { X, MapPin, Quote, Lightbulb, Film, ArrowRight, Box } from "lucide-react"
 import { useState, useEffect } from "react"
-import type { Location } from "@/lib/modules/locations"
-import type { Fiction } from "@/lib/modules/fictions"
+import type { Location } from "@/src/locations"
+import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
 import { useApi } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -19,7 +19,7 @@ interface LocationDetailProps {
 
 export function LocationDetail({ location, onClose, onViewPlace, onView3D }: LocationDetailProps) {
   const { fictions: fictionsService, scenes: scenesService } = useApi()
-  const [fiction, setFiction] = useState<Fiction | undefined>(undefined)
+  const [fiction, setFiction] = useState<FictionWithMedia | undefined>(undefined)
   const [sceneCount, setSceneCount] = useState(0)
 
   useEffect(() => {

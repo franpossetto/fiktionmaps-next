@@ -2,6 +2,7 @@
 
 import Image from "next/image"
 import { Check } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 
 export interface AvatarOption {
@@ -21,14 +22,16 @@ export function OnboardingStepAvatar({
   selectedAvatar,
   onSelectAvatar,
 }: OnboardingStepAvatarProps) {
+  const t = useTranslations("Onboarding")
+
   return (
     <div className="flex w-full flex-col items-center">
       <div className="mb-12 w-full text-center">
         <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl">
-          Choose your avatar
+          {t("step2Title")}
         </h1>
         <p className="mt-4 text-lg text-muted-foreground sm:text-xl">
-          Pick the one that feels like you. None fit? Change it anytime — you&apos;re one of a kind.
+          {t("step2Subtitle")}
         </p>
       </div>
       <div className="w-full grid grid-cols-4 gap-3 sm:gap-4 max-h-[280px] sm:max-h-none overflow-y-auto overflow-x-hidden overscroll-contain">
@@ -39,7 +42,7 @@ export function OnboardingStepAvatar({
               key={avatar.id}
               type="button"
               onClick={() => onSelectAvatar(avatar.url)}
-              aria-label={`Select avatar ${avatar.label}`}
+              aria-label={t("step2SelectAvatar", { label: avatar.label })}
               className={cn(
                 "relative flex aspect-square w-full min-w-0 items-center justify-center overflow-hidden rounded-xl border-2 transition-all ring-offset-2 ring-offset-background",
                 active

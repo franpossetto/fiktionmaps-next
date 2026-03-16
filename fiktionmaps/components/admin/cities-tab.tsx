@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter } from "@/i18n/navigation"
 import { ArrowLeft, ArrowRight, Plus, MoreVertical, Edit2, Trash2, MapPin, Search, Loader2 } from "lucide-react"
-import type { City } from "@/modules/cities/city.domain"
+import type { City } from "@/src/cities/city.domain"
 import { Button } from "@/components/ui/button"
 import { createCityAction, deleteCityAction } from "@/app/(app)/admin/actions"
 import {

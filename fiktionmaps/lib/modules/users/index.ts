@@ -1,5 +1,0 @@
-export type { Interest, CheckIn, UserProfile } from "./user.model"
-export type { IUserRepository } from "./user.repository"
-export { UserService } from "./user.service"
-export { MockUserRepository } from "./user.mock"
-export { ApiUserRepository } from "./user.api"

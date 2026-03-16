@@ -3,9 +3,10 @@
 import { useEffect, useState, useRef } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowRight, MapPin, Film, Star, Globe, User } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
-import type { City } from "@/lib/modules/cities"
-import type { Fiction } from "@/lib/modules/fictions"
+import type { City } from "@/src/cities/city.domain"
+import type { Fiction } from "@/src/fictions/fiction.domain"
 import { useApi } from "@/lib/api"
 import { useAuth } from "@/context/auth-context"
 import { cn } from "@/lib/utils"
@@ -39,14 +40,14 @@ const AVATARS = (onboardingData.avatars as { id: string; label: string; url: str
 
 const MAX_SELECTION = 10
 
-const STEPS = [
-  { id: "welcome", icon: Star, title: "Welcome to FiktionMaps" },
-  { id: "avatar", icon: User, title: "Choose your avatar" },
-  { id: "about", icon: User, title: "Tell us about you" },
-  { id: "genres", icon: Film, title: "Tell us what you love?" },
-  { id: "fictions", icon: Star, title: "What worlds do you want to explore?" },
-  { id: "cities", icon: MapPin, title: "What places fascinate you?" },
-  { id: "done", icon: Globe, title: "You're all set" },
+const STEP_IDS = [
+  { id: "welcome", icon: Star, titleKey: "welcomeTitle" as const },
+  { id: "avatar", icon: User, titleKey: "chooseAvatar" as const },
+  { id: "about", icon: User, titleKey: "tellUsAboutYou" as const },
+  { id: "genres", icon: Film, titleKey: "tellUsWhatYouLove" as const },
+  { id: "fictions", icon: Star, titleKey: "worldsToExplore" as const },
+  { id: "cities", icon: MapPin, titleKey: "placesFascinateYou" as const },
+  { id: "done", icon: Globe, titleKey: "allSet" as const },
 ]
 
 const stepVariants = {
@@ -61,6 +62,7 @@ interface OnboardingProps {
 }
 
 export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
+  const t = useTranslations("Onboarding")
   const { user, completeOnboarding } = useAuth()
   const { cities: cityService, fictions: fictionService } = useApi()
   const [allCities, setAllCities] = useState<City[]>([])
@@ -152,7 +154,7 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
       setUsername(withSuffix)
       setUsernameAvailable(isSuffixAvailable === true)
       if (isSuffixAvailable === false) {
-        setUsernameError("That username is already taken. Try another one.")
+        setUsernameError(t("usernameTaken"))
       }
       setSkipNextDebounce(true)
     }
@@ -187,12 +189,12 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
   if (!forceStartAtZero && step === null) {
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-background text-foreground">
-        <p className="text-sm text-muted-foreground">Loading your onboarding…</p>
+        <p className="text-sm text-muted-foreground">{t("loadingOnboarding")}</p>
       </div>
     )
   }
 
-  const totalSteps = STEPS.length
+  const totalSteps = STEP_IDS.length
 
   const toggleWithMax = <T extends string>(arr: T[], val: T, set: (v: T[]) => void, max: number) => {
     if (arr.includes(val)) {
@@ -206,9 +208,9 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
 
   function validateUsername(value: string) {
     const trimmed = value.trim()
-    if (trimmed.length < 3) return "Username must be at least 3 characters"
+    if (trimmed.length < 3) return t("usernameMinLength")
     if (!/^[a-zA-Z0-9.-]+$/.test(trimmed)) {
-      return "Only letters, numbers, dots (.) and hyphens (-) are allowed"
+      return t("usernameInvalidChars")
     }
     return null
   }
@@ -227,13 +229,13 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
         p_username: trimmed,
       })
       if (error) {
-        setUsernameError("Could not check availability. You can still continue.")
+        setUsernameError(t("couldNotCheck"))
         setUsernameAvailable(null)
         return
       }
       setUsernameAvailable(available === true)
       if (available === false) {
-        setUsernameError("That username is already taken. Try another one.")
+        setUsernameError(t("usernameTaken"))
       }
     } finally {
       setUsernameChecking(false)
@@ -275,7 +277,7 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
           p_username: username.trim(),
         })
         if (!checkError && available === false) {
-          setUsernameError("That username is already taken. Try another one.")
+          setUsernameError(t("usernameTaken"))
           setUsernameAvailable(false)
           return
         }
@@ -290,9 +292,9 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
 
         if (updateError) {
           if (updateError.code === "23505") {
-            setUsernameError("That username is already taken. Try another one.")
+            setUsernameError(t("usernameTaken"))
           } else {
-            setUsernameError("Could not save your username. Please try again.")
+            setUsernameError(t("couldNotSaveUsername"))
           }
           return
         }
@@ -340,7 +342,7 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
           localStorage.setItem("fiktionmaps_onboarding_genres", JSON.stringify(selectedGenres))
         }
       } catch (e) {
-        setCompleteError(e instanceof Error ? e.message : "Could not save. Try again.")
+        setCompleteError(e instanceof Error ? e.message : t("couldNotSave"))
       } finally {
         setCompleting(false)
       }
@@ -456,7 +458,7 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
             onClick={() => setStep((s) => (s ?? 0) - 1)}
             className="text-sm text-muted-foreground transition-opacity hover:opacity-70"
           >
-            Back
+            {t("back")}
           </button>
         ) : (
           <div />
@@ -487,14 +489,14 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
             variant={step === 0 && hasSelectionInStep ? "default" : "outline"}
           >
             {step === 0
-              ? "Next"
+              ? t("next")
               : step === totalSteps - 1
                 ? completing
-                  ? "Saving…"
-                  : "Start exploring"
+                  ? t("saving")
+                  : t("startExploring")
                 : step === 2 && aboutSaving
-                  ? "Saving…"
-                  : "Continue"}
+                  ? t("saving")
+                  : t("continue")}
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter } from "@/i18n/navigation"
 import { useThemeSettings } from "@/lib/theme-settings-context"
 import type { ThemeBase, StyleVariant, TimeOfDay } from "@/lib/theme-settings"
 import type { ThemeSettings } from "@/lib/theme-settings"

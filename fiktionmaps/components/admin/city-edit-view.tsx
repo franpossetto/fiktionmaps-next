@@ -1,13 +1,12 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, Link } from "@/i18n/navigation"
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react"
 import { motion } from "framer-motion"
-import type { City } from "@/modules/cities/city.domain"
+import type { City } from "@/src/cities/city.domain"
 import { Button } from "@/components/ui/button"
-import { updateCityAction } from "@/app/(app)/admin/actions"
-import Link from "next/link"
+import { updateCityAction } from "@/app/[locale]/(app)/admin/actions"
 import { CityMapPicker } from "./city-map-picker"
 
 interface CityEditViewProps {

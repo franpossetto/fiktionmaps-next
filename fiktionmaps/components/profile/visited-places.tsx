@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import type { Location } from "@/lib/modules/locations"
-import type { Fiction } from "@/lib/modules/fictions"
+import type { Location } from "@/src/locations"
+import type { Fiction } from "@/src/fictions/fiction.domain"
 import { useApi } from "@/lib/api"
 import { MapPin, Heart } from "lucide-react"
 import Image from "next/image"

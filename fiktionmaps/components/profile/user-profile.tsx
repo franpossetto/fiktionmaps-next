@@ -2,18 +2,17 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import Image from "next/image"
-import Link from "next/link"
-import type { UserProfile as UserProfileType, CheckIn } from "@/lib/modules/users"
-import type { City } from "@/lib/modules/cities"
-import type { Location } from "@/lib/modules/locations"
-import type { Fiction } from "@/lib/modules/fictions"
-import type { Tour } from "@/lib/modules/tours"
+import { Link } from "@/i18n/navigation"
+import type { UserProfile as UserProfileType, CheckIn } from "@/src/users"
+import type { City } from "@/src/cities/city.domain"
+import type { Location } from "@/src/locations"
+import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
 import { useApi } from "@/lib/api"
 import { ProfileHeader } from "./profile-header"
 import { VisitedPlaces } from "./visited-places"
 import { ContributorData } from "./contributor-data"
 import { PageStickyBar } from "@/components/layout/page-sticky-bar"
-import { ImageIcon, Share2, Upload, Route, ChevronRight, Sparkles } from "lucide-react"
+import { ImageIcon, Share2, Upload, ChevronRight, Sparkles } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { getCurrentUserProfileAction, type ProfileWithOnboarding } from "@/lib/auth/profile.actions"
@@ -36,26 +35,24 @@ function onboardingProgress(profile: { username?: string; avatar?: string }): { 
   return { completed, percent }
 }
 
-type TabView = "gallery" | "contributor" | "tours"
+type TabView = "gallery" | "contributor"
 
 const tabs: { id: TabView; label: string; icon: React.ElementType }[] = [
   { id: "gallery", label: "Check-Ins", icon: ImageIcon },
   { id: "contributor", label: "My Contributions", icon: Upload },
-  { id: "tours", label: "My Tours", icon: Route },
 ]
 
 export function UserProfileComponent({ profile }: UserProfileProps) {
   const { user } = useAuth()
-  const { cities: cityService, locations, tours, users } = useApi()
+  const { cities: cityService, locations, users } = useApi()
   const [allCities, setAllCities] = useState<City[]>([])
   const [locationMap, setLocationMap] = useState<Map<string, Location>>(new Map())
   const [loadedProfile, setLoadedProfile] = useState<ProfileWithOnboarding | UserProfileType | undefined>(profile)
   const [contributedLocations, setContributedLocations] = useState<Location[]>([])
-  const [contributedFictions, setContributedFictions] = useState<Fiction[]>([])
+  const [contributedFictions, setContributedFictions] = useState<FictionWithMedia[]>([])
   const [contributedPhotos, setContributedPhotos] = useState<CheckIn[]>([])
   const [activeTab, setActiveTab] = useState<TabView>("gallery")
   const [stickyHeader, setStickyHeader] = useState(false)
-  const [myTours, setMyTours] = useState<Tour[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const heroRef = useRef<HTMLDivElement>(null)
 
@@ -135,42 +132,6 @@ export function UserProfileComponent({ profile }: UserProfileProps) {
     container.addEventListener("scroll", onScroll, { passive: true })
     return () => container.removeEventListener("scroll", onScroll)
   }, [])
-
-  const refreshMyTours = useCallback(() => {
-    tours.listUserTours(user?.id).then(setMyTours)
-  }, [user?.id, tours])
-
-  useEffect(() => {
-    refreshMyTours()
-    window.addEventListener("storage", refreshMyTours)
-    window.addEventListener("focus", refreshMyTours)
-    return () => {
-      window.removeEventListener("storage", refreshMyTours)
-      window.removeEventListener("focus", refreshMyTours)
-    }
-  }, [refreshMyTours])
-
-  const [tourStopCounts, setTourStopCounts] = useState<Map<string, number>>(new Map())
-
-  useEffect(() => {
-    if (myTours.length === 0) return
-    Promise.all(
-      myTours.map((tour) =>
-        tours.getTourBySlug(tour.slug).then((r) => ({ slug: tour.slug, count: r?.stops.length ?? 0 })),
-      ),
-    ).then((results) => {
-      setTourStopCounts(new Map(results.map((r) => [r.slug, r.count])))
-    })
-  }, [myTours, tours])
-
-  const myToursWithStops = useMemo(
-    () =>
-      myTours.map((tour) => ({
-        tour,
-        stopsCount: tourStopCounts.get(tour.slug) ?? 0,
-      })),
-    [myTours, tourStopCounts],
-  )
 
   if (!user) {
     return (
@@ -353,72 +314,6 @@ export function UserProfileComponent({ profile }: UserProfileProps) {
               uploadedFictions={contributedFictions}
               contributedPhotos={contributedPhotos}
             />
-          </section>
-        )}
-
-        {activeTab === "tours" && (
-          <section className="space-y-4">
-            <div>
-              <h2 className="text-xl font-bold text-foreground mb-1">My Tours</h2>
-              <p className="text-sm text-muted-foreground">
-                Tours created from your account.
-              </p>
-            </div>
-
-            {myToursWithStops.length === 0 ? (
-              <div className="rounded-xl border border-border bg-card p-6 text-center">
-                <p className="text-base font-semibold text-foreground">You have no tours yet</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Create your first route and it will appear here.
-                </p>
-                <Button asChild className="mt-4">
-                  <Link href="/tours/create-tour-2">Create Tour</Link>
-                </Button>
-              </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {myToursWithStops.map(({ tour, stopsCount }) => {
-                  const cityLabel = tour.cityId ? cityNameById.get(tour.cityId) ?? tour.cityId : "Multi-city"
-                  const creatorName = tour.createdBy?.includes("@")
-                    ? tour.createdBy.split("@")[0]
-                    : tour.createdBy || "You"
-                  return (
-                    <article
-                      key={tour.id}
-                      className="overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary/40"
-                    >
-                      <Link href={`/tours/${tour.slug}`} className="block">
-                        <div className="relative h-36 w-full">
-                          <Image
-                            src={tour.coverImage || "/logo-icon.png"}
-                            alt={tour.title}
-                            fill
-                            sizes="(max-width: 768px) 100vw, 33vw"
-                            className="object-cover"
-                          />
-                        </div>
-                        <div className="space-y-2 p-3">
-                          <p className="truncate text-sm font-semibold text-foreground">{tour.title}</p>
-                          {tour.description && (
-                            <p className="line-clamp-2 text-xs text-muted-foreground">{tour.description}</p>
-                          )}
-                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                            <span>{cityLabel}</span>
-                            <span>•</span>
-                            <span>{stopsCount} stops</span>
-                            <span>•</span>
-                            <span>{tour.visibility}</span>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground">
-                            by {creatorName}
-                          </p>
-                        </div>
-                      </Link>
-                    </article>
-                  )
-                })}
-              </div>
-            )}
           </section>
         )}
 

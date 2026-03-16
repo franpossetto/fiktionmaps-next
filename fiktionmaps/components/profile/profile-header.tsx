@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
-import type { UserProfile } from "@/lib/modules/users"
+import type { UserProfile } from "@/src/users"
 import { Share2, Settings, Instagram, Twitter, ImageIcon, Heart } from "lucide-react"
 import Image from "next/image"
 import { useAuth } from "@/context/auth-context"
