@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Map as ReactMapGL,
@@ -19,6 +19,7 @@ export function MapboxContainer({
   id,
   defaultCenter,
   defaultZoom,
+  center: controlledCenter,
   minZoom,
   maxZoom,
   interactive = true,
@@ -33,10 +34,12 @@ export function MapboxContainer({
   controls,
 }: MapContainerProps) {
   const [mapLoaded, setMapLoaded] = useState(false)
+  const mapRef = useRef<MapboxMap | null>(null)
   const onLoad = useCallback(
     (e: { target: MapboxMap }) => {
       setMapLoaded(true)
       const map = e.target
+      mapRef.current = map
       if (onMapReady) {
         const handle: MapControlHandle = {
           panTo: (pos) => map.panTo([pos.lng, pos.lat]),
@@ -59,6 +62,12 @@ export function MapboxContainer({
     },
     [onMapReady],
   )
+
+  // When center prop is provided (e.g. minimap), keep map view in sync with it
+  useEffect(() => {
+    if (!controlledCenter || !mapRef.current) return
+    mapRef.current.setCenter([controlledCenter.lng, controlledCenter.lat])
+  }, [controlledCenter?.lat, controlledCenter?.lng])
 
   /* 4 map styles: day, dawn, dusk, night — 1:1 with env vars (DAWN_URL→dawn, DUSK_URL→dusk) */
   const style = mapStyle
@@ -99,6 +108,15 @@ export function MapboxContainer({
         onClick={
           onClick
             ? (e) => onClick({ lat: e.lngLat.lat, lng: e.lngLat.lng })
+            : undefined
+        }
+        onMove={
+          onCenterChange
+            ? (e) =>
+                onCenterChange({
+                  lat: e.viewState.latitude,
+                  lng: e.viewState.longitude,
+                })
             : undefined
         }
         onMoveEnd={

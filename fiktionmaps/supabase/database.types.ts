@@ -173,6 +173,107 @@ export type Database = {
         }
         Relationships: []
       }
+      locations: {
+        Row: {
+          id: string
+          formatted_address: string
+          post_code: string | null
+          latitude: number
+          longitude: number
+          name: string
+          type: string | null
+          external_id: string | null
+          provider: string | null
+          city_id: string
+          is_landmark: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          formatted_address: string
+          post_code?: string | null
+          latitude: number
+          longitude: number
+          name: string
+          type?: string | null
+          external_id?: string | null
+          provider?: string | null
+          city_id: string
+          is_landmark?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          formatted_address?: string
+          post_code?: string | null
+          latitude?: number
+          longitude?: number
+          name?: string
+          type?: string | null
+          external_id?: string | null
+          provider?: string | null
+          city_id?: string
+          is_landmark?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locations_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      places: {
+        Row: {
+          id: string
+          fiction_id: string
+          location_id: string | null
+          description: string | null
+          active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          fiction_id: string
+          location_id?: string | null
+          description?: string | null
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          fiction_id?: string
+          location_id?: string | null
+          description?: string | null
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "places_fiction_id_fkey"
+            columns: ["fiction_id"]
+            isOneToOne: false
+            referencedRelation: "fictions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "places_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -285,6 +386,14 @@ export type CityUpdate = TablesUpdate<"cities">
 export type AssetImageRow = Tables<"asset_images">
 export type AssetImageInsert = TablesInsert<"asset_images">
 export type AssetImageUpdate = TablesUpdate<"asset_images">
+
+export type LocationRow = Tables<"locations">
+export type LocationInsert = TablesInsert<"locations">
+export type LocationUpdate = TablesUpdate<"locations">
+
+export type PlaceRow = Tables<"places">
+export type PlaceInsert = TablesInsert<"places">
+export type PlaceUpdate = TablesUpdate<"places">
 
 export type Enums<
   PublicEnumNameOrOptions extends

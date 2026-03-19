@@ -1,7 +1,7 @@
 import createIntlMiddleware from "next-intl/middleware"
 import { NextResponse, type NextRequest } from "next/server"
 import { createServerClient } from "@supabase/ssr"
-import type { Database } from "@/supabase/database.types"
+import type { Database } from "./supabase/database.types"
 import { routing } from "./i18n/routing"
 
 const intlMiddleware = createIntlMiddleware(routing)

@@ -2,7 +2,6 @@
 
 import { MapPin, Search } from "lucide-react"
 import type { City } from "@/src/cities/city.domain"
-import { useApi } from "@/lib/api"
 import {
   Dialog,
   DialogContent,
@@ -13,19 +12,27 @@ import { Button } from "@/components/ui/button"
 import { useState, useMemo, useEffect } from "react"
 
 interface CitySelectorProps {
+  /** Cities list (from DB). When not provided, fetches from /api/cities. */
+  cities?: City[]
   selectedCity: City
   onCityChange: (city: City) => void
 }
 
-export function CitySelector({ selectedCity, onCityChange }: CitySelectorProps) {
-  const { cities: citiesService } = useApi()
-  const [cities, setCities] = useState<City[]>([])
+export function CitySelector({ cities: citiesProp, selectedCity, onCityChange }: CitySelectorProps) {
+  const [cities, setCities] = useState<City[]>(citiesProp ?? [])
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
 
   useEffect(() => {
-    citiesService.getAll().then(setCities)
-  }, [citiesService])
+    if (citiesProp !== undefined) {
+      setCities(citiesProp)
+      return
+    }
+    fetch("/api/cities")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: City[]) => setCities(list))
+      .catch(() => {})
+  }, [citiesProp])
 
   const filtered = useMemo(() => {
     if (!search.trim()) return cities

@@ -10,6 +10,7 @@ import { LocationsTab } from "./locations-tab"
 import { ScenesTab } from "./scenes-tab"
 import type { Fiction } from "@/src/fictions/fiction.domain"
 import type { City } from "@/src/cities/city.domain"
+import type { Location } from "@/src/locations"
 import { useAdminViewModeStorage } from "@/lib/local-storage-service-hooks"
 
 type AdminSection = "fictions" | "cities" | "locations" | "scenes"
@@ -39,8 +40,8 @@ const sections: SectionItem[] = [
   },
   {
     id: "locations",
-    label: "Manage Locations",
-    description: "Add filming locations and place scenes on an interactive map",
+    label: "Manage Places",
+    description: "Create places by picking real locations on the map and linking them to fictions",
     icon: MapPin,
     color: "from-purple-600 to-pink-600",
   },
@@ -56,11 +57,12 @@ const sections: SectionItem[] = [
 interface AdminDashboardProps {
   initialFictions?: Fiction[]
   initialCities?: City[]
+  initialLocations?: Location[]
   onOpenFiction?: (fictionId: string) => void
   onOpenCity?: (cityId: string) => void
 }
 
-export function AdminDashboard({ initialFictions, initialCities, onOpenFiction, onOpenCity }: AdminDashboardProps) {
+export function AdminDashboard({ initialFictions, initialCities, initialLocations, onOpenFiction, onOpenCity }: AdminDashboardProps) {
   const searchParams = useSearchParams()
   const [activeSection, setActiveSection] = useState<AdminSection>(() => {
     const tab = searchParams.get("tab")
@@ -170,7 +172,7 @@ export function AdminDashboard({ initialFictions, initialCities, onOpenFiction, 
               viewMode={viewMode}
             />
           )}
-          {activeSection === "locations" && <LocationsTab />}
+          {activeSection === "locations" && <LocationsTab initialLocations={initialLocations} />}
           {activeSection === "scenes" && <ScenesTab />}
         </div>
       </div>

@@ -12,20 +12,37 @@ import Image from "next/image"
 
 interface LocationDetailProps {
   location: Location
+  /** When provided (e.g. from map page), used instead of fetching. */
+  fiction?: FictionWithMedia | null
   onClose: () => void
   onViewPlace?: (location: Location) => void
   onView3D?: () => void
 }
 
-export function LocationDetail({ location, onClose, onViewPlace, onView3D }: LocationDetailProps) {
+export function LocationDetail({
+  location,
+  fiction: fictionProp,
+  onClose,
+  onViewPlace,
+  onView3D,
+}: LocationDetailProps) {
   const { fictions: fictionsService, scenes: scenesService } = useApi()
-  const [fiction, setFiction] = useState<FictionWithMedia | undefined>(undefined)
+  const [fiction, setFiction] = useState<FictionWithMedia | undefined>(
+    fictionProp ?? undefined
+  )
   const [sceneCount, setSceneCount] = useState(0)
 
   useEffect(() => {
-    fictionsService.getById(location.fictionId).then(setFiction)
+    if (fictionProp !== undefined) {
+      setFiction(fictionProp ?? undefined)
+    } else {
+      fictionsService.getById(location.fictionId).then(setFiction)
+    }
+  }, [location.fictionId, fictionProp, fictionsService])
+
+  useEffect(() => {
     scenesService.getByLocationId(location.id).then((s) => setSceneCount(s.length))
-  }, [location.id, location.fictionId, fictionsService, scenesService])
+  }, [location.id, scenesService])
 
   return (
     <>

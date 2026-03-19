@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { Database } from "@/supabase/database.types"
+import type { Database } from "../../supabase/database.types"
 import type { FictionWithMedia } from "./fiction.domain"
 
 export type AssetImageRow = { entity_id: string; role: string; variant: string; url: string }
@@ -8,7 +8,7 @@ export function mapAssetImagesToFiction(
   fiction: Record<string, unknown>,
   rows: AssetImageRow[]
 ): FictionWithMedia {
-  const base = fiction as FictionWithMedia
+  const base = fiction as unknown as FictionWithMedia
   let coverImage: string | null = null
   let coverImageLarge: string | null = null
   let bannerImage: string | null = null

@@ -7,6 +7,10 @@ import { supabaseRepositoryAdapter as citiesSupabaseAdapter } from "@/src/cities
 import { getAllFictionsWithClient } from "@/src/fictions/fiction-cached-read"
 import { createFictionsService } from "@/src/fictions/fiction.services"
 import { supabaseRepositoryAdapter as fictionsSupabaseAdapter } from "@/src/fictions/fiction.repository.adapter"
+import {
+  createPlacesService,
+  placesSupabaseAdapter,
+} from "@/src/places"
 import { createUsersService } from "@/src/users/user.services"
 import { supabaseRepositoryAdapter } from "@/src/users/user.repository.adapter"
 
@@ -55,3 +59,14 @@ export const getCityFictions = citiesService.getCityFictions
 
 export type { City } from "@/src/cities/city.domain"
 export type { CreateCityData, UpdateCityData } from "@/src/cities/city.dtos"
+
+const placesService = createPlacesService({
+  placesRepo: placesSupabaseAdapter,
+})
+
+export const getAllPlaces = placesService.listAllAsLocations
+export const createPlace = placesService.create
+export const updatePlace = placesService.update
+
+export type { Location } from "@/src/locations"
+export type { CreatePlaceData, UpdatePlaceData } from "@/src/places"

@@ -18,6 +18,8 @@ export interface MapContainerProps {
   mapKey?: string
   defaultCenter: LatLng
   defaultZoom: number
+  /** When set, map view follows this center (e.g. minimap following main map). Updates when the value changes. */
+  center?: LatLng
   minZoom?: number
   maxZoom?: number
   interactive?: boolean

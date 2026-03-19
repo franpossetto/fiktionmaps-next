@@ -25,6 +25,8 @@ interface MapViewProps {
   onToggle3D?: (is3D: boolean) => void
   /** Called when the map has finished loading; use to animate in overlay controls. */
   onMapLoaded?: () => void
+  /** Reports current map bounds (west,south,east,north) on move end. */
+  onBoundsChange?: (bounds: { west: number; south: number; east: number; north: number }) => void
 }
 
 /** Flies the map to a location when focusLocationId changes. Must be rendered inside MapContainer. */
@@ -76,6 +78,49 @@ function MapLoadReporter({ onLoaded }: { onLoaded?: () => void }) {
   useEffect(() => {
     if (mapLoaded && onLoaded) onLoaded()
   }, [mapLoaded, onLoaded])
+  return null
+}
+
+function MapBoundsReporter({
+  onBoundsChange,
+}: {
+  onBoundsChange?: (bounds: { west: number; south: number; east: number; north: number }) => void
+}) {
+  const maps = useMap()
+  const mapRef = maps?.current
+
+  useEffect(() => {
+    if (!mapRef || !onBoundsChange) return
+    let map: mapboxgl.Map
+    try {
+      map = mapRef.getMap()
+    } catch {
+      return
+    }
+
+    const report = () => {
+      try {
+        const b = map.getBounds()
+        onBoundsChange({
+          west: b.getWest(),
+          south: b.getSouth(),
+          east: b.getEast(),
+          north: b.getNorth(),
+        })
+      } catch {
+        // map not ready
+      }
+    }
+
+    report()
+    map.on("load", report)
+    map.on("moveend", report)
+    return () => {
+      map.off("load", report)
+      map.off("moveend", report)
+    }
+  }, [mapRef, onBoundsChange])
+
   return null
 }
 
@@ -307,6 +352,7 @@ export function MapView({
   is3D = false,
   onToggle3D,
   onMapLoaded,
+  onBoundsChange,
 }: MapViewProps) {
   const clusterItems = useMemo(() => toClusterItems(locations), [locations])
   const renderMarker = is3D ? renderLocationMarker3D : renderLocationMarker2D
@@ -337,6 +383,7 @@ export function MapView({
       onCenterChange={onCenterChange}
     >
       <MapLoadReporter onLoaded={onMapLoaded} />
+      <MapBoundsReporter onBoundsChange={onBoundsChange} />
       <MapFocusController locations={locations} focusLocationId={focusLocationId} />
       <MapViewPins
         cityId={city.id}

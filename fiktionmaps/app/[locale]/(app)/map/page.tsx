@@ -5,7 +5,6 @@ import { motion } from "framer-motion"
 import type { City } from "@/src/cities/city.domain"
 import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
 import type { Location } from "@/src/locations"
-import { useApi } from "@/lib/api"
 import { MapView, Map3DToggleSlot, MapMinimapSlot } from "@/components/map/map-view"
 import { MapProvider } from "@/lib/map"
 import { CitySelector } from "@/components/map/city-selector"
@@ -15,10 +14,37 @@ import { ThumbnailCarousel } from "@/components/map/thumbnail-carousel"
 import { PlacePage } from "@/components/map/place-page"
 import { usePlaceSelectorCollapsedStorage } from "@/lib/local-storage-service-hooks"
 
+type Bbox = { west: number; south: number; east: number; north: number }
+
+/** Returns a bbox (west, south, east, north) for a ~radiusKm square around lat/lng. */
+function bboxAround(lat: number, lng: number, radiusKm: number): Bbox {
+  const kmPerDegLat = 111.32
+  const deltaLat = radiusKm / kmPerDegLat
+  const deltaLng = radiusKm / (kmPerDegLat * Math.cos((lat * Math.PI) / 180))
+  return {
+    west: lng - deltaLng,
+    south: lat - deltaLat,
+    east: lng + deltaLng,
+    north: lat + deltaLat,
+  }
+}
+
+/** Union of two bboxes so the result contains both areas. */
+function bboxUnion(a: Bbox, b: Bbox): Bbox {
+  return {
+    west: Math.min(a.west, b.west),
+    south: Math.min(a.south, b.south),
+    east: Math.max(a.east, b.east),
+    north: Math.max(a.north, b.north),
+  }
+}
+
+const MIN_LOAD_RADIUS_KM = 50
+
 export default function MapPage() {
-  const { cities: citiesService, locations: locationsService } = useApi()
   const [placeSelectorCollapsed, setPlaceSelectorCollapsed] = usePlaceSelectorCollapsedStorage()
 
+  const [cities, setCities] = useState<City[]>([])
   const [selectedCity, setSelectedCity] = useState<City | null>(null)
   const [availableFictions, setAvailableFictions] = useState<FictionWithMedia[]>([])
   const [selectedFictionIds, setSelectedFictionIds] = useState<string[]>([])
@@ -28,35 +54,60 @@ export default function MapPage() {
   const [placePageLocation, setPlacePageLocation] = useState<Location | null>(null)
   const [is3D, setIs3D] = useState(false)
   const [mapLoaded, setMapLoaded] = useState(false)
+  const [bounds, setBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
+  const [citiesLoading, setCitiesLoading] = useState(true)
 
+  // Load cities from DB, then fictions for first city
   useEffect(() => {
-    citiesService.getAll().then(async (cities) => {
-      if (cities.length > 0) {
-        const city = cities[0]
-        setSelectedCity(city)
-        const fics = await citiesService.getCityFictions(city.id)
-        setAvailableFictions(fics)
-        setSelectedFictionIds(fics.map((f) => f.id))
-      }
-    })
-  }, [citiesService])
+    setCitiesLoading(true)
+    fetch("/api/cities")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((citiesList: City[]) => {
+        setCities(citiesList)
+        if (citiesList.length > 0) {
+          const city = citiesList[0]
+          setSelectedCity(city)
+          return fetch(`/api/map/city-fictions?cityId=${encodeURIComponent(city.id)}`)
+            .then((r) => (r.ok ? r.json() : []))
+            .then((fics: FictionWithMedia[]) => {
+              setAvailableFictions(fics)
+              setSelectedFictionIds(fics.map((f) => f.id))
+            })
+        }
+      })
+      .catch(() => {})
+      .finally(() => setCitiesLoading(false))
+  }, [])
 
   useEffect(() => {
     if (!selectedCity || selectedFictionIds.length === 0) {
       setFilteredLocations([])
       return
     }
-    locationsService.getFiltered(selectedCity.id, selectedFictionIds).then(setFilteredLocations)
-  }, [selectedCity?.id, selectedFictionIds, locationsService])
+    const minBbox = bboxAround(selectedCity.lat, selectedCity.lng, MIN_LOAD_RADIUS_KM)
+    const bbox = bounds ? bboxUnion(bounds, minBbox) : minBbox
+    const controller = new AbortController()
+    const params = new URLSearchParams()
+    for (const id of selectedFictionIds) params.append("fictionIds[]", id)
+    params.set("bbox", `${bbox.west},${bbox.south},${bbox.east},${bbox.north}`)
+    fetch(`/api/map/locations?${params.toString()}`, { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setFilteredLocations((data ?? []) as Location[]))
+      .catch(() => {
+        // ignore abort/network for now
+      })
+    return () => controller.abort()
+  }, [selectedCity?.id, selectedCity?.lat, selectedCity?.lng, selectedFictionIds, bounds])
 
   const handleCityChange = useCallback(async (city: City) => {
     setSelectedCity(city)
     setSelectedLocation(null)
     setFocusedLocationId(null)
-    const fics = await citiesService.getCityFictions(city.id)
+    const res = await fetch(`/api/map/city-fictions?cityId=${encodeURIComponent(city.id)}`)
+    const fics = res.ok ? ((await res.json()) as FictionWithMedia[]) : []
     setAvailableFictions(fics)
     setSelectedFictionIds(fics.map((f) => f.id))
-  }, [citiesService])
+  }, [])
 
   const handleToggleFiction = (fictionId: string) => {
     setSelectedFictionIds((prev) =>
@@ -120,7 +171,13 @@ export default function MapPage() {
     setPlaceSelectorCollapsed,
   ])
 
-  if (!selectedCity) return null
+  if (citiesLoading || !selectedCity) {
+    return (
+      <div className="flex min-h-full items-center justify-center bg-background">
+        <p className="text-muted-foreground">Loading map…</p>
+      </div>
+    )
+  }
 
   return (
     <MapProvider>
@@ -153,7 +210,11 @@ export default function MapPage() {
         transition={{ duration: 0.35, ease: "easeOut", delay: 0.08 }}
       >
         <Map3DToggleSlot />
-        <CitySelector selectedCity={selectedCity} onCityChange={handleCityChange} />
+        <CitySelector
+          cities={cities}
+          selectedCity={selectedCity}
+          onCityChange={handleCityChange}
+        />
       </motion.div>
 
       <div className="relative flex-1 min-h-0 w-full">
@@ -166,6 +227,7 @@ export default function MapPage() {
           is3D={is3D}
           onToggle3D={setIs3D}
           onMapLoaded={() => setMapLoaded(true)}
+          onBoundsChange={setBounds}
         />
       </div>
 
@@ -182,6 +244,7 @@ export default function MapPage() {
       {selectedLocation && (
         <LocationDetail
           location={selectedLocation}
+          fiction={availableFictions.find((f) => f.id === selectedLocation.fictionId)}
           onClose={() => setSelectedLocation(null)}
           onViewPlace={handleOpenPlacePage}
         />
@@ -192,6 +255,8 @@ export default function MapPage() {
           <div className="flex-1 min-h-0 overflow-hidden">
             <PlacePage
               location={placePageLocation}
+              fiction={availableFictions.find((f) => f.id === placePageLocation.fictionId)}
+              city={cities.find((c) => c.id === placePageLocation.cityId)}
               onBack={() => setPlacePageLocation(null)}
             />
           </div>

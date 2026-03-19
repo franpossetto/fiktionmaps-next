@@ -185,6 +185,7 @@ export function NavMap({ city, viewportCenter, locations, onMinimapClick }: NavM
             id="minimap"
             mapKey={`minimap-${city.id}`}
             defaultCenter={{ lat: city.lat, lng: city.lng }}
+            center={viewportCenter}
             defaultZoom={11}
             minZoom={10}
             maxZoom={14}

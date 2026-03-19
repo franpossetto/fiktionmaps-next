@@ -12,4 +12,8 @@ export interface Location {
   sceneDescription: string
   sceneQuote?: string
   visitTip?: string
+  /** From locations.type (admin edit). */
+  locationType?: string | null
+  /** From locations.is_landmark (admin edit). */
+  isLandmark?: boolean
 }

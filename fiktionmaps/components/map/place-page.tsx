@@ -19,36 +19,50 @@ import { Badge } from "@/components/ui/badge"
 import { PageStickyBar } from "@/components/layout/page-sticky-bar"
 import type { Location } from "@/src/locations"
 import type { Scene } from "@/src/scenes"
-import type { Fiction } from "@/src/fictions/fiction.domain"
+import type { Fiction, FictionWithMedia } from "@/src/fictions/fiction.domain"
 import type { City } from "@/src/cities/city.domain"
 import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
 import { useApi } from "@/lib/api"
 
-interface PlacePageProps {
+export interface PlacePageProps {
   location: Location
+  /** When provided (e.g. from map), used instead of fetching. */
+  fiction?: Fiction | FictionWithMedia | null
+  /** When provided (e.g. from map), used instead of fetching. */
+  city?: City | null
   onBack: () => void
 }
 
-export function PlacePage({ location, onBack }: PlacePageProps) {
+export function PlacePage({
+  location,
+  fiction: fictionProp,
+  city: cityProp,
+  onBack,
+}: PlacePageProps) {
   const { fictions: fictionsService, cities: citiesService, scenes: scenesService, locations: locationsService } = useApi()
 
-  const [fiction, setFiction] = useState<Fiction | undefined>(undefined)
-  const [city, setCity] = useState<City | undefined>(undefined)
+  const [fiction, setFiction] = useState<Fiction | undefined>(fictionProp ?? undefined)
+  const [city, setCity] = useState<City | undefined>(cityProp ?? undefined)
   const [scenes, setScenes] = useState<Scene[]>([])
   const [fictionScenes, setFictionScenes] = useState<Scene[]>([])
   const [sceneLocations, setSceneLocations] = useState<Map<string, Location>>(new Map())
 
   useEffect(() => {
+    if (fictionProp !== undefined) setFiction(fictionProp ?? undefined)
+    if (cityProp !== undefined) setCity(cityProp ?? undefined)
+  }, [fictionProp, cityProp])
+
+  useEffect(() => {
     let cancelled = false
     async function loadData() {
       const [f, c, s] = await Promise.all([
-        fictionsService.getById(location.fictionId),
-        citiesService.getById(location.cityId),
+        fictionProp !== undefined ? Promise.resolve(fictionProp ?? null) : fictionsService.getById(location.fictionId),
+        cityProp !== undefined ? Promise.resolve(cityProp ?? null) : citiesService.getById(location.cityId),
         scenesService.getByLocationId(location.id),
       ])
       if (cancelled) return
-      setFiction(f)
-      setCity(c)
+      setFiction(f ?? undefined)
+      setCity(c ?? undefined)
       setScenes(s)
       const fs = f ? await scenesService.getByFictionId(f.id) : s
       if (cancelled) return
@@ -64,7 +78,7 @@ export function PlacePage({ location, onBack }: PlacePageProps) {
     }
     loadData()
     return () => { cancelled = true }
-  }, [location.id, location.fictionId, location.cityId, fictionsService, citiesService, scenesService, locationsService])
+  }, [location.id, location.fictionId, location.cityId, fictionProp, cityProp, fictionsService, citiesService, scenesService, locationsService])
 
   // For TV series group by season; for movies/books keep flat
   const isTvSeries = fiction?.type === "tv-series"

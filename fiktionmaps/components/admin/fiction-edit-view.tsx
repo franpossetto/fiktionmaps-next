@@ -8,7 +8,7 @@ import type { Fiction, FictionWithMedia } from "@/src/fictions/fiction.domain"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
 import { FICTION_GENRES } from "@/lib/constants/fiction-genres"
-import { updateFictionAction, uploadFictionImageAction, deleteFictionAction } from "@/app/[locale]/(app)/admin/actions"
+import { updateFictionAction, uploadFictionImageAction, deleteFictionAction } from "@/src/fictions/fiction.actions"
 import {
   AlertDialog,
   AlertDialogCancel,

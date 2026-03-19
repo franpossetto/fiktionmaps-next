@@ -8,7 +8,7 @@ import type { Fiction, FictionWithMedia } from "@/src/fictions/fiction.domain"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
 import { FICTION_GENRES } from "@/lib/constants/fiction-genres"
-import { createFictionAction, deleteFictionAction, setFictionActiveAction, uploadFictionImageAction } from "@/app/(app)/admin/actions"
+import { createFictionAction, deleteFictionAction, setFictionActiveAction, uploadFictionImageAction } from "@/src/fictions/fiction.actions"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import {
   AlertDialog,
