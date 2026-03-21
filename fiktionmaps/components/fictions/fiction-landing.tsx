@@ -10,6 +10,7 @@ import { PageHero } from "@/components/layout/page-hero"
 import { PageStickyBar } from "@/components/layout/page-sticky-bar"
 import { SearchInput } from "@/components/ui/search-input"
 import { Film } from "lucide-react"
+import { useAuth } from "@/context/auth-context"
 
 type FictionLandingView = "browse" | "detail"
 
@@ -37,8 +38,13 @@ export function FictionLanding({
   onFocusHandled,
 }: FictionLandingProps) {
   const { fictions: fictionService, locations: locationService } = useApi()
+  const { user } = useAuth()
   const [allFictions, setAllFictions] = useState<FictionWithMedia[]>(initialFictions ?? [])
   const [locationCountMap, setLocationCountMap] = useState<Map<string, number>>(new Map())
+  const [likeCountByFictionId, setLikeCountByFictionId] = useState<Record<string, number>>({})
+  const [likedFictionIds, setLikedFictionIds] = useState<string[]>([])
+
+  const likedFictionIdSet = useMemo(() => new Set(likedFictionIds), [likedFictionIds])
 
   useEffect(() => {
     if (initialFictions !== undefined) {
@@ -67,7 +73,7 @@ export function FictionLanding({
   }, [fictionService, locationService, initialFictions])
 
   const [view, setView] = useState<FictionLandingView>("browse")
-  const [selectedFiction, setSelectedFiction] = useState<Fiction | null>(null)
+  const [selectedFiction, setSelectedFiction] = useState<FictionWithMedia | null>(null)
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(0)
   const [stickyHeader, setStickyHeader] = useState(false)
@@ -137,6 +143,83 @@ export function FictionLanding({
     onFocusHandled?.()
   }, [focusFictionId, onFocusHandled, allFictions])
 
+  // User-specific likes: which fictions are liked by the logged-in user.
+  useEffect(() => {
+    if (!user) {
+      setLikedFictionIds([])
+      return
+    }
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/user-fiction-likes")
+        const data = (await res.json()) as string[]
+        if (!cancelled) setLikedFictionIds(data)
+      } catch {
+        if (!cancelled) setLikedFictionIds([])
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
+
+  // Public like counts for currently displayed items.
+  const displayedFictionIdsKey = useMemo(
+    () => displayedItems.map((f) => f.id).join(","),
+    [displayedItems],
+  )
+
+  useEffect(() => {
+    const ids = displayedFictionIdsKey ? displayedFictionIdsKey.split(",").filter(Boolean) : []
+    if (ids.length === 0) {
+      setLikeCountByFictionId({})
+      return
+    }
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/fictions/likes?fictionIds=${encodeURIComponent(ids.join(","))}`)
+        const data = (await res.json()) as { likeCountByFictionId: Record<string, number> }
+        if (!cancelled) setLikeCountByFictionId(data.likeCountByFictionId ?? {})
+      } catch {
+        if (!cancelled) setLikeCountByFictionId({})
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [displayedFictionIdsKey])
+
+  const toggleLike = useCallback(
+    async (fictionId: string) => {
+      if (!user) return
+
+      const res = await fetch("/api/user-fiction-likes/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fictionId }),
+      })
+
+      if (!res.ok) return
+
+      const data = (await res.json()) as { liked: boolean; likeCount: number }
+
+      setLikeCountByFictionId((prev) => ({ ...prev, [fictionId]: data.likeCount }))
+      setLikedFictionIds((prev) => {
+        const set = new Set(prev)
+        if (data.liked) set.add(fictionId)
+        else set.delete(fictionId)
+        return Array.from(set)
+      })
+    },
+    [user?.id],
+  )
+
   if (view === "detail" && selectedFiction) {
     return (
       <FictionDetail
@@ -185,13 +268,16 @@ export function FictionLanding({
           emptyState
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-5 pb-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-2 gap-2.5 pb-8 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
               {displayedItems.map((fiction) => (
                 <FictionCard
                   key={fiction.id}
                   fiction={fiction}
                   locationCount={locationCountMap.get(fiction.id) ?? 0}
                   href={`/fictions/${fiction.id}`}
+                  likeCount={likeCountByFictionId[fiction.id] ?? 0}
+                  liked={likedFictionIdSet.has(fiction.id)}
+                  onToggleLike={user ? toggleLike : undefined}
                 />
               ))}
             </div>

@@ -274,6 +274,167 @@ export type Database = {
           },
         ]
       }
+      interests: {
+        Row: {
+          id: string
+          key: string
+          category: string | null
+          active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          category?: string | null
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          category?: string | null
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      interest_translations: {
+        Row: {
+          interest_id: string
+          locale: string
+          label: string
+          description: string | null
+        }
+        Insert: {
+          interest_id: string
+          locale: string
+          label: string
+          description?: string | null
+        }
+        Update: {
+          interest_id?: string
+          locale?: string
+          label?: string
+          description?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interest_translations_interest_id_fkey"
+            columns: ["interest_id"]
+            isOneToOne: false
+            referencedRelation: "interests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiction_interests: {
+        Row: {
+          fiction_id: string
+          interest_id: string
+          weight: number
+          created_at: string
+        }
+        Insert: {
+          fiction_id: string
+          interest_id: string
+          weight?: number
+          created_at?: string
+        }
+        Update: {
+          fiction_id?: string
+          interest_id?: string
+          weight?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiction_interests_fiction_id_fkey"
+            columns: ["fiction_id"]
+            isOneToOne: false
+            referencedRelation: "fictions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiction_interests_interest_id_fkey"
+            columns: ["interest_id"]
+            isOneToOne: false
+            referencedRelation: "interests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_interests: {
+        Row: {
+          user_id: string
+          interest_id: string
+          source: string
+          created_at: string
+        }
+        Insert: {
+          user_id: string
+          interest_id: string
+          source?: string
+          created_at?: string
+        }
+        Update: {
+          user_id?: string
+          interest_id?: string
+          source?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_interests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_interests_interest_id_fkey"
+            columns: ["interest_id"]
+            isOneToOne: false
+            referencedRelation: "interests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiction_likes: {
+        Row: {
+          user_id: string
+          fiction_id: string
+          created_at: string
+        }
+        Insert: {
+          user_id: string
+          fiction_id: string
+          created_at?: string
+        }
+        Update: {
+          user_id?: string
+          fiction_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiction_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiction_likes_fiction_id_fkey"
+            columns: ["fiction_id"]
+            isOneToOne: false
+            referencedRelation: "fictions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -394,6 +555,26 @@ export type LocationUpdate = TablesUpdate<"locations">
 export type PlaceRow = Tables<"places">
 export type PlaceInsert = TablesInsert<"places">
 export type PlaceUpdate = TablesUpdate<"places">
+
+export type InterestRow = Tables<"interests">
+export type InterestInsert = TablesInsert<"interests">
+export type InterestUpdate = TablesUpdate<"interests">
+
+export type InterestTranslationRow = Tables<"interest_translations">
+export type InterestTranslationInsert = TablesInsert<"interest_translations">
+export type InterestTranslationUpdate = TablesUpdate<"interest_translations">
+
+export type FictionInterestRow = Tables<"fiction_interests">
+export type FictionInterestInsert = TablesInsert<"fiction_interests">
+export type FictionInterestUpdate = TablesUpdate<"fiction_interests">
+
+export type UserInterestRow = Tables<"user_interests">
+export type UserInterestInsert = TablesInsert<"user_interests">
+export type UserInterestUpdate = TablesUpdate<"user_interests">
+
+export type FictionLikeRow = Tables<"fiction_likes">
+export type FictionLikeInsert = TablesInsert<"fiction_likes">
+export type FictionLikeUpdate = TablesUpdate<"fiction_likes">
 
 export type Enums<
   PublicEnumNameOrOptions extends

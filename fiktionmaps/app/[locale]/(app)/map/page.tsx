@@ -65,7 +65,7 @@ export default function MapPage() {
       .then((citiesList: City[]) => {
         setCities(citiesList)
         if (citiesList.length > 0) {
-          const city = citiesList[0]
+          const city = citiesList[5]
           setSelectedCity(city)
           return fetch(`/api/map/city-fictions?cityId=${encodeURIComponent(city.id)}`)
             .then((r) => (r.ok ? r.json() : []))

@@ -3,10 +3,11 @@
 import { useEffect, useState, useRef } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowRight, MapPin, Film, Star, Globe, User } from "lucide-react"
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import type { City } from "@/src/cities/city.domain"
-import type { Fiction } from "@/src/fictions/fiction.domain"
+import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { InterestCatalogItem } from "@/src/interests"
 import { useApi } from "@/lib/api"
 import { useAuth } from "@/context/auth-context"
 import { cn } from "@/lib/utils"
@@ -17,8 +18,8 @@ import {
   OnboardingStepWelcome,
   OnboardingStepAvatar,
   OnboardingStepAbout,
-  OnboardingStepGenres,
   OnboardingStepFictions,
+  OnboardingStepInterests,
   OnboardingStepCities,
   OnboardingStepDone,
 } from "@/components/auth/onboarding/index"
@@ -32,10 +33,9 @@ function firstPendingStep(profile: { username?: string; avatar?: string } | null
   const hasAvatar = !!(profile.avatar && profile.avatar !== DEFAULT_AVATAR)
   if (!hasUsername) return 0
   if (!hasAvatar) return 1
-  return 2 // genres, fictions, cities
+  return 2 // genres, fictions, interests, cities
 }
 
-const GENRES = onboardingData.genres
 const AVATARS = (onboardingData.avatars as { id: string; label: string; url: string }[]).slice(0, 8)
 
 const MAX_SELECTION = 10
@@ -63,10 +63,12 @@ interface OnboardingProps {
 
 export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
   const t = useTranslations("Onboarding")
+  const locale = useLocale()
   const { user, completeOnboarding } = useAuth()
-  const { cities: cityService, fictions: fictionService } = useApi()
+  const { cities: cityService } = useApi()
   const [allCities, setAllCities] = useState<City[]>([])
-  const [allFictions, setAllFictions] = useState<Fiction[]>([])
+  const [allFictions, setAllFictions] = useState<FictionWithMedia[]>([])
+  const [allInterests, setAllInterests] = useState<InterestCatalogItem[]>([])
   const [step, setStep] = useState<number | null>(forceStartAtZero ? 0 : null)
   // Start empty so that the suggestion effect can propose a checked username.
   const [username, setUsername] = useState<string>("")
@@ -82,6 +84,7 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
   const [aboutDateOfBirth, setAboutDateOfBirth] = useState("")
   const [selectedGenres, setSelectedGenres] = useState<string[]>([])
   const [selectedFictions, setSelectedFictions] = useState<string[]>([])
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([])
   const [selectedCities, setSelectedCities] = useState<string[]>([])
   const [completeError, setCompleteError] = useState<string | null>(null)
   const [completing, setCompleting] = useState(false)
@@ -90,8 +93,41 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
 
   useEffect(() => {
     cityService.getAll().then(setAllCities)
-    fictionService.getAll().then(setAllFictions)
-  }, [cityService, fictionService])
+  }, [cityService])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/fictions")
+        const data = (await res.json()) as FictionWithMedia[]
+        if (!cancelled) setAllFictions(data)
+      } catch {
+        if (!cancelled) setAllFictions([])
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/interests?locale=${encodeURIComponent(locale)}`)
+        const data = (await res.json()) as InterestCatalogItem[]
+        if (!cancelled) setAllInterests(data)
+      } catch {
+        // Keep onboarding usable even if interests fail to load.
+        if (!cancelled) setAllInterests([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [locale])
 
   // Debounced validation: check availability shortly after the user stops typing.
   useEffect(() => {
@@ -254,7 +290,7 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
     step === 0 ? canAdvance()
     : step === 1 ? avatarSelected
     : step === 2 ? true // about: optional, can always continue
-    : step === 3 ? selectedGenres.length > 0
+    : step === 3 ? selectedInterests.length > 0
     : step === 4 ? selectedFictions.length > 0
     : step === 5 ? selectedCities.length > 0
     : true
@@ -335,6 +371,7 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
         await completeOnboarding({
           genres: selectedGenres,
           fictions: selectedFictions,
+          interests: selectedInterests,
           cities: selectedCities,
           ...(avatarSelected ? { avatar: selectedAvatar } : {}),
         })
@@ -389,7 +426,7 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
           transition={{ duration: 0.35, ease: "easeOut" }}
           className={cn(
             "flex w-full flex-col items-center",
-            step === 1 || step === 4 ? "max-w-4xl" : "max-w-lg"
+            step === 1 || step === 3 || step === 4 ? "max-w-4xl" : "max-w-lg"
           )}
         >
 
@@ -415,11 +452,13 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
         )}
 
         {step === 3 && (
-          <OnboardingStepGenres
-            genres={GENRES}
-            selectedGenres={selectedGenres}
+          <OnboardingStepInterests
+            interests={allInterests}
+            selectedInterests={selectedInterests}
             maxSelection={MAX_SELECTION}
-            onToggleGenre={(genre: string) => toggleWithMax(selectedGenres, genre, setSelectedGenres, MAX_SELECTION)}
+            onToggleInterest={(id: string) =>
+              toggleWithMax(selectedInterests, id, setSelectedInterests, MAX_SELECTION)
+            }
           />
         )}
 
@@ -437,10 +476,11 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
             cities={allCities}
             selectedCities={selectedCities}
             maxSelection={MAX_SELECTION}
-            onToggleCity={(id: string) => toggleWithMax(selectedCities, id, setSelectedCities, MAX_SELECTION)}
+            onToggleCity={(id: string) =>
+              toggleWithMax(selectedCities, id, setSelectedCities, MAX_SELECTION)
+            }
           />
         )}
-
         {step === 6 && <OnboardingStepDone />}
         </motion.div>
         )}
@@ -450,7 +490,7 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
       <div
         className={cn(
           "mt-6 flex w-full items-center justify-between",
-          step != null && (step === 1 || step === 4) ? "max-w-4xl" : "max-w-lg"
+          step != null && (step === 1 || step === 3 || step === 4) ? "max-w-4xl" : "max-w-lg"
         )}
       >
         {step != null && step > 0 && step < totalSteps - 1 ? (
@@ -468,7 +508,7 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
           {step != null && (step === 3 || step === 4 || step === 5) && (
             <div className="text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">
-                {step === 3 && `${selectedGenres.length}/${MAX_SELECTION}`}
+                {step === 3 && `${selectedInterests.length}/${MAX_SELECTION}`}
                 {step === 4 && `${selectedFictions.length}/${MAX_SELECTION}`}
                 {step === 5 && `${selectedCities.length}/${MAX_SELECTION}`}
               </span>

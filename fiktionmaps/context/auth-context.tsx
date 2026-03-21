@@ -19,6 +19,7 @@ export interface User {
 export interface UserPreferences {
   genres: string[]
   fictions: string[]
+  interests: string[]
   cities: string[]
   avatar?: string
 }
@@ -119,7 +120,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const completeOnboarding = useCallback(async (prefs: UserPreferences) => {
-    const result = await completeOnboardingAction({ avatar: prefs.avatar })
+    const result = await completeOnboardingAction({
+      avatar: prefs.avatar,
+      interests: prefs.interests,
+      fictions: prefs.fictions,
+    })
     if (result.error) throw new Error(result.error)
     setPreferences(prefs)
     setNeedsOnboarding(false)

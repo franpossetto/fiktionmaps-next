@@ -1,7 +1,11 @@
 "use server"
 
 import { getCurrentUserProfile, updateCurrentUserProfile } from "@/lib/app-services"
+import { createClient } from "@/lib/supabase/server"
 import type { UserProfile } from "@/src/users"
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export type ProfileWithOnboarding = UserProfile & {
   onboardingCompleted: boolean
@@ -75,12 +79,80 @@ export type CompleteOnboardingResult =
 
 export async function completeOnboardingAction(prefs: {
   avatar?: string
+  interests?: string[]
+  fictions?: string[]
 }): Promise<CompleteOnboardingResult> {
   try {
     const updated = await updateCurrentUserProfile({
       onboarding_completed: true,
       ...(prefs.avatar != null ? { avatar_url: prefs.avatar } : {}),
     })
+
+    // Persist onboarding interests.
+    // These are user-specific preferences and should survive across devices/sessions.
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { data: null, error: "Unauthorized" }
+    }
+
+    const interestIds = Array.from(
+      new Set(
+        (prefs.interests ?? []).filter(
+          (id) => typeof id === "string" && id.trim().length > 0 && UUID_REGEX.test(id)
+        )
+      )
+    )
+
+    const fictionIds = Array.from(
+      new Set(
+        (prefs.fictions ?? []).filter(
+          (id) => typeof id === "string" && id.trim().length > 0 && UUID_REGEX.test(id)
+        )
+      )
+    )
+
+    // Replace selection: delete current rows and (optionally) re-insert.
+    const { error: delError } = await supabase
+      .from("user_interests")
+      .delete()
+      .eq("user_id", user.id)
+
+    if (delError) throw delError
+
+    if (interestIds.length > 0) {
+      const { error: insError } = await supabase.from("user_interests").insert(
+        interestIds.map((interest_id) => ({
+          user_id: user.id,
+          interest_id,
+          source: "onboarding",
+        }))
+      )
+      if (insError) throw insError
+    }
+
+    // Persist onboarding fiction selections as likes.
+    // Replace selection so user can toggle later without leftover rows.
+    const { error: delFictionError } = await supabase
+      .from("fiction_likes")
+      .delete()
+      .eq("user_id", user.id)
+
+    if (delFictionError) throw delFictionError
+
+    if (fictionIds.length > 0) {
+      const { error: insFictionError } = await supabase.from("fiction_likes").insert(
+        fictionIds.map((fiction_id) => ({
+          user_id: user.id,
+          fiction_id,
+        }))
+      )
+      if (insFictionError) throw insFictionError
+    }
+
     return updated ? { data: true, error: null } : { data: null, error: "Failed to update profile" }
   } catch (e) {
     return {

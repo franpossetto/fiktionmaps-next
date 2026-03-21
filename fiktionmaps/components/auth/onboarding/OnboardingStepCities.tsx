@@ -38,19 +38,21 @@ export function OnboardingStepCities({
               key={city.id}
               onClick={() => onToggleCity(city.id)}
               className={cn(
-                "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all border",
+                "flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors",
                 active
-                  ? "bg-cyan-500/10 border-cyan-500 text-cyan-500"
+                  ? "border-foreground bg-foreground text-background"
                   : "bg-muted border-border text-muted-foreground"
               )}
               title={`${city.name}${city.country ? `, ${city.country}` : ""}`}
             >
-              <MapPin className={cn("h-4 w-4", active ? "text-cyan-500" : "text-muted-foreground")} />
+              <MapPin className="h-4 w-4 shrink-0" />
               <span className="truncate max-w-[10rem]">
                 {city.name}
                 {city.country ? `, ${city.country}` : ""}
               </span>
-              {active && <Check className="h-3 w-3" />}
+              <span className="inline-flex h-3 w-3 items-center justify-center">
+                <Check className={cn("h-3 w-3 transition-opacity", active ? "opacity-100" : "opacity-0")} />
+              </span>
             </button>
           )
         })}

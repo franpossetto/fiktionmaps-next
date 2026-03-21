@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useMemo, useRef } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
 import Image from "next/image"
 import { useRouter, Link } from "@/i18n/navigation"
-import { ArrowLeft, ArrowRight, Loader2, ImagePlus, Film, Trash2 } from "lucide-react"
+import { ArrowLeft, ArrowRight, Loader2, ImagePlus, Film, Trash2, Check } from "lucide-react"
 import type { Fiction, FictionWithMedia } from "@/src/fictions/fiction.domain"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
@@ -19,6 +19,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
+import { useLocale } from "next-intl"
+import type { InterestCatalogItem } from "@/src/interests"
 
 const FICTION_TYPES: { value: Fiction["type"]; label: string }[] = [
   { value: "movie", label: "Movie" },
@@ -45,6 +47,7 @@ function toFormState(f: Fiction) {
 
 export function FictionEditView({ initialFiction }: FictionEditViewProps) {
   const router = useRouter()
+  const locale = useLocale()
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const initialForm = useMemo(() => toFormState(initialFiction), [initialFiction])
@@ -63,6 +66,71 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
   const [deleting, setDeleting] = useState(false)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const bannerInputRef = useRef<HTMLInputElement>(null)
+
+  // Interests (admin selector)
+  const [allInterests, setAllInterests] = useState<InterestCatalogItem[]>([])
+  const [selectedInterestIds, setSelectedInterestIds] = useState<string[]>([])
+  const [loadingInterests, setLoadingInterests] = useState(false)
+  const [savingInterests, setSavingInterests] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoadingInterests(true)
+      try {
+        const [interestsRes, assignedRes] = await Promise.all([
+          fetch(`/api/interests?locale=${encodeURIComponent(locale)}`),
+          fetch(`/api/admin/fictions/${initialFiction.id}/interests`),
+        ])
+
+        if (!interestsRes.ok) throw new Error("Failed to load interests")
+        if (!assignedRes.ok) throw new Error("Failed to load fiction interests")
+
+        const interests = (await interestsRes.json()) as InterestCatalogItem[]
+        const assigned = (await assignedRes.json()) as string[]
+
+        if (!cancelled) {
+          setAllInterests(interests)
+          setSelectedInterestIds(assigned)
+        }
+      } catch {
+        if (!cancelled) {
+          setAllInterests([])
+          setSelectedInterestIds([])
+        }
+      } finally {
+        if (!cancelled) setLoadingInterests(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [initialFiction.id, locale])
+
+  const toggleInterest = (interestId: string) => {
+    setSelectedInterestIds((prev) => {
+      if (prev.includes(interestId)) return prev.filter((x) => x !== interestId)
+      return [...prev, interestId]
+    })
+  }
+
+  const saveInterests = async () => {
+    if (savingInterests || loadingInterests) return
+    setSavingInterests(true)
+    try {
+      const res = await fetch(`/api/admin/fictions/${initialFiction.id}/interests`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ interestIds: selectedInterestIds }),
+      })
+      if (!res.ok) throw new Error("Failed to save interests")
+
+      router.refresh()
+    } finally {
+      setSavingInterests(false)
+    }
+  }
 
   const deleteTitleMatches = deleteConfirmTitle === initialFiction.title
 
@@ -372,6 +440,58 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
                   />
                   <span className="text-sm text-foreground">Active (visible in search)</span>
                 </label>
+              </FormField>
+
+              <FormField label="Interests">
+                <div className="rounded-lg border border-border bg-card/50 p-3">
+                  {loadingInterests ? (
+                    <div className="text-sm text-muted-foreground">Loading interests…</div>
+                  ) : allInterests.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No interests available.</div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {allInterests.map((interest) => {
+                        const active = selectedInterestIds.includes(interest.id)
+                        return (
+                          <button
+                            key={interest.id}
+                            type="button"
+                            onClick={() => toggleInterest(interest.id)}
+                            className={cn(
+                              "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all border",
+                              active
+                                ? "bg-cyan-500/10 border-cyan-500 text-cyan-500"
+                                : "bg-background border-border text-muted-foreground hover:border-muted-foreground/40"
+                            )}
+                            title={interest.key}
+                          >
+                            {active && <Check className="h-3.5 w-3.5" />}
+                            {interest.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={saveInterests}
+                    disabled={savingInterests || loadingInterests || allInterests.length === 0}
+                    className="rounded-xl"
+                  >
+                    {savingInterests ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Saving…
+                      </>
+                    ) : (
+                      "Save interests"
+                    )}
+                  </Button>
+                </div>
               </FormField>
 
               <FormField label="Description" required error={errors.synopsis}>
