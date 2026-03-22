@@ -2,13 +2,16 @@
 
 import { X, MapPin, Quote, Lightbulb, Film, ArrowRight, Box } from "lucide-react"
 import { useState, useEffect } from "react"
+import { useTranslations } from "next-intl"
 import type { Location } from "@/src/locations"
 import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { Scene } from "@/src/scenes"
 import { useApi } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
 import Image from "next/image"
+import { SceneClipPanelCard } from "./scene-clip-panel-card"
 
 interface LocationDetailProps {
   location: Location
@@ -26,23 +29,38 @@ export function LocationDetail({
   onViewPlace,
   onView3D,
 }: LocationDetailProps) {
-  const { fictions: fictionsService, scenes: scenesService } = useApi()
+  const t = useTranslations("Map")
+  const { fictions: fictionsService } = useApi()
   const [fiction, setFiction] = useState<FictionWithMedia | undefined>(
     fictionProp ?? undefined
   )
-  const [sceneCount, setSceneCount] = useState(0)
+  const [placeScenes, setPlaceScenes] = useState<Scene[]>([])
 
   useEffect(() => {
     if (fictionProp !== undefined) {
       setFiction(fictionProp ?? undefined)
     } else {
-      fictionsService.getById(location.fictionId).then(setFiction)
+      fictionsService.getById(location.fictionId).then((f) => setFiction(f ?? undefined))
     }
   }, [location.fictionId, fictionProp, fictionsService])
 
   useEffect(() => {
-    scenesService.getByLocationId(location.id).then((s) => setSceneCount(s.length))
-  }, [location.id, scenesService])
+    let cancelled = false
+    const params = new URLSearchParams({ placeId: location.id, active: "true" })
+    fetch(`/api/scenes?${params}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((s: unknown) => {
+        if (!cancelled && Array.isArray(s)) setPlaceScenes(s as Scene[])
+      })
+      .catch(() => {
+        if (!cancelled) setPlaceScenes([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [location.id])
+
+  const sceneCount = placeScenes.length
 
   return (
     <>
@@ -105,7 +123,7 @@ export function LocationDetail({
               </p>
             </div>
 
-            {/* Scene */}
+            {/* Scene (text) */}
             <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 The Scene
@@ -122,6 +140,29 @@ export function LocationDetail({
                 </div>
               )}
             </div>
+
+            {placeScenes.length > 0 && (
+              <>
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t("sceneClips")} · {t("sceneClipCount", { count: placeScenes.length })}
+                </h3>
+                {placeScenes.slice(0, 5).map((sc) => (
+                  <SceneClipPanelCard
+                    key={sc.id}
+                    scene={sc}
+                    fiction={fiction ?? null}
+                    noVideoLabel={t("noSceneVideo")}
+                    playVideoLabel={t("playSceneVideo")}
+                    filmTimelineCaption={t("filmTimelineCaption")}
+                  />
+                ))}
+                {placeScenes.length > 5 && (
+                  <p className="text-center text-xs text-muted-foreground">
+                    +{placeScenes.length - 5} more on the place page
+                  </p>
+                )}
+              </>
+            )}
 
             {/* Visit Tip */}
             {location.visitTip && (
@@ -191,7 +232,7 @@ export function LocationDetail({
                     <span className="text-sm font-semibold text-foreground">{fiction.title}</span>
                     <span className="text-xs text-muted-foreground">
                       {fiction.year} &middot; {fiction.genre}
-                      {fiction.director && ` \u00B7 ${fiction.director}`}
+                      {fiction.author ? ` \u00B7 ${fiction.author}` : ""}
                     </span>
                   </div>
                 </div>

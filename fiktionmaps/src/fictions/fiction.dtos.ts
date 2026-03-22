@@ -8,6 +8,8 @@ export interface CreateFictionData {
   description: string
   /** Default true: visible in search. */
   active?: boolean
+  /** Total runtime in seconds (movie / tv-series). */
+  duration_sec?: number | null
 }
 
 export interface UpdateFictionData {
@@ -18,4 +20,5 @@ export interface UpdateFictionData {
   genre?: string
   description?: string
   active?: boolean
+  duration_sec?: number | null
 }

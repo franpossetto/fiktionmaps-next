@@ -1,4 +1,6 @@
 export type { Scene } from "./scene.domain"
-export type { ScenesRepositoryPort } from "./scene.repository.port"
+export type { CreateSceneData, UpdateSceneData } from "./scene.dtos"
+export type { SceneListFilters, ScenesRepositoryPort } from "./scene.repository.port"
+export { scenesSupabaseAdapter } from "./scene.repository.adapter"
 export { createScenesService } from "./scene.services"
 export { createMockScenesRepository } from "./scene.repository.mock"

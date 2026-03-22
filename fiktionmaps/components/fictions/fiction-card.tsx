@@ -11,6 +11,8 @@ import { ThumbsUp } from "lucide-react"
 interface FictionCardProps {
   fiction: FictionWithMedia
   locationCount: number
+  /** Video scenes (movie / TV); optional for backwards compatibility. */
+  sceneCount?: number
   /** When set, the card is a link to this URL (SEO-friendly, shareable). */
   href?: string
   onClick?: () => void
@@ -22,6 +24,7 @@ interface FictionCardProps {
 export function FictionCard({
   fiction,
   locationCount,
+  sceneCount = 0,
   href,
   onClick,
   likeCount,
@@ -44,10 +47,15 @@ export function FictionCard({
           onError={() => setCoverError(true)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-        <div className="absolute bottom-0 left-0 right-0 flex items-center gap-2 p-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+        <div className="absolute bottom-0 left-0 right-0 flex flex-wrap items-center gap-x-2 gap-y-0.5 p-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
           <span className="text-xs font-medium text-foreground">
             {locationCount} location{locationCount > 1 ? "s" : ""}
           </span>
+          {(fiction.type === "movie" || fiction.type === "tv-series") && sceneCount > 0 && (
+            <span className="text-xs font-medium text-foreground">
+              {sceneCount} scene{sceneCount > 1 ? "s" : ""}
+            </span>
+          )}
         </div>
         <div className="absolute right-2 top-2 flex items-center gap-2">
           <Badge variant="secondary" className="bg-background/70 px-1.5 py-0 text-[10px] backdrop-blur-sm">

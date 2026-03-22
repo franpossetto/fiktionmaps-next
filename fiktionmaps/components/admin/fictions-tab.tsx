@@ -41,6 +41,7 @@ interface FictionFormData {
   genre: string
   synopsis: string
   active: boolean
+  runtimeMinutes: string
 }
 
 type ViewMode = "cards" | "table"
@@ -64,6 +65,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
     genre: "",
     synopsis: "",
     active: true,
+    runtimeMinutes: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -114,6 +116,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
       genre: "",
       synopsis: "",
       active: true,
+      runtimeMinutes: "",
     })
     setCoverFile(null)
     setCoverPreviewUrl(null)
@@ -169,6 +172,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
     fd.set("genre", formData.genre)
     fd.set("synopsis", formData.synopsis)
     fd.set("active", formData.active ? "true" : "false")
+    fd.set("runtimeMinutes", formData.runtimeMinutes ?? "")
     const result = await createFictionAction(fd)
     if (!result.success) {
       setSubmitting(false)
@@ -446,6 +450,22 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                     <span className="text-sm text-foreground">Active (visible in search)</span>
                   </label>
                 </FormField>
+
+                {(formData.type === "movie" || formData.type === "tv-series") && (
+                  <FormField label="Runtime (minutes)">
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      inputMode="numeric"
+                      value={formData.runtimeMinutes}
+                      onChange={(e) => setFormData({ ...formData, runtimeMinutes: e.target.value })}
+                      placeholder="e.g. 120"
+                      className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground/20 transition-all"
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">Optional. Used to position scenes on the film timeline.</p>
+                  </FormField>
+                )}
 
                 <FormField label="Description" required error={errors.synopsis}>
                   <textarea

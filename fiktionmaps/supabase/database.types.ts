@@ -81,6 +81,7 @@ export type Database = {
           genre: string
           description: string
           active: boolean
+          duration_sec: number | null
           created_at: string
           updated_at: string
         }
@@ -93,6 +94,7 @@ export type Database = {
           genre: string
           description: string
           active?: boolean
+          duration_sec?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -105,6 +107,7 @@ export type Database = {
           genre?: string
           description?: string
           active?: boolean
+          duration_sec?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -270,6 +273,78 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scenes: {
+        Row: {
+          id: string
+          fiction_id: string
+          place_id: string
+          title: string
+          description: string
+          quote: string | null
+          timestamp_label: string | null
+          season: number | null
+          episode: number | null
+          episode_title: string | null
+          video_url: string | null
+          sort_order: number
+          active: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          fiction_id: string
+          place_id: string
+          title: string
+          description: string
+          quote?: string | null
+          timestamp_label?: string | null
+          season?: number | null
+          episode?: number | null
+          episode_title?: string | null
+          video_url?: string | null
+          sort_order?: number
+          active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          fiction_id?: string
+          place_id?: string
+          title?: string
+          description?: string
+          quote?: string | null
+          timestamp_label?: string | null
+          season?: number | null
+          episode?: number | null
+          episode_title?: string | null
+          video_url?: string | null
+          sort_order?: number
+          active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scenes_fiction_id_fkey"
+            columns: ["fiction_id"]
+            isOneToOne: false
+            referencedRelation: "fictions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scenes_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
             referencedColumns: ["id"]
           },
         ]
@@ -555,6 +630,10 @@ export type LocationUpdate = TablesUpdate<"locations">
 export type PlaceRow = Tables<"places">
 export type PlaceInsert = TablesInsert<"places">
 export type PlaceUpdate = TablesUpdate<"places">
+
+export type SceneRow = Tables<"scenes">
+export type SceneInsert = TablesInsert<"scenes">
+export type SceneUpdate = TablesUpdate<"scenes">
 
 export type InterestRow = Tables<"interests">
 export type InterestInsert = TablesInsert<"interests">

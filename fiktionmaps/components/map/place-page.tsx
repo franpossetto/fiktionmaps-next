@@ -39,7 +39,7 @@ export function PlacePage({
   city: cityProp,
   onBack,
 }: PlacePageProps) {
-  const { fictions: fictionsService, cities: citiesService, scenes: scenesService, locations: locationsService } = useApi()
+  const { fictions: fictionsService, cities: citiesService, locations: locationsService } = useApi()
 
   const [fiction, setFiction] = useState<Fiction | undefined>(fictionProp ?? undefined)
   const [city, setCity] = useState<City | undefined>(cityProp ?? undefined)
@@ -55,16 +55,26 @@ export function PlacePage({
   useEffect(() => {
     let cancelled = false
     async function loadData() {
-      const [f, c, s] = await Promise.all([
+      const [f, c] = await Promise.all([
         fictionProp !== undefined ? Promise.resolve(fictionProp ?? null) : fictionsService.getById(location.fictionId),
         cityProp !== undefined ? Promise.resolve(cityProp ?? null) : citiesService.getById(location.cityId),
-        scenesService.getByLocationId(location.id),
       ])
       if (cancelled) return
       setFiction(f ?? undefined)
       setCity(c ?? undefined)
+
+      const placeParams = new URLSearchParams({ placeId: location.id, active: "true" })
+      const scenesRes = await fetch(`/api/scenes?${placeParams}`)
+      const s: Scene[] = scenesRes.ok ? await scenesRes.json() : []
+      if (cancelled) return
       setScenes(s)
-      const fs = f ? await scenesService.getByFictionId(f.id) : s
+
+      let fs = s
+      if (f) {
+        const fictionParams = new URLSearchParams({ fictionId: f.id, active: "true" })
+        const fsRes = await fetch(`/api/scenes?${fictionParams}`)
+        fs = fsRes.ok ? await fsRes.json() : []
+      }
       if (cancelled) return
       setFictionScenes(fs)
       const locationIds = [...new Set(fs.map((scene) => scene.locationId))]
@@ -77,8 +87,10 @@ export function PlacePage({
       setSceneLocations(locMap)
     }
     loadData()
-    return () => { cancelled = true }
-  }, [location.id, location.fictionId, location.cityId, fictionProp, cityProp, fictionsService, citiesService, scenesService, locationsService])
+    return () => {
+      cancelled = true
+    }
+  }, [location.id, location.fictionId, location.cityId, fictionProp, cityProp, fictionsService, citiesService, locationsService])
 
   // For TV series group by season; for movies/books keep flat
   const isTvSeries = fiction?.type === "tv-series"
@@ -181,8 +193,8 @@ export function PlacePage({
               <video
                 ref={watchVideoRef}
                 key={currentWatchScene.id}
-                src={currentWatchScene.videoUrl}
-                poster={currentWatchScene.thumbnail}
+                src={currentWatchScene.videoUrl || undefined}
+                poster={currentWatchScene.thumbnail || undefined}
                 autoPlay
                 controls
                 muted={muted}
@@ -475,7 +487,7 @@ export function PlacePage({
                     {/* Thumbnail */}
                     <div className="relative w-[200px] min-h-[120px] shrink-0 overflow-hidden rounded-lg self-stretch">
                       <Image
-                        src={scene.thumbnail}
+                        src={scene.thumbnail || "/placeholder.svg"}
                         alt={scene.title}
                         fill
                         className="object-cover"
@@ -498,9 +510,9 @@ export function PlacePage({
                           S{scene.season} E{scene.episode} &middot; {scene.episodeTitle}
                         </p>
                       )}
-                      {!isTvSeries && scene.chapter && (
+                      {!isTvSeries && scene.timestamp && (
                         <p className="text-[11px] font-medium text-muted-foreground">
-                          {scene.chapter}
+                          {scene.timestamp}
                         </p>
                       )}
                       <h3 className="text-sm font-semibold text-foreground leading-snug">
@@ -543,8 +555,8 @@ export function PlacePage({
                 >
                   <div className="relative aspect-video w-full bg-black">
                     <video
-                      src={scene.videoUrl}
-                      poster={scene.thumbnail}
+                      src={scene.videoUrl || undefined}
+                      poster={scene.thumbnail || undefined}
                       controls
                       preload="metadata"
                       playsInline

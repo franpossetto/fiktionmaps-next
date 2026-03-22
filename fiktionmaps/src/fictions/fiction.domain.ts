@@ -8,6 +8,8 @@ export interface Fiction {
   genre: string
   description: string
   active: boolean
+  /** Full work runtime in seconds (audiovisual). Omitted or null if unknown. */
+  duration_sec?: number | null
   created_at: string
   updated_at: string
 }

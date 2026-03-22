@@ -11,6 +11,7 @@ import {
   createPlacesService,
   placesSupabaseAdapter,
 } from "@/src/places"
+import { createScenesService, scenesSupabaseAdapter } from "@/src/scenes"
 import { createUsersService } from "@/src/users/user.services"
 import { supabaseRepositoryAdapter } from "@/src/users/user.repository.adapter"
 
@@ -70,3 +71,19 @@ export const updatePlace = placesService.update
 
 export type { Location } from "@/src/locations"
 export type { CreatePlaceData, UpdatePlaceData } from "@/src/places"
+
+const scenesService = createScenesService({
+  scenesRepo: scenesSupabaseAdapter,
+})
+
+export const listScenes = scenesService.list.bind(scenesService)
+export const getSceneById = scenesService.getById.bind(scenesService)
+export const getScenesByFictionId = scenesService.getByFictionId.bind(scenesService)
+export const getScenesByLocationId = scenesService.getByLocationId.bind(scenesService)
+export const getScenesByPlaceId = scenesService.getByPlaceId.bind(scenesService)
+export const createScene = scenesService.create.bind(scenesService)
+export const updateScene = scenesService.update.bind(scenesService)
+export const deleteScene = scenesService.remove.bind(scenesService)
+
+export type { Scene } from "@/src/scenes/scene.domain"
+export type { CreateSceneData, UpdateSceneData } from "@/src/scenes/scene.dtos"

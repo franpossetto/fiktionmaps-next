@@ -45,6 +45,7 @@ export const supabaseRepositoryAdapter: FictionsRepositoryPort = {
         genre: data.genre,
         description: data.description,
         active: data.active ?? true,
+        duration_sec: data.duration_sec ?? null,
       })
       .select()
       .single()

@@ -78,6 +78,7 @@ export async function updateFictionAction(
   const author = (formData.get("author") as string)?.trim() || null
   const director = (formData.get("director") as string)?.trim() || null
   const active = formData.get("active") !== "false"
+  const runtimeMinutesRaw = ((formData.get("runtimeMinutes") as string) ?? "").trim()
 
   if (!title?.trim()) return { success: false, error: "Title is required" }
   if (!type || !["movie", "book", "tv-series"].includes(type))
@@ -88,6 +89,16 @@ export async function updateFictionAction(
   if (!genre?.trim()) return { success: false, error: "Genre is required" }
   if (!description?.trim()) return { success: false, error: "Description is required" }
 
+  let duration_sec: number | null = null
+  if (type === "movie" || type === "tv-series") {
+    if (runtimeMinutesRaw !== "") {
+      const n = parseInt(runtimeMinutesRaw, 10)
+      if (Number.isNaN(n) || n <= 0)
+        return { success: false, error: "Runtime must be a positive number of minutes" }
+      duration_sec = n * 60
+    }
+  }
+
   const fiction = await updateFiction(id, {
     title: title.trim(),
     type,
@@ -96,6 +107,7 @@ export async function updateFictionAction(
     genre: genre.trim(),
     description: description.trim(),
     active,
+    duration_sec,
   })
 
   if (!fiction) return { success: false, error: "Failed to update fiction" }
@@ -123,6 +135,16 @@ export async function createFictionAction(formData: FormData): Promise<CreateFic
   if (!genre?.trim()) return { success: false, error: "Genre is required" }
   if (!description?.trim()) return { success: false, error: "Description is required" }
 
+  const runtimeMinutesRawCreate = ((formData.get("runtimeMinutes") as string) ?? "").trim()
+  let duration_sec: number | null = null
+  if ((type === "movie" || type === "tv-series") && runtimeMinutesRawCreate !== "") {
+    const n = parseInt(runtimeMinutesRawCreate, 10)
+    if (Number.isNaN(n) || n <= 0)
+      return { success: false, error: "Runtime must be a positive number of minutes" }
+    duration_sec = n * 60
+  }
+  if (type === "book") duration_sec = null
+
   const fiction = await createFiction({
     title: title.trim(),
     type,
@@ -131,6 +153,7 @@ export async function createFictionAction(formData: FormData): Promise<CreateFic
     genre: genre.trim(),
     description: description.trim(),
     active,
+    duration_sec,
   })
 
   if (!fiction) return { success: false, error: "Failed to create fiction" }

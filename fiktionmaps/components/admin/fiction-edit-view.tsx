@@ -42,6 +42,10 @@ function toFormState(f: Fiction) {
     genre: f.genre,
     synopsis: f.description,
     active: f.active,
+    runtimeMinutes:
+      f.duration_sec != null && f.duration_sec > 0
+        ? String(Math.round(f.duration_sec / 60))
+        : "",
   }
 }
 
@@ -208,6 +212,7 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
     fd.set("director", formData.director)
     fd.set("author", formData.author)
     fd.set("active", formData.active ? "true" : "false")
+    fd.set("runtimeMinutes", formData.runtimeMinutes ?? "")
     const result = await updateFictionAction(initialFiction.id, fd)
     setSaving(false)
     if (result.success) {
@@ -427,6 +432,24 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
                     placeholder="Author or show creator"
                     className={inputClass}
                   />
+                </FormField>
+              )}
+
+              {(formData.type === "movie" || formData.type === "tv-series") && (
+                <FormField label="Runtime (minutes)">
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    inputMode="numeric"
+                    value={formData.runtimeMinutes}
+                    onChange={(e) => setFormData((p) => ({ ...p, runtimeMinutes: e.target.value }))}
+                    placeholder="e.g. 120 for 2 hours — used for scene timelines"
+                    className={inputClass}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Optional. Total length of the film or series episode block; scene timecodes map onto this.
+                  </p>
                 </FormField>
               )}
 

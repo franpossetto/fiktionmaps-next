@@ -24,6 +24,7 @@ export function FictionDetail({ fiction, onBack, onViewPlace }: FictionDetailPro
   const [allLocations, setAllLocations] = useState<Location[]>([])
   const [fictionCities, setFictionCities] = useState<City[]>([])
   const [cityMap, setCityMap] = useState<Map<string, City>>(new Map())
+  const [sceneCount, setSceneCount] = useState(0)
 
   useEffect(() => {
     async function load() {
@@ -37,6 +38,21 @@ export function FictionDetail({ fiction, onBack, onViewPlace }: FictionDetailPro
     }
     load()
   }, [fiction.id, locationService, fictionService])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/scenes?fictionId=${encodeURIComponent(fiction.id)}&active=true`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((scenes: unknown) => {
+        if (!cancelled) setSceneCount(Array.isArray(scenes) ? scenes.length : 0)
+      })
+      .catch(() => {
+        if (!cancelled) setSceneCount(0)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [fiction.id])
 
   const [expandedLocation, setExpandedLocation] = useState<string | null>(null)
   const [heroVisible, setHeroVisible] = useState(true)
@@ -185,6 +201,12 @@ export function FictionDetail({ fiction, onBack, onViewPlace }: FictionDetailPro
                   <MapPin className="h-3.5 w-3.5" />
                   {allLocations.length} location{allLocations.length > 1 ? "s" : ""} in{" "}
                   {fictionCities.length} cit{fictionCities.length > 1 ? "ies" : "y"}
+                  {(fiction.type === "movie" || fiction.type === "tv-series") && sceneCount > 0 && (
+                    <>
+                      {" "}
+                      &middot; {sceneCount} scene{sceneCount > 1 ? "s" : ""}
+                    </>
+                  )}
                 </span>
               </div>
               {fiction.description && (
@@ -210,7 +232,7 @@ export function FictionDetail({ fiction, onBack, onViewPlace }: FictionDetailPro
                   {city?.name}, {city?.country}
                 </h2>
                 <span className="text-sm text-muted-foreground">
-                  &middot; {locs.length} scene{locs.length > 1 ? "s" : ""}
+                  &middot; {locs.length} place{locs.length > 1 ? "s" : ""}
                 </span>
               </div>
 

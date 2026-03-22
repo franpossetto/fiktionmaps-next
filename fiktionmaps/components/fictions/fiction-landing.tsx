@@ -41,6 +41,7 @@ export function FictionLanding({
   const { user } = useAuth()
   const [allFictions, setAllFictions] = useState<FictionWithMedia[]>(initialFictions ?? [])
   const [locationCountMap, setLocationCountMap] = useState<Map<string, number>>(new Map())
+  const [sceneCountMap, setSceneCountMap] = useState<Map<string, number>>(new Map())
   const [likeCountByFictionId, setLikeCountByFictionId] = useState<Record<string, number>>({})
   const [likedFictionIds, setLikedFictionIds] = useState<string[]>([])
 
@@ -63,11 +64,22 @@ export function FictionLanding({
         list = fictions
       }
       const counts = new Map<string, number>()
-      await Promise.all(list.map(async (f) => {
-        const locs = await locationService.getByFictionId(f.id)
-        counts.set(f.id, locs.length)
-      }))
+      const sceneCounts = new Map<string, number>()
+      await Promise.all(
+        list.map(async (f) => {
+          const locs = await locationService.getByFictionId(f.id)
+          counts.set(f.id, locs.length)
+          try {
+            const res = await fetch(`/api/scenes?fictionId=${encodeURIComponent(f.id)}&active=true`)
+            const scenes = res.ok ? await res.json() : []
+            sceneCounts.set(f.id, Array.isArray(scenes) ? scenes.length : 0)
+          } catch {
+            sceneCounts.set(f.id, 0)
+          }
+        }),
+      )
       setLocationCountMap(counts)
+      setSceneCountMap(sceneCounts)
     }
     load()
   }, [fictionService, locationService, initialFictions])
@@ -274,6 +286,7 @@ export function FictionLanding({
                   key={fiction.id}
                   fiction={fiction}
                   locationCount={locationCountMap.get(fiction.id) ?? 0}
+                  sceneCount={sceneCountMap.get(fiction.id) ?? 0}
                   href={`/fictions/${fiction.id}`}
                   likeCount={likeCountByFictionId[fiction.id] ?? 0}
                   liked={likedFictionIdSet.has(fiction.id)}
