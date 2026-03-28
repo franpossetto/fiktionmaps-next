@@ -1,12 +1,6 @@
 import { NextResponse } from "next/server"
 import { createAnonymousClient } from "@/lib/supabase/server"
-
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-function isValidUuid(id: string): boolean {
-  return UUID_REGEX.test(id)
-}
+import { isUuidString } from "@/lib/validation/primitives"
 
 /** GET: like counts for the provided fiction ids. */
 export async function GET(req: Request) {
@@ -18,7 +12,7 @@ export async function GET(req: Request) {
     .map((s) => s.trim())
     .filter(Boolean)
 
-  const validIds = fictionIds.filter((id) => isValidUuid(id))
+  const validIds = fictionIds.filter((id) => isUuidString(id))
   if (validIds.length === 0) return NextResponse.json({ likeCountByFictionId: {} })
 
   const supabase = createAnonymousClient()

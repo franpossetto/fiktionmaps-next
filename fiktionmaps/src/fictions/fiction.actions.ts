@@ -1,8 +1,13 @@
 "use server"
 
 import { revalidatePath, revalidateTag } from "next/cache"
+import { zodErrorMessage } from "@/lib/validation/http"
 import { createFiction, updateFiction, deleteFiction } from "@/lib/app-services"
 import type { Fiction } from "./fiction.domain"
+import {
+  parseCreateFictionFormData,
+  parseUpdateFictionFormData,
+} from "./fiction.schemas"
 import {
   uploadEntityImage,
   validateImageFile,
@@ -70,45 +75,10 @@ export async function updateFictionAction(
   id: string,
   formData: FormData
 ): Promise<UpdateFictionResult> {
-  const title = formData.get("title") as string | null
-  const type = formData.get("type") as "movie" | "book" | "tv-series" | null
-  const yearStr = formData.get("year") as string | null
-  const genre = formData.get("genre") as string | null
-  const description = formData.get("synopsis") as string | null
-  const author = (formData.get("author") as string)?.trim() || null
-  const director = (formData.get("director") as string)?.trim() || null
-  const active = formData.get("active") !== "false"
-  const runtimeMinutesRaw = ((formData.get("runtimeMinutes") as string) ?? "").trim()
+  const parsed = parseUpdateFictionFormData(formData)
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
 
-  if (!title?.trim()) return { success: false, error: "Title is required" }
-  if (!type || !["movie", "book", "tv-series"].includes(type))
-    return { success: false, error: "Type must be movie, book, or tv-series" }
-  const year = yearStr ? parseInt(yearStr, 10) : NaN
-  if (Number.isNaN(year) || year < 1900 || year > new Date().getFullYear())
-    return { success: false, error: "Invalid year" }
-  if (!genre?.trim()) return { success: false, error: "Genre is required" }
-  if (!description?.trim()) return { success: false, error: "Description is required" }
-
-  let duration_sec: number | null = null
-  if (type === "movie" || type === "tv-series") {
-    if (runtimeMinutesRaw !== "") {
-      const n = parseInt(runtimeMinutesRaw, 10)
-      if (Number.isNaN(n) || n <= 0)
-        return { success: false, error: "Runtime must be a positive number of minutes" }
-      duration_sec = n * 60
-    }
-  }
-
-  const fiction = await updateFiction(id, {
-    title: title.trim(),
-    type,
-    year,
-    author: type === "movie" ? director : author,
-    genre: genre.trim(),
-    description: description.trim(),
-    active,
-    duration_sec,
-  })
+  const fiction = await updateFiction(id, parsed.data)
 
   if (!fiction) return { success: false, error: "Failed to update fiction" }
 
@@ -119,42 +89,10 @@ export async function updateFictionAction(
 }
 
 export async function createFictionAction(formData: FormData): Promise<CreateFictionResult> {
-  const title = formData.get("title") as string | null
-  const type = formData.get("type") as "movie" | "book" | "tv-series" | null
-  const yearStr = formData.get("year") as string | null
-  const genre = formData.get("genre") as string | null
-  const description = formData.get("synopsis") as string | null
-  const active = formData.get("active") !== "false"
+  const parsed = parseCreateFictionFormData(formData)
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
 
-  if (!title?.trim()) return { success: false, error: "Title is required" }
-  if (!type || !["movie", "book", "tv-series"].includes(type))
-    return { success: false, error: "Type must be movie, book, or tv-series" }
-  const year = yearStr ? parseInt(yearStr, 10) : NaN
-  if (Number.isNaN(year) || year < 1900 || year > new Date().getFullYear())
-    return { success: false, error: "Invalid year" }
-  if (!genre?.trim()) return { success: false, error: "Genre is required" }
-  if (!description?.trim()) return { success: false, error: "Description is required" }
-
-  const runtimeMinutesRawCreate = ((formData.get("runtimeMinutes") as string) ?? "").trim()
-  let duration_sec: number | null = null
-  if ((type === "movie" || type === "tv-series") && runtimeMinutesRawCreate !== "") {
-    const n = parseInt(runtimeMinutesRawCreate, 10)
-    if (Number.isNaN(n) || n <= 0)
-      return { success: false, error: "Runtime must be a positive number of minutes" }
-    duration_sec = n * 60
-  }
-  if (type === "book") duration_sec = null
-
-  const fiction = await createFiction({
-    title: title.trim(),
-    type,
-    year,
-    author: null,
-    genre: genre.trim(),
-    description: description.trim(),
-    active,
-    duration_sec,
-  })
+  const fiction = await createFiction(parsed.data)
 
   if (!fiction) return { success: false, error: "Failed to create fiction" }
 

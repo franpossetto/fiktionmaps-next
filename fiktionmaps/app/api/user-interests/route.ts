@@ -1,16 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-function isValidUuid(id: string): boolean {
-  return UUID_REGEX.test(id)
-}
-
-function jsonError(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status })
-}
+import { interestIdsBodySchema } from "@/lib/validation/api-payloads"
+import { jsonError, jsonZodError } from "@/lib/validation/http"
 
 async function requireUserId() {
   const supabase = await createClient()
@@ -44,16 +35,17 @@ export async function PUT(req: Request) {
   const { userId } = await requireUserId()
   if (!userId) return jsonError("Unauthorized", 401)
 
-  let payload: { interestIds: string[] }
+  let body: unknown
   try {
-    payload = (await req.json()) as { interestIds: string[] }
+    body = await req.json()
   } catch {
     return jsonError("Invalid JSON body")
   }
 
-  if (!Array.isArray(payload.interestIds)) return jsonError("interestIds must be an array")
-  const interestIds = payload.interestIds.filter((id) => typeof id === "string" && id.trim().length > 0)
-  if (!interestIds.every(isValidUuid)) return jsonError("All interestIds must be valid UUIDs")
+  const parsed = interestIdsBodySchema.safeParse(body)
+  if (!parsed.success) return jsonZodError(parsed.error)
+
+  const { interestIds } = parsed.data
 
   const supabase = await createClient()
 
@@ -75,4 +67,3 @@ export async function PUT(req: Request) {
 
   return NextResponse.json({ success: true })
 }
-

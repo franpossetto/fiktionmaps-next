@@ -2,10 +2,8 @@
 
 import { getCurrentUserProfile, updateCurrentUserProfile } from "@/lib/app-services"
 import { createClient } from "@/lib/supabase/server"
+import { isUuidString } from "@/lib/validation/primitives"
 import type { UserProfile } from "@/src/users"
-
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export type ProfileWithOnboarding = UserProfile & {
   onboardingCompleted: boolean
@@ -102,7 +100,7 @@ export async function completeOnboardingAction(prefs: {
     const interestIds = Array.from(
       new Set(
         (prefs.interests ?? []).filter(
-          (id) => typeof id === "string" && id.trim().length > 0 && UUID_REGEX.test(id)
+          (id) => typeof id === "string" && id.trim().length > 0 && isUuidString(id.trim())
         )
       )
     )
@@ -110,7 +108,7 @@ export async function completeOnboardingAction(prefs: {
     const fictionIds = Array.from(
       new Set(
         (prefs.fictions ?? []).filter(
-          (id) => typeof id === "string" && id.trim().length > 0 && UUID_REGEX.test(id)
+          (id) => typeof id === "string" && id.trim().length > 0 && isUuidString(id.trim())
         )
       )
     )

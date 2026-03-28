@@ -1,13 +1,7 @@
 import { NextResponse } from "next/server"
 import { createAnonymousClient } from "@/lib/supabase/server"
+import { isUuidString } from "@/lib/validation/primitives"
 import type { Location } from "@/src/locations"
-
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-function isUuid(s: string): boolean {
-  return UUID_REGEX.test(s)
-}
 
 function parseFictionIds(searchParams: URLSearchParams): string[] {
   const ids = searchParams.getAll("fictionIds[]")
@@ -48,7 +42,7 @@ export async function GET(req: Request) {
   }
 
   // places.fiction_id is UUID; passing slugs (e.g. from mock data) causes Postgres to throw.
-  const fictionIds = rawFictionIds.filter(isUuid)
+  const fictionIds = rawFictionIds.filter(isUuidString)
   if (fictionIds.length === 0) {
     return NextResponse.json([] satisfies Location[])
   }

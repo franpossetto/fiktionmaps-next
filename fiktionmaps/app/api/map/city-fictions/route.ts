@@ -1,19 +1,17 @@
 import { NextResponse } from "next/server"
 import { createAnonymousClient } from "@/lib/supabase/server"
+import { uuidSchema } from "@/lib/validation/primitives"
 import {
   mapAssetImagesToFiction,
   type AssetImageRow,
 } from "@/src/fictions/fiction-cached-read"
 import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
 /** GET: fictions that have at least one place in the given city (for map selector). */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const cityId = searchParams.get("cityId")
-  if (!cityId || !UUID_REGEX.test(cityId)) {
+  if (!cityId || !uuidSchema.safeParse(cityId).success) {
     return NextResponse.json({ error: "Valid cityId is required" }, { status: 400 })
   }
 
