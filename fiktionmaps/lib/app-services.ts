@@ -1,15 +1,17 @@
 import { unstable_cache } from "next/cache"
 import { cache } from "react"
 import { getSessionUserId } from "@/lib/auth/auth.service"
-import { createAnonymousClient } from "@/lib/supabase/server"
+import { createAnonymousClient, createClient } from "@/lib/supabase/server"
 import { createCitiesService } from "@/src/cities/city.services"
-import { supabaseRepositoryAdapter as citiesSupabaseAdapter } from "@/src/cities/city.repository.adapter"
-import { getAllCitiesWithClient } from "@/src/cities/city-cached-read"
-import { getAllFictionsWithClient } from "@/src/fictions/fiction-cached-read"
+import {
+  createCitiesSupabaseAdapter,
+  supabaseRepositoryAdapter as citiesSupabaseAdapter,
+} from "@/src/cities/city.repository.adapter"
+import { createFictionsSupabaseAdapter } from "@/src/fictions/fiction.repository.adapter"
 import { createFictionsService } from "@/src/fictions/fiction.services"
-import { supabaseRepositoryAdapter as fictionsSupabaseAdapter } from "@/src/fictions/fiction.repository.adapter"
 import {
   createPlacesService,
+  createPlacesSupabaseAdapter,
   placesSupabaseAdapter,
 } from "@/src/places"
 import { createScenesService, scenesSupabaseAdapter } from "@/src/scenes"
@@ -30,13 +32,17 @@ export const updateCurrentUserProfile = usersService.updateCurrentUserProfile
 export type { Profile } from "@/src/users/user.domain"
 export type { UpdateProfileData, UserRole } from "@/src/users/user.dtos"
 
+const fictionsRepoSession = createFictionsSupabaseAdapter(createClient)
 const fictionsService = createFictionsService({
-  fictionsRepo: fictionsSupabaseAdapter,
+  fictionsRepo: fictionsRepoSession,
 })
 
 /** Cached 60s so repeated page views don't hit Supabase every time. Uses anonymous client (no cookies) so it's safe inside unstable_cache. Invalidate with revalidateTag("fictions") after mutations. */
+const fictionsRepoPublic = createFictionsSupabaseAdapter(() =>
+  Promise.resolve(createAnonymousClient())
+)
 export const getAllFictions = unstable_cache(
-  async () => getAllFictionsWithClient(createAnonymousClient()),
+  async () => fictionsRepoPublic.getAll(),
   ["fictions"],
   { revalidate: 60, tags: ["fictions"] }
 )
@@ -50,13 +56,22 @@ export const getFictionCities = fictionsService.getFictionCities
 export type { Fiction, FictionWithMedia } from "@/src/fictions/fiction.domain"
 export type { CreateFictionData, UpdateFictionData } from "@/src/fictions/fiction.dtos"
 
+const placesRepoPublic = createPlacesSupabaseAdapter(() =>
+  Promise.resolve(createAnonymousClient())
+)
+const citiesRepoPublic = createCitiesSupabaseAdapter(() =>
+  Promise.resolve(createAnonymousClient())
+)
+
 const citiesService = createCitiesService({
   citiesRepo: citiesSupabaseAdapter,
+  placesRepo: placesRepoPublic,
+  fictionsRepo: fictionsRepoPublic,
 })
 
 /** Cached 60s so repeated page views don't hit Supabase every time. Uses anonymous client (no cookies) so it's safe inside unstable_cache. Invalidate with revalidateTag("cities", "page") after mutations. */
 export const getAllCities = unstable_cache(
-  async () => getAllCitiesWithClient(createAnonymousClient()),
+  async () => citiesRepoPublic.getAll(),
   ["cities"],
   { revalidate: 60, tags: ["cities"] }
 )
@@ -65,7 +80,15 @@ export const createCity = citiesService.create
 export const findOrCreateCity = citiesService.findOrCreate
 export const updateCity = citiesService.update
 export const deleteCity = citiesService.delete
-export const getCityFictions = citiesService.getCityFictions
+
+/** Fictions linked to a city (locations → places), with media. Cached; uses anonymous client inside the cache scope. */
+export function getCityFictions(cityId: string) {
+  return unstable_cache(
+    async () => citiesService.getCityFictions(cityId),
+    ["city-fictions", cityId],
+    { revalidate: 60, tags: ["cities", "fictions"] }
+  )()
+}
 
 export type { City } from "@/src/cities/city.domain"
 export type { CreateCityData, UpdateCityData } from "@/src/cities/city.dtos"

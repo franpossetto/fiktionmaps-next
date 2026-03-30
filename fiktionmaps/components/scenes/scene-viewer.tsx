@@ -24,10 +24,20 @@ function bboxAround(lat: number, lng: number, radiusKm: number): Bbox {
   }
 }
 
-export function SceneViewer() {
-  const [selectedCity, setSelectedCity] = useState<City | null>(null)
+interface SceneViewerProps {
+  initialCities?: City[]
+  initialSelectedCity?: City | null
+  initialAvailableFictions?: Fiction[]
+}
+
+export function SceneViewer({
+  initialCities,
+  initialSelectedCity = null,
+  initialAvailableFictions,
+}: SceneViewerProps = {}) {
+  const [selectedCity, setSelectedCity] = useState<City | null>(initialSelectedCity)
   const [selectedFictionIds, setSelectedFictionIds] = useState<string[]>([])
-  const [availableFictions, setAvailableFictions] = useState<Fiction[]>([])
+  const [availableFictions, setAvailableFictions] = useState<Fiction[]>(initialAvailableFictions ?? [])
   const [scenes, setScenes] = useState<Location[]>([])
   const [fiction, setFiction] = useState<Fiction | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -38,11 +48,14 @@ export function SceneViewer() {
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
+    if (initialSelectedCity) return
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch("/api/cities")
-        const allCities = (await res.json()) as City[]
+        const allCities =
+          initialCities && initialCities.length > 0
+            ? initialCities
+            : ((await (await fetch("/api/cities")).json()) as City[])
         if (!cancelled && allCities.length > 0) setSelectedCity(allCities[0])
       } catch {
         if (!cancelled) setSelectedCity(null)
@@ -51,10 +64,17 @@ export function SceneViewer() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [initialSelectedCity, initialCities])
 
   useEffect(() => {
     if (!selectedCity) return
+    if (initialSelectedCity && selectedCity.id === initialSelectedCity.id && initialAvailableFictions) {
+      if (availableFictions.length === 0) {
+        setAvailableFictions(initialAvailableFictions)
+        setSelectedFictionIds(initialAvailableFictions.map((f) => f.id))
+      }
+      return
+    }
     let cancelled = false
     ;(async () => {
       try {
@@ -74,7 +94,7 @@ export function SceneViewer() {
     return () => {
       cancelled = true
     }
-  }, [selectedCity])
+  }, [selectedCity, initialSelectedCity, initialAvailableFictions, availableFictions.length])
 
   useEffect(() => {
     if (!selectedCity) return

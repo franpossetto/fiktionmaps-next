@@ -1,16 +1,14 @@
 import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { FictionsRepositoryPort } from "@/src/fictions/fiction.repository.port"
+import type { PlacesRepositoryPort } from "@/src/places/place.repository.port"
 import type { City } from "./city.domain"
 import type { CreateCityData, UpdateCityData } from "./city.dtos"
 import type { CitiesRepositoryPort } from "./city.repository.port"
 
 interface CitiesServiceDeps {
   citiesRepo: CitiesRepositoryPort
-  locationsRepo?: {
-    getByCityId(cityId: string): Promise<{ fictionId: string }[]>
-  }
-  fictionsRepo?: {
-    getAll(): Promise<FictionWithMedia[]>
-  }
+  placesRepo: PlacesRepositoryPort
+  fictionsRepo: FictionsRepositoryPort
 }
 
 export function createCitiesService(deps: CitiesServiceDeps) {
@@ -41,11 +39,9 @@ export function createCitiesService(deps: CitiesServiceDeps) {
   }
 
   async function getCityFictions(cityId: string): Promise<FictionWithMedia[]> {
-    if (!deps.locationsRepo || !deps.fictionsRepo) return []
-    const locations = await deps.locationsRepo.getByCityId(cityId)
-    const fictionIds = [...new Set(locations.map((l) => l.fictionId))]
-    const allFictions = await deps.fictionsRepo.getAll()
-    return allFictions.filter((f) => fictionIds.includes(f.id))
+    const fictionIds = await deps.placesRepo.getFictionIdsByCityId(cityId)
+    if (fictionIds.length === 0) return []
+    return deps.fictionsRepo.getByIds(fictionIds)
   }
 
   return {

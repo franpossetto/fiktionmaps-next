@@ -10,7 +10,7 @@ import {
 import { getSessionUserId } from "@/lib/auth/auth.service"
 import { createClient } from "@/lib/supabase/server"
 import type { CityCheckin, PlaceCheckin, PlaceCheckinResult } from "@/src/checkins"
-import { mapAssetImagesToFiction, type AssetImageRow } from "@/src/fictions/fiction-cached-read"
+import { mapAssetImagesToFiction, type AssetImageRow } from "@/src/fictions/fiction.mappers"
 import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
 
 export interface EnrichedPlaceCheckin {

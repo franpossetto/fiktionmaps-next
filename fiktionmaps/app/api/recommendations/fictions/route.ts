@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
-import { mapAssetImagesToFiction } from "@/src/fictions/fiction-cached-read"
+import { mapAssetImagesToFiction } from "@/src/fictions/fiction.mappers"
 
 type ScoredFiction = { fictionId: string; score: number }
 
