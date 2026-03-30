@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { getCityById } from "@/lib/app-services"
+import { getCityById } from "@/src/server"
 import { CityEditView } from "@/components/admin/city-edit-view"
 
 interface AdminCityEditPageProps {

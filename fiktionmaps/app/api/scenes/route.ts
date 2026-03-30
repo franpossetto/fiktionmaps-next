@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { jsonError, jsonZodError } from "@/lib/validation/http"
-import { createScene, listScenes } from "@/lib/app-services"
+import { createScene, listScenes } from "@/src/server"
 import {
   createSceneBodySchema,
   listScenesQuerySchema,

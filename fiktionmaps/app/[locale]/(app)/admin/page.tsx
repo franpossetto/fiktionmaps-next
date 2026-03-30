@@ -1,5 +1,5 @@
 import { Suspense } from "react"
-import { getAllFictions, getAllCities, getAllPlaces } from "@/lib/app-services"
+import { getAllCities, getAllFictions, getAllPlaces } from "@/src/server"
 import { AdminDashboard } from "@/components/admin/admin-dashboard"
 
 export default async function AdminPage() {

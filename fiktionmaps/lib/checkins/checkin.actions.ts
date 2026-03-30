@@ -6,7 +6,7 @@ import {
   checkinPlace,
   getMyCityCheckins,
   getMyPlaceCheckins,
-} from "@/lib/app-services"
+} from "@/src/server"
 import { getSessionUserId } from "@/lib/auth/auth.service"
 import { createClient } from "@/lib/supabase/server"
 import type { CityCheckin, PlaceCheckin, PlaceCheckinResult } from "@/src/checkins"

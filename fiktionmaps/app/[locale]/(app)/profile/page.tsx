@@ -1,4 +1,4 @@
-import { getAllCities } from "@/lib/app-services"
+import { getAllCities } from "@/src/server"
 import { getCurrentUserProfileAction } from "@/lib/auth/profile.actions"
 import {
   getUserCityCheckinsAction,

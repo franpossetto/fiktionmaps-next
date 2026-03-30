@@ -1,4 +1,4 @@
-import { getAllFictions } from "@/lib/app-services"
+import { getAllFictions } from "@/src/server"
 import { FictionLanding } from "@/components/fictions/fiction-landing"
 
 export default async function FictionsPage() {

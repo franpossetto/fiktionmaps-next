@@ -2,7 +2,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache"
 import { zodErrorMessage } from "@/lib/validation/http"
-import { createFiction, updateFiction, deleteFiction } from "@/lib/app-services"
+import { createFiction, updateFiction, deleteFiction } from "@/src/server"
 import type { Fiction } from "./fiction.domain"
 import {
   parseCreateFictionFormData,

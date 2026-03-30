@@ -1,4 +1,4 @@
-import { getAllCities, getCityFictions } from "@/lib/app-services"
+import { getAllCities, getCityFictions } from "@/src/server"
 import { SceneViewer } from "@/components/scenes/scene-viewer"
 
 export default async function ScenesPage() {

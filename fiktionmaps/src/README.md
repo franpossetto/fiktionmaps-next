@@ -7,4 +7,6 @@ This folder centralizes **logic that has no UI** and **interacts with the backen
 - **Adapters**: implementations (Supabase, mocks, API clients) that satisfy the ports.
 - **Services**: use-case functions built from ports/adapters (`*.services.ts`).
 
-The app (e.g. `lib/app-services.ts`, `lib/api/registry.ts`) wires these pieces and exposes them to the rest of the codebase.
+The app wires these pieces in `src/server` (adapters + session/anonymous clients) and `src/server/queries` (cached reads for RSC via Next.js `unstable_cache` / React `cache`). App code typically imports from the barrel `@/src/server` (see `lib/api/registry.ts` where relevant).
+
+For vocabulary, layers, entry points, and how to add a new module, see [docs/architecture-modules.md](../docs/architecture-modules.md).

@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { getFictionById } from "@/lib/app-services"
+import { getFictionById } from "@/src/server"
 import { FictionDetailPageClient } from "./fiction-detail-page-client"
 
 type Props = {
