@@ -12,3 +12,6 @@ export const getScenesByPlaceId = scenesService.getByPlaceId.bind(scenesService)
 export const createScene = scenesService.create.bind(scenesService)
 export const updateScene = scenesService.update.bind(scenesService)
 export const deleteScene = scenesService.remove.bind(scenesService)
+
+export const listCitiesWithActiveScenes = scenesService.listCitiesWithActiveScenes.bind(scenesService)
+export const listScenesWithVideoInBbox = scenesService.listScenesWithVideoInBbox.bind(scenesService)

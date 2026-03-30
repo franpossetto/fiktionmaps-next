@@ -2,7 +2,10 @@ import {
   ASSET_VIDEOS_BUCKET,
   tryParseStoragePathFromVideoUrl,
 } from "@/lib/asset-videos/asset-videos-bucket"
-import { createClient } from "@/lib/supabase/server"
+import type { MapBbox } from "@/lib/validation/map-query"
+import { createAnonymousClient, createClient } from "@/lib/supabase/server"
+import type { City } from "@/src/cities/city.domain"
+import type { Location } from "@/src/locations"
 import type { Scene } from "./scene.domain"
 import type { CreateSceneData, UpdateSceneData } from "./scene.dtos"
 import type { SceneListFilters, ScenesRepositoryPort } from "./scene.repository.port"
@@ -70,15 +73,17 @@ const sceneSelect = `
   )
 `
 
-async function removeVideoObjectIfAny(supabase: Awaited<ReturnType<typeof createClient>>, videoUrl: string | null) {
+async function removeVideoObjectIfAny(supabase: SupabaseLike, videoUrl: string | null) {
   const path = tryParseStoragePathFromVideoUrl(videoUrl, ASSET_VIDEOS_BUCKET)
   if (!path) return
   const { error } = await supabase.storage.from(ASSET_VIDEOS_BUCKET).remove([path])
   if (error) console.warn("[scenes repo] storage remove video:", error.message)
 }
 
+type SupabaseLike = Awaited<ReturnType<typeof createClient>>
+
 async function fetchSceneById(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseLike,
   id: string
 ): Promise<Scene | null> {
   const { data, error } = await supabase.from("scenes").select(sceneSelect).eq("id", id).maybeSingle()
@@ -88,6 +93,26 @@ async function fetchSceneById(
   }
   if (!data) return null
   return mapRow(data as SceneRowWithPlace)
+}
+
+type LocFromJoin = {
+  id?: string
+  name?: string
+  formatted_address?: string
+  latitude?: number
+  longitude?: number
+  city_id?: string
+}
+
+function locationFromSceneJoinRow(r: unknown): LocFromJoin | null {
+  const row = r as { places?: unknown }
+  const pRaw = row.places
+  const placeObj = Array.isArray(pRaw) ? pRaw[0] : pRaw
+  if (!placeObj || typeof placeObj !== "object") return null
+  const locRaw = "locations" in placeObj ? (placeObj as { locations?: unknown }).locations : undefined
+  const locObj = Array.isArray(locRaw) ? locRaw[0] : locRaw
+  if (!locObj || typeof locObj !== "object") return null
+  return locObj as LocFromJoin
 }
 
 export const scenesSupabaseAdapter: ScenesRepositoryPort = {
@@ -281,5 +306,190 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       return false
     }
     return true
+  },
+
+  async listCitiesWithActiveScenes(
+    fictionIds: string[] | null,
+  ): Promise<Pick<City, "id" | "name" | "country">[]> {
+    const supabase = createAnonymousClient()
+
+    let sceneQuery = supabase
+      .from("scenes")
+      .select(
+        `
+        id,
+        places!inner (
+          locations!inner (
+            city_id
+          )
+        )
+      `,
+      )
+      .eq("active", true)
+
+    if (fictionIds && fictionIds.length > 0) {
+      sceneQuery = sceneQuery.in("fiction_id", fictionIds)
+    }
+
+    const { data: sceneRows, error } = await sceneQuery
+
+    if (error) {
+      console.error("[scenes repo] listCitiesWithActiveScenes:", error.message)
+      return []
+    }
+
+    const cityIds = new Set<string>()
+    for (const row of sceneRows ?? []) {
+      const placesRaw = (row as { places?: unknown }).places
+      const placeObj = Array.isArray(placesRaw) ? placesRaw[0] : placesRaw
+      const locRaw =
+        placeObj && typeof placeObj === "object" && "locations" in placeObj
+          ? (placeObj as { locations?: unknown }).locations
+          : undefined
+      const locObj = Array.isArray(locRaw) ? locRaw[0] : locRaw
+      const cid =
+        locObj && typeof locObj === "object" && "city_id" in locObj
+          ? (locObj as { city_id?: string }).city_id
+          : undefined
+      if (cid) cityIds.add(cid)
+    }
+
+    if (cityIds.size === 0) return []
+
+    const { data: cities, error: citiesError } = await supabase
+      .from("cities")
+      .select("id, name, country")
+      .in("id", [...cityIds])
+      .order("name", { ascending: true })
+
+    if (citiesError) {
+      console.error("[scenes repo] listCitiesWithActiveScenes cities:", citiesError.message)
+      return []
+    }
+
+    return (cities ?? []) as Pick<City, "id" | "name" | "country">[]
+  },
+
+  async listScenesWithVideoInBbox(params: { fictionIds: string[]; bbox: MapBbox }): Promise<Location[]> {
+    const { fictionIds, bbox } = params
+    if (fictionIds.length === 0) return []
+
+    const supabase = createAnonymousClient()
+
+    const { data: locationRows, error: locError } = await supabase
+      .from("locations")
+      .select("id")
+      .gte("latitude", bbox.south)
+      .lte("latitude", bbox.north)
+      .gte("longitude", bbox.west)
+      .lte("longitude", bbox.east)
+
+    if (locError) {
+      console.error("[scenes repo] listScenesWithVideoInBbox locations:", locError.message)
+      return []
+    }
+
+    const locationIds = (locationRows ?? []).map((r) => r.id).filter(Boolean)
+    if (locationIds.length === 0) return []
+
+    const { data: placeRows, error: placeError } = await supabase
+      .from("places")
+      .select("id")
+      .in("fiction_id", fictionIds)
+      .in("location_id", locationIds)
+
+    if (placeError) {
+      console.error("[scenes repo] listScenesWithVideoInBbox places:", placeError.message)
+      return []
+    }
+
+    const placeIds = (placeRows ?? []).map((r) => r.id as string).filter(Boolean)
+    if (placeIds.length === 0) return []
+
+    const { data: sceneRows, error: sceneError } = await supabase
+      .from("scenes")
+      .select(
+        `
+        id,
+        fiction_id,
+        place_id,
+        title,
+        description,
+        quote,
+        video_url,
+        sort_order,
+        places!inner (
+          location_id,
+          locations!inner (
+            id,
+            name,
+            formatted_address,
+            latitude,
+            longitude,
+            city_id
+          )
+        )
+      `,
+      )
+      .eq("active", true)
+      .not("video_url", "is", null)
+      .in("fiction_id", fictionIds)
+      .in("place_id", placeIds)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true })
+
+    if (sceneError) {
+      console.error("[scenes repo] listScenesWithVideoInBbox scenes:", sceneError.message)
+      return []
+    }
+
+    const rows = sceneRows ?? []
+    const sceneIds = rows.map((r) => (r as { id?: string }).id).filter(Boolean) as string[]
+
+    const { data: sceneThumbRows } =
+      sceneIds.length > 0
+        ? await supabase
+            .from("asset_images")
+            .select("entity_id, url")
+            .eq("entity_type", "scene")
+            .eq("role", "avatar")
+            .eq("variant", "sm")
+            .in("entity_id", sceneIds)
+        : { data: null }
+
+    const thumbBySceneId = new Map<string, string>()
+    for (const r of sceneThumbRows ?? []) {
+      if (r.entity_id && r.url) thumbBySceneId.set(r.entity_id as string, r.url as string)
+    }
+
+    const result: Location[] = rows.map((raw) => {
+      const r = raw as {
+        id: string
+        fiction_id: string
+        title: string
+        description: string
+        quote: string | null
+        video_url: string
+      }
+      const loc = locationFromSceneJoinRow(raw)
+      const poster = thumbBySceneId.get(r.id) ?? ""
+      return {
+        id: r.id,
+        name: r.title?.trim() || loc?.name || "Scene",
+        address: loc?.formatted_address ?? "",
+        lat: loc?.latitude ?? 0,
+        lng: loc?.longitude ?? 0,
+        cityId: loc?.city_id ?? "",
+        fictionId: r.fiction_id ?? "",
+        image: poster,
+        videoUrl: String(r.video_url).trim(),
+        description: r.description ?? "",
+        sceneDescription: r.description ?? "",
+        sceneQuote: r.quote ?? undefined,
+        visitTip: undefined,
+      }
+    })
+
+    return result
   },
 }

@@ -8,6 +8,7 @@ import type { Location } from "@/src/locations"
 import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
 import { CitySelector } from "@/components/map/city-selector"
 import { FictionSelector } from "@/components/map/fiction-selector"
+import { ScenesEmptyHint } from "@/components/scenes/scenes-empty-hint"
 
 type Bbox = { west: number; south: number; east: number; north: number }
 const SCENE_VIEWER_RADIUS_KM = 80
@@ -35,10 +36,15 @@ export function SceneViewer({
   initialSelectedCity = null,
   initialAvailableFictions,
 }: SceneViewerProps = {}) {
+  const [citiesList, setCitiesList] = useState<City[]>(() => initialCities ?? [])
   const [selectedCity, setSelectedCity] = useState<City | null>(initialSelectedCity)
   const [selectedFictionIds, setSelectedFictionIds] = useState<string[]>([])
   const [availableFictions, setAvailableFictions] = useState<Fiction[]>(initialAvailableFictions ?? [])
   const [scenes, setScenes] = useState<Location[]>([])
+  const [scenesLoading, setScenesLoading] = useState(Boolean(initialSelectedCity))
+  const [hintCities, setHintCities] = useState<Pick<City, "id" | "name" | "country">[]>([])
+  const [hintVariant, setHintVariant] = useState<"scoped" | "global" | null>(null)
+  const [hintsLoading, setHintsLoading] = useState(false)
   const [fiction, setFiction] = useState<Fiction | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [muted, setMuted] = useState(true)
@@ -46,6 +52,20 @@ export function SceneViewer({
   const [showControls, setShowControls] = useState(true)
   const videoRef = useRef<HTMLVideoElement>(null)
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (initialCities && initialCities.length > 0) return
+    let cancelled = false
+    fetch("/api/cities")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: City[]) => {
+        if (!cancelled) setCitiesList(list)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [initialCities])
 
   useEffect(() => {
     if (initialSelectedCity) return
@@ -97,12 +117,17 @@ export function SceneViewer({
   }, [selectedCity, initialSelectedCity, initialAvailableFictions, availableFictions.length])
 
   useEffect(() => {
-    if (!selectedCity) return
+    if (!selectedCity) {
+      setScenes([])
+      setScenesLoading(false)
+      return
+    }
     const fictionIds = selectedFictionIds.length > 0
       ? selectedFictionIds
       : availableFictions.map((f) => f.id)
     if (fictionIds.length === 0) {
       setScenes([])
+      setScenesLoading(false)
       return
     }
     const bbox = bboxAround(selectedCity.lat, selectedCity.lng, SCENE_VIEWER_RADIUS_KM)
@@ -110,19 +135,82 @@ export function SceneViewer({
     for (const id of fictionIds) params.append("fictionIds[]", id)
     params.set("bbox", `${bbox.west},${bbox.south},${bbox.east},${bbox.north}`)
     let cancelled = false
+    setScenesLoading(true)
     ;(async () => {
       try {
-        const res = await fetch(`/api/map/locations?${params.toString()}`)
+        const res = await fetch(`/api/scenes/for-viewer?${params.toString()}`)
+        if (!res.ok) throw new Error("for-viewer failed")
         const data = (await res.json()) as Location[]
-        if (!cancelled) setScenes(data)
+        if (!cancelled) {
+          setScenes(Array.isArray(data) ? data.filter((s) => s.videoUrl?.trim()) : [])
+          setScenesLoading(false)
+        }
       } catch {
-        if (!cancelled) setScenes([])
+        if (!cancelled) {
+          setScenes([])
+          setScenesLoading(false)
+        }
       }
     })()
     return () => {
       cancelled = true
     }
   }, [selectedCity, selectedFictionIds, availableFictions])
+
+  useEffect(() => {
+    if (scenesLoading || scenes.length > 0 || !selectedCity) {
+      setHintCities([])
+      setHintVariant(null)
+      setHintsLoading(false)
+      return
+    }
+    const fictionIds =
+      selectedFictionIds.length > 0 ? selectedFictionIds : availableFictions.map((f) => f.id)
+
+    const otherThanCurrent = (list: Pick<City, "id" | "name" | "country">[]) =>
+      list.filter((c) => c.id !== selectedCity.id)
+
+    let cancelled = false
+    setHintsLoading(true)
+    ;(async () => {
+      try {
+        const params = new URLSearchParams()
+        for (const id of fictionIds) params.append("fictionIds[]", id)
+        let res = await fetch(`/api/scenes/city-hints?${params.toString()}`)
+        let data = (await res.json()) as { cities?: Pick<City, "id" | "name" | "country">[] }
+        let cities = data.cities ?? []
+        let variant: "scoped" | "global" = fictionIds.length > 0 ? "scoped" : "global"
+
+        if (fictionIds.length > 0 && otherThanCurrent(cities).length === 0) {
+          res = await fetch("/api/scenes/city-hints")
+          data = (await res.json()) as { cities?: Pick<City, "id" | "name" | "country">[] }
+          cities = data.cities ?? []
+          variant = "global"
+        }
+
+        if (!cancelled) {
+          setHintCities(cities)
+          setHintVariant(otherThanCurrent(cities).length > 0 ? variant : null)
+        }
+      } catch {
+        if (!cancelled) {
+          setHintCities([])
+          setHintVariant(null)
+        }
+      } finally {
+        if (!cancelled) setHintsLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    scenesLoading,
+    scenes.length,
+    selectedFictionIds,
+    availableFictions,
+    selectedCity,
+  ])
 
   const currentScene = scenes[currentIndex] || null
   const currentFictionId = currentScene?.fictionId
@@ -210,20 +298,53 @@ export function SceneViewer({
     return () => video.removeEventListener("ended", handleEnd)
   }, [goNext, currentIndex])
 
-  if (!currentScene || !fiction) {
+  if (scenesLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-background">
+        <p className="text-muted-foreground">Loading scenes…</p>
+      </div>
+    )
+  }
+
+  if (!currentScene || !fiction) {
+    const fictionIdsForHint =
+      selectedFictionIds.length > 0 ? selectedFictionIds : availableFictions.map((f) => f.id)
+    const otherCitiesWithScenes =
+      selectedCity ? hintCities.filter((c) => c.id !== selectedCity.id) : []
+
+    return (
+      <div className="flex h-full items-center justify-center bg-background px-4">
         <div className="flex flex-col items-center gap-4 text-muted-foreground">
           <Film className="h-16 w-16 opacity-40" />
-          <p className="text-lg font-medium">No scenes available</p>
-          <p className="text-sm">Select a city and fiction to start</p>
-          <div className="flex items-center gap-3 pt-4">
+          <p className="text-lg font-medium text-foreground">
+            {!selectedCity ? "No scenes available" : "No scenes in this city"}
+          </p>
+          <p className="text-center text-sm">
+            {fictionIdsForHint.length === 0
+              ? "Select a fiction above to see scenes."
+              : "Try another city or adjust which fictions are included."}
+          </p>
+          {!hintsLoading && hintVariant != null && (
+            <ScenesEmptyHint
+              variant={hintVariant}
+              otherCitiesWithScenes={otherCitiesWithScenes}
+              onPickCity={handleCityChange}
+              cities={citiesList}
+            />
+          )}
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <FictionSelector
               availableFictions={availableFictions}
               selectedFictionIds={selectedFictionIds}
               onToggleFiction={toggleFiction}
             />
-            {selectedCity && <CitySelector selectedCity={selectedCity} onCityChange={handleCityChange} />}
+            {selectedCity && (
+              <CitySelector
+                cities={citiesList.length > 0 ? citiesList : undefined}
+                selectedCity={selectedCity}
+                onCityChange={handleCityChange}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -244,27 +365,36 @@ export function SceneViewer({
         autoPlay
         muted={muted}
         playsInline
+        preload="auto"
         className="absolute inset-0 h-full w-full object-cover"
-        poster={currentScene.image}
+        poster={currentScene.image?.trim() || undefined}
       />
 
       {/* Gradient overlays */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/70 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/80 to-transparent" />
 
-      {/* Top bar - selectors */}
+      {/* Top bar — theme-neutral: always light controls on video (light mode foreground is dark and vanishes on video). */}
       <div
         className={`absolute inset-x-0 top-0 z-20 flex items-center justify-between px-5 py-4 transition-opacity duration-300 ${
           showControls ? "opacity-100" : "opacity-0"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <FictionSelector
-          availableFictions={availableFictions}
-          selectedFictionIds={selectedFictionIds}
-          onToggleFiction={toggleFiction}
-        />
-        {selectedCity && <CitySelector selectedCity={selectedCity} onCityChange={handleCityChange} />}
+        <div className="flex flex-wrap items-center gap-2 [&_button]:border-white/25 [&_button]:bg-black/45 [&_button]:text-white [&_button]:shadow-md [&_button]:backdrop-blur-md [&_button]:hover:bg-black/60 [&_button_svg]:!text-white [&_button_span]:text-white">
+          <FictionSelector
+            availableFictions={availableFictions}
+            selectedFictionIds={selectedFictionIds}
+            onToggleFiction={toggleFiction}
+          />
+          {selectedCity && (
+            <CitySelector
+              cities={citiesList.length > 0 ? citiesList : undefined}
+              selectedCity={selectedCity}
+              onCityChange={handleCityChange}
+            />
+          )}
+        </div>
       </div>
 
       {/* Nav arrows - left / right click zones */}
@@ -280,8 +410,8 @@ export function SceneViewer({
             }`}
             aria-label="Previous scene"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm transition-colors hover:bg-black/70">
-              <ChevronLeft className="h-5 w-5 text-foreground" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white shadow-md backdrop-blur-sm transition-colors hover:bg-black/75">
+              <ChevronLeft className="h-5 w-5" />
             </div>
           </button>
           <button
@@ -294,8 +424,8 @@ export function SceneViewer({
             }`}
             aria-label="Next scene"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black/50 backdrop-blur-sm transition-colors hover:bg-black/70">
-              <ChevronRight className="h-5 w-5 text-foreground" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white shadow-md backdrop-blur-sm transition-colors hover:bg-black/75">
+              <ChevronRight className="h-5 w-5" />
             </div>
           </button>
         </>
@@ -322,8 +452,8 @@ export function SceneViewer({
                   i === currentIndex
                     ? "bg-primary"
                     : i < currentIndex
-                      ? "bg-foreground/50"
-                      : "bg-foreground/20"
+                      ? "bg-white/55"
+                      : "bg-white/25"
                 }`}
                 aria-label={`Go to scene ${i + 1}`}
               />
@@ -341,14 +471,14 @@ export function SceneViewer({
               >
                 {fiction.title}
               </span>
-              <span className="text-xs text-foreground/60">
+              <span className="text-xs text-white/75 drop-shadow-md">
                 Scene {currentIndex + 1} of {scenes.length}
               </span>
             </div>
-            <h2 className="text-xl font-bold text-foreground drop-shadow-lg">
+            <h2 className="text-xl font-bold text-white drop-shadow-md [text-shadow:_0_1px_3px_rgb(0_0_0_/_0.9)]">
               {currentScene.name}
             </h2>
-            <p className="max-w-lg text-sm text-foreground/70 line-clamp-1 drop-shadow-lg">
+            <p className="max-w-lg text-sm text-white/85 line-clamp-1 drop-shadow-md [text-shadow:_0_1px_2px_rgb(0_0_0_/_0.85)]">
               {currentScene.sceneDescription}
             </p>
           </div>
@@ -360,13 +490,13 @@ export function SceneViewer({
                 e.stopPropagation()
                 togglePlayPause()
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-foreground/20 backdrop-blur-sm transition-colors hover:bg-foreground/30"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white shadow-md backdrop-blur-sm transition-colors hover:bg-black/70"
               aria-label={paused ? "Play" : "Pause"}
             >
               {paused ? (
-                <Play className="h-4 w-4 text-foreground" />
+                <Play className="h-4 w-4" />
               ) : (
-                <Pause className="h-4 w-4 text-foreground" />
+                <Pause className="h-4 w-4" />
               )}
             </button>
             <button
@@ -374,13 +504,13 @@ export function SceneViewer({
                 e.stopPropagation()
                 setMuted((p) => !p)
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-foreground/20 backdrop-blur-sm transition-colors hover:bg-foreground/30"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white shadow-md backdrop-blur-sm transition-colors hover:bg-black/70"
               aria-label={muted ? "Unmute" : "Mute"}
             >
               {muted ? (
-                <VolumeX className="h-4 w-4 text-foreground" />
+                <VolumeX className="h-4 w-4" />
               ) : (
-                <Volume2 className="h-4 w-4 text-foreground" />
+                <Volume2 className="h-4 w-4" />
               )}
             </button>
           </div>

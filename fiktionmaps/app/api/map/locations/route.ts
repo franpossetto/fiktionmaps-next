@@ -1,38 +1,16 @@
 import { NextResponse } from "next/server"
 import { createAnonymousClient } from "@/lib/supabase/server"
+import {
+  parseFictionIdsFromSearchParams,
+  parseMapBboxFromSearchParams,
+} from "@/lib/validation/map-query"
 import { isUuidString } from "@/lib/validation/primitives"
 import type { Location } from "@/src/locations"
 
-function parseFictionIds(searchParams: URLSearchParams): string[] {
-  const ids = searchParams.getAll("fictionIds[]")
-  if (ids.length) return ids.filter(Boolean)
-  const csv = searchParams.get("fictionIds")
-  if (!csv) return []
-  return csv
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-}
-
-function parseBbox(searchParams: URLSearchParams): {
-  west: number
-  south: number
-  east: number
-  north: number
-} | null {
-  const bbox = searchParams.get("bbox")
-  if (!bbox) return null
-  const parts = bbox.split(",").map((p) => parseFloat(p.trim()))
-  if (parts.length !== 4) return null
-  const [west, south, east, north] = parts
-  if (![west, south, east, north].every((n) => Number.isFinite(n))) return null
-  return { west, south, east, north }
-}
-
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
-  const rawFictionIds = parseFictionIds(searchParams)
-  const bbox = parseBbox(searchParams)
+  const rawFictionIds = parseFictionIdsFromSearchParams(searchParams)
+  const bbox = parseMapBboxFromSearchParams(searchParams)
 
   if (!bbox) {
     return NextResponse.json({ error: "Missing bbox" }, { status: 400 })

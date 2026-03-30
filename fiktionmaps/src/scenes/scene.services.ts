@@ -1,5 +1,8 @@
+import type { MapBbox } from "@/lib/validation/map-query"
+import type { City } from "@/src/cities/city.domain"
 import type { CreateSceneData, UpdateSceneData } from "./scene.dtos"
 import type { Scene } from "./scene.domain"
+import type { Location } from "@/src/locations"
 import type { SceneListFilters, ScenesRepositoryPort } from "./scene.repository.port"
 
 interface ScenesServiceDeps {
@@ -43,6 +46,19 @@ export function createScenesService(deps: ScenesServiceDeps) {
     return deps.scenesRepo.delete(id)
   }
 
+  async function listCitiesWithActiveScenes(
+    fictionIds: string[] | null,
+  ): Promise<Pick<City, "id" | "name" | "country">[]> {
+    return deps.scenesRepo.listCitiesWithActiveScenes(fictionIds)
+  }
+
+  async function listScenesWithVideoInBbox(params: {
+    fictionIds: string[]
+    bbox: MapBbox
+  }): Promise<Location[]> {
+    return deps.scenesRepo.listScenesWithVideoInBbox(params)
+  }
+
   return {
     getAll,
     getByLocationId,
@@ -53,5 +69,7 @@ export function createScenesService(deps: ScenesServiceDeps) {
     create,
     update,
     remove,
+    listCitiesWithActiveScenes,
+    listScenesWithVideoInBbox,
   }
 }

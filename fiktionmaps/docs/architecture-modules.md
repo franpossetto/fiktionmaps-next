@@ -96,6 +96,7 @@ None of them **is** the domain: domain lives under `src/<module>/`, not under `a
 
 ## 7. Anti-patterns
 
+- Comments inside `*.repository.port.ts` or `*.repository.adapter.ts` (keep those files free of explanatory prose; names and structure should suffice).
 - Putting core business logic **only** in `src/server` without going through the module’s **services**.
 - Treating “domain” and “composition” as the same layer in prose or code.
 - Making `*.domain.ts` import DTOs or adapters.
