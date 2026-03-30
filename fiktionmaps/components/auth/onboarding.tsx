@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import type { City } from "@/src/cities/city.domain"
 import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
 import type { InterestCatalogItem } from "@/src/interests"
-import { useApi } from "@/lib/api"
 import { useAuth } from "@/context/auth-context"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -65,7 +64,6 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
   const t = useTranslations("Onboarding")
   const locale = useLocale()
   const { user, completeOnboarding } = useAuth()
-  const { cities: cityService } = useApi()
   const [allCities, setAllCities] = useState<City[]>([])
   const [allFictions, setAllFictions] = useState<FictionWithMedia[]>([])
   const [allInterests, setAllInterests] = useState<InterestCatalogItem[]>([])
@@ -92,8 +90,21 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
   const resumeApplied = useRef(false)
 
   useEffect(() => {
-    cityService.getAll().then(setAllCities)
-  }, [cityService])
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/cities")
+        const data = (await res.json()) as City[]
+        if (!cancelled) setAllCities(data)
+      } catch {
+        if (!cancelled) setAllCities([])
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false

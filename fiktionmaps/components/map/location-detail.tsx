@@ -6,7 +6,6 @@ import { useTranslations } from "next-intl"
 import type { Location } from "@/src/locations"
 import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
 import type { Scene } from "@/src/scenes"
-import { useApi } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
@@ -30,19 +29,31 @@ export function LocationDetail({
   onView3D,
 }: LocationDetailProps) {
   const t = useTranslations("Map")
-  const { fictions: fictionsService } = useApi()
   const [fiction, setFiction] = useState<FictionWithMedia | undefined>(
     fictionProp ?? undefined
   )
   const [placeScenes, setPlaceScenes] = useState<Scene[]>([])
 
   useEffect(() => {
+    let cancelled = false
     if (fictionProp !== undefined) {
       setFiction(fictionProp ?? undefined)
     } else {
-      fictionsService.getById(location.fictionId).then((f) => setFiction(f ?? undefined))
+      fetch("/api/fictions")
+        .then((r) => (r.ok ? r.json() : []))
+        .then((rows: unknown) => {
+          if (cancelled || !Array.isArray(rows)) return
+          const hit = (rows as FictionWithMedia[]).find((f) => f.id === location.fictionId)
+          setFiction(hit ?? undefined)
+        })
+        .catch(() => {
+          if (!cancelled) setFiction(undefined)
+        })
     }
-  }, [location.fictionId, fictionProp, fictionsService])
+    return () => {
+      cancelled = true
+    }
+  }, [location.fictionId, fictionProp])
 
   useEffect(() => {
     let cancelled = false

@@ -1,6 +1,0 @@
-[
-  { "id": "london", "name": "London", "country": "United Kingdom", "lat": 51.5074, "lng": -0.1278, "zoom": 13 },
-  { "id": "new-york", "name": "New York", "country": "United States", "lat": 40.7128, "lng": -74.006, "zoom": 13 },
-  { "id": "paris", "name": "Paris", "country": "France", "lat": 48.8566, "lng": 2.3522, "zoom": 13 },
-  { "id": "seville", "name": "Seville", "country": "Spain", "lat": 37.3891, "lng": -5.9845, "zoom": 14 }
-]

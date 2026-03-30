@@ -6,13 +6,25 @@ import type { City } from "@/src/cities/city.domain"
 import type { Fiction } from "@/src/fictions/fiction.domain"
 import type { Location } from "@/src/locations"
 import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
-import { useApi } from "@/lib/api"
 import { CitySelector } from "@/components/map/city-selector"
 import { FictionSelector } from "@/components/map/fiction-selector"
 
-export function SceneViewer() {
-  const { cities: cityService, fictions: fictionService, locations: locationService } = useApi()
+type Bbox = { west: number; south: number; east: number; north: number }
+const SCENE_VIEWER_RADIUS_KM = 80
 
+function bboxAround(lat: number, lng: number, radiusKm: number): Bbox {
+  const kmPerDegLat = 111.32
+  const deltaLat = radiusKm / kmPerDegLat
+  const deltaLng = radiusKm / (kmPerDegLat * Math.cos((lat * Math.PI) / 180))
+  return {
+    west: lng - deltaLng,
+    south: lat - deltaLat,
+    east: lng + deltaLng,
+    north: lat + deltaLat,
+  }
+}
+
+export function SceneViewer() {
   const [selectedCity, setSelectedCity] = useState<City | null>(null)
   const [selectedFictionIds, setSelectedFictionIds] = useState<string[]>([])
   const [availableFictions, setAvailableFictions] = useState<Fiction[]>([])
@@ -26,27 +38,71 @@ export function SceneViewer() {
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    cityService.getAll().then((allCities) => {
-      if (allCities.length > 0) setSelectedCity(allCities[0])
-    })
-  }, [cityService])
-
-  useEffect(() => {
-    if (!selectedCity) return
-    cityService.getCityFictions(selectedCity.id).then((fics) => {
-      setAvailableFictions(fics)
-      setSelectedFictionIds(fics.map((f) => f.id))
-    })
-  }, [selectedCity, cityService])
-
-  useEffect(() => {
-    if (!selectedCity) return
-    if (selectedFictionIds.length > 0) {
-      locationService.getFiltered(selectedCity.id, selectedFictionIds).then(setScenes)
-    } else {
-      locationService.getByCityId(selectedCity.id).then(setScenes)
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/cities")
+        const allCities = (await res.json()) as City[]
+        if (!cancelled && allCities.length > 0) setSelectedCity(allCities[0])
+      } catch {
+        if (!cancelled) setSelectedCity(null)
+      }
+    })()
+    return () => {
+      cancelled = true
     }
-  }, [selectedCity, selectedFictionIds, locationService])
+  }, [])
+
+  useEffect(() => {
+    if (!selectedCity) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/map/city-fictions?cityId=${encodeURIComponent(selectedCity.id)}`)
+        const fics = (await res.json()) as Fiction[]
+        if (!cancelled) {
+          setAvailableFictions(fics)
+          setSelectedFictionIds(fics.map((f) => f.id))
+        }
+      } catch {
+        if (!cancelled) {
+          setAvailableFictions([])
+          setSelectedFictionIds([])
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedCity])
+
+  useEffect(() => {
+    if (!selectedCity) return
+    const fictionIds = selectedFictionIds.length > 0
+      ? selectedFictionIds
+      : availableFictions.map((f) => f.id)
+    if (fictionIds.length === 0) {
+      setScenes([])
+      return
+    }
+    const bbox = bboxAround(selectedCity.lat, selectedCity.lng, SCENE_VIEWER_RADIUS_KM)
+    const params = new URLSearchParams()
+    for (const id of fictionIds) params.append("fictionIds[]", id)
+    params.set("bbox", `${bbox.west},${bbox.south},${bbox.east},${bbox.north}`)
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/map/locations?${params.toString()}`)
+        const data = (await res.json()) as Location[]
+        if (!cancelled) setScenes(data)
+      } catch {
+        if (!cancelled) setScenes([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedCity, selectedFictionIds, availableFictions])
 
   const currentScene = scenes[currentIndex] || null
   const currentFictionId = currentScene?.fictionId
@@ -56,8 +112,8 @@ export function SceneViewer() {
       setFiction(null)
       return
     }
-    fictionService.getById(currentFictionId).then((f) => setFiction(f ?? null))
-  }, [currentFictionId, fictionService])
+    setFiction(availableFictions.find((f) => f.id === currentFictionId) ?? null)
+  }, [currentFictionId, availableFictions])
 
   const goNext = useCallback(() => {
     if (scenes.length > 0) {

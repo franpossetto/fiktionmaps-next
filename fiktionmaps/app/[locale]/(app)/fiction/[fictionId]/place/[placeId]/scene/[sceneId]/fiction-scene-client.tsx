@@ -6,7 +6,6 @@ import { useRouter } from "@/i18n/navigation"
 import type { Location } from "@/src/locations"
 import type { Scene } from "@/src/scenes"
 import type { Fiction } from "@/src/fictions/fiction.domain"
-import { useApi } from "@/lib/api"
 import { SceneWatchView } from "@/components/scenes/scene-watch-view"
 
 export function FictionSceneClient() {
@@ -18,8 +17,6 @@ export function FictionSceneClient() {
       ? params.placeId
       : null
   const sceneId = params.sceneId as string
-
-  const { fictions: fictionsService, locations: locationsService } = useApi()
 
   const [loadError, setLoadError] = useState<string | null>(null)
   const [location, setLocation] = useState<Location | null>(null)
@@ -69,7 +66,13 @@ export function FictionSceneClient() {
       setLocation(loc)
 
       const [f, fs] = await Promise.all([
-        fictionsService.getById(loc.fictionId),
+        fetch("/api/fictions")
+          .then((r) => (r.ok ? r.json() : []))
+          .then((rows: unknown) =>
+            Array.isArray(rows)
+              ? ((rows as Fiction[]).find((item) => item.id === loc.fictionId) ?? null)
+              : null,
+          ),
         (async () => {
           const fictionParams = new URLSearchParams({ fictionId: loc.fictionId, active: "true" })
           const fsRes = await fetch(`/api/scenes?${fictionParams}`)
@@ -80,12 +83,22 @@ export function FictionSceneClient() {
       setFiction(f ?? undefined)
       setFictionScenes(fs)
 
-      const locationIds = [...new Set([...fs.map((s) => s.locationId), scene.locationId])]
-      const locs = await Promise.all(locationIds.map((id) => locationsService.getById(id)))
+      const placeIds = [...new Set([...fs.map((s) => s.placeId), scene.placeId])]
+      const placeEntries = await Promise.all(
+        placeIds.map(async (id) => {
+          const res = await fetch(`/api/map/place?placeId=${encodeURIComponent(id)}`)
+          if (!res.ok) return null
+          const place = (await res.json()) as Location
+          return { placeId: id, place }
+        }),
+      )
       if (cancelled) return
       const locMap = new Map<string, Location>()
-      for (const l of locs) {
-        if (l) locMap.set(l.id, l)
+      for (const entry of placeEntries) {
+        if (!entry) continue
+        const matchingScene = [...fs, scene].find((item) => item.placeId === entry.placeId)
+        if (matchingScene) locMap.set(matchingScene.locationId, entry.place)
+        locMap.set(entry.placeId, entry.place)
       }
       setSceneLocations(locMap)
     })()
@@ -93,7 +106,7 @@ export function FictionSceneClient() {
     return () => {
       cancelled = true
     }
-  }, [fictionId, routePlaceId, sceneId, fictionsService, locationsService])
+  }, [fictionId, routePlaceId, sceneId])
 
   const currentWatchScene = useMemo(
     () => fictionScenes.find((s) => s.id === sceneId) ?? sceneFromUrl,

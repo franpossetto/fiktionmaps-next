@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect, useRef } from "react"
 import Image from "next/image"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
-import { useApi } from "@/lib/api"
 import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
 import type { Location } from "@/src/locations"
 import type { City } from "@/src/cities/city.domain"
@@ -20,24 +19,44 @@ export interface FictionDetailProps {
 }
 
 export function FictionDetail({ fiction, onBack, onViewPlace }: FictionDetailProps) {
-  const { fictions: fictionService, locations: locationService } = useApi()
   const [allLocations, setAllLocations] = useState<Location[]>([])
   const [fictionCities, setFictionCities] = useState<City[]>([])
   const [cityMap, setCityMap] = useState<Map<string, City>>(new Map())
   const [sceneCount, setSceneCount] = useState(0)
 
   useEffect(() => {
+    let cancelled = false
     async function load() {
-      const [locs, cities] = await Promise.all([
-        locationService.getByFictionId(fiction.id),
-        fictionService.getFictionCities(fiction.id),
-      ])
-      setAllLocations(locs)
-      setFictionCities(cities)
-      setCityMap(new Map(cities.map((c) => [c.id, c])))
+      try {
+        const [locationsRes, citiesRes] = await Promise.all([
+          fetch("/api/admin/places"),
+          fetch("/api/cities"),
+        ])
+        const locationsRaw = (await locationsRes.json()) as unknown
+        const citiesRaw = (await citiesRes.json()) as unknown
+        const locations = Array.isArray(locationsRaw) ? (locationsRaw as Location[]) : []
+        const cities = Array.isArray(citiesRaw) ? (citiesRaw as City[]) : []
+        const fictionLocations = locations.filter((loc) => loc.fictionId === fiction.id)
+        const cityIdSet = new Set(fictionLocations.map((loc) => loc.cityId))
+        const filteredCities = cities.filter((city) => cityIdSet.has(city.id))
+        if (!cancelled) {
+          setAllLocations(fictionLocations)
+          setFictionCities(filteredCities)
+          setCityMap(new Map(filteredCities.map((c) => [c.id, c])))
+        }
+      } catch {
+        if (!cancelled) {
+          setAllLocations([])
+          setFictionCities([])
+          setCityMap(new Map())
+        }
+      }
     }
     load()
-  }, [fiction.id, locationService, fictionService])
+    return () => {
+      cancelled = true
+    }
+  }, [fiction.id])
 
   useEffect(() => {
     let cancelled = false

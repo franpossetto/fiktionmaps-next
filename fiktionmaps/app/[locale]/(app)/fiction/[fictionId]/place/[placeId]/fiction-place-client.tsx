@@ -7,15 +7,12 @@ import type { Location } from "@/src/locations"
 import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
 import type { City } from "@/src/cities/city.domain"
 import { PlacePage } from "@/components/map/place-page"
-import { useApi } from "@/lib/api"
 
 export function FictionPlaceClient() {
   const params = useParams()
   const router = useRouter()
   const fictionId = params.fictionId as string
   const placeId = params.placeId as string
-
-  const { fictions: fictionsService, cities: citiesService } = useApi()
 
   const [loadError, setLoadError] = useState<string | null>(null)
   const [location, setLocation] = useState<Location | null>(null)
@@ -43,8 +40,20 @@ export function FictionPlaceClient() {
       }
 
       const [f, c] = await Promise.all([
-        fictionsService.getById(fictionId),
-        citiesService.getById(loc.cityId),
+        fetch("/api/fictions")
+          .then((r) => (r.ok ? r.json() : []))
+          .then((rows: unknown) =>
+            Array.isArray(rows)
+              ? (rows as FictionWithMedia[]).find((item) => item.id === fictionId) ?? null
+              : null,
+          ),
+        fetch("/api/cities")
+          .then((r) => (r.ok ? r.json() : []))
+          .then((rows: unknown) =>
+            Array.isArray(rows)
+              ? (rows as City[]).find((item) => item.id === loc.cityId) ?? null
+              : null,
+          ),
       ])
       if (cancelled) return
       setLocation(loc)
@@ -55,7 +64,7 @@ export function FictionPlaceClient() {
     return () => {
       cancelled = true
     }
-  }, [fictionId, placeId, fictionsService, citiesService])
+  }, [fictionId, placeId])
 
   if (loadError === "not_found") {
     return (

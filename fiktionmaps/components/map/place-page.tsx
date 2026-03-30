@@ -10,7 +10,6 @@ import type { Scene } from "@/src/scenes"
 import type { Fiction, FictionWithMedia } from "@/src/fictions/fiction.domain"
 import type { City } from "@/src/cities/city.domain"
 import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
-import { useApi } from "@/lib/api"
 import { SceneWatchView } from "@/components/scenes/scene-watch-view"
 
 export interface PlacePageProps {
@@ -28,8 +27,6 @@ export function PlacePage({
   city: cityProp,
   onBack,
 }: PlacePageProps) {
-  const { fictions: fictionsService, cities: citiesService, locations: locationsService } = useApi()
-
   const [fiction, setFiction] = useState<Fiction | undefined>(fictionProp ?? undefined)
   const [city, setCity] = useState<City | undefined>(cityProp ?? undefined)
   const [scenes, setScenes] = useState<Scene[]>([])
@@ -45,8 +42,24 @@ export function PlacePage({
     let cancelled = false
     async function loadData() {
       const [f, c] = await Promise.all([
-        fictionProp !== undefined ? Promise.resolve(fictionProp ?? null) : fictionsService.getById(location.fictionId),
-        cityProp !== undefined ? Promise.resolve(cityProp ?? null) : citiesService.getById(location.cityId),
+        fictionProp !== undefined
+          ? Promise.resolve(fictionProp ?? null)
+          : fetch("/api/fictions")
+              .then((r) => (r.ok ? r.json() : []))
+              .then((rows: unknown) =>
+                Array.isArray(rows)
+                  ? (rows as FictionWithMedia[]).find((item) => item.id === location.fictionId) ?? null
+                  : null,
+              ),
+        cityProp !== undefined
+          ? Promise.resolve(cityProp ?? null)
+          : fetch("/api/cities")
+              .then((r) => (r.ok ? r.json() : []))
+              .then((rows: unknown) =>
+                Array.isArray(rows)
+                  ? (rows as City[]).find((item) => item.id === location.cityId) ?? null
+                  : null,
+              ),
       ])
       if (cancelled) return
       setFiction(f ?? undefined)
@@ -66,12 +79,22 @@ export function PlacePage({
       }
       if (cancelled) return
       setFictionScenes(fs)
-      const locationIds = [...new Set(fs.map((scene) => scene.locationId))]
-      const locs = await Promise.all(locationIds.map((id) => locationsService.getById(id)))
+      const placeIds = [...new Set(fs.map((scene) => scene.placeId))]
+      const placeEntries = await Promise.all(
+        placeIds.map(async (id) => {
+          const res = await fetch(`/api/map/place?placeId=${encodeURIComponent(id)}`)
+          if (!res.ok) return null
+          const place = (await res.json()) as Location
+          return { placeId: id, place }
+        }),
+      )
       if (cancelled) return
       const locMap = new Map<string, Location>()
-      for (const loc of locs) {
-        if (loc) locMap.set(loc.id, loc)
+      for (const entry of placeEntries) {
+        if (!entry) continue
+        const matchingScene = fs.find((scene) => scene.placeId === entry.placeId)
+        if (matchingScene) locMap.set(matchingScene.locationId, entry.place)
+        locMap.set(entry.placeId, entry.place)
       }
       setSceneLocations(locMap)
     }
@@ -79,7 +102,7 @@ export function PlacePage({
     return () => {
       cancelled = true
     }
-  }, [location.id, location.fictionId, location.cityId, fictionProp, cityProp, fictionsService, citiesService, locationsService])
+  }, [location.id, location.fictionId, location.cityId, fictionProp, cityProp])
 
   // For TV series group by season; for movies/books keep flat
   const isTvSeries = fiction?.type === "tv-series"

@@ -5,7 +5,6 @@ import { hasLocale } from "next-intl"
 import { notFound } from "next/navigation"
 import { ThemeSettingsProvider } from "@/lib/theme-settings-context"
 import { AuthProvider } from "@/context/auth-context"
-import { ApiProvider } from "@/lib/api/provider"
 import { LangSetter } from "@/components/layout/lang-setter"
 import { routing } from "@/i18n/routing"
 
@@ -30,9 +29,7 @@ export default async function LocaleLayout({ children, params }: Props) {
     <NextIntlClientProvider messages={messages}>
       <LangSetter locale={locale} />
       <ThemeSettingsProvider>
-        <ApiProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </ApiProvider>
+        <AuthProvider>{children}</AuthProvider>
       </ThemeSettingsProvider>
     </NextIntlClientProvider>
   )

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useMemo, useEffect, useRef, useCallback, useTransition, startTransition } from "react"
-import { useApi } from "@/lib/api"
 import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
 import type { Location } from "@/src/locations"
 import { FictionCard } from "@/components/fictions/fiction-card"
@@ -37,7 +36,6 @@ export function FictionLanding({
   focusFictionId,
   onFocusHandled,
 }: FictionLandingProps) {
-  const { fictions: fictionService, locations: locationService } = useApi()
   const { user } = useAuth()
   const [allFictions, setAllFictions] = useState<FictionWithMedia[]>(initialFictions ?? [])
   const [locationCountMap, setLocationCountMap] = useState<Map<string, number>>(new Map())
@@ -59,16 +57,34 @@ export function FictionLanding({
       if (initialFictions !== undefined) {
         list = initialFictions
       } else {
-        const fictions = await fictionService.getAll()
-        setAllFictions(fictions)
-        list = fictions
+        try {
+          const res = await fetch("/api/fictions")
+          const fictions = (await res.json()) as FictionWithMedia[]
+          setAllFictions(Array.isArray(fictions) ? fictions : [])
+          list = Array.isArray(fictions) ? fictions : []
+        } catch {
+          setAllFictions([])
+          list = []
+        }
       }
       const counts = new Map<string, number>()
       const sceneCounts = new Map<string, number>()
+      let locations: Location[] = []
+      try {
+        const locationsRes = await fetch("/api/admin/places")
+        const raw = (await locationsRes.json()) as unknown
+        locations = Array.isArray(raw) ? (raw as Location[]) : []
+      } catch {
+        locations = []
+      }
+      for (const f of list) {
+        counts.set(
+          f.id,
+          locations.filter((loc) => loc.fictionId === f.id).length,
+        )
+      }
       await Promise.all(
         list.map(async (f) => {
-          const locs = await locationService.getByFictionId(f.id)
-          counts.set(f.id, locs.length)
           try {
             const res = await fetch(`/api/scenes?fictionId=${encodeURIComponent(f.id)}&active=true`)
             const scenes = res.ok ? await res.json() : []
@@ -82,7 +98,7 @@ export function FictionLanding({
       setSceneCountMap(sceneCounts)
     }
     load()
-  }, [fictionService, locationService, initialFictions])
+  }, [initialFictions])
 
   const [view, setView] = useState<FictionLandingView>("browse")
   const [selectedFiction, setSelectedFiction] = useState<FictionWithMedia | null>(null)
