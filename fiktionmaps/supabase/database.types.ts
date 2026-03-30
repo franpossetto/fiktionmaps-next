@@ -510,6 +510,144 @@ export type Database = {
           },
         ]
       }
+      user_homes: {
+        Row: {
+          id: string
+          user_id: string
+          city_id: string
+          date_from: string
+          date_to: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          city_id: string
+          date_from: string
+          date_to?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          city_id?: string
+          date_from?: string
+          date_to?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_homes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_homes_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      city_checkins: {
+        Row: {
+          id: string
+          user_id: string
+          city_id: string
+          lat: number | null
+          lng: number | null
+          origin: string
+          checked_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          city_id: string
+          lat?: number | null
+          lng?: number | null
+          origin: string
+          checked_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          city_id?: string
+          lat?: number | null
+          lng?: number | null
+          origin?: string
+          checked_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "city_checkins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "city_checkins_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      place_checkins: {
+        Row: {
+          id: string
+          user_id: string
+          place_id: string
+          lat: number | null
+          lng: number | null
+          distance_m: number | null
+          verified: boolean | null
+          origin: string
+          checked_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          place_id: string
+          lat?: number | null
+          lng?: number | null
+          distance_m?: number | null
+          verified?: boolean | null
+          origin: string
+          checked_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          place_id?: string
+          lat?: number | null
+          lng?: number | null
+          distance_m?: number | null
+          verified?: boolean | null
+          origin?: string
+          checked_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_checkins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "place_checkins_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -654,6 +792,18 @@ export type UserInterestUpdate = TablesUpdate<"user_interests">
 export type FictionLikeRow = Tables<"fiction_likes">
 export type FictionLikeInsert = TablesInsert<"fiction_likes">
 export type FictionLikeUpdate = TablesUpdate<"fiction_likes">
+
+export type UserHomeRow = Tables<"user_homes">
+export type UserHomeInsert = TablesInsert<"user_homes">
+export type UserHomeUpdate = TablesUpdate<"user_homes">
+
+export type CityCheckinRow = Tables<"city_checkins">
+export type CityCheckinInsert = TablesInsert<"city_checkins">
+export type CityCheckinUpdate = TablesUpdate<"city_checkins">
+
+export type PlaceCheckinRow = Tables<"place_checkins">
+export type PlaceCheckinInsert = TablesInsert<"place_checkins">
+export type PlaceCheckinUpdate = TablesUpdate<"place_checkins">
 
 export type Enums<
   PublicEnumNameOrOptions extends

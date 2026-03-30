@@ -44,22 +44,21 @@ function isValidSupabaseUrl(url: string | undefined): url is string {
 }
 
 export async function middleware(request: NextRequest) {
-  const intlResponse = await intlMiddleware(request)
-  if (intlResponse.status >= 300 && intlResponse.status < 400) {
-    const location = intlResponse.headers.get("location")
+  const response = await intlMiddleware(request)
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get("location")
     // Avoid next-intl redirecting to /en/undefined or /en/undefinedundefined (see next-intl#2240)
     if (location?.includes("undefined")) {
       const safe = request.nextUrl.clone()
       safe.pathname = `/${routing.defaultLocale}/map`
       return NextResponse.redirect(safe)
     }
-    return intlResponse
+    return response
   }
 
   const pathname = request.nextUrl.pathname
   const pathWithoutLocale = pathnameWithoutLocale(pathname)
 
-  let response = NextResponse.next({ request })
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -72,7 +71,6 @@ export async function middleware(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           )

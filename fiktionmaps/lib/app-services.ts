@@ -4,6 +4,7 @@ import { getSessionUserId } from "@/lib/auth/auth.service"
 import { createAnonymousClient } from "@/lib/supabase/server"
 import { createCitiesService } from "@/src/cities/city.services"
 import { supabaseRepositoryAdapter as citiesSupabaseAdapter } from "@/src/cities/city.repository.adapter"
+import { getAllCitiesWithClient } from "@/src/cities/city-cached-read"
 import { getAllFictionsWithClient } from "@/src/fictions/fiction-cached-read"
 import { createFictionsService } from "@/src/fictions/fiction.services"
 import { supabaseRepositoryAdapter as fictionsSupabaseAdapter } from "@/src/fictions/fiction.repository.adapter"
@@ -14,6 +15,8 @@ import {
 import { createScenesService, scenesSupabaseAdapter } from "@/src/scenes"
 import { createUsersService } from "@/src/users/user.services"
 import { supabaseRepositoryAdapter } from "@/src/users/user.repository.adapter"
+import { createHomesService, homesSupabaseAdapter } from "@/src/homes"
+import { createCheckinsService, checkinsSupabaseAdapter } from "@/src/checkins"
 
 const usersService = createUsersService({
   usersRepo: supabaseRepositoryAdapter,
@@ -51,9 +54,15 @@ const citiesService = createCitiesService({
   citiesRepo: citiesSupabaseAdapter,
 })
 
-export const getAllCities = citiesService.getAll
+/** Cached 60s so repeated page views don't hit Supabase every time. Uses anonymous client (no cookies) so it's safe inside unstable_cache. Invalidate with revalidateTag("cities", "page") after mutations. */
+export const getAllCities = unstable_cache(
+  async () => getAllCitiesWithClient(createAnonymousClient()),
+  ["cities"],
+  { revalidate: 60, tags: ["cities"] }
+)
 export const getCityById = citiesService.getById
 export const createCity = citiesService.create
+export const findOrCreateCity = citiesService.findOrCreate
 export const updateCity = citiesService.update
 export const deleteCity = citiesService.delete
 export const getCityFictions = citiesService.getCityFictions
@@ -87,3 +96,26 @@ export const deleteScene = scenesService.remove.bind(scenesService)
 
 export type { Scene } from "@/src/scenes/scene.domain"
 export type { CreateSceneData, UpdateSceneData } from "@/src/scenes/scene.dtos"
+
+const homesService = createHomesService({
+  homesRepo: homesSupabaseAdapter,
+  getCurrentUserId: getSessionUserId,
+})
+
+export const getMyHomes = homesService.getMyHomes
+export const addHome = homesService.addHome
+export const deleteHome = homesService.deleteHome
+
+export type { UserHome, CreateHomeData } from "@/src/homes"
+
+const checkinsService = createCheckinsService({
+  checkinsRepo: checkinsSupabaseAdapter,
+  getCurrentUserId: getSessionUserId,
+})
+
+export const checkinCity = checkinsService.checkinCity
+export const checkinPlace = checkinsService.checkinPlace
+export const getMyCityCheckins = checkinsService.getMyCityCheckins
+export const getMyPlaceCheckins = checkinsService.getMyPlaceCheckins
+
+export type { CityCheckin, PlaceCheckin, PlaceCheckinResult } from "@/src/checkins"

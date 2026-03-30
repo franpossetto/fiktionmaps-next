@@ -28,6 +28,11 @@ export function createMockCitiesRepository(): CitiesRepositoryPort {
     async getById(id: string) {
       return cities.find((c) => c.id === id) ?? null
     },
+    async findByNameAndCountry(name: string, country: string) {
+      return cities.find(
+        (c) => c.name.toLowerCase() === name.toLowerCase() && c.country.toLowerCase() === country.toLowerCase(),
+      ) ?? null
+    },
     async create() {
       return null
     },

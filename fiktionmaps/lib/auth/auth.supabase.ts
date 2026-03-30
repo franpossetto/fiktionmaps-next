@@ -99,12 +99,3 @@ export async function getUser(): Promise<AuthResult<AuthUser>> {
     error: null,
   }
 }
-
-export async function getSession(): Promise<AuthResult<{ userId: string }>> {
-  const supabase = await createClient()
-  const { data, error } = await supabase.auth.getSession()
-
-  if (error || !data.session) return { data: null, error: error?.message ?? null }
-
-  return { data: { userId: data.session.user.id }, error: null }
-}

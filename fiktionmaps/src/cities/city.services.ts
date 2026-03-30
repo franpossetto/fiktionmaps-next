@@ -26,6 +26,12 @@ export function createCitiesService(deps: CitiesServiceDeps) {
     return deps.citiesRepo.create(data)
   }
 
+  async function findOrCreate(data: CreateCityData): Promise<City | null> {
+    const existing = await deps.citiesRepo.findByNameAndCountry(data.name, data.country)
+    if (existing) return existing
+    return deps.citiesRepo.create(data)
+  }
+
   async function update(id: string, data: UpdateCityData): Promise<City | null> {
     return deps.citiesRepo.update(id, data)
   }
@@ -46,6 +52,7 @@ export function createCitiesService(deps: CitiesServiceDeps) {
     getAll,
     getById,
     create,
+    findOrCreate,
     update,
     delete: deleteCity,
     getCityFictions,

@@ -26,7 +26,8 @@ export async function getAuthenticatedUser(): Promise<AuthResult<AuthUser>> {
   return supabase.getUser()
 }
 
+/** Resolves the current user id via `getUser()` (validated with Auth), not from session storage alone. */
 export async function getSessionUserId(): Promise<string | null> {
-  const result = await supabase.getSession()
-  return result.data?.userId ?? null
+  const result = await supabase.getUser()
+  return result.data?.id ?? null
 }

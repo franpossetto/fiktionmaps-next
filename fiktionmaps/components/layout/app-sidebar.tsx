@@ -7,10 +7,11 @@ import {
   Film,
   LayoutGrid,
   User,
+  Settings,
+  LogOut,
 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
-import { UserMenu } from "@/components/layout/user-menu"
 import Image from "next/image"
 import { Link, usePathname } from "@/i18n/navigation"
 import { useAuth } from "@/context/auth-context"
@@ -21,7 +22,7 @@ export function AppSidebar() {
   const t = useTranslations("Nav")
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const pathname = usePathname()
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
 
   const navItems: { id: AppView; href: string; labelKey: "map" | "fictions" | "scenes" | "admin"; icon: React.ElementType }[] = [
     { id: "map", href: "/map", labelKey: "map", icon: Map },
@@ -110,9 +111,59 @@ export function AppSidebar() {
           </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-1 pb-1">
-          <div className="border-t border-chrome-border w-full mt-2 pt-2">
-            <UserMenu />
+        <div className="flex flex-col items-center gap-1 pb-2 w-full">
+          <div className="border-t border-chrome-border w-full mt-2 pt-2 flex flex-col items-center gap-1">
+            {[
+              { id: "profile", href: "/profile", label: t("profile"), Icon: User },
+              { id: "settings", href: "/settings", label: t("settings"), Icon: Settings },
+            ].map(({ id, href, label, Icon }) => {
+              const active = isActive(href)
+              return (
+                <div key={id} className="relative">
+                  <Link
+                    href={href}
+                    onMouseEnter={() => setHoveredItem(id)}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    className={cn(
+                      "flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200",
+                      active
+                        ? "bg-chrome-active text-foreground shadow-[inset_0_0_0_1px_hsl(var(--chrome-border))]"
+                        : "text-chrome-muted hover:bg-chrome-hover hover:text-foreground",
+                    )}
+                    aria-label={label}
+                  >
+                    <Icon className="h-[20px] w-[20px]" />
+                  </Link>
+                  {active && (
+                    <div className="absolute -left-[14px] top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-primary" />
+                  )}
+                  {hoveredItem === id && (
+                    <div className="absolute left-[52px] top-1/2 -translate-y-1/2 rounded-md bg-chrome-tooltip px-2.5 py-1 text-xs font-medium text-foreground shadow-lg whitespace-nowrap z-50 border border-chrome-border">
+                      {label}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="border-t border-chrome-border w-full mt-1 pt-2 flex justify-center">
+            <div className="relative">
+              <button
+                onClick={logout}
+                onMouseEnter={() => setHoveredItem("logout")}
+                onMouseLeave={() => setHoveredItem(null)}
+                className="flex h-11 w-11 items-center justify-center rounded-xl text-chrome-muted transition-all duration-200 hover:bg-chrome-hover hover:text-foreground"
+                aria-label={t("signOut")}
+              >
+                <LogOut className="h-[20px] w-[20px]" />
+              </button>
+              {hoveredItem === "logout" && (
+                <div className="absolute left-[52px] top-1/2 -translate-y-1/2 rounded-md bg-chrome-tooltip px-2.5 py-1 text-xs font-medium text-foreground shadow-lg whitespace-nowrap z-50 border border-chrome-border">
+                  {t("signOut")}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -22,6 +22,19 @@ export const supabaseRepositoryAdapter: CitiesRepositoryPort = {
     return data as City
   },
 
+  async findByNameAndCountry(name: string, country: string): Promise<City | null> {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("cities")
+      .select("*")
+      .ilike("name", name)
+      .ilike("country", country)
+      .limit(1)
+      .maybeSingle()
+    if (error || !data) return null
+    return data as City
+  },
+
   async create(data: CreateCityData): Promise<City | null> {
     const supabase = await createClient()
     const { data: row, error } = await supabase

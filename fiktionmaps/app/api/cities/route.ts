@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server"
-import { createAnonymousClient } from "@/lib/supabase/server"
-import type { City } from "@/src/cities/city.domain"
+import { getAllCities } from "@/lib/app-services"
 
-/** GET: list all cities from the database (public, for map etc.). */
+/** GET: list all cities (public, for map etc.). Uses shared cache from app-services. */
 export async function GET() {
-  const supabase = createAnonymousClient()
-  const { data, error } = await supabase.from("cities").select("*").order("name")
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  try {
+    const cities = await getAllCities()
+    return NextResponse.json(cities)
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to load cities"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
-  return NextResponse.json((data ?? []) as City[])
 }

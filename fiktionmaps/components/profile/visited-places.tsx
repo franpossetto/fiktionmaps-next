@@ -79,9 +79,9 @@ export function VisitedPlaces({ locations, favorites, onLocationClick }: Visited
               <div className="space-y-2">
                 <h3 className="font-bold text-foreground text-base line-clamp-2">{location.name}</h3>
                 {fiction && (
-                  <p className="text-xs text-cyan-300/80 font-medium">{fiction.title}</p>
+                  <p className="text-sm text-cyan-300/80 font-medium">{fiction.title}</p>
                 )}
-                <p className="text-xs text-muted-foreground line-clamp-1 flex items-center gap-1">
+                <p className="text-sm text-muted-foreground line-clamp-1 flex items-center gap-1">
                   <MapPin className="h-3 w-3" />
                   {location.address}
                 </p>

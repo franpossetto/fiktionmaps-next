@@ -1,5 +1,6 @@
 "use server"
 
+import { cache } from "react"
 import { getCurrentUserProfile, updateCurrentUserProfile } from "@/lib/app-services"
 import { createClient } from "@/lib/supabase/server"
 import { isUuidString } from "@/lib/validation/primitives"
@@ -53,7 +54,7 @@ export type GetCurrentProfileResult =
   | { data: ProfileWithOnboarding; error: null }
   | { data: null; error: string | null }
 
-export async function getCurrentUserProfileAction(): Promise<GetCurrentProfileResult> {
+async function fetchCurrentUserProfileAction(): Promise<GetCurrentProfileResult> {
   try {
     const profile = await getCurrentUserProfile()
     if (!profile) {
@@ -70,6 +71,9 @@ export async function getCurrentUserProfileAction(): Promise<GetCurrentProfileRe
     }
   }
 }
+
+/** Request-scoped dedupe for repeated profile reads in the same render/request. */
+export const getCurrentUserProfileAction = cache(fetchCurrentUserProfileAction)
 
 export type CompleteOnboardingResult =
   | { data: true; error: null }

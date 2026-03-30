@@ -139,7 +139,19 @@
     "visitedPlaces": "Visited places",
     "checkIns": "Check-ins",
     "noCheckIns": "No check-ins yet",
-    "noVisitedPlaces": "No visited places yet"
+    "noVisitedPlaces": "No visited places yet",
+    "logInToViewProfile": "Sign in to view your profile.",
+    "loadingProfile": "Loading profile…",
+    "sidebarPlaces": "Places",
+    "sidebarScenes": "Scenes",
+    "noSidebarScenes": "No scene clips yet.",
+    "sidebarArticles": "Articles",
+    "noSidebarArticles": "No articles yet.",
+    "unknownFiction": "Unknown fiction",
+    "unknownCity": "Unknown city",
+    "seeAll": "See all",
+    "noSidebarPlaces": "No places visited yet.",
+    "sidebarHome": "Home"
   },
   "Admin": {
     "dashboard": "Admin",
@@ -278,6 +290,28 @@
     "title": "Page not found",
     "description": "The page you requested does not exist.",
     "backToHome": "Back to home"
+  },
+  "Homes": {
+    "noHomes": "No homes added yet. Tell us where you've lived!",
+    "loading": "Loading homes…",
+    "noCurrent": "No current home set."
+  },
+  "Checkins": {
+    "cityPromptTitle": "Are you in {city}?",
+    "cityPromptDescription": "Register your visit to this city.",
+    "confirmCheckin": "Yes, check in",
+    "dismiss": "Not now",
+    "saving": "Saving…",
+    "loadingCheckins": "Loading check-ins…",
+    "noCheckins": "No check-ins yet. Start exploring cities and places!",
+    "recentCheckins": "Recent check-ins",
+    "showAll": "See all",
+    "showLess": "See less",
+    "today": "today",
+    "yesterday": "yesterday",
+    "daysAgo": "{days}d ago",
+    "cityCheckinLabel": "city check-in",
+    "cityBadge": "city"
   },
   "Metadata": {
     "title": "FiktionMaps - Discover Movie & Book Locations",

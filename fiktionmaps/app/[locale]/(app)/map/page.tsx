@@ -11,8 +11,8 @@ import { CitySelector } from "@/components/map/city-selector"
 import { FictionSelector } from "@/components/map/fiction-selector"
 import { LocationDetail } from "@/components/map/location-detail"
 import { ThumbnailCarousel } from "@/components/map/thumbnail-carousel"
-import { PlacePage } from "@/components/map/place-page"
 import { usePlaceSelectorCollapsedStorage } from "@/lib/local-storage-service-hooks"
+import { useRouter } from "@/i18n/navigation"
 
 type Bbox = { west: number; south: number; east: number; north: number }
 
@@ -42,6 +42,7 @@ function bboxUnion(a: Bbox, b: Bbox): Bbox {
 const MIN_LOAD_RADIUS_KM = 50
 
 export default function MapPage() {
+  const router = useRouter()
   const [placeSelectorCollapsed, setPlaceSelectorCollapsed] = usePlaceSelectorCollapsedStorage()
 
   const [cities, setCities] = useState<City[]>([])
@@ -51,7 +52,6 @@ export default function MapPage() {
   const [filteredLocations, setFilteredLocations] = useState<Location[]>([])
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null)
   const [focusedLocationId, setFocusedLocationId] = useState<string | null>(null)
-  const [placePageLocation, setPlacePageLocation] = useState<Location | null>(null)
   const [is3D, setIs3D] = useState(false)
   const [mapLoaded, setMapLoaded] = useState(false)
   const [bounds, setBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
@@ -127,10 +127,15 @@ export default function MapPage() {
     setFocusedLocationId(location.id)
   }, [])
 
-  const handleOpenPlacePage = useCallback((location: Location) => {
-    setSelectedLocation(null)
-    setPlacePageLocation(location)
-  }, [])
+  const handleExplorePlace = useCallback(
+    (location: Location) => {
+      setSelectedLocation(null)
+      router.push(
+        `/fiction/${encodeURIComponent(location.fictionId)}/place/${encodeURIComponent(location.id)}`,
+      )
+    },
+    [router],
+  )
 
   const isNavigationModeActive = !placeSelectorCollapsed && filteredLocations.length > 0
 
@@ -246,22 +251,10 @@ export default function MapPage() {
           location={selectedLocation}
           fiction={availableFictions.find((f) => f.id === selectedLocation.fictionId)}
           onClose={() => setSelectedLocation(null)}
-          onViewPlace={handleOpenPlacePage}
+          onViewPlace={handleExplorePlace}
         />
       )}
 
-      {placePageLocation && (
-        <div className="absolute inset-0 z-[3000] flex min-h-0 flex-col overflow-hidden bg-background">
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <PlacePage
-              location={placePageLocation}
-              fiction={availableFictions.find((f) => f.id === placePageLocation.fictionId)}
-              city={cities.find((c) => c.id === placePageLocation.cityId)}
-              onBack={() => setPlacePageLocation(null)}
-            />
-          </div>
-        </div>
-      )}
       </div>
     </MapProvider>
   )

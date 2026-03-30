@@ -139,7 +139,19 @@
     "visitedPlaces": "Lugares visitados",
     "checkIns": "Registros",
     "noCheckIns": "Aún no hay registros",
-    "noVisitedPlaces": "Aún no hay lugares visitados"
+    "noVisitedPlaces": "Aún no hay lugares visitados",
+    "logInToViewProfile": "Iniciá sesión para ver tu perfil.",
+    "loadingProfile": "Cargando perfil…",
+    "sidebarPlaces": "Lugares",
+    "sidebarScenes": "Escenas",
+    "noSidebarScenes": "Todavía no hay clips de escenas.",
+    "sidebarArticles": "Artículos",
+    "noSidebarArticles": "Todavía no hay artículos.",
+    "unknownFiction": "Ficción desconocida",
+    "unknownCity": "Ciudad desconocida",
+    "seeAll": "Ver",
+    "noSidebarPlaces": "Aún no visitaste ningún lugar.",
+    "sidebarHome": "Hogar"
   },
   "Admin": {
     "dashboard": "Admin",
@@ -278,6 +290,28 @@
     "title": "Página no encontrada",
     "description": "La página que buscas no existe.",
     "backToHome": "Volver al inicio"
+  },
+  "Homes": {
+    "noHomes": "Aún no agregaste hogares. ¡Contanos dónde viviste!",
+    "loading": "Cargando hogares…",
+    "noCurrent": "No tenés un hogar actual configurado."
+  },
+  "Checkins": {
+    "cityPromptTitle": "¿Estás en {city}?",
+    "cityPromptDescription": "Registrá tu visita a esta ciudad.",
+    "confirmCheckin": "Sí, registrar",
+    "dismiss": "Ahora no",
+    "saving": "Guardando…",
+    "loadingCheckins": "Cargando check-ins…",
+    "noCheckins": "Aún no hay check-ins. ¡Empezá a explorar ciudades y lugares!",
+    "recentCheckins": "Check-ins recientes",
+    "showAll": "Ver todos",
+    "showLess": "Ver menos",
+    "today": "hoy",
+    "yesterday": "ayer",
+    "daysAgo": "hace {days}d",
+    "cityCheckinLabel": "check-in de ciudad",
+    "cityBadge": "ciudad"
   },
   "Metadata": {
     "title": "FiktionMaps - Descubre ubicaciones de películas y libros",

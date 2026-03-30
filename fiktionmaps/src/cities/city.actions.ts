@@ -1,8 +1,8 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { zodErrorMessage } from "@/lib/validation/http"
-import { createCity, updateCity, deleteCity } from "@/lib/app-services"
+import { createCity, findOrCreateCity, updateCity, deleteCity } from "@/lib/app-services"
 import { cityWriteSchema } from "./city.schemas"
 import type { City } from "./city.domain"
 
@@ -35,6 +35,7 @@ export async function createCityAction(formData: FormData): Promise<CreateCityRe
   const city = await createCity(parsed.data)
   if (!city) return { success: false, error: "Failed to create city" }
   revalidatePath("/admin")
+  revalidateTag("cities", "page")
   return { success: true, city }
 }
 
@@ -46,6 +47,7 @@ export async function updateCityAction(id: string, formData: FormData): Promise<
   if (!city) return { success: false, error: "Failed to update city" }
   revalidatePath("/admin")
   revalidatePath(`/admin/city/${id}`)
+  revalidateTag("cities", "page")
   return { success: true, city }
 }
 
@@ -54,5 +56,28 @@ export async function deleteCityAction(id: string): Promise<DeleteCityResult> {
   if (!ok) return { success: false, error: "Failed to delete city" }
   revalidatePath("/admin")
   revalidatePath(`/admin/city/${id}`)
+  revalidateTag("cities", "page")
   return { success: true }
+}
+
+export type FindOrCreateCityResult =
+  | { success: true; city: City }
+  | { success: false; error: string }
+
+export async function findOrCreateCityAction(data: {
+  name: string
+  country: string
+  lat: number
+  lng: number
+}): Promise<FindOrCreateCityResult> {
+  const city = await findOrCreateCity({
+    name: data.name,
+    country: data.country,
+    lat: data.lat,
+    lng: data.lng,
+    zoom: 12,
+  })
+  if (!city) return { success: false, error: "Failed to find or create city" }
+  revalidateTag("cities", "page")
+  return { success: true, city }
 }
