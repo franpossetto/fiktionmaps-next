@@ -22,9 +22,12 @@ export interface ScenesRepositoryPort {
   update(id: string, data: UpdateSceneData): Promise<Scene | null>
   delete(id: string): Promise<boolean>
 
-  listCitiesWithActiveScenes(
-    fictionIds: string[] | null,
-  ): Promise<Pick<City, "id" | "name" | "country">[]>
+  listCitiesWithActiveScenes(fictionIds: string[] | null): Promise<City[]>
+
+  listFictionIdsWithScenesInCity(cityId: string): Promise<string[]>
 
   listScenesWithVideoInBbox(params: { fictionIds: string[]; bbox: MapBbox }): Promise<Location[]>
+
+  /** All scenes with video for fictions in this city (no geographic radius). */
+  listScenesWithVideoInCity(params: { fictionIds: string[]; cityId: string }): Promise<Location[]>
 }

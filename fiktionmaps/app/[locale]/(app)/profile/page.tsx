@@ -1,11 +1,11 @@
-import { getAllCities } from "@/src/server"
-import { getCurrentUserProfileAction } from "@/lib/auth/profile.actions"
+import { getAllCities } from "@/lib/server"
+import { getCurrentUserProfileAction } from "@/lib/actions/auth/profile.actions"
 import {
   getUserCityCheckinsAction,
   getUserPlaceCheckinsEnrichedAction,
-} from "@/lib/checkins/checkin.actions"
-import { getUserHomesAction } from "@/lib/homes/home.actions"
-import { getProfileScenesPreviewAction } from "@/lib/profile/profile-contributions.actions"
+} from "@/lib/actions/checkins/checkin.actions"
+import { getUserHomesAction } from "@/lib/actions/homes/home.actions"
+import { getProfileScenesPreviewAction } from "@/lib/actions/profile/profile-contributions.actions"
 import { UserProfileComponent } from "@/components/profile/user-profile"
 
 export default async function ProfilePage() {

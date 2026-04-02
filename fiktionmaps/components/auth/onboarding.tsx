@@ -11,7 +11,7 @@ import type { InterestCatalogItem } from "@/src/interests"
 import { useAuth } from "@/context/auth-context"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentUserProfileAction } from "@/lib/auth/profile.actions"
+import { getCurrentUserProfileAction } from "@/lib/actions/auth/profile.actions"
 import onboardingData from "@/data/onboarding.json"
 import {
   OnboardingStepWelcome,

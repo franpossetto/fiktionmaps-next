@@ -6,8 +6,8 @@ import {
   signUpAction,
   signOutAction,
   getAuthenticatedUserAction,
-} from "@/lib/auth/auth.actions"
-import { getCurrentUserProfileAction, completeOnboardingAction } from "@/lib/auth/profile.actions"
+} from "@/lib/actions/auth/auth.actions"
+import { getCurrentUserProfileAction, completeOnboardingAction } from "@/lib/actions/auth/profile.actions"
 
 export interface User {
   id: string

@@ -2,12 +2,12 @@
 
 import { revalidatePath, revalidateTag } from "next/cache"
 import { zodErrorMessage } from "@/lib/validation/http"
-import { createFiction, updateFiction, deleteFiction } from "@/src/server"
-import type { Fiction } from "./fiction.domain"
+import { createFiction, updateFiction, deleteFiction } from "@/lib/server"
+import type { Fiction } from "@/src/fictions/fiction.domain"
 import {
   parseCreateFictionFormData,
   parseUpdateFictionFormData,
-} from "./fiction.schemas"
+} from "@/src/fictions/fiction.schemas"
 import {
   uploadEntityImage,
   validateImageFile,

@@ -2,9 +2,9 @@
 
 import { revalidatePath, revalidateTag } from "next/cache"
 import { zodErrorMessage } from "@/lib/validation/http"
-import { createCity, findOrCreateCity, updateCity, deleteCity } from "@/src/server"
-import { cityWriteSchema } from "./city.schemas"
-import type { City } from "./city.domain"
+import { createCity, findOrCreateCity, updateCity, deleteCity } from "@/lib/server"
+import { cityWriteSchema } from "@/src/cities/city.schemas"
+import type { City } from "@/src/cities/city.domain"
 
 export type CreateCityResult =
   | { success: true; city: City }

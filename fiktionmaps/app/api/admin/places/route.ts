@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getAllPlaces, createPlace } from "@/src/server"
+import { getAllPlaces, createPlace } from "@/lib/server"
 import { jsonError, jsonZodError } from "@/lib/validation/http"
 import { createPlaceSchema } from "@/src/places/place.schemas"
 

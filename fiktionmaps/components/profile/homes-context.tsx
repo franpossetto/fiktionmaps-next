@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import { getUserHomesAction } from "@/lib/homes/home.actions"
+import { getUserHomesAction } from "@/lib/actions/homes/home.actions"
 import type { UserHome } from "@/src/homes"
 import type { City } from "@/src/cities/city.domain"
 

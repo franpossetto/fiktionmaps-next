@@ -1,7 +1,7 @@
 "use server"
 
-import * as auth from "./auth.service"
-import type { AuthUser } from "./auth.types"
+import * as auth from "@/lib/auth/auth.service"
+import type { AuthUser } from "@/lib/auth/auth.types"
 
 export async function signInAction(email: string, password: string) {
   return auth.signIn({ email, password })

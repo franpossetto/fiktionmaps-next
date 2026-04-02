@@ -12,7 +12,7 @@ import {
 import { MAPBOX_ACCESS_TOKEN } from "@/lib/map/mapbox/styles"
 import { haversineDistance } from "@/lib/geo/haversine"
 import { useAuth } from "@/context/auth-context"
-import { findOrCreateCityAction } from "@/src/cities/city.actions"
+import { findOrCreateCityAction } from "@/lib/actions/cities/city.actions"
 
 interface DetectedCity {
   /** UUID from the cities DB table. */

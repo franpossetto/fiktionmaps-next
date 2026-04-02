@@ -1,7 +1,7 @@
 "use server"
 
 import { cache } from "react"
-import { getCurrentUserProfile, updateCurrentUserProfile } from "@/src/server"
+import { getCurrentUserProfile, updateCurrentUserProfile } from "@/lib/server"
 import { createClient } from "@/lib/supabase/server"
 import { isUuidString } from "@/lib/validation/primitives"
 import type { UserProfile } from "@/src/users"

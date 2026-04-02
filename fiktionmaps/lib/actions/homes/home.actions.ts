@@ -1,7 +1,7 @@
 "use server"
 
 import { cache } from "react"
-import { getMyHomes, addHome, deleteHome } from "@/src/server"
+import { getMyHomes, addHome, deleteHome } from "@/lib/server"
 import type { UserHome, CreateHomeData } from "@/src/homes"
 
 export type HomesResult<T> =

@@ -79,9 +79,9 @@ export function AdminDashboard({ initialFictions, initialCities, initialLocation
   }, [searchParams])
 
   return (
-    <div className="h-full w-full flex flex-col bg-gradient-to-b from-background to-background/50">
-      {/* Header - always visible */}
-      <div className="border-b border-border bg-card/50 backdrop-blur-sm px-6 py-6 sticky top-0 z-40">
+    <div className="flex h-full min-h-0 w-full flex-col bg-gradient-to-b from-background to-background/50">
+      {/* Header — sticky within the centered column (same canvas rhythm as profile) */}
+      <div className="sticky top-0 z-40 border-b border-border bg-card/50 py-6 backdrop-blur-sm">
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
           Content Management
         </h1>
@@ -92,7 +92,7 @@ export function AdminDashboard({ initialFictions, initialCities, initialLocation
 
       {/* Tabs bar */}
       <div className="border-b border-border bg-card/30">
-        <div className="flex items-center justify-between gap-4 px-6">
+        <div className="flex items-center justify-between gap-4">
           <nav className="flex gap-0" aria-label="Admin sections">
             {sections.map((section) => {
               const Icon = section.icon
@@ -156,8 +156,8 @@ export function AdminDashboard({ initialFictions, initialCities, initialLocation
       </div>
 
       {/* Main content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-6 w-full">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="w-full pb-10 pt-6">
           {activeSection === "fictions" && (
             <FictionsTab
               initialFictions={initialFictions}

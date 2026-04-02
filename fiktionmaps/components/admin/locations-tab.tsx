@@ -7,7 +7,7 @@ import type { Fiction } from "@/src/fictions/fiction.domain"
 import type { Location } from "@/src/locations"
 import { Button } from "@/components/ui/button"
 import { PlaceCreateView, type PlaceFormData } from "./place-create-view"
-import { uploadPlaceImageAction } from "@/src/places/place.actions"
+import { uploadPlaceImageAction } from "@/lib/actions/places/place.actions"
 
 type WorkflowStep = "list" | "create" | "edit"
 

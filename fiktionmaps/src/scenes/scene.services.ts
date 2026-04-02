@@ -46,10 +46,12 @@ export function createScenesService(deps: ScenesServiceDeps) {
     return deps.scenesRepo.delete(id)
   }
 
-  async function listCitiesWithActiveScenes(
-    fictionIds: string[] | null,
-  ): Promise<Pick<City, "id" | "name" | "country">[]> {
+  async function listCitiesWithActiveScenes(fictionIds: string[] | null): Promise<City[]> {
     return deps.scenesRepo.listCitiesWithActiveScenes(fictionIds)
+  }
+
+  async function listFictionIdsWithScenesInCity(cityId: string): Promise<string[]> {
+    return deps.scenesRepo.listFictionIdsWithScenesInCity(cityId)
   }
 
   async function listScenesWithVideoInBbox(params: {
@@ -57,6 +59,13 @@ export function createScenesService(deps: ScenesServiceDeps) {
     bbox: MapBbox
   }): Promise<Location[]> {
     return deps.scenesRepo.listScenesWithVideoInBbox(params)
+  }
+
+  async function listScenesWithVideoInCity(params: {
+    fictionIds: string[]
+    cityId: string
+  }): Promise<Location[]> {
+    return deps.scenesRepo.listScenesWithVideoInCity(params)
   }
 
   return {
@@ -70,6 +79,8 @@ export function createScenesService(deps: ScenesServiceDeps) {
     update,
     remove,
     listCitiesWithActiveScenes,
+    listFictionIdsWithScenesInCity,
     listScenesWithVideoInBbox,
+    listScenesWithVideoInCity,
   }
 }

@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache"
-import { getAllCitiesUncached, getCityFictionsUncached } from "@/src/server/cities"
+import { getAllCitiesUncached, getCityFictionsUncached } from "@/lib/server/cities"
 
 /** Cached 60s; invalidate with revalidateTag("cities"). */
 export const getAllCities = unstable_cache(

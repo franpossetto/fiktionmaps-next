@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
-import { getAllCities } from "@/src/server"
+import { getAllCities } from "@/lib/server"
 
-/** GET: list all cities (public, for map etc.). Uses cached reads from `@/src/server`. */
+/** GET: list all cities (public, for map etc.). Uses cached reads from `@/lib/server`. */
 export async function GET() {
   try {
     const cities = await getAllCities()

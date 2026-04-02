@@ -8,16 +8,17 @@ This document is the explicit reference for implementing **new modules** without
 
 | Term | Meaning |
 |------|---------|
-| **Domain** | Core model and business rules. Only files such as `*.domain.ts` and use-case logic that does **not** depend on Next.js or Supabase. |
+| **Domain** | Core model and business rules. Only files such as `*.domain.ts` and use-case logic that does **not** depend on Next.js or Supabase. Lives under **`src/<module>/`**. |
 | **Repository (contract)** | Interface in `*.repository.port.ts`: which persistence operations exist. |
 | **Repository (implementation)** | Code in `*.repository.adapter.ts` that **implements** the port using Supabase (or another backend). |
 | **Service** | Use cases in `*.services.ts`: orchestration and rules; depends on the **port**, not the concrete adapter. |
 | **DTO / schema** | Input/output shapes and validation (`*.dtos.ts`, `*.schemas.ts`). **Not** a “layer under domain” in the pyramid; they are the **edge** of the use case. |
-| **Application composition** | `src/server/`: instances, Supabase clients, which adapter is injected. **Not** domain. |
-| **Cached reads (RSC)** | `src/server/queries/`: only `unstable_cache` / `cache` wrappers around functions already defined in composition. **Not** domain. |
-| **Framework entry** | `app/` (routes, pages, `route.ts`) and `*.actions.ts` with `"use server"`. **Not** domain layers; they are **doors** where traffic enters. |
+| **Application composition** | **`lib/server/`**: instances, Supabase clients, which adapter is injected. **Not** domain. |
+| **Cached reads (RSC)** | **`lib/server/queries/`**: only `unstable_cache` / `cache` wrappers around functions already defined in composition. **Not** domain. |
+| **Server actions** | **`lib/actions/<feature>/*.actions.ts`**: functions with `"use server"` that call **`@/lib/server`** (or domain types). **Not** domain. |
+| **Framework entry** | **`app/`** (routes, pages, `route.ts`). **Not** domain layers; they are **doors** where traffic enters. |
 
-**Rule:** “Domain” names only the core. `src/server` is **not** a synonym for domain.
+**Rule:** “Domain” names only the core. **`lib/server`** is **not** a synonym for domain. **`lib/`** as a whole is **not** domain: it is the **application shell** next to Next.js (composition, actions, clients, shared UI helpers).
 
 ---
 
@@ -50,19 +51,34 @@ This is **infrastructure**, not domain.
 
 ---
 
-## 4. Composition (`src/server`): what it is and what it is not
+## 4. Composition (`lib/server`): what it is and what it is not
 
 - **It is** where the system is **wired**: `createXSupabaseAdapter(...)`, `createXService({ repo: ... })`, **session** vs **anonymous** client as required.
-- **It is not** another step inside the domain pyramid domain → repository → service. It **imports** domain code and adapters already written and **exports** functions ready for `app/` and actions.
+- **It is not** another step inside the domain pyramid domain → repository → service. It **imports** domain code and adapters already written and **exports** functions ready for `app/`, **`lib/actions/`**, and API routes.
 
 Typical files:
 
-- `src/server/<module>.ts` — wiring for that context.
-- `src/server/anon-repos.ts` — read-only repos with the anonymous client (safe inside `unstable_cache`). **One global file**, not necessarily one per entity.
-- `src/server/queries/<module>.ts` — cached reads for RSC only; they call “uncached” functions defined in the same module’s composition file.
-- `src/server/index.ts` — re-exports what the app should use (`@/src/server`).
+- `lib/server/<module>.ts` — wiring for that context.
+- `lib/server/anon-repos.ts` — read-only repos with the anonymous client (safe inside `unstable_cache`). **One global file**, not necessarily one per entity.
+- `lib/server/queries/<module>.ts` — cached reads for RSC only; they call “uncached” functions defined in the same module’s composition file.
+- `lib/server/index.ts` — re-exports what the app should use (`@/lib/server`).
 
-**Important:** files under `src/server/queries/` should import composition from paths like `@/src/server/<module>` (not from the barrel `index.ts`) to **avoid circular dependencies**.
+**Important:** files under `lib/server/queries/` should import composition from paths like `@/lib/server/<module>` (not from the barrel `index.ts`) to **avoid circular dependencies**.
+
+### 4.1. Layout of `lib/` (application shell)
+
+Domain modules live in **`src/<module>/`**. Everything under **`lib/`** is **outside** that pyramid: shared clients, composition, server actions, validation helpers, etc.
+
+| Path | Role |
+|------|------|
+| **`lib/server/`** | Application composition (see §4). |
+| **`lib/server/queries/`** | Cached reads for RSC (`unstable_cache`). |
+| **`lib/actions/<feature>/`** | Server actions (`"use server"`); import **`@/lib/server`**, not adapters directly. |
+| **`lib/supabase/`** | Browser and server Supabase clients. |
+| **`lib/validation/`** | Shared parsers, HTTP helpers, primitives used at edges. |
+| **`lib/constants/`**, **`lib/map/`**, **`lib/asset-*`**, etc. | Product constants, map UI, asset pipelines — **not** domain modules; keep them free of business rules that belong in `src/`. |
+
+**`lib/utils`:** use for small shared helpers that do not deserve their own folder; avoid dumping domain logic there.
 
 ---
 
@@ -74,10 +90,10 @@ There is no single URL “for domain”. There are **several entry kinds** becau
 |-------|------|
 | `app/**/page.tsx` (RSC) | Navigation: HTML, data for render, metadata. |
 | `app/api/**/route.ts` | Explicit HTTP (REST, webhooks, non-React clients). |
-| `*.actions.ts` (`"use server"`) | Mutations from the client (forms, buttons) without hand-written REST routes. |
+| `lib/actions/**/**.actions.ts` (`"use server"`) | Mutations from the client (forms, buttons) without hand-written REST routes. |
 
-All of these may import `@/src/server` (or domain types where appropriate).  
-None of them **is** the domain: domain lives under `src/<module>/`, not under `app/`.
+Pages and routes import **`@/lib/server`** (or **`@/lib/server/queries`** for cached reads) or call **server actions** that delegate to **`@/lib/server`**.  
+None of these **is** the domain: domain lives under **`src/<module>/`**, not under `app/` or `lib/`.
 
 ---
 
@@ -88,20 +104,21 @@ None of them **is** the domain: domain lives under `src/<module>/`, not under `a
 3. **`src/<name>/<name>.repository.port.ts`** — repository interface (references domain types).
 4. **`src/<name>/<name>.repository.adapter.ts`** — Supabase implementation; imports `lib/supabase/server.ts` as needed.
 5. **`src/<name>/<name>.services.ts`** — use cases; depends only on the **port** (injection in the next step).
-6. **`src/server/<name>.ts`** — build adapters + `createXService`, export functions for mutations and reads **without** `unstable_cache` here (unless you explicitly choose otherwise).
-7. If you need public cached reads for RSC: **`src/server/queries/<name>.ts`** + exports in **`src/server/queries/index.ts`** and **`src/server/index.ts`**.
-8. **Server actions** in `src/<name>/<name>.actions.ts` or equivalent, and/or routes under **`app/`**, importing **`@/src/server`**.
+6. **`lib/server/<name>.ts`** — build adapters + `createXService`, export functions for mutations and reads **without** `unstable_cache` here (unless you explicitly choose otherwise).
+7. If you need public cached reads for RSC: **`lib/server/queries/<name>.ts`** + exports in **`lib/server/queries/index.ts`** and **`lib/server/index.ts`**.
+8. **Server actions** in **`lib/actions/<feature>/*.actions.ts`**, and/or routes under **`app/`**, importing **`@/lib/server`**.
 
 ---
 
 ## 7. Anti-patterns
 
 - Comments inside `*.repository.port.ts` or `*.repository.adapter.ts` (keep those files free of explanatory prose; names and structure should suffice).
-- Putting core business logic **only** in `src/server` without going through the module’s **services**.
+- Putting core business logic **only** in `lib/server` without going through the module’s **services**.
 - Treating “domain” and “composition” as the same layer in prose or code.
 - Making `*.domain.ts` import DTOs or adapters.
-- Importing `*.repository.adapter` from **pages** or **components**; the app should go through **`@/src/server`** or actions, not couple to the adapter.
-- Using `unstable_cache` inside the **adapter**; framework caching belongs in **`src/server/queries`**.
+- Importing `*.repository.adapter` from **pages** or **components**; the app should go through **`@/lib/server`** or **server actions**, not couple to the adapter.
+- Using `unstable_cache` inside the **adapter**; framework caching belongs in **`lib/server/queries`**.
+- Placing **`"use server"`** action files inside **`src/`**; they belong under **`lib/actions/`** (domain stays framework-agnostic).
 
 ---
 
@@ -124,11 +141,12 @@ repository.adapter  →  lib/supabase/server.ts
 **Composition and entries (not domain):**
 
 ```
-src/server (+ queries)  =  composition and RSC cache
+lib/server (+ queries)     =  composition and RSC cache
+lib/actions/<feature>/     =  server actions → @/lib/server
 
-app/  and  *.actions.ts  →  import  →  @/src/server  →  …  →  services / repos / domain
+app/  →  import  →  @/lib/server  or  lib/actions  →  …  →  services / repos / domain
 ```
 
 ---
 
-*Aligned with `fiktionmaps/src/` and `fiktionmaps/src/server/`.*
+*Aligned with **`fiktionmaps/src/`** (domain) and **`fiktionmaps/lib/`** (application shell: `server`, `actions`, clients, shared helpers).*

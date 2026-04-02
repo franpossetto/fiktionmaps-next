@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { jsonError, jsonZodError } from "@/lib/validation/http"
 import { uuidSchema } from "@/lib/validation/primitives"
-import { deleteScene, getSceneById, updateScene } from "@/src/server"
+import { deleteScene, getSceneById, updateScene } from "@/lib/server"
 import { patchSceneBodySchema } from "@/src/scenes/scene.schemas"
 
 async function requireUserId() {

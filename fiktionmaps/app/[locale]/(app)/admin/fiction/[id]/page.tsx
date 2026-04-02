@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { getFictionById } from "@/src/server"
+import { getFictionById } from "@/lib/server"
 import { FictionEditView } from "@/components/admin/fiction-edit-view"
 
 interface AdminFictionEditPageProps {

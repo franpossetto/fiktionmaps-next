@@ -115,6 +115,100 @@ function locationFromSceneJoinRow(r: unknown): LocFromJoin | null {
   return locObj as LocFromJoin
 }
 
+type AnonSupabase = ReturnType<typeof createAnonymousClient>
+
+async function fetchScenesWithVideoForPlaceIds(
+  supabase: AnonSupabase,
+  fictionIds: string[],
+  placeIds: string[],
+): Promise<Location[]> {
+  if (placeIds.length === 0 || fictionIds.length === 0) return []
+
+  const { data: sceneRows, error: sceneError } = await supabase
+    .from("scenes")
+    .select(
+      `
+        id,
+        fiction_id,
+        place_id,
+        title,
+        description,
+        quote,
+        video_url,
+        sort_order,
+        places!inner (
+          location_id,
+          locations!inner (
+            id,
+            name,
+            formatted_address,
+            latitude,
+            longitude,
+            city_id
+          )
+        )
+      `,
+    )
+    .eq("active", true)
+    .not("video_url", "is", null)
+    .in("fiction_id", fictionIds)
+    .in("place_id", placeIds)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true })
+
+  if (sceneError) {
+    console.error("[scenes repo] fetchScenesWithVideoForPlaceIds scenes:", sceneError.message)
+    return []
+  }
+
+  const rows = sceneRows ?? []
+  const sceneIds = rows.map((r) => (r as { id?: string }).id).filter(Boolean) as string[]
+
+  const { data: sceneThumbRows } =
+    sceneIds.length > 0
+      ? await supabase
+          .from("asset_images")
+          .select("entity_id, url")
+          .eq("entity_type", "scene")
+          .eq("role", "avatar")
+          .eq("variant", "sm")
+          .in("entity_id", sceneIds)
+      : { data: null }
+
+  const thumbBySceneId = new Map<string, string>()
+  for (const r of sceneThumbRows ?? []) {
+    if (r.entity_id && r.url) thumbBySceneId.set(r.entity_id as string, r.url as string)
+  }
+
+  return rows.map((raw) => {
+    const r = raw as {
+      id: string
+      fiction_id: string
+      title: string
+      description: string
+      quote: string | null
+      video_url: string
+    }
+    const loc = locationFromSceneJoinRow(raw)
+    const poster = thumbBySceneId.get(r.id) ?? ""
+    return {
+      id: r.id,
+      name: r.title?.trim() || loc?.name || "Scene",
+      address: loc?.formatted_address ?? "",
+      lat: loc?.latitude ?? 0,
+      lng: loc?.longitude ?? 0,
+      cityId: loc?.city_id ?? "",
+      fictionId: r.fiction_id ?? "",
+      image: poster,
+      videoUrl: String(r.video_url).trim(),
+      description: r.description ?? "",
+      sceneDescription: r.description ?? "",
+      sceneQuote: r.quote ?? undefined,
+      visitTip: undefined,
+    }
+  })
+}
+
 export const scenesSupabaseAdapter: ScenesRepositoryPort = {
   async getAll(): Promise<Scene[]> {
     const supabase = await createClient()
@@ -308,9 +402,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
     return true
   },
 
-  async listCitiesWithActiveScenes(
-    fictionIds: string[] | null,
-  ): Promise<Pick<City, "id" | "name" | "country">[]> {
+  async listCitiesWithActiveScenes(fictionIds: string[] | null): Promise<City[]> {
     const supabase = createAnonymousClient()
 
     let sceneQuery = supabase
@@ -326,6 +418,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       `,
       )
       .eq("active", true)
+      .not("video_url", "is", null)
 
     if (fictionIds && fictionIds.length > 0) {
       sceneQuery = sceneQuery.in("fiction_id", fictionIds)
@@ -358,7 +451,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
 
     const { data: cities, error: citiesError } = await supabase
       .from("cities")
-      .select("id, name, country")
+      .select("*")
       .in("id", [...cityIds])
       .order("name", { ascending: true })
 
@@ -367,7 +460,56 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       return []
     }
 
-    return (cities ?? []) as Pick<City, "id" | "name" | "country">[]
+    return (cities ?? []) as City[]
+  },
+
+  async listFictionIdsWithScenesInCity(cityId: string): Promise<string[]> {
+    const supabase = createAnonymousClient()
+
+    const { data: locationRows, error: locError } = await supabase
+      .from("locations")
+      .select("id")
+      .eq("city_id", cityId)
+
+    if (locError) {
+      console.error("[scenes repo] listFictionIdsWithScenesInCity locations:", locError.message)
+      return []
+    }
+
+    const locationIds = (locationRows ?? []).map((r) => r.id).filter(Boolean)
+    if (locationIds.length === 0) return []
+
+    const { data: placeRows, error: placeError } = await supabase
+      .from("places")
+      .select("id")
+      .in("location_id", locationIds)
+
+    if (placeError) {
+      console.error("[scenes repo] listFictionIdsWithScenesInCity places:", placeError.message)
+      return []
+    }
+
+    const placeIds = (placeRows ?? []).map((r) => r.id as string).filter(Boolean)
+    if (placeIds.length === 0) return []
+
+    const { data: sceneRows, error: sceneError } = await supabase
+      .from("scenes")
+      .select("fiction_id")
+      .in("place_id", placeIds)
+      .eq("active", true)
+      .not("video_url", "is", null)
+
+    if (sceneError) {
+      console.error("[scenes repo] listFictionIdsWithScenesInCity scenes:", sceneError.message)
+      return []
+    }
+
+    const ids = new Set<string>()
+    for (const r of sceneRows ?? []) {
+      const fid = (r as { fiction_id?: string }).fiction_id
+      if (fid) ids.add(fid)
+    }
+    return [...ids].sort()
   },
 
   async listScenesWithVideoInBbox(params: { fictionIds: string[]; bbox: MapBbox }): Promise<Location[]> {
@@ -406,90 +548,45 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
     const placeIds = (placeRows ?? []).map((r) => r.id as string).filter(Boolean)
     if (placeIds.length === 0) return []
 
-    const { data: sceneRows, error: sceneError } = await supabase
-      .from("scenes")
-      .select(
-        `
-        id,
-        fiction_id,
-        place_id,
-        title,
-        description,
-        quote,
-        video_url,
-        sort_order,
-        places!inner (
-          location_id,
-          locations!inner (
-            id,
-            name,
-            formatted_address,
-            latitude,
-            longitude,
-            city_id
-          )
-        )
-      `,
-      )
-      .eq("active", true)
-      .not("video_url", "is", null)
-      .in("fiction_id", fictionIds)
-      .in("place_id", placeIds)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true })
+    return fetchScenesWithVideoForPlaceIds(supabase, fictionIds, placeIds)
+  },
 
-    if (sceneError) {
-      console.error("[scenes repo] listScenesWithVideoInBbox scenes:", sceneError.message)
+  async listScenesWithVideoInCity(params: {
+    fictionIds: string[]
+    cityId: string
+  }): Promise<Location[]> {
+    const { fictionIds, cityId } = params
+    if (fictionIds.length === 0) return []
+
+    const supabase = createAnonymousClient()
+
+    const { data: locationRows, error: locError } = await supabase
+      .from("locations")
+      .select("id")
+      .eq("city_id", cityId)
+
+    if (locError) {
+      console.error("[scenes repo] listScenesWithVideoInCity locations:", locError.message)
       return []
     }
 
-    const rows = sceneRows ?? []
-    const sceneIds = rows.map((r) => (r as { id?: string }).id).filter(Boolean) as string[]
+    const locationIds = (locationRows ?? []).map((r) => r.id).filter(Boolean)
+    if (locationIds.length === 0) return []
 
-    const { data: sceneThumbRows } =
-      sceneIds.length > 0
-        ? await supabase
-            .from("asset_images")
-            .select("entity_id, url")
-            .eq("entity_type", "scene")
-            .eq("role", "avatar")
-            .eq("variant", "sm")
-            .in("entity_id", sceneIds)
-        : { data: null }
+    const { data: placeRows, error: placeError } = await supabase
+      .from("places")
+      .select("id")
+      .in("fiction_id", fictionIds)
+      .in("location_id", locationIds)
 
-    const thumbBySceneId = new Map<string, string>()
-    for (const r of sceneThumbRows ?? []) {
-      if (r.entity_id && r.url) thumbBySceneId.set(r.entity_id as string, r.url as string)
+    if (placeError) {
+      console.error("[scenes repo] listScenesWithVideoInCity places:", placeError.message)
+      return []
     }
 
-    const result: Location[] = rows.map((raw) => {
-      const r = raw as {
-        id: string
-        fiction_id: string
-        title: string
-        description: string
-        quote: string | null
-        video_url: string
-      }
-      const loc = locationFromSceneJoinRow(raw)
-      const poster = thumbBySceneId.get(r.id) ?? ""
-      return {
-        id: r.id,
-        name: r.title?.trim() || loc?.name || "Scene",
-        address: loc?.formatted_address ?? "",
-        lat: loc?.latitude ?? 0,
-        lng: loc?.longitude ?? 0,
-        cityId: loc?.city_id ?? "",
-        fictionId: r.fiction_id ?? "",
-        image: poster,
-        videoUrl: String(r.video_url).trim(),
-        description: r.description ?? "",
-        sceneDescription: r.description ?? "",
-        sceneQuote: r.quote ?? undefined,
-        visitTip: undefined,
-      }
-    })
+    const placeIds = (placeRows ?? []).map((r) => r.id as string).filter(Boolean)
+    if (placeIds.length === 0) return []
 
-    return result
+    return fetchScenesWithVideoForPlaceIds(supabase, fictionIds, placeIds)
   },
 }

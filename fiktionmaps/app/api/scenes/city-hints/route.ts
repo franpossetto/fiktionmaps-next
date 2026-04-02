@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { parseFictionIdsFromSearchParams } from "@/lib/validation/map-query"
 import { isUuidString } from "@/lib/validation/primitives"
-import { listCitiesWithActiveScenes } from "@/src/server/scenes"
+import { listCitiesWithActiveScenes } from "@/lib/server/scenes"
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)

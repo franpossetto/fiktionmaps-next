@@ -5,21 +5,21 @@ import { Link } from "@/i18n/navigation"
 import { useAuth } from "@/context/auth-context"
 import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
-import { getCurrentUserProfileAction, type ProfileWithOnboarding } from "@/lib/auth/profile.actions"
+import { getCurrentUserProfileAction, type ProfileWithOnboarding } from "@/lib/actions/auth/profile.actions"
 import type { UserProfile as UserProfileType } from "@/src/users"
 import type { City } from "@/src/cities/city.domain"
 import type { UserHome } from "@/src/homes"
-import type { EnrichedPlaceCheckin } from "@/lib/checkins/checkin.actions"
+import type { EnrichedPlaceCheckin } from "@/lib/actions/checkins/checkin.actions"
 import {
   getUserCityCheckinsAction,
   getUserPlaceCheckinsEnrichedAction,
-} from "@/lib/checkins/checkin.actions"
+} from "@/lib/actions/checkins/checkin.actions"
 import type { CityCheckin } from "@/src/checkins"
 import {
   getProfileScenesPreviewAction,
   type ProfileArticlePreview,
   type ProfileScenePreview,
-} from "@/lib/profile/profile-contributions.actions"
+} from "@/lib/actions/profile/profile-contributions.actions"
 
 import { ProfileHeader } from "./profile-header"
 import { HomesProvider } from "./homes-context"

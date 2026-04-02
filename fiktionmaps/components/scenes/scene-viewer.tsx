@@ -10,21 +10,6 @@ import { CitySelector } from "@/components/map/city-selector"
 import { FictionSelector } from "@/components/map/fiction-selector"
 import { ScenesEmptyHint } from "@/components/scenes/scenes-empty-hint"
 
-type Bbox = { west: number; south: number; east: number; north: number }
-const SCENE_VIEWER_RADIUS_KM = 80
-
-function bboxAround(lat: number, lng: number, radiusKm: number): Bbox {
-  const kmPerDegLat = 111.32
-  const deltaLat = radiusKm / kmPerDegLat
-  const deltaLng = radiusKm / (kmPerDegLat * Math.cos((lat * Math.PI) / 180))
-  return {
-    west: lng - deltaLng,
-    south: lat - deltaLat,
-    east: lng + deltaLng,
-    north: lat + deltaLat,
-  }
-}
-
 interface SceneViewerProps {
   initialCities?: City[]
   initialSelectedCity?: City | null
@@ -54,9 +39,9 @@ export function SceneViewer({
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    if (initialCities && initialCities.length > 0) return
+    if (initialCities !== undefined) return
     let cancelled = false
-    fetch("/api/cities")
+    fetch("/api/scenes/cities")
       .then((r) => (r.ok ? r.json() : []))
       .then((list: City[]) => {
         if (!cancelled) setCitiesList(list)
@@ -73,9 +58,9 @@ export function SceneViewer({
     ;(async () => {
       try {
         const allCities =
-          initialCities && initialCities.length > 0
+          initialCities !== undefined
             ? initialCities
-            : ((await (await fetch("/api/cities")).json()) as City[])
+            : ((await (await fetch("/api/scenes/cities")).json()) as City[])
         if (!cancelled && allCities.length > 0) setSelectedCity(allCities[0])
       } catch {
         if (!cancelled) setSelectedCity(null)
@@ -98,7 +83,9 @@ export function SceneViewer({
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(`/api/map/city-fictions?cityId=${encodeURIComponent(selectedCity.id)}`)
+        const res = await fetch(
+          `/api/scenes/city-fictions-with-scenes?cityId=${encodeURIComponent(selectedCity.id)}`,
+        )
         const fics = (await res.json()) as Fiction[]
         if (!cancelled) {
           setAvailableFictions(fics)
@@ -130,10 +117,9 @@ export function SceneViewer({
       setScenesLoading(false)
       return
     }
-    const bbox = bboxAround(selectedCity.lat, selectedCity.lng, SCENE_VIEWER_RADIUS_KM)
     const params = new URLSearchParams()
     for (const id of fictionIds) params.append("fictionIds[]", id)
-    params.set("bbox", `${bbox.west},${bbox.south},${bbox.east},${bbox.north}`)
+    params.set("cityId", selectedCity.id)
     let cancelled = false
     setScenesLoading(true)
     ;(async () => {
@@ -224,10 +210,18 @@ export function SceneViewer({
   }, [currentFictionId, availableFictions])
 
   const goNext = useCallback(() => {
-    if (scenes.length > 0) {
-      setCurrentIndex((prev) => (prev + 1) % scenes.length)
+    if (scenes.length === 0) return
+    if (scenes.length === 1) {
+      const v = videoRef.current
+      if (v) {
+        v.currentTime = 0
+        void v.play()
+      }
       setPaused(false)
+      return
     }
+    setCurrentIndex((prev) => (prev + 1) % scenes.length)
+    setPaused(false)
   }, [scenes.length])
 
   const goPrev = useCallback(() => {
@@ -289,15 +283,6 @@ export function SceneViewer({
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [goNext, goPrev])
 
-  // Auto-advance on video end
-  useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-    const handleEnd = () => goNext()
-    video.addEventListener("ended", handleEnd)
-    return () => video.removeEventListener("ended", handleEnd)
-  }, [goNext, currentIndex])
-
   if (scenesLoading) {
     return (
       <div className="flex h-full items-center justify-center bg-background">
@@ -313,16 +298,38 @@ export function SceneViewer({
       selectedCity ? hintCities.filter((c) => c.id !== selectedCity.id) : []
 
     return (
-      <div className="flex h-full items-center justify-center bg-background px-4">
-        <div className="flex flex-col items-center gap-4 text-muted-foreground">
+      <div className="relative flex h-full w-full flex-col bg-background">
+        <div className="pointer-events-auto absolute left-4 top-4 z-[1000] flex items-center gap-2">
+          <FictionSelector
+            availableFictions={availableFictions}
+            selectedFictionIds={selectedFictionIds}
+            onToggleFiction={toggleFiction}
+          />
+        </div>
+        {selectedCity && (
+          <div className="pointer-events-auto absolute right-4 top-4 z-[1000] flex items-center gap-2">
+            <CitySelector
+              cities={citiesList.length > 0 ? citiesList : undefined}
+              selectedCity={selectedCity}
+              onCityChange={handleCityChange}
+            />
+          </div>
+        )}
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-4 text-muted-foreground">
           <Film className="h-16 w-16 opacity-40" />
           <p className="text-lg font-medium text-foreground">
-            {!selectedCity ? "No scenes available" : "No scenes in this city"}
+            {citiesList.length === 0
+              ? "No scenes in the catalog yet"
+              : !selectedCity
+                ? "No scenes available"
+                : "No scenes in this city"}
           </p>
           <p className="text-center text-sm">
-            {fictionIdsForHint.length === 0
-              ? "Select a fiction above to see scenes."
-              : "Try another city or adjust which fictions are included."}
+            {citiesList.length === 0
+              ? "Check back when new scenes are added."
+              : fictionIdsForHint.length === 0
+                ? "Select fictions on the left to see scenes."
+                : "Try another city or adjust which fictions are included."}
           </p>
           {!hintsLoading && hintVariant != null && (
             <ScenesEmptyHint
@@ -332,20 +339,6 @@ export function SceneViewer({
               cities={citiesList}
             />
           )}
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-            <FictionSelector
-              availableFictions={availableFictions}
-              selectedFictionIds={selectedFictionIds}
-              onToggleFiction={toggleFiction}
-            />
-            {selectedCity && (
-              <CitySelector
-                cities={citiesList.length > 0 ? citiesList : undefined}
-                selectedCity={selectedCity}
-                onCityChange={handleCityChange}
-              />
-            )}
-          </div>
         </div>
       </div>
     )
@@ -368,33 +361,39 @@ export function SceneViewer({
         preload="auto"
         className="absolute inset-0 h-full w-full object-cover"
         poster={currentScene.image?.trim() || undefined}
+        onEnded={(e) => {
+          e.stopPropagation()
+          goNext()
+        }}
       />
 
       {/* Gradient overlays */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/70 to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/80 to-transparent" />
 
-      {/* Top bar — theme-neutral: always light controls on video (light mode foreground is dark and vanishes on video). */}
+      {/* Top bar — fiction left / city right (same rhythm as Map); light controls on video. */}
       <div
-        className={`absolute inset-x-0 top-0 z-20 flex items-center justify-between px-5 py-4 transition-opacity duration-300 ${
+        className={`pointer-events-none absolute inset-x-0 top-0 z-20 transition-opacity duration-300 ${
           showControls ? "opacity-100" : "opacity-0"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex flex-wrap items-center gap-2 [&_button]:border-white/25 [&_button]:bg-black/45 [&_button]:text-white [&_button]:shadow-md [&_button]:backdrop-blur-md [&_button]:hover:bg-black/60 [&_button_svg]:!text-white [&_button_span]:text-white">
+        <div className="pointer-events-auto absolute left-4 top-4 z-[1000] flex flex-wrap items-center gap-2 [&_button]:border-white/25 [&_button]:bg-black/45 [&_button]:text-white [&_button]:shadow-md [&_button]:backdrop-blur-md [&_button]:hover:bg-black/60 [&_button_svg]:!text-white [&_button_span]:text-white">
           <FictionSelector
             availableFictions={availableFictions}
             selectedFictionIds={selectedFictionIds}
             onToggleFiction={toggleFiction}
           />
-          {selectedCity && (
+        </div>
+        {selectedCity && (
+          <div className="pointer-events-auto absolute right-4 top-4 z-[1000] flex flex-wrap items-center gap-2 [&_button]:border-white/25 [&_button]:bg-black/45 [&_button]:text-white [&_button]:shadow-md [&_button]:backdrop-blur-md [&_button]:hover:bg-black/60 [&_button_svg]:!text-white [&_button_span]:text-white">
             <CitySelector
               cities={citiesList.length > 0 ? citiesList : undefined}
               selectedCity={selectedCity}
               onCityChange={handleCityChange}
             />
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Nav arrows - left / right click zones */}

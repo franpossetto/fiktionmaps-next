@@ -12,7 +12,7 @@ import {
   getUserCityCheckinsAction,
   getUserPlaceCheckinsEnrichedAction,
   type EnrichedPlaceCheckin,
-} from "@/lib/checkins/checkin.actions"
+} from "@/lib/actions/checkins/checkin.actions"
 import type { CityCheckin } from "@/src/checkins"
 import type { City } from "@/src/cities/city.domain"
 import {

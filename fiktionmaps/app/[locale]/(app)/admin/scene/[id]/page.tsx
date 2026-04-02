@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { getSceneById } from "@/src/server"
+import { getSceneById } from "@/lib/server"
 import { SceneEditView } from "@/components/admin/scene-edit-view"
 
 interface AdminSceneEditPageProps {
