@@ -1,0 +1,18 @@
+{
+  "genres": [
+    "Romance", "Comedy", "Drama", "Fantasy", "Sci-Fi",
+    "Thriller", "Action", "Horror", "Documentary", "Animation"
+  ],
+  "avatars": [
+    { "id": "aurora", "label": "Aurora", "url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Aurora" },
+    { "id": "orion", "label": "Orion", "url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Orion" },
+    { "id": "luna", "label": "Luna", "url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Luna" },
+    { "id": "nova", "label": "Nova", "url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Nova" },
+    { "id": "atlas", "label": "Atlas", "url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Atlas" },
+    { "id": "sage", "label": "Sage", "url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Sage" },
+    { "id": "milo", "label": "Milo", "url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Milo" },
+    { "id": "zoe", "label": "Zoe", "url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Zoe" },
+    { "id": "kai", "label": "Kai", "url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Kai" },
+    { "id": "iris", "label": "Iris", "url": "https://api.dicebear.com/7.x/avataaars/svg?seed=Iris" }
+  ]
+}
