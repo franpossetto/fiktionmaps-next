@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { useRouter } from "@/i18n/navigation"
-import type { Location } from "@/src/locations"
-import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
-import type { City } from "@/src/cities/city.domain"
+import type { Location } from "@/src/locations/domain/location.entity"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import type { City } from "@/src/cities/domain/city.entity"
 import { PlacePage } from "@/components/map/place-page"
+import { getAllCitiesAction } from "@/src/cities/infrastructure/next/city.actions"
+import { getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
+import { getPlaceLocationAction } from "@/src/places/infrastructure/next/place.actions"
 
 export function FictionPlaceClient() {
   const params = useParams()
@@ -27,12 +30,11 @@ export function FictionPlaceClient() {
     setCity(null)
 
     ;(async () => {
-      const placeRes = await fetch(`/api/map/place?placeId=${encodeURIComponent(placeId)}`)
-      if (!placeRes.ok) {
+      const loc = await getPlaceLocationAction(placeId)
+      if (!loc) {
         if (!cancelled) setLoadError("not_found")
         return
       }
-      const loc = (await placeRes.json()) as Location
       if (cancelled) return
       if (loc.id !== placeId || loc.fictionId !== fictionId) {
         setLoadError("not_found")
@@ -40,20 +42,8 @@ export function FictionPlaceClient() {
       }
 
       const [f, c] = await Promise.all([
-        fetch("/api/fictions")
-          .then((r) => (r.ok ? r.json() : []))
-          .then((rows: unknown) =>
-            Array.isArray(rows)
-              ? (rows as FictionWithMedia[]).find((item) => item.id === fictionId) ?? null
-              : null,
-          ),
-        fetch("/api/cities")
-          .then((r) => (r.ok ? r.json() : []))
-          .then((rows: unknown) =>
-            Array.isArray(rows)
-              ? (rows as City[]).find((item) => item.id === loc.cityId) ?? null
-              : null,
-          ),
+        getActiveFictionsAction().then((rows) => rows.find((item) => item.id === fictionId) ?? null),
+        getAllCitiesAction().then((rows) => rows.find((item) => item.id === loc.cityId) ?? null),
       ])
       if (cancelled) return
       setLocation(loc)

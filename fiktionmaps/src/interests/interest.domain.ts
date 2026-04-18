@@ -1,6 +1,1 @@
-export interface InterestCatalogItem {
-  id: string
-  key: string
-  label: string
-}
-
+export type { InterestCatalogItem } from "./domain/interest.entity"

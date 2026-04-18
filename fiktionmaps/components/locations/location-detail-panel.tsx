@@ -1,4 +1,4 @@
-import type { Location } from "@/src/locations"
+import type { Location } from "@/src/locations/domain/location.entity"
 
 interface LocationDetailPanelProps {
   location: Location

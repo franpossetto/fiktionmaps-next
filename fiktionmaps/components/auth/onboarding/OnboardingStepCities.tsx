@@ -3,7 +3,7 @@
 import { Check, MapPin } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
-import type { City } from "@/src/cities/city.domain"
+import type { City } from "@/src/cities/domain/city.entity"
 
 export interface OnboardingStepCitiesProps {
   cities: City[]

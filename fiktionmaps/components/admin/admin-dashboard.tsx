@@ -8,9 +8,9 @@ import { FictionsTab } from "./fictions-tab"
 import { CitiesTab } from "./cities-tab"
 import { LocationsTab } from "./locations-tab"
 import { ScenesTab } from "./scenes-tab"
-import type { Fiction } from "@/src/fictions/fiction.domain"
-import type { City } from "@/src/cities/city.domain"
-import type { Location } from "@/src/locations"
+import type { Fiction } from "@/src/fictions/domain/fiction.entity"
+import type { City } from "@/src/cities/domain/city.entity"
+import type { Location } from "@/src/locations/domain/location.entity"
 import { useAdminViewModeStorage } from "@/lib/local-storage-service-hooks"
 
 type AdminSection = "fictions" | "cities" | "locations" | "scenes"
@@ -172,8 +172,8 @@ export function AdminDashboard({ initialFictions, initialCities, initialLocation
               viewMode={viewMode}
             />
           )}
-          {activeSection === "locations" && <LocationsTab initialLocations={initialLocations} />}
-          {activeSection === "scenes" && <ScenesTab />}
+          {activeSection === "locations" && <LocationsTab initialLocations={initialLocations} initialFictions={initialFictions} initialCities={initialCities} />}
+          {activeSection === "scenes" && <ScenesTab initialFictions={initialFictions} initialPlaces={initialLocations} />}
         </div>
       </div>
     </div>

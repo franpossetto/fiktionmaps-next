@@ -2,8 +2,8 @@
 
 import { useRef, useEffect, useState } from "react"
 import { Tv, Film, Play } from "lucide-react"
-import type { Scene } from "@/src/scenes"
-import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { Scene } from "@/src/scenes/domain/scene.entity"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import {
   Dialog,
   DialogContent,

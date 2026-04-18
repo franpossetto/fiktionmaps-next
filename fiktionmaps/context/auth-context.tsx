@@ -7,7 +7,10 @@ import {
   signOutAction,
   getAuthenticatedUserAction,
 } from "@/lib/actions/auth/auth.actions"
-import { getCurrentUserProfileAction, completeOnboardingAction } from "@/lib/actions/auth/profile.actions"
+import {
+  getCurrentUserProfileAction,
+  completeOnboardingAction,
+} from "@/src/users/infrastructure/next/user.actions"
 
 export interface User {
   id: string

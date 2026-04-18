@@ -3,14 +3,16 @@
 import { X, MapPin, Quote, Lightbulb, Film, ArrowRight, Box } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useTranslations } from "next-intl"
-import type { Location } from "@/src/locations"
-import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
-import type { Scene } from "@/src/scenes"
+import type { Location } from "@/src/locations/domain/location.entity"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import type { Scene } from "@/src/scenes/domain/scene.entity"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
 import Image from "next/image"
 import { SceneClipPanelCard } from "./scene-clip-panel-card"
+import { getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
+import { listScenesAction } from "@/src/scenes/infrastructure/next/scene.actions"
 
 interface LocationDetailProps {
   location: Location
@@ -39,11 +41,10 @@ export function LocationDetail({
     if (fictionProp !== undefined) {
       setFiction(fictionProp ?? undefined)
     } else {
-      fetch("/api/fictions")
-        .then((r) => (r.ok ? r.json() : []))
-        .then((rows: unknown) => {
-          if (cancelled || !Array.isArray(rows)) return
-          const hit = (rows as FictionWithMedia[]).find((f) => f.id === location.fictionId)
+      getActiveFictionsAction()
+        .then((rows) => {
+          if (cancelled) return
+          const hit = rows.find((f) => f.id === location.fictionId)
           setFiction(hit ?? undefined)
         })
         .catch(() => {
@@ -57,11 +58,9 @@ export function LocationDetail({
 
   useEffect(() => {
     let cancelled = false
-    const params = new URLSearchParams({ placeId: location.id, active: "true" })
-    fetch(`/api/scenes?${params}`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((s: unknown) => {
-        if (!cancelled && Array.isArray(s)) setPlaceScenes(s as Scene[])
+    listScenesAction({ placeId: location.id, active: "true" })
+      .then((s) => {
+        if (!cancelled) setPlaceScenes(s)
       })
       .catch(() => {
         if (!cancelled) setPlaceScenes([])

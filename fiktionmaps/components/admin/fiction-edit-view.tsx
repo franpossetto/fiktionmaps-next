@@ -4,11 +4,17 @@ import { useState, useMemo, useRef, useEffect } from "react"
 import Image from "next/image"
 import { useRouter, Link } from "@/i18n/navigation"
 import { ArrowLeft, ArrowRight, Loader2, ImagePlus, Film, Trash2, Check } from "lucide-react"
-import type { Fiction, FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { Fiction, FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
 import { FICTION_GENRES } from "@/lib/constants/fiction-genres"
-import { updateFictionAction, uploadFictionImageAction, deleteFictionAction } from "@/lib/actions/fictions/fiction.actions"
+import {
+  updateFictionAction,
+  uploadFictionImageAction,
+  deleteFictionAction,
+  getFictionInterestsAction,
+  setFictionInterestsAction,
+} from "@/src/fictions/infrastructure/next/fiction.actions"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -21,6 +27,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useLocale } from "next-intl"
 import type { InterestCatalogItem } from "@/src/interests"
+import { getInterestCatalogAction } from "@/src/interests/infrastructure/next/interest.actions"
 
 const FICTION_TYPES: { value: Fiction["type"]; label: string }[] = [
   { value: "movie", label: "Movie" },
@@ -40,7 +47,7 @@ function toFormState(f: Fiction) {
     director: f.type === "movie" ? (f.author ?? "") : "",
     author: f.type !== "movie" ? (f.author ?? "") : "",
     genre: f.genre,
-    synopsis: f.description,
+    description: f.description,
     active: f.active,
     runtimeMinutes:
       f.duration_sec != null && f.duration_sec > 0
@@ -82,20 +89,16 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
     ;(async () => {
       setLoadingInterests(true)
       try {
-        const [interestsRes, assignedRes] = await Promise.all([
-          fetch(`/api/interests?locale=${encodeURIComponent(locale)}`),
-          fetch(`/api/admin/fictions/${initialFiction.id}/interests`),
+        const [interests, assignedResult] = await Promise.all([
+          getInterestCatalogAction(locale),
+          getFictionInterestsAction(initialFiction.id),
         ])
 
-        if (!interestsRes.ok) throw new Error("Failed to load interests")
-        if (!assignedRes.ok) throw new Error("Failed to load fiction interests")
-
-        const interests = (await interestsRes.json()) as InterestCatalogItem[]
-        const assigned = (await assignedRes.json()) as string[]
+        if (!assignedResult.success) throw new Error(assignedResult.error)
 
         if (!cancelled) {
           setAllInterests(interests)
-          setSelectedInterestIds(assigned)
+          setSelectedInterestIds(assignedResult.interestIds)
         }
       } catch {
         if (!cancelled) {
@@ -123,12 +126,8 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
     if (savingInterests || loadingInterests) return
     setSavingInterests(true)
     try {
-      const res = await fetch(`/api/admin/fictions/${initialFiction.id}/interests`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ interestIds: selectedInterestIds }),
-      })
-      if (!res.ok) throw new Error("Failed to save interests")
+      const result = await setFictionInterestsAction(initialFiction.id, selectedInterestIds)
+      if (!result.success) throw new Error(result.error)
 
       router.refresh()
     } finally {
@@ -156,7 +155,7 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
     if (!formData.title.trim()) newErrors.title = "Title is required"
     if (formData.year < 1900 || formData.year > new Date().getFullYear())
       newErrors.year = "Invalid year"
-    if (!formData.synopsis.trim()) newErrors.synopsis = "Description is required"
+    if (!formData.description.trim()) newErrors.description = "Description is required"
     if (!formData.genre.trim()) newErrors.genre = "Genre is required"
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -208,7 +207,7 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
     fd.set("type", formData.type)
     fd.set("year", String(formData.year))
     fd.set("genre", formData.genre)
-    fd.set("synopsis", formData.synopsis)
+    fd.set("description", formData.description)
     fd.set("director", formData.director)
     fd.set("author", formData.author)
     fd.set("active", formData.active ? "true" : "false")
@@ -517,10 +516,10 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
                 </div>
               </FormField>
 
-              <FormField label="Description" required error={errors.synopsis}>
+              <FormField label="Description" required error={errors.description}>
                 <textarea
-                  value={formData.synopsis}
-                  onChange={(e) => setFormData((p) => ({ ...p, synopsis: e.target.value }))}
+                  value={formData.description}
+                  onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
                   placeholder="Short description of the fiction..."
                   rows={4}
                   className={cn(inputClass, "resize-none")}

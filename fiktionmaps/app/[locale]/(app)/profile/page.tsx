@@ -1,16 +1,16 @@
-import { getAllCities } from "@/lib/server"
-import { getCurrentUserProfileAction } from "@/lib/actions/auth/profile.actions"
+import { getAllCitiesCached } from "@/src/cities/infrastructure/next/city.queries"
+import { getCurrentUserProfileAction } from "@/src/users/infrastructure/next/user.actions"
 import {
   getUserCityCheckinsAction,
   getUserPlaceCheckinsEnrichedAction,
-} from "@/lib/actions/checkins/checkin.actions"
-import { getUserHomesAction } from "@/lib/actions/homes/home.actions"
-import { getProfileScenesPreviewAction } from "@/lib/actions/profile/profile-contributions.actions"
+} from "@/src/checkins/infrastructure/next/checkin.actions"
+import { getUserHomesAction } from "@/src/homes/infrastructure/next/home.actions"
+import { getProfileScenesPreviewAction } from "@/src/scenes/infrastructure/next/profile-scene-previews.actions"
 import { UserProfileComponent } from "@/components/profile/user-profile"
 
 export default async function ProfilePage() {
   const [cities, scenePreviews, profileRes, cityCheckinsRes, placeCheckinsRes, homesRes] = await Promise.all([
-    getAllCities(),
+    getAllCitiesCached(),
     getProfileScenesPreviewAction(),
     getCurrentUserProfileAction(),
     getUserCityCheckinsAction(),

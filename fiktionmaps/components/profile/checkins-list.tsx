@@ -12,9 +12,9 @@ import {
   getUserCityCheckinsAction,
   getUserPlaceCheckinsEnrichedAction,
   type EnrichedPlaceCheckin,
-} from "@/lib/actions/checkins/checkin.actions"
-import type { CityCheckin } from "@/src/checkins"
-import type { City } from "@/src/cities/city.domain"
+} from "@/src/checkins/infrastructure/next/checkin.actions"
+import type { CityCheckin } from "@/src/checkins/infrastructure/next/checkin.actions"
+import type { City } from "@/src/cities/domain/city.entity"
 import {
   PlacesSidebarRow,
   PROFILE_SEE_ALL_THRESHOLD,
@@ -100,12 +100,7 @@ export function CheckinsList({
 
   useEffect(() => {
     fetchData()
-    if (externalCityMap) return
-    fetch("/api/cities")
-      .then((res) => res.json())
-      .then((data: City[]) => setCities(new Map(data.map((c) => [c.id, c]))))
-      .catch(() => {})
-  }, [fetchData, externalCityMap])
+  }, [fetchData])
 
   const unified: UnifiedCheckin[] = [
     ...cityCheckins.map((c) => {

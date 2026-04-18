@@ -5,7 +5,7 @@ import { Check } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
-import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 
 export interface OnboardingStepFictionsProps {
   fictions: FictionWithMedia[]

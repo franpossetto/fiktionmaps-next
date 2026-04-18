@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { motion } from "framer-motion"
-import type { City } from "@/src/cities/city.domain"
-import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
-import type { Location } from "@/src/locations"
+import type { City } from "@/src/cities/domain/city.entity"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import type { Location } from "@/src/locations/domain/location.entity"
 import { MapView, Map3DToggleSlot, MapMinimapSlot } from "@/components/map/map-view"
 import { MapProvider } from "@/lib/map"
 import { CitySelector } from "@/components/map/city-selector"
@@ -13,6 +13,11 @@ import { LocationDetail } from "@/components/map/location-detail"
 import { ThumbnailCarousel } from "@/components/map/thumbnail-carousel"
 import { usePlaceSelectorCollapsedStorage } from "@/lib/local-storage-service-hooks"
 import { useRouter } from "@/i18n/navigation"
+import {
+  getAllCitiesAction,
+  getCityFictionsAction,
+} from "@/src/cities/infrastructure/next/city.actions"
+import { getPlacesInBboxAction } from "@/src/places/infrastructure/next/place.actions"
 
 type Bbox = { west: number; south: number; east: number; north: number }
 
@@ -60,19 +65,16 @@ export default function MapPage() {
   // Load cities from DB, then fictions for first city
   useEffect(() => {
     setCitiesLoading(true)
-    fetch("/api/cities")
-      .then((r) => (r.ok ? r.json() : []))
+    getAllCitiesAction()
       .then((citiesList: City[]) => {
         setCities(citiesList)
         if (citiesList.length > 0) {
           const city = citiesList[5]
           setSelectedCity(city)
-          return fetch(`/api/map/city-fictions?cityId=${encodeURIComponent(city.id)}`)
-            .then((r) => (r.ok ? r.json() : []))
-            .then((fics: FictionWithMedia[]) => {
-              setAvailableFictions(fics)
-              setSelectedFictionIds(fics.map((f) => f.id))
-            })
+          return getCityFictionsAction(city.id).then((fics: FictionWithMedia[]) => {
+            setAvailableFictions(fics)
+            setSelectedFictionIds(fics.map((f) => f.id))
+          })
         }
       })
       .catch(() => {})
@@ -86,25 +88,22 @@ export default function MapPage() {
     }
     const minBbox = bboxAround(selectedCity.lat, selectedCity.lng, MIN_LOAD_RADIUS_KM)
     const bbox = bounds ? bboxUnion(bounds, minBbox) : minBbox
-    const controller = new AbortController()
-    const params = new URLSearchParams()
-    for (const id of selectedFictionIds) params.append("fictionIds[]", id)
-    params.set("bbox", `${bbox.west},${bbox.south},${bbox.east},${bbox.north}`)
-    fetch(`/api/map/locations?${params.toString()}`, { signal: controller.signal })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setFilteredLocations((data ?? []) as Location[]))
-      .catch(() => {
-        // ignore abort/network for now
+    let cancelled = false
+    getPlacesInBboxAction(selectedFictionIds, bbox)
+      .then((data) => {
+        if (!cancelled) setFilteredLocations(data ?? [])
       })
-    return () => controller.abort()
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
   }, [selectedCity?.id, selectedCity?.lat, selectedCity?.lng, selectedFictionIds, bounds])
 
   const handleCityChange = useCallback(async (city: City) => {
     setSelectedCity(city)
     setSelectedLocation(null)
     setFocusedLocationId(null)
-    const res = await fetch(`/api/map/city-fictions?cityId=${encodeURIComponent(city.id)}`)
-    const fics = res.ok ? ((await res.json()) as FictionWithMedia[]) : []
+    const fics = await getCityFictionsAction(city.id)
     setAvailableFictions(fics)
     setSelectedFictionIds(fics.map((f) => f.id))
   }, [])

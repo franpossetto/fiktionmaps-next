@@ -2,13 +2,19 @@
 
 import { useState, useCallback, useRef, useEffect } from "react"
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, Play, Pause, Film } from "lucide-react"
-import type { City } from "@/src/cities/city.domain"
-import type { Fiction } from "@/src/fictions/fiction.domain"
-import type { Location } from "@/src/locations"
+import type { City } from "@/src/cities/domain/city.entity"
+import type { Fiction } from "@/src/fictions/domain/fiction.entity"
+import type { Location } from "@/src/locations/domain/location.entity"
 import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
 import { CitySelector } from "@/components/map/city-selector"
 import { FictionSelector } from "@/components/map/fiction-selector"
 import { ScenesEmptyHint } from "@/components/scenes/scenes-empty-hint"
+import {
+  getCitiesWithScenesForViewerAction,
+  getCityFictionsWithScenesForViewerAction,
+  getCityHintsForScenesViewerAction,
+  listScenesForViewerAction,
+} from "@/src/scenes/infrastructure/next/scene.actions"
 
 interface SceneViewerProps {
   initialCities?: City[]
@@ -41,8 +47,7 @@ export function SceneViewer({
   useEffect(() => {
     if (initialCities !== undefined) return
     let cancelled = false
-    fetch("/api/scenes/cities")
-      .then((r) => (r.ok ? r.json() : []))
+    getCitiesWithScenesForViewerAction()
       .then((list: City[]) => {
         if (!cancelled) setCitiesList(list)
       })
@@ -58,9 +63,7 @@ export function SceneViewer({
     ;(async () => {
       try {
         const allCities =
-          initialCities !== undefined
-            ? initialCities
-            : ((await (await fetch("/api/scenes/cities")).json()) as City[])
+          initialCities !== undefined ? initialCities : await getCitiesWithScenesForViewerAction()
         if (!cancelled && allCities.length > 0) setSelectedCity(allCities[0])
       } catch {
         if (!cancelled) setSelectedCity(null)
@@ -83,10 +86,7 @@ export function SceneViewer({
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(
-          `/api/scenes/city-fictions-with-scenes?cityId=${encodeURIComponent(selectedCity.id)}`,
-        )
-        const fics = (await res.json()) as Fiction[]
+        const fics = await getCityFictionsWithScenesForViewerAction(selectedCity.id)
         if (!cancelled) {
           setAvailableFictions(fics)
           setSelectedFictionIds(fics.map((f) => f.id))
@@ -117,16 +117,11 @@ export function SceneViewer({
       setScenesLoading(false)
       return
     }
-    const params = new URLSearchParams()
-    for (const id of fictionIds) params.append("fictionIds[]", id)
-    params.set("cityId", selectedCity.id)
     let cancelled = false
     setScenesLoading(true)
     ;(async () => {
       try {
-        const res = await fetch(`/api/scenes/for-viewer?${params.toString()}`)
-        if (!res.ok) throw new Error("for-viewer failed")
-        const data = (await res.json()) as Location[]
+        const data = await listScenesForViewerAction(fictionIds, { cityId: selectedCity.id })
         if (!cancelled) {
           setScenes(Array.isArray(data) ? data.filter((s) => s.videoUrl?.trim()) : [])
           setScenesLoading(false)
@@ -160,16 +155,14 @@ export function SceneViewer({
     setHintsLoading(true)
     ;(async () => {
       try {
-        const params = new URLSearchParams()
-        for (const id of fictionIds) params.append("fictionIds[]", id)
-        let res = await fetch(`/api/scenes/city-hints?${params.toString()}`)
-        let data = (await res.json()) as { cities?: Pick<City, "id" | "name" | "country">[] }
+        let data = await getCityHintsForScenesViewerAction(
+          fictionIds.length > 0 ? fictionIds : null,
+        )
         let cities = data.cities ?? []
         let variant: "scoped" | "global" = fictionIds.length > 0 ? "scoped" : "global"
 
         if (fictionIds.length > 0 && otherThanCurrent(cities).length === 0) {
-          res = await fetch("/api/scenes/city-hints")
-          data = (await res.json()) as { cities?: Pick<City, "id" | "name" | "country">[] }
+          data = await getCityHintsForScenesViewerAction(null)
           cities = data.cities ?? []
           variant = "global"
         }

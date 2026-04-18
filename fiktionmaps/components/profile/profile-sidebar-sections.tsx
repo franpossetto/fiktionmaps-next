@@ -5,10 +5,10 @@ import { ArrowRight } from "lucide-react"
 import Image from "next/image"
 import { useTranslations } from "next-intl"
 import { useRouter } from "@/i18n/navigation"
-import type { EnrichedPlaceCheckin } from "@/lib/actions/checkins/checkin.actions"
-import type { City } from "@/src/cities/city.domain"
+import type { City } from "@/src/cities/domain/city.entity"
+import type { EnrichedPlaceCheckin } from "@/src/checkins/domain/checkin.entity"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
-import type { ProfileArticlePreview, ProfileScenePreview } from "@/lib/actions/profile/profile-contributions.actions"
+import type { ProfileArticlePreview, ProfileScenePreview } from "@/src/scenes/infrastructure/next/profile-scene-previews.actions"
 
 /** Profile section headers show "See all" only when total records exceed this count. */
 export const PROFILE_SEE_ALL_THRESHOLD = 10

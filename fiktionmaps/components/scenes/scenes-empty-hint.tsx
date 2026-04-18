@@ -1,7 +1,7 @@
 "use client"
 
 import { MapPin } from "lucide-react"
-import type { City } from "@/src/cities/city.domain"
+import type { City } from "@/src/cities/domain/city.entity"
 
 interface ScenesEmptyHintProps {
   otherCitiesWithScenes: Pick<City, "id" | "name" | "country">[]

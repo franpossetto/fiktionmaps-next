@@ -4,11 +4,11 @@ import { useEffect, useState, useRef } from "react"
 import Image from "next/image"
 import { useRouter } from "@/i18n/navigation"
 import { Plus, MoreVertical, Edit2, Trash2, Book, Search, Loader2, CheckCircle, CircleOff, ArrowLeft, ArrowRight, ImagePlus, Film } from "lucide-react"
-import type { Fiction, FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { Fiction, FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
 import { FICTION_GENRES } from "@/lib/constants/fiction-genres"
-import { createFictionAction, deleteFictionAction, setFictionActiveAction, uploadFictionImageAction } from "@/lib/actions/fictions/fiction.actions"
+import { createFictionAction, deleteFictionAction, setFictionActiveAction, uploadFictionImageAction } from "@/src/fictions/infrastructure/next/fiction.actions"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import {
   AlertDialog,
@@ -39,7 +39,7 @@ interface FictionFormData {
   type: Fiction["type"]
   year: number
   genre: string
-  synopsis: string
+  description: string
   active: boolean
   runtimeMinutes: string
 }
@@ -63,7 +63,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
     type: "movie",
     year: new Date().getFullYear(),
     genre: "",
-    synopsis: "",
+    description: "",
     active: true,
     runtimeMinutes: "",
   })
@@ -114,7 +114,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
       type: "movie",
       year: new Date().getFullYear(),
       genre: "",
-      synopsis: "",
+      description: "",
       active: true,
       runtimeMinutes: "",
     })
@@ -153,7 +153,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
     const newErrors: Record<string, string> = {}
     if (!formData.title.trim()) newErrors.title = "Title is required"
     if (!formData.genre) newErrors.genre = "Genre is required"
-    if (!formData.synopsis.trim()) newErrors.synopsis = "Description is required"
+    if (!formData.description.trim()) newErrors.description = "Description is required"
     if (formData.year < 1900 || formData.year > new Date().getFullYear())
       newErrors.year = "Invalid year"
     setErrors(newErrors)
@@ -170,7 +170,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
     fd.set("type", formData.type)
     fd.set("year", String(formData.year))
     fd.set("genre", formData.genre)
-    fd.set("synopsis", formData.synopsis)
+    fd.set("description", formData.description)
     fd.set("active", formData.active ? "true" : "false")
     fd.set("runtimeMinutes", formData.runtimeMinutes ?? "")
     const result = await createFictionAction(fd)
@@ -467,10 +467,10 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                   </FormField>
                 )}
 
-                <FormField label="Description" required error={errors.synopsis}>
+                <FormField label="Description" required error={errors.description}>
                   <textarea
-                    value={formData.synopsis}
-                    onChange={(e) => setFormData({ ...formData, synopsis: e.target.value })}
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Short description of the fiction..."
                     rows={4}
                     className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground/20 transition-all resize-none"

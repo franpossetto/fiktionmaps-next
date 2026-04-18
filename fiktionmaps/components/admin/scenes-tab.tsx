@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from "react"
 import { useTranslations } from "next-intl"
 import { useRouter } from "@/i18n/navigation"
 import { Plus, Edit2, Trash2, ChevronRight, Clapperboard, CheckCircle2, Search, Loader2 } from "lucide-react"
-import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
-import type { Location } from "@/src/locations"
-import type { Scene } from "@/src/scenes"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import type { Location } from "@/src/locations/domain/location.entity"
+import type { Scene } from "@/src/scenes/domain/scene.entity"
 import { createClient } from "@/lib/supabase/client"
 import { ASSET_VIDEOS_BUCKET } from "@/lib/asset-videos/asset-videos-bucket"
 import { buildTimecodeLabel, type TimecodeParts } from "@/lib/scenes/scene-timecode"
@@ -15,6 +15,11 @@ import { FormField } from "./form-field"
 import { DragDropZone } from "./drag-drop-zone"
 import { SceneTimecodeInput } from "./scene-timecode-input"
 import { WizardShell } from "./wizard-shell"
+import {
+  createSceneAction,
+  deleteSceneAction,
+  listScenesAction,
+} from "@/src/scenes/infrastructure/next/scene.actions"
 
 function sanitizeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_")
@@ -60,11 +65,11 @@ const emptyForm = (): SceneFormData => ({
 
 type WorkflowStep = "list" | "select-fiction" | "select-location" | "details"
 
-export function ScenesTab() {
+export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initialFictions?: FictionWithMedia[], initialPlaces?: Location[] }) {
   const t = useTranslations("Scenes")
   const router = useRouter()
-  const [fictions, setFictions] = useState<FictionWithMedia[]>([])
-  const [locations, setLocations] = useState<Location[]>([])
+  const [fictions, setFictions] = useState<FictionWithMedia[]>(initialFictions)
+  const [locations, setLocations] = useState<Location[]>(initialPlaces)
   const [scenes, setScenes] = useState<Scene[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -76,27 +81,17 @@ export function ScenesTab() {
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const loadScenes = useCallback(async () => {
-    const res = await fetch("/api/scenes")
-    if (!res.ok) {
+    try {
+      const data = await listScenesAction()
+      setScenes(data)
+      setError(null)
+    } catch {
       setError("Failed to load scenes")
-      return
     }
-    const data = (await res.json()) as Scene[]
-    setScenes(data)
-    setError(null)
   }, [])
 
   useEffect(() => {
-    // Use admin APIs (real UUIDs from DB), not useApi mocks — POST /api/scenes validates UUIDs.
-    Promise.all([
-      fetch("/api/admin/fictions").then((r) => (r.ok ? r.json() : [])),
-      fetch("/api/admin/places").then((r) => (r.ok ? r.json() : [])),
-    ])
-      .then(([f, l]) => {
-        setFictions((f ?? []) as FictionWithMedia[])
-        setLocations((l ?? []) as Location[])
-      })
-      .catch(() => setError("Failed to load fictions or locations"))
+    // Server action uses same validation as former POST /api/scenes.
     loadScenes().finally(() => setLoading(false))
   }, [loadScenes])
 
@@ -180,20 +175,15 @@ export function ScenesTab() {
         episodeTitle: isTv && formData.episodeTitle.trim() ? formData.episodeTitle.trim() : null,
       }
 
-      const res = await fetch("/api/scenes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...basePayload,
-          videoUrl,
-          sortOrder: 0,
-          active: true,
-        }),
+      const result = await createSceneAction({
+        ...basePayload,
+        videoUrl,
+        sortOrder: 0,
+        active: true,
       })
 
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(j.error || "Failed to create scene")
+      if (!result.success) {
+        throw new Error(result.error || "Failed to create scene")
       }
 
       await loadScenes()
@@ -209,10 +199,9 @@ export function ScenesTab() {
   const handleDelete = async (scene: Scene) => {
     if (!window.confirm(t("deleteConfirm", { title: scene.title }))) return
     setError(null)
-    const res = await fetch(`/api/scenes/${scene.id}`, { method: "DELETE" })
-    if (!res.ok) {
-      const j = (await res.json().catch(() => ({}))) as { error?: string }
-      setError(j.error || "Failed to delete scene")
+    const result = await deleteSceneAction(scene.id)
+    if (!result.success) {
+      setError(result.error || "Failed to delete scene")
       return
     }
     await loadScenes()

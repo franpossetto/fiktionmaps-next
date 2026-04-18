@@ -15,8 +15,8 @@ import {
 } from "@/components/ui/dialog"
 import { FormField } from "./form-field"
 import { LocationImageCropper } from "./location-image-cropper"
-import type { City } from "@/src/cities/city.domain"
-import type { Fiction } from "@/src/fictions/fiction.domain"
+import type { City } from "@/src/cities/domain/city.entity"
+import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 
 const GEOCODE_URL = "https://api.mapbox.com/geocoding/v5/mapbox.places"
 const PLACE_MAP_ID = "admin-place-map"

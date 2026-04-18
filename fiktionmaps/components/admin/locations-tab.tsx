@@ -2,22 +2,29 @@
 
 import { useEffect, useState } from "react"
 import { Plus, Edit2, Trash2, Search, MapPin } from "lucide-react"
-import type { City } from "@/src/cities/city.domain"
-import type { Fiction } from "@/src/fictions/fiction.domain"
-import type { Location } from "@/src/locations"
+import type { City } from "@/src/cities/domain/city.entity"
+import type { Fiction } from "@/src/fictions/domain/fiction.entity"
+import type { Location } from "@/src/locations/domain/location.entity"
 import { Button } from "@/components/ui/button"
 import { PlaceCreateView, type PlaceFormData } from "./place-create-view"
-import { uploadPlaceImageAction } from "@/lib/actions/places/place.actions"
+import { uploadPlaceImageAction } from "@/src/places/infrastructure/next/place.actions"
+import {
+  createPlaceAction,
+  updatePlaceAction,
+  getAllPlacesAction,
+} from "@/src/places/infrastructure/next/place.actions"
 
 type WorkflowStep = "list" | "create" | "edit"
 
 interface LocationsTabProps {
   initialLocations?: Location[]
+  initialFictions?: Fiction[]
+  initialCities?: City[]
 }
 
-export function LocationsTab({ initialLocations }: LocationsTabProps) {
-  const [cities, setCities] = useState<City[]>([])
-  const [fictions, setFictions] = useState<Fiction[]>([])
+export function LocationsTab({ initialLocations, initialFictions = [], initialCities = [] }: LocationsTabProps) {
+  const [cities, setCities] = useState<City[]>(initialCities)
+  const [fictions, setFictions] = useState<Fiction[]>(initialFictions)
   const [locations, setLocations] = useState<Location[]>(initialLocations ?? [])
   const [workflowStep, setWorkflowStep] = useState<WorkflowStep>("list")
   const [editingLocation, setEditingLocation] = useState<Location | null>(null)
@@ -28,16 +35,6 @@ export function LocationsTab({ initialLocations }: LocationsTabProps) {
   useEffect(() => {
     setLocations(initialLocations ?? [])
   }, [initialLocations])
-
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/admin/cities").then((r) => (r.ok ? r.json() : [])),
-      fetch("/api/admin/fictions").then((r) => (r.ok ? r.json() : [])),
-    ]).then(([c, f]) => {
-      setCities((c ?? []) as City[])
-      setFictions((f ?? []) as Fiction[])
-    })
-  }, [])
 
   const defaultCity = cities[0]
   const initialPlaceFormData: PlaceFormData = {
@@ -55,31 +52,19 @@ export function LocationsTab({ initialLocations }: LocationsTabProps) {
 
   const handleEditSubmit = async (placeId: string, data: PlaceFormData) => {
     setSubmitError(null)
-    const res = await fetch(`/api/admin/places/${placeId}`, {
-      method: "PATCH",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        fictionId: data.fictionId,
-        cityId: data.cityId,
-        name: data.name,
-        formattedAddress: data.formattedAddress || data.address,
-        latitude: data.latitude,
-        longitude: data.longitude,
-        description: data.description,
-        isLandmark: data.isLandmark,
-        locationType: data.locationType || null,
-      }),
+    const result = await updatePlaceAction(placeId, {
+      fictionId: data.fictionId,
+      cityId: data.cityId,
+      name: data.name,
+      formattedAddress: data.formattedAddress || data.address,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      description: data.description,
+      isLandmark: data.isLandmark,
+      locationType: data.locationType || null,
     })
-    let json: { error?: string }
-    try {
-      json = await res.json()
-    } catch {
-      setSubmitError(res.ok ? "Invalid response" : "Failed to update place")
-      return
-    }
-    if (!res.ok) {
-      setSubmitError(json?.error ?? "Failed to update place")
+    if (!result.success) {
+      setSubmitError(result.error)
       return
     }
     if (data.image) {
@@ -87,61 +72,39 @@ export function LocationsTab({ initialLocations }: LocationsTabProps) {
       formData.set("file", data.image)
       await uploadPlaceImageAction(placeId, formData)
     }
-    const listRes = await fetch("/api/admin/places")
-    if (listRes.ok) {
-      const list = await listRes.json()
-      setLocations((list ?? []) as Location[])
-    }
+    const list = await getAllPlacesAction()
+    setLocations(list)
     setWorkflowStep("list")
     setEditingLocation(null)
   }
 
   const handleCreateSubmit = async (data: PlaceFormData) => {
     setSubmitError(null)
-    const res = await fetch("/api/admin/places", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        fictionId: data.fictionId,
-        cityId: data.cityId,
-        name: data.name,
-        formattedAddress: data.formattedAddress || data.address,
-        latitude: data.latitude,
-        longitude: data.longitude,
-        description: data.description,
-        isLandmark: data.isLandmark,
-        locationType: data.locationType || null,
-      }),
+    const result = await createPlaceAction({
+      fictionId: data.fictionId,
+      cityId: data.cityId,
+      name: data.name,
+      formattedAddress: data.formattedAddress || data.address,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      description: data.description,
+      isLandmark: data.isLandmark,
+      locationType: data.locationType || null,
     })
-    let json: { error?: string; locations?: Location[] }
-    try {
-      json = await res.json()
-    } catch {
-      setSubmitError(res.ok ? "Invalid response" : "Failed to create place")
+    if (!result.success) {
+      setSubmitError(result.error)
       return
     }
-    if (!res.ok) {
-      setSubmitError(json?.error ?? "Failed to create place")
-      return
-    }
-    const createdPlaceId = (json as { createdPlaceId?: string }).createdPlaceId
-    if (data.image && createdPlaceId) {
+    if (data.image) {
       const formData = new FormData()
       formData.set("file", data.image)
-      const uploadResult = await uploadPlaceImageAction(createdPlaceId, formData)
+      const uploadResult = await uploadPlaceImageAction(result.createdPlaceId, formData)
       if (!uploadResult.success) {
         setSubmitError(uploadResult.error ?? "Place created but image upload failed")
       }
     }
     // Refetch list so new place shows with image (or placeholder)
-    const listRes = await fetch("/api/admin/places")
-    if (listRes.ok) {
-      const list = await listRes.json()
-      setLocations((list ?? []) as Location[])
-    } else if (json.locations) {
-      setLocations(json.locations as Location[])
-    }
+    setLocations(await getAllPlacesAction())
     setWorkflowStep("list")
   }
 

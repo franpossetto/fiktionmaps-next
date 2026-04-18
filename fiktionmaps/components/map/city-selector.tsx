@@ -1,7 +1,7 @@
 "use client"
 
 import { MapPin, Search } from "lucide-react"
-import type { City } from "@/src/cities/city.domain"
+import type { City } from "@/src/cities/domain/city.entity"
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useState, useMemo, useEffect } from "react"
+import { getAllCitiesAction } from "@/src/cities/infrastructure/next/city.actions"
 
 interface CitySelectorProps {
   /** Cities list (from DB). When not provided, fetches from /api/cities. */
@@ -28,9 +29,8 @@ export function CitySelector({ cities: citiesProp, selectedCity, onCityChange }:
       setCities(citiesProp)
       return
     }
-    fetch("/api/cities")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((list: City[]) => setCities(list))
+    getAllCitiesAction()
+      .then((list) => setCities(list))
       .catch(() => {})
   }, [citiesProp])
 

@@ -4,15 +4,16 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import { useTranslations } from "next-intl"
 import { Link, useRouter } from "@/i18n/navigation"
 import { ArrowLeft, CheckCircle2, Loader2, RefreshCw } from "lucide-react"
-import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
-import type { Location } from "@/src/locations"
-import type { Scene } from "@/src/scenes"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import type { Location } from "@/src/locations/domain/location.entity"
+import type { Scene } from "@/src/scenes/domain/scene.entity"
 import { createClient } from "@/lib/supabase/client"
 import { ASSET_VIDEOS_BUCKET } from "@/lib/asset-videos/asset-videos-bucket"
 import { buildTimecodeLabel, parseTimecodeLabel, type TimecodeParts } from "@/lib/scenes/scene-timecode"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
 import { SceneTimecodeInput } from "./scene-timecode-input"
+import { updateSceneAction } from "@/src/scenes/infrastructure/next/scene.actions"
 
 function sanitizeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_")
@@ -60,13 +61,15 @@ function sceneToForm(scene: Scene): SceneFormData {
 
 export interface SceneEditViewProps {
   initialScene: Scene
+  fictions?: FictionWithMedia[]
+  places?: Location[]
 }
 
-export function SceneEditView({ initialScene }: SceneEditViewProps) {
+export function SceneEditView({ initialScene, fictions: initialFictions = [], places: initialPlaces = [] }: SceneEditViewProps) {
   const t = useTranslations("Scenes")
   const router = useRouter()
-  const [fictions, setFictions] = useState<FictionWithMedia[]>([])
-  const [locations, setLocations] = useState<Location[]>([])
+  const [fictions, setFictions] = useState<FictionWithMedia[]>(initialFictions)
+  const [locations, setLocations] = useState<Location[]>(initialPlaces)
   const [formData, setFormData] = useState<SceneFormData>(() => sceneToForm(initialScene))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -83,18 +86,6 @@ export function SceneEditView({ initialScene }: SceneEditViewProps) {
     setPendingVideoPreviewUrl(url)
     return () => URL.revokeObjectURL(url)
   }, [formData.videoFile])
-
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/admin/fictions").then((r) => (r.ok ? r.json() : [])),
-      fetch("/api/admin/places").then((r) => (r.ok ? r.json() : [])),
-    ])
-      .then(([f, l]) => {
-        setFictions((f ?? []) as FictionWithMedia[])
-        setLocations((l ?? []) as Location[])
-      })
-      .catch(() => {})
-  }, [])
 
   const selectedFiction = useMemo(
     () => fictions.find((f) => f.id === formData.fictionId),
@@ -156,18 +147,13 @@ export function SceneEditView({ initialScene }: SceneEditViewProps) {
         episodeTitle: isTv && formData.episodeTitle.trim() ? formData.episodeTitle.trim() : null,
       }
 
-      const res = await fetch(`/api/scenes/${initialScene.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...basePayload,
-          ...(videoUrl ? { videoUrl } : {}),
-        }),
+      const result = await updateSceneAction(initialScene.id, {
+        ...basePayload,
+        ...(videoUrl ? { videoUrl } : {}),
       })
 
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(j.error || "Failed to update scene")
+      if (!result.success) {
+        throw new Error(result.error || "Failed to update scene")
       }
 
       router.push("/admin")

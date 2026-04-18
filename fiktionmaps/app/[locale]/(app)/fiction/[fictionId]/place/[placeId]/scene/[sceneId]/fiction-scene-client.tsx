@@ -3,10 +3,13 @@
 import { useEffect, useState, useMemo } from "react"
 import { useParams } from "next/navigation"
 import { useRouter } from "@/i18n/navigation"
-import type { Location } from "@/src/locations"
-import type { Scene } from "@/src/scenes"
-import type { Fiction } from "@/src/fictions/fiction.domain"
+import type { Location } from "@/src/locations/domain/location.entity"
+import type { Scene } from "@/src/scenes/domain/scene.entity"
+import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 import { SceneWatchView } from "@/components/scenes/scene-watch-view"
+import { getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
+import { getPlaceLocationAction } from "@/src/places/infrastructure/next/place.actions"
+import { getSceneByIdAction, listScenesAction } from "@/src/scenes/infrastructure/next/scene.actions"
 
 export function FictionSceneClient() {
   const params = useParams()
@@ -33,12 +36,11 @@ export function FictionSceneClient() {
     setSceneFromUrl(null)
 
     ;(async () => {
-      const sceneRes = await fetch(`/api/scenes/${encodeURIComponent(sceneId)}`)
-      if (!sceneRes.ok) {
+      const scene = await getSceneByIdAction(sceneId)
+      if (!scene) {
         if (!cancelled) setLoadError("not_found")
         return
       }
-      const scene = (await sceneRes.json()) as Scene
       if (cancelled) return
       if (scene.fictionId !== fictionId) {
         setLoadError("not_found")
@@ -51,12 +53,11 @@ export function FictionSceneClient() {
       setSceneFromUrl(scene)
 
       const resolvedPlaceId = routePlaceId ?? scene.placeId
-      const placeRes = await fetch(`/api/map/place?placeId=${encodeURIComponent(resolvedPlaceId)}`)
-      if (!placeRes.ok) {
+      const loc = await getPlaceLocationAction(resolvedPlaceId)
+      if (!loc) {
         if (!cancelled) setLoadError("not_found")
         return
       }
-      const loc = (await placeRes.json()) as Location
       if (cancelled) return
       if (loc.id !== resolvedPlaceId || loc.fictionId !== fictionId) {
         setLoadError("not_found")
@@ -66,18 +67,8 @@ export function FictionSceneClient() {
       setLocation(loc)
 
       const [f, fs] = await Promise.all([
-        fetch("/api/fictions")
-          .then((r) => (r.ok ? r.json() : []))
-          .then((rows: unknown) =>
-            Array.isArray(rows)
-              ? ((rows as Fiction[]).find((item) => item.id === loc.fictionId) ?? null)
-              : null,
-          ),
-        (async () => {
-          const fictionParams = new URLSearchParams({ fictionId: loc.fictionId, active: "true" })
-          const fsRes = await fetch(`/api/scenes?${fictionParams}`)
-          return (fsRes.ok ? await fsRes.json() : []) as Scene[]
-        })(),
+        getActiveFictionsAction().then((rows) => rows.find((item) => item.id === loc.fictionId) ?? null),
+        listScenesAction({ fictionId: loc.fictionId, active: "true" }),
       ])
       if (cancelled) return
       setFiction(f ?? undefined)
@@ -86,9 +77,8 @@ export function FictionSceneClient() {
       const placeIds = [...new Set([...fs.map((s) => s.placeId), scene.placeId])]
       const placeEntries = await Promise.all(
         placeIds.map(async (id) => {
-          const res = await fetch(`/api/map/place?placeId=${encodeURIComponent(id)}`)
-          if (!res.ok) return null
-          const place = (await res.json()) as Location
+          const place = await getPlaceLocationAction(id)
+          if (!place) return null
           return { placeId: id, place }
         }),
       )

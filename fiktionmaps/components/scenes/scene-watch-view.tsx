@@ -5,9 +5,9 @@ import Image from "next/image"
 import { ArrowLeft, Play, Pause, Volume2, VolumeX } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { PageStickyBar } from "@/components/layout/page-sticky-bar"
-import type { Location } from "@/src/locations"
-import type { Scene } from "@/src/scenes"
-import type { Fiction } from "@/src/fictions/fiction.domain"
+import type { Location } from "@/src/locations/domain/location.entity"
+import type { Scene } from "@/src/scenes/domain/scene.entity"
+import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
 
 export function SceneWatchView({

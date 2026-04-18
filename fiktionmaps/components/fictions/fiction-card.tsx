@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
-import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { Link } from "@/i18n/navigation"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import { ThumbsUp } from "lucide-react"

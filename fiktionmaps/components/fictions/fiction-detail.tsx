@@ -3,14 +3,17 @@
 import { useState, useMemo, useEffect, useRef } from "react"
 import Image from "next/image"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
-import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
-import type { Location } from "@/src/locations"
-import type { City } from "@/src/cities/city.domain"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import type { Location } from "@/src/locations/domain/location.entity"
+import type { City } from "@/src/cities/domain/city.entity"
 import { Badge } from "@/components/ui/badge"
 import { LocationCard } from "@/components/locations/location-card"
 import { LocationDetailPanel } from "@/components/locations/location-detail-panel"
 import { PageStickyBar } from "@/components/layout/page-sticky-bar"
 import { MapPin, ArrowLeft, Clock } from "lucide-react"
+import { getAllCitiesAction } from "@/src/cities/infrastructure/next/city.actions"
+import { getAllPlacesAction } from "@/src/places/infrastructure/next/place.actions"
+import { listScenesAction } from "@/src/scenes/infrastructure/next/scene.actions"
 
 export interface FictionDetailProps {
   fiction: FictionWithMedia
@@ -28,14 +31,12 @@ export function FictionDetail({ fiction, onBack, onViewPlace }: FictionDetailPro
     let cancelled = false
     async function load() {
       try {
-        const [locationsRes, citiesRes] = await Promise.all([
-          fetch("/api/admin/places"),
-          fetch("/api/cities"),
+        const [locationsRaw, citiesRaw] = await Promise.all([
+          getAllPlacesAction(),
+          getAllCitiesAction(),
         ])
-        const locationsRaw = (await locationsRes.json()) as unknown
-        const citiesRaw = (await citiesRes.json()) as unknown
-        const locations = Array.isArray(locationsRaw) ? (locationsRaw as Location[]) : []
-        const cities = Array.isArray(citiesRaw) ? (citiesRaw as City[]) : []
+        const locations = Array.isArray(locationsRaw) ? locationsRaw : []
+        const cities = Array.isArray(citiesRaw) ? citiesRaw : []
         const fictionLocations = locations.filter((loc) => loc.fictionId === fiction.id)
         const cityIdSet = new Set(fictionLocations.map((loc) => loc.cityId))
         const filteredCities = cities.filter((city) => cityIdSet.has(city.id))
@@ -60,10 +61,9 @@ export function FictionDetail({ fiction, onBack, onViewPlace }: FictionDetailPro
 
   useEffect(() => {
     let cancelled = false
-    fetch(`/api/scenes?fictionId=${encodeURIComponent(fiction.id)}&active=true`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((scenes: unknown) => {
-        if (!cancelled) setSceneCount(Array.isArray(scenes) ? scenes.length : 0)
+    listScenesAction({ fictionId: fiction.id, active: "true" })
+      .then((scenes) => {
+        if (!cancelled) setSceneCount(scenes.length)
       })
       .catch(() => {
         if (!cancelled) setSceneCount(0)

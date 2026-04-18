@@ -5,12 +5,16 @@ import Image from "next/image"
 import { ArrowLeft, MapPin, Play, Lightbulb, Quote, Film, Tv, Clock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { PageStickyBar } from "@/components/layout/page-sticky-bar"
-import type { Location } from "@/src/locations"
-import type { Scene } from "@/src/scenes"
-import type { Fiction, FictionWithMedia } from "@/src/fictions/fiction.domain"
-import type { City } from "@/src/cities/city.domain"
+import type { Location } from "@/src/locations/domain/location.entity"
+import type { Scene } from "@/src/scenes/domain/scene.entity"
+import type { Fiction, FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import type { City } from "@/src/cities/domain/city.entity"
 import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
 import { SceneWatchView } from "@/components/scenes/scene-watch-view"
+import { getAllCitiesAction } from "@/src/cities/infrastructure/next/city.actions"
+import { getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
+import { getPlaceLocationAction } from "@/src/places/infrastructure/next/place.actions"
+import { listScenesAction } from "@/src/scenes/infrastructure/next/scene.actions"
 
 export interface PlacePageProps {
   location: Location
@@ -44,47 +48,31 @@ export function PlacePage({
       const [f, c] = await Promise.all([
         fictionProp !== undefined
           ? Promise.resolve(fictionProp ?? null)
-          : fetch("/api/fictions")
-              .then((r) => (r.ok ? r.json() : []))
-              .then((rows: unknown) =>
-                Array.isArray(rows)
-                  ? (rows as FictionWithMedia[]).find((item) => item.id === location.fictionId) ?? null
-                  : null,
-              ),
+          : getActiveFictionsAction().then((rows) => rows.find((item) => item.id === location.fictionId) ?? null),
         cityProp !== undefined
           ? Promise.resolve(cityProp ?? null)
-          : fetch("/api/cities")
-              .then((r) => (r.ok ? r.json() : []))
-              .then((rows: unknown) =>
-                Array.isArray(rows)
-                  ? (rows as City[]).find((item) => item.id === location.cityId) ?? null
-                  : null,
-              ),
+          : getAllCitiesAction()
+              .then((rows) => rows.find((item) => item.id === location.cityId) ?? null),
       ])
       if (cancelled) return
       setFiction(f ?? undefined)
       setCity(c ?? undefined)
 
-      const placeParams = new URLSearchParams({ placeId: location.id, active: "true" })
-      const scenesRes = await fetch(`/api/scenes?${placeParams}`)
-      const s: Scene[] = scenesRes.ok ? await scenesRes.json() : []
+      const s = await listScenesAction({ placeId: location.id, active: "true" })
       if (cancelled) return
       setScenes(s)
 
       let fs = s
       if (f) {
-        const fictionParams = new URLSearchParams({ fictionId: f.id, active: "true" })
-        const fsRes = await fetch(`/api/scenes?${fictionParams}`)
-        fs = fsRes.ok ? await fsRes.json() : []
+        fs = await listScenesAction({ fictionId: f.id, active: "true" })
       }
       if (cancelled) return
       setFictionScenes(fs)
       const placeIds = [...new Set(fs.map((scene) => scene.placeId))]
       const placeEntries = await Promise.all(
         placeIds.map(async (id) => {
-          const res = await fetch(`/api/map/place?placeId=${encodeURIComponent(id)}`)
-          if (!res.ok) return null
-          const place = (await res.json()) as Location
+          const place = await getPlaceLocationAction(id)
+          if (!place) return null
           return { placeId: id, place }
         }),
       )

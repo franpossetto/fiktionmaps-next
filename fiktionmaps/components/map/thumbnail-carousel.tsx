@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect, useCallback } from "react"
 import { ChevronLeft, ChevronRight, Images, X } from "lucide-react"
 import { useTranslations } from "next-intl"
-import type { Location } from "@/src/locations"
+import type { Location } from "@/src/locations/domain/location.entity"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/hooks/use-mobile"

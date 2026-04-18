@@ -1,0 +1,40 @@
+---
+description: Arquitectura fiktionmaps — capa Next, use cases, repos, dominio
+alwaysApply: true
+---
+
+# Arquitectura (obligatorio)
+
+## Flujo fijo por operación de negocio
+
+1. **domain/** — Puerto: interfaz `*.repository.ts` (y entidades, Zod de dominio en `*.schemas.ts`).
+2. **infrastructure/supabase/** — Implementación del puerto: usa el **cliente Supabase** y mappers; único sitio de `supabase.from(...)` para tablas de negocio.
+3. **application/** — **Un use case por caso de uso** (`*.usecase.ts`): recibe deps (repos) por parámetro o factory; **solo** habla con puertos; **no** importa `@/lib/supabase/server`.
+4. **infrastructure/next/** — **Server actions** y **queries** cacheadas: validan entrada → llaman **al use case** → devuelven resultado → `revalidatePath` / `revalidateTag` si aplica.
+
+## Reglas duras
+
+- Toda **action** o **query** que lea o escriba datos de negocio debe **invocar un use case**, no el repositorio ni Supabase directamente.
+- **Prohibido** en `infrastructure/next`: llamar **métodos del repositorio** (`repo.getById`, `repo.create`, etc.) o repetir lógica de negocio fuera del use case. La orquestación y el acceso a datos van en el **use case**.
+- **Permitido** en `infrastructure/next`: construir adaptadores de repo **solo para inyectarlos** como deps al use case (composition root en el borde). Ahí no va lógica de negocio, solo cableado.
+- **Prohibido** `supabase.from(...)` en actions/queries para tablas de negocio. **Excepción**: `createClient()` solo para **`auth.getUser()`** / sesión en el borde.
+- Varios puntos de entrada (p. ej. dos actions) pueden **reutilizar el mismo** use case si es la misma operación de aplicación.
+
+## Use cases
+
+- Nombre: `*.usecase.ts` en `application/`.
+- Un archivo use case = **una operación** reconocible (comando o consulta), no lógica duplicada en `*.queries.ts`.
+
+## Tipos de respuesta de server actions
+
+- Tipos `CreateXResult` / `{ success, error }` son contrato **UI/Next**: junto a actions o `*.actions.types.ts` en `infrastructure/next`.
+- **No** mezclarlos en `domain/*.schemas.ts` (dominio + Zod, no DTOs de acción).
+
+## Código legado
+
+- Si un archivo aún llama a repo o Supabase desde `infrastructure/next`, al **tocarlo** migrar a **use case + regla anterior** en el mismo cambio; no añadir más atajos.
+
+## Cambios mínimos
+
+- No refactors masivos ni docs salvo que el usuario lo pida.
+- Respetar imports y estilo del archivo que se edita.

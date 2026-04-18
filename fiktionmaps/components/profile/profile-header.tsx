@@ -14,7 +14,7 @@ import {
 } from "@/lib/constants/hero-images"
 import onboardingData from "@/data/onboarding.json"
 import { cn } from "@/lib/utils"
-import type { UserProfile } from "@/src/users"
+import type { UserProfile } from "@/src/users/domain/user.views"
 
 /** Re-enable the hero cover strip when we ship it again (set to true). */
 const SHOW_PROFILE_HERO_BANNER = false

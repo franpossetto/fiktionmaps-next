@@ -150,3 +150,190 @@ app/  →  import  →  @/lib/server  or  lib/actions  →  …  →  services /
 ---
 
 *Aligned with **`fiktionmaps/src/`** (domain) and **`fiktionmaps/lib/`** (application shell: `server`, `actions`, clients, shared helpers).*
+Naming map — current → target
+CurrentTarget{feature}.domain.tsdomain/{feature}.entity.ts{feature}.dtos.tsmerged into domain/{feature}.entity.ts{feature}.repository.port.tsdomain/{feature}.repository.ts{feature}.repository.adapter.tsinfrastructure/supabase/{feature}.repository.impl.ts{feature}.services.tsapplication/{action}-{feature}.usecase.ts (split by action)index.tsremoved — no barrel exportsapp/api/{feature}/route.tsremoved — replaced by infrastructure/next/{feature}.queries.ts and infrastructure/next/{feature}.actions.ts
+
+Target structure per feature
+src/
+└── {feature}/
+    ├── domain/
+    │   ├── {feature}.entity.ts        ← types + DTOs (merged from domain + dtos)
+    │   └── {feature}.repository.ts    ← interface (from repository.port)
+    ├── infrastructure/
+    │   ├── supabase/
+    │   │   └── {feature}.repository.impl.ts   ← Supabase adapter (from repository.adapter)
+    │   └── next/
+    │       ├── {feature}.queries.ts   ← cached reads for Server Components
+    │       └── {feature}.actions.ts   ← Server Actions for Client Components
+    └── application/
+        └── {action}-{feature}.usecase.ts  ← split from services.ts, only if business logic
+
+Shared files to create
+Create these if they don't exist:
+src/shared/domain/base.entity.ts
+tsexport type BaseEntity = {
+  id: string
+  createdAt: string
+  updatedAt: string
+}
+src/shared/infrastructure/db/client.ts
+tsimport { createServerClient } from "@supabase/ssr"
+import { cookies } from "next/headers"
+
+export function getSupabaseServer() {
+  const cookieStore = cookies()
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get: (name) => cookieStore.get(name)?.value } }
+  )
+}
+src/shared/infrastructure/next/cache.config.ts
+tsexport const CacheConfig = {
+  short:  { revalidate: 60 },
+  medium: { revalidate: 60 * 10 },
+  long:   { revalidate: 60 * 60 },
+  static: { revalidate: false },
+} as const
+src/shared/infrastructure/next/cache.keys.ts
+tsexport const CacheKeys = {
+  checkin:   (id: string) => ["checkin", id],
+  city:      (id: string) => ["city", id],
+  fiction:   (id: string) => ["fiction", id],
+  interest:  (id: string) => ["interest", id],
+  location:  (id: string) => ["location", id],
+  place:     (id: string) => ["place", id],
+  scene:     (id: string) => ["scene", id],
+  user:      (id: string) => ["user", id],
+} as const
+
+Migration steps — do them in this order
+Step 1 — Create shared/
+Create the four shared files listed above.
+Step 2 — Migrate one feature at a time
+Start with the simplest feature (recommend: cities or interests).
+For each feature:
+
+Create domain/{feature}.entity.ts
+
+Copy types from {feature}.domain.ts
+Merge DTOs from {feature}.dtos.ts into the same file
+Extend BaseEntity for the main type
+
+
+Create domain/{feature}.repository.ts
+
+Copy the interface from {feature}.repository.port.ts
+Update imports to point to the new entity file
+
+
+Create infrastructure/supabase/{feature}.repository.impl.ts
+
+Copy implementation from {feature}.repository.adapter.ts
+Add cache() from React to all read methods
+Remove cache() from write methods
+Update import to use getSupabaseServer() from @/shared/infrastructure/db/client
+
+
+Analyze {feature}.services.ts
+
+For each method, decide: does it have real business logic?
+If yes → create application/{action}-{feature}.usecase.ts
+If no (simple fetch or pass-through) → skip, call repo directly from queries
+
+
+Create infrastructure/next/{feature}.queries.ts
+
+One export per read operation
+Wrap with unstable_cache using CacheKeys and CacheConfig
+Call use-case if it exists, otherwise call repo directly
+
+
+Create infrastructure/next/{feature}.actions.ts
+
+Add "use server" at the top
+One export per write operation
+Call revalidateTag after every mutation
+
+
+Update app/ pages that used the old imports
+
+Replace imports from @/src/{feature} with @/{feature}/infrastructure/next/{feature}.queries
+Replace API calls with direct function calls (no more fetch('/api/{feature}'))
+
+
+Delete old files
+
+{feature}.domain.ts
+{feature}.dtos.ts
+{feature}.repository.port.ts
+{feature}.repository.adapter.ts
+{feature}.services.ts
+index.ts
+
+
+Add cache key to shared/infrastructure/next/cache.keys.ts if not already there
+
+Step 3 — Remove API routes
+After all features are migrated, the app/api/ folder should be empty or removed.
+Server Components call queries.ts directly — no HTTP layer needed.
+Step 4 — Verify
+For each migrated feature, verify:
+
+ No imports from infrastructure/ inside application/
+ No imports from application/ or infrastructure/ inside domain/
+ cache() React only on read methods in repository impl
+ unstable_cache only in queries.ts
+ "use server" only in actions.ts
+ revalidateTag called after every mutation in actions.ts
+ Pages import from infrastructure/next/ only, not from Supabase directly
+
+
+Important decisions during migration
+When splitting services.ts into use-cases
+Keep as use-case (real business logic):
+ts// services.ts has this → extract to use-case
+if (!fiction) throw new Error("Fiction not found")
+if (fiction.status === "draft") throw new Error("Not published")
+await notifyFollowers(fiction.id)
+Skip use-case (pass-through):
+ts// services.ts has this → call repo directly from queries.ts
+return this.repository.findById(id)
+When handling app/api/ routes
+Most routes are just a wrapper around a service call:
+ts// current: app/api/fictions/route.ts
+export async function GET() {
+  const fictions = await fictionsService.getAll()
+  return Response.json(fictions)
+}
+Replace with a direct call in the Server Component:
+ts// target: fictions/infrastructure/next/fiction.queries.ts
+export function getFictionsCached() {
+  return unstable_cache(
+    () => repo.getAll(),
+    CacheKeys.fiction("all"),
+    CacheConfig.long
+  )()
+}
+Keep app/api/ routes only if they are consumed by external clients or mobile apps.
+When handling user-private data
+If the data belongs to a specific user, include userId in the cache key:
+tsexport function getUserProfileCached(userId: string) {
+  return unstable_cache(
+    () => repo.getByUserId(userId),
+    ["profile", userId],   // userId in key — never shared between users
+    CacheConfig.medium
+  )()
+}
+
+Strict rules — never break these
+
+cache() from React — only on read methods in repository impl
+unstable_cache — only in queries.ts
+"use server" — only in actions.ts
+revalidateTag — every mutation must invalidate cache
+Use-cases receive repo as parameter — never instantiate inside
+Features never import from each other — use shared/ for cross-feature types
+No barrel exports (index.ts) — import directly from the file
+No fetch('/api/...') calls from Server Components — call functions directly
+Migrations stay in supabase/migrations/ — outside src/

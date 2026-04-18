@@ -1,27 +1,27 @@
-"use client"
-
-import { useEffect } from "react"
-import { useRouter } from "@/i18n/navigation"
-import { useSearchParams } from "next/navigation"
-import { useAuth } from "@/context/auth-context"
+import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
+import { getCurrentUserProfileAction } from "@/src/users/infrastructure/next/user.actions"
 import { Onboarding } from "@/components/auth/onboarding"
 
-export default function OnboardingPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { user, needsOnboarding } = useAuth()
+type Props = {
+  searchParams: Promise<{ from?: string }>
+}
 
-  const fromProfile = searchParams.get("from") === "profile"
+export default async function OnboardingPage({ searchParams }: Props) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  useEffect(() => {
-    if (!user) {
-      router.replace("/login")
-    } else if (!needsOnboarding) {
-      router.replace("/map")
-    }
-  }, [user, needsOnboarding, router])
+  if (!user) redirect("/login")
 
-  if (!user || !needsOnboarding) return null
+  const profileResult = await getCurrentUserProfileAction()
+  const needsOnboarding = profileResult.data ? !profileResult.data.onboardingCompleted : true
+
+  if (!needsOnboarding) redirect("/map")
+
+  const { from } = await searchParams
+  const fromProfile = from === "profile"
 
   return <Onboarding forceStartAtZero={fromProfile} />
 }

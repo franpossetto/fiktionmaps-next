@@ -12,7 +12,7 @@ import {
 import { MAPBOX_ACCESS_TOKEN } from "@/lib/map/mapbox/styles"
 import { haversineDistance } from "@/lib/geo/haversine"
 import { useAuth } from "@/context/auth-context"
-import { findOrCreateCityAction } from "@/lib/actions/cities/city.actions"
+import { findOrCreateCityAction } from "@/src/cities/infrastructure/next/city.actions"
 
 interface DetectedCity {
   /** UUID from the cities DB table. */
@@ -96,6 +96,7 @@ async function resolveCity(
     country: mapboxCity.country,
     lat: mapboxCity.lat,
     lng: mapboxCity.lng,
+    zoom: 12,
   })
   if (!result.success) return null
   return {

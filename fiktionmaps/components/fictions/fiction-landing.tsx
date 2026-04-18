@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useMemo, useEffect, useRef, useCallback, useTransition, startTransition } from "react"
-import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
-import type { Location } from "@/src/locations"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import type { Location } from "@/src/locations/domain/location.entity"
 import { FictionCard } from "@/components/fictions/fiction-card"
 import { FictionDetail } from "@/components/fictions/fiction-detail"
 import { PageHero } from "@/components/layout/page-hero"
@@ -10,6 +10,10 @@ import { PageStickyBar } from "@/components/layout/page-sticky-bar"
 import { SearchInput } from "@/components/ui/search-input"
 import { Film } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
+import { getAllPlacesAction } from "@/src/places/infrastructure/next/place.actions"
+import { getFictionLikeCountsAction, getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
+import { getMyLikedFictionIdsAction, toggleFictionLikeAction } from "@/src/users/infrastructure/next/user.actions"
+import { listScenesAction } from "@/src/scenes/infrastructure/next/scene.actions"
 
 type FictionLandingView = "browse" | "detail"
 
@@ -58,8 +62,7 @@ export function FictionLanding({
         list = initialFictions
       } else {
         try {
-          const res = await fetch("/api/fictions")
-          const fictions = (await res.json()) as FictionWithMedia[]
+          const fictions = await getActiveFictionsAction()
           setAllFictions(Array.isArray(fictions) ? fictions : [])
           list = Array.isArray(fictions) ? fictions : []
         } catch {
@@ -71,9 +74,7 @@ export function FictionLanding({
       const sceneCounts = new Map<string, number>()
       let locations: Location[] = []
       try {
-        const locationsRes = await fetch("/api/admin/places")
-        const raw = (await locationsRes.json()) as unknown
-        locations = Array.isArray(raw) ? (raw as Location[]) : []
+        locations = await getAllPlacesAction()
       } catch {
         locations = []
       }
@@ -86,9 +87,8 @@ export function FictionLanding({
       await Promise.all(
         list.map(async (f) => {
           try {
-            const res = await fetch(`/api/scenes?fictionId=${encodeURIComponent(f.id)}&active=true`)
-            const scenes = res.ok ? await res.json() : []
-            sceneCounts.set(f.id, Array.isArray(scenes) ? scenes.length : 0)
+            const scenes = await listScenesAction({ fictionId: f.id, active: "true" })
+            sceneCounts.set(f.id, scenes.length)
           } catch {
             sceneCounts.set(f.id, 0)
           }
@@ -181,8 +181,7 @@ export function FictionLanding({
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch("/api/user-fiction-likes")
-        const data = (await res.json()) as string[]
+        const data = await getMyLikedFictionIdsAction()
         if (!cancelled) setLikedFictionIds(data)
       } catch {
         if (!cancelled) setLikedFictionIds([])
@@ -210,9 +209,8 @@ export function FictionLanding({
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(`/api/fictions/likes?fictionIds=${encodeURIComponent(ids.join(","))}`)
-        const data = (await res.json()) as { likeCountByFictionId: Record<string, number> }
-        if (!cancelled) setLikeCountByFictionId(data.likeCountByFictionId ?? {})
+        const likeCountByFictionId = await getFictionLikeCountsAction(ids)
+        if (!cancelled) setLikeCountByFictionId(likeCountByFictionId)
       } catch {
         if (!cancelled) setLikeCountByFictionId({})
       }
@@ -227,20 +225,13 @@ export function FictionLanding({
     async (fictionId: string) => {
       if (!user) return
 
-      const res = await fetch("/api/user-fiction-likes/toggle", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fictionId }),
-      })
+      const result = await toggleFictionLikeAction(fictionId)
+      if (!result.success) return
 
-      if (!res.ok) return
-
-      const data = (await res.json()) as { liked: boolean; likeCount: number }
-
-      setLikeCountByFictionId((prev) => ({ ...prev, [fictionId]: data.likeCount }))
+      setLikeCountByFictionId((prev) => ({ ...prev, [fictionId]: result.likeCount }))
       setLikedFictionIds((prev) => {
         const set = new Set(prev)
-        if (data.liked) set.add(fictionId)
+        if (result.liked) set.add(fictionId)
         else set.delete(fictionId)
         return Array.from(set)
       })

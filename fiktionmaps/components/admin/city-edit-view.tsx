@@ -4,9 +4,9 @@ import { useState, useMemo } from "react"
 import { useRouter, Link } from "@/i18n/navigation"
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react"
 import { motion } from "framer-motion"
-import type { City } from "@/src/cities/city.domain"
+import type { City } from "@/src/cities/domain/city.entity"
 import { Button } from "@/components/ui/button"
-import { updateCityAction } from "@/lib/actions/cities/city.actions"
+import { updateCityAction } from "@/src/cities/infrastructure/next/city.actions"
 import { CityMapPicker } from "./city-map-picker"
 
 interface CityEditViewProps {

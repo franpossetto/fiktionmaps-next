@@ -1,17 +1,21 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowRight, MapPin, Film, Star, Globe, User } from "lucide-react"
 import { useLocale, useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
-import type { City } from "@/src/cities/city.domain"
-import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { City } from "@/src/cities/domain/city.entity"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { InterestCatalogItem } from "@/src/interests"
 import { useAuth } from "@/context/auth-context"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentUserProfileAction } from "@/lib/actions/auth/profile.actions"
+import { getCurrentUserProfileAction } from "@/src/users/infrastructure/next/user.actions"
+import { getAllCitiesAction } from "@/src/cities/infrastructure/next/city.actions"
+import { getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
+import { getInterestCatalogAction } from "@/src/interests/infrastructure/next/interest.actions"
 import onboardingData from "@/data/onboarding.json"
 import {
   OnboardingStepWelcome,
@@ -63,6 +67,7 @@ interface OnboardingProps {
 export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
   const t = useTranslations("Onboarding")
   const locale = useLocale()
+  const router = useRouter()
   const { user, completeOnboarding } = useAuth()
   const [allCities, setAllCities] = useState<City[]>([])
   const [allFictions, setAllFictions] = useState<FictionWithMedia[]>([])
@@ -91,27 +96,17 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      try {
-        const res = await fetch("/api/cities")
-        const data = (await res.json()) as City[]
-        if (!cancelled) setAllCities(data)
-      } catch {
-        if (!cancelled) setAllCities([])
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
+    getAllCitiesAction()
+      .then((data) => { if (!cancelled) setAllCities(data) })
+      .catch(() => { if (!cancelled) setAllCities([]) })
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch("/api/fictions")
-        const data = (await res.json()) as FictionWithMedia[]
+        const data = await getActiveFictionsAction()
         if (!cancelled) setAllFictions(data)
       } catch {
         if (!cancelled) setAllFictions([])
@@ -127,8 +122,7 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(`/api/interests?locale=${encodeURIComponent(locale)}`)
-        const data = (await res.json()) as InterestCatalogItem[]
+        const data = await getInterestCatalogAction(locale)
         if (!cancelled) setAllInterests(data)
       } catch {
         // Keep onboarding usable even if interests fail to load.
@@ -389,6 +383,7 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
         if (typeof window !== "undefined") {
           localStorage.setItem("fiktionmaps_onboarding_genres", JSON.stringify(selectedGenres))
         }
+        router.push(`/${locale}/map`)
       } catch (e) {
         setCompleteError(e instanceof Error ? e.message : t("couldNotSave"))
       } finally {

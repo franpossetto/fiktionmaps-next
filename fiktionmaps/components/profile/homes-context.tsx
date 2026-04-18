@@ -9,9 +9,9 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import { getUserHomesAction } from "@/lib/actions/homes/home.actions"
-import type { UserHome } from "@/src/homes"
-import type { City } from "@/src/cities/city.domain"
+import { getUserHomesAction } from "@/src/homes/infrastructure/next/home.actions"
+import type { UserHome } from "@/src/homes/domain/home.entity"
+import type { City } from "@/src/cities/domain/city.entity"
 
 type HomesContextValue = {
   homes: UserHome[]
@@ -41,10 +41,7 @@ export function HomesProvider({
   const [error, setError] = useState<string | null>(null)
 
   const refreshCities = useCallback(() => {
-    fetch("/api/cities")
-      .then((res) => res.json())
-      .then((data: City[]) => setCityMap(new Map(data.map((c) => [c.id, c]))))
-      .catch(() => {})
+    // cities are provided via initialCities prop; no client-side refetch needed
   }, [])
 
   const refetch = useCallback(async () => {

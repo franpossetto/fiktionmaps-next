@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { getFictionById } from "@/lib/server"
+import { getFictionByIdCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { FictionEditView } from "@/components/admin/fiction-edit-view"
 
 interface AdminFictionEditPageProps {
@@ -8,7 +8,7 @@ interface AdminFictionEditPageProps {
 
 export default async function AdminFictionEditPage({ params }: AdminFictionEditPageProps) {
   const { id } = await params
-  const fiction = await getFictionById(id)
+  const fiction = await getFictionByIdCached(id)
   if (!fiction) notFound()
 
   return (

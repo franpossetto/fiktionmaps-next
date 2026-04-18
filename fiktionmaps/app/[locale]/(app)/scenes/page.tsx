@@ -1,4 +1,7 @@
-import { getCitiesWithScenesForViewer, getCityFictionsWithScenesForViewer } from "@/lib/server/queries"
+import {
+  getCitiesWithScenesForViewer,
+  getCityFictionsWithScenesForViewer,
+} from "@/src/scenes/infrastructure/next/scene.queries"
 import { SceneViewer } from "@/components/scenes/scene-viewer"
 
 export default async function ScenesPage() {

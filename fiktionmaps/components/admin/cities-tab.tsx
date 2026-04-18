@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "@/i18n/navigation"
 import { ArrowLeft, ArrowRight, Plus, MoreVertical, Edit2, Trash2, MapPin, Search, Loader2 } from "lucide-react"
-import type { City } from "@/src/cities/city.domain"
+import type { City } from "@/src/cities/domain/city.entity"
 import { Button } from "@/components/ui/button"
-import { createCityAction, deleteCityAction } from "@/lib/actions/cities/city.actions"
+import { createCityAction, deleteCityAction } from "@/src/cities/infrastructure/next/city.actions"
 import {
   AlertDialog,
   AlertDialogCancel,

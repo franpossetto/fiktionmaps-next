@@ -2,7 +2,7 @@
 
 import { useRouter } from "@/i18n/navigation"
 import { FictionDetail } from "@/components/fictions/fiction-detail"
-import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 
 export function FictionDetailPageClient({ fiction }: { fiction: FictionWithMedia }) {
   const router = useRouter()

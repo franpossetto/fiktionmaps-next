@@ -1,23 +1,12 @@
-"use client"
-
-import { useRouter } from "@/i18n/navigation"
-import { useAuth } from "@/context/auth-context"
+import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
 import { AuthPage } from "@/components/auth/auth-page"
-import { useEffect } from "react"
 
-export default function LoginPage() {
-  const router = useRouter()
-  const { user, needsOnboarding } = useAuth()
+export default async function LoginPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  useEffect(() => {
-    if (user && needsOnboarding) {
-      router.replace("/onboarding")
-    } else if (user) {
-      router.replace("/map")
-    }
-  }, [user, needsOnboarding, router])
+  if (user) redirect("/map")
 
-  if (user) return null
-
-  return <AuthPage onBrowseMap={() => router.push("/map")} />
+  return <AuthPage />
 }

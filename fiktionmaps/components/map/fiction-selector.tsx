@@ -1,7 +1,7 @@
 "use client"
 
 import { Film, Check, Search } from "lucide-react"
-import type { FictionWithMedia } from "@/src/fictions/fiction.domain"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import {
   Dialog,
   DialogContent,

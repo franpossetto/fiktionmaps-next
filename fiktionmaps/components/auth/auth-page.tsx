@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
+import Link from "next/link"
 import { useTranslations } from "next-intl"
 import { useAuth } from "@/context/auth-context"
+import { useRouter } from "@/i18n/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ArrowDown, ArrowLeft } from "lucide-react"
@@ -51,16 +53,25 @@ function Field({
 /* ------------------------------------------------------------------ */
 /*  Auth Page                                                           */
 /* ------------------------------------------------------------------ */
-export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
+export function AuthPage() {
   const t = useTranslations("Auth")
   const tCommon = useTranslations("Common")
-  const { login, signup, isLoading } = useAuth()
+  const { login, signup, isLoading, user, needsOnboarding } = useAuth()
+  const router = useRouter()
   const [view, setView] = useState<AuthView>("login")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [name, setName] = useState("")
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+
+  useEffect(() => {
+    if (user && needsOnboarding) {
+      router.replace("/onboarding")
+    } else if (user) {
+      router.replace("/map")
+    }
+  }, [user, needsOnboarding, router])
 
   const resetForm = () => {
     setEmail("")
@@ -238,24 +249,21 @@ export function AuthPage({ onBrowseMap }: { onBrowseMap?: () => void }) {
 
             <LocaleSwitcher />
 
-            {onBrowseMap && <div className="h-8" />}
+            <div className="h-8" />
           </div>
         )}
       </div>
 
-      {onBrowseMap && (
-        <div className="absolute inset-x-0 bottom-6 flex justify-center">
-          <button
-            type="button"
-            onClick={onBrowseMap}
-            className="group flex h-8 w-24 items-center justify-center text-muted-foreground transition-transform duration-200 active:scale-95"
-            aria-label={tCommon("browseMap")}
-            title={tCommon("browseMap")}
-          >
-            <ArrowDown className="h-4 w-4 transition-transform duration-200 group-hover:translate-y-0.5" />
-          </button>
-        </div>
-      )}
+      <div className="absolute inset-x-0 bottom-6 flex justify-center">
+        <Link
+          href="/map"
+          className="group flex h-8 w-24 items-center justify-center text-muted-foreground transition-transform duration-200 active:scale-95"
+          aria-label={tCommon("browseMap")}
+          title={tCommon("browseMap")}
+        >
+          <ArrowDown className="h-4 w-4 transition-transform duration-200 group-hover:translate-y-0.5" />
+        </Link>
+      </div>
     </div>
   )
 }

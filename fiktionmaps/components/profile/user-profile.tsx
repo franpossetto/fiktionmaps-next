@@ -5,21 +5,24 @@ import { Link } from "@/i18n/navigation"
 import { useAuth } from "@/context/auth-context"
 import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
-import { getCurrentUserProfileAction, type ProfileWithOnboarding } from "@/lib/actions/auth/profile.actions"
-import type { UserProfile as UserProfileType } from "@/src/users"
-import type { City } from "@/src/cities/city.domain"
-import type { UserHome } from "@/src/homes"
-import type { EnrichedPlaceCheckin } from "@/lib/actions/checkins/checkin.actions"
+import {
+  getCurrentUserProfileAction,
+  type ProfileWithOnboarding,
+} from "@/src/users/infrastructure/next/user.actions"
+import type { UserProfile as UserProfileType } from "@/src/users/domain/user.views"
+import type { City } from "@/src/cities/domain/city.entity"
+import type { UserHome } from "@/src/homes/domain/home.entity"
 import {
   getUserCityCheckinsAction,
   getUserPlaceCheckinsEnrichedAction,
-} from "@/lib/actions/checkins/checkin.actions"
-import type { CityCheckin } from "@/src/checkins"
+  type EnrichedPlaceCheckin,
+  type CityCheckin,
+} from "@/src/checkins/infrastructure/next/checkin.actions"
 import {
   getProfileScenesPreviewAction,
   type ProfileArticlePreview,
   type ProfileScenePreview,
-} from "@/lib/actions/profile/profile-contributions.actions"
+} from "@/src/scenes/infrastructure/next/profile-scene-previews.actions"
 
 import { ProfileHeader } from "./profile-header"
 import { HomesProvider } from "./homes-context"
@@ -131,15 +134,6 @@ export function UserProfileComponent({
         setScenePreviews(scenes)
       }
     )
-
-    if (!initialCities?.length) {
-      fetch("/api/cities")
-        .then((res) => res.json())
-        .then((data: City[]) => {
-          if (!cancelled) setCityMap(new Map(data.map((c) => [c.id, c])))
-        })
-        .catch(() => {})
-    }
 
     const onFocus = () => refetchProfile()
     window.addEventListener("focus", onFocus)

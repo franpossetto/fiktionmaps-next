@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { getFictionById } from "@/lib/server"
+import { getFictionByIdCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { FictionDetailPageClient } from "./fiction-detail-page-client"
 
 type Props = {
@@ -9,7 +9,7 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const fiction = await getFictionById(slug)
+  const fiction = await getFictionByIdCached(slug)
   if (!fiction || !fiction.active) {
     return { title: "Fiction not found" }
   }
@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function FictionSlugPage({ params }: Props) {
   const { slug } = await params
-  const fiction = await getFictionById(slug)
+  const fiction = await getFictionByIdCached(slug)
   if (!fiction || !fiction.active) {
     notFound()
   }

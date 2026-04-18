@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl"
 import { motion, AnimatePresence } from "framer-motion"
 import { MAPBOX_ACCESS_TOKEN } from "@/lib/map/mapbox/styles"
 import { useGeo } from "./geo-provider"
-import { checkinCityAction } from "@/lib/actions/checkins/checkin.actions"
+import { checkinCityAction } from "@/src/checkins/infrastructure/next/checkin.actions"
 
 function staticMapUrl(lat: number, lng: number): string {
   if (!MAPBOX_ACCESS_TOKEN) return ""
