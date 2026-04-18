@@ -1,48 +1,14 @@
 import createIntlMiddleware from "next-intl/middleware"
 import { NextResponse, type NextRequest } from "next/server"
-import { createServerClient } from "@supabase/ssr"
-import type { Database } from "./supabase/database.types"
 import { routing } from "./i18n/routing"
 
 const intlMiddleware = createIntlMiddleware(routing)
 
-const PROTECTED_PATHS = ["/profile", "/settings", "/admin"]
-
-function isProtected(pathname: string): boolean {
-  return PROTECTED_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(path + "/")
-  )
-}
-
-const localeList = routing.locales as readonly string[]
-
-/** Strip locale prefix to get path for auth checks. e.g. /en/profile -> /profile */
-function pathnameWithoutLocale(pathname: string): string {
-  const segments = pathname.split("/").filter(Boolean)
-  if (segments.length > 0 && localeList.includes(segments[0])) {
-    return "/" + segments.slice(1).join("/") || "/"
-  }
-  return pathname
-}
-
-function getLocaleFromPathname(pathname: string): string {
-  const segments = pathname.split("/").filter(Boolean)
-  if (segments.length > 0 && localeList.includes(segments[0])) {
-    return segments[0]
-  }
-  return routing.defaultLocale
-}
-
-function isValidSupabaseUrl(url: string | undefined): url is string {
-  if (!url || typeof url !== "string") return false
-  try {
-    const parsed = new URL(url)
-    return parsed.protocol === "http:" || parsed.protocol === "https:"
-  } catch {
-    return false
-  }
-}
-
+/**
+ * TEMP: Supabase auth + protected routes removed to debug Vercel
+ * `ReferenceError: __dirname is not defined` (likely Edge + @supabase/ssr bundle).
+ * Restore session check + PROTECTED_PATHS redirect after confirming.
+ */
 export async function middleware(request: NextRequest) {
   const response = await intlMiddleware(request)
   if (response.status >= 300 && response.status < 400) {
@@ -54,41 +20,6 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(safe)
     }
     return response
-  }
-
-  const pathname = request.nextUrl.pathname
-  const pathWithoutLocale = pathnameWithoutLocale(pathname)
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  let user: { id: string } | null = null
-  if (isValidSupabaseUrl(supabaseUrl) && supabaseAnonKey) {
-    const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
-        },
-      },
-    })
-    const {
-      data: { user: sessionUser },
-    } = await supabase.auth.getUser()
-    user = sessionUser
-  }
-
-  if (isProtected(pathWithoutLocale) && !user) {
-    const loginUrl = request.nextUrl.clone()
-    const locale = getLocaleFromPathname(pathname)
-    loginUrl.pathname = `/${locale}/login`
-    loginUrl.searchParams.set("redirectTo", pathname)
-    return NextResponse.redirect(loginUrl)
   }
 
   return response
