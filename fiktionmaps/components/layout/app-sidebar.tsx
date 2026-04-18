@@ -22,7 +22,7 @@ export function AppSidebar() {
   const t = useTranslations("Nav")
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const pathname = usePathname()
-  const { user, logout } = useAuth()
+  const { user, isAdmin, logout } = useAuth()
 
   const navItems: { id: AppView; href: string; labelKey: "map" | "fictions" | "scenes" | "admin"; icon: React.ElementType }[] = [
     { id: "map", href: "/map", labelKey: "map", icon: Map },
@@ -31,9 +31,9 @@ export function AppSidebar() {
     { id: "admin", href: "/admin", labelKey: "admin", icon: LayoutGrid },
   ]
 
-  const visibleNavItems = !user
-    ? navItems.filter((item) => item.id !== "admin")
-    : navItems
+  const visibleNavItems = navItems.filter(
+    (item) => item.id !== "admin" || (user && isAdmin)
+  )
 
   const isActive = (href: string) => pathname?.startsWith(href)
 

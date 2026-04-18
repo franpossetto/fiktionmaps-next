@@ -32,6 +32,7 @@ export type Database = {
           phone: string | null
           date_of_birth: string | null
           onboarding_completed: boolean
+          role: string
           created_at: string
           updated_at: string
         }
@@ -45,6 +46,7 @@ export type Database = {
           phone?: string | null
           date_of_birth?: string | null
           onboarding_completed?: boolean
+          role?: string
           created_at?: string
           updated_at?: string
         }
@@ -58,6 +60,7 @@ export type Database = {
           phone?: string | null
           date_of_birth?: string | null
           onboarding_completed?: boolean
+          role?: string
           created_at?: string
           updated_at?: string
         }

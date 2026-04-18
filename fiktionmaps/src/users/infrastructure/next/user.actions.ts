@@ -15,11 +15,14 @@ import { getUserFictionLikesUseCase } from "@/src/fiction-likes/application/get-
 import { toggleFictionLikeUseCase } from "@/src/fiction-likes/application/toggle-fiction-like.usecase"
 import { getUserInterestIdsUseCase } from "@/src/user-interests/application/get-user-interest-ids.usecase"
 import { setUserInterestsUseCase } from "@/src/user-interests/application/set-user-interests.usecase"
-import { getProfileByUserIdCached } from "./user.queries"
+import { getProfileUseCase } from "@/src/users/application/get-profile.usecase"
 import type { UserProfile } from "@/src/users/domain/user.views"
+import type { UserRole } from "@/src/users/domain/user.dtos"
+import type { Profile } from "@/src/users/domain/user.entity"
 
 export type ProfileWithOnboarding = UserProfile & {
   onboardingCompleted: boolean
+  role: UserRole
   gender?: string
   phone?: string
   dateOfBirth?: string
@@ -29,17 +32,7 @@ export type ProfileWithOnboarding = UserProfile & {
  * Maps Supabase public.profiles row to the UI UserProfile shape.
  * Use when the profile page is driven by Supabase auth + profiles table.
  */
-function profileToUserProfile(p: {
-  id: string
-  username: string | null
-  avatar_url: string | null
-  bio: string | null
-  gender?: string | null
-  phone?: string | null
-  date_of_birth?: string | null
-  created_at: string
-  onboarding_completed: boolean
-}): ProfileWithOnboarding {
+function profileToUserProfile(p: Profile): ProfileWithOnboarding {
   return {
     id: p.id,
     username: p.username?.trim() || "",
@@ -56,6 +49,7 @@ function profileToUserProfile(p: {
       frictionsConnected: 0,
     },
     onboardingCompleted: p.onboarding_completed,
+    role: p.role,
     gender: p.gender ?? undefined,
     phone: p.phone ?? undefined,
     dateOfBirth: p.date_of_birth ?? undefined,
@@ -72,9 +66,16 @@ async function fetchCurrentUserProfileAction(): Promise<GetCurrentProfileResult>
     if (!userId) {
       return { data: null, error: null }
     }
-    const profile = await getProfileByUserIdCached(userId)
+    // Fresh read for the session (avoid unstable_cache stale role after DB changes).
+    const profile = await getProfileUseCase(userId, createUsersSupabaseAdapter(createClient))
     if (!profile) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[getCurrentUserProfileAction] no profile row for userId", userId)
+      }
       return { data: null, error: null }
+    }
+    if (process.env.NODE_ENV === "development") {
+      console.info("[getCurrentUserProfileAction] role", profile.role, "userId", userId)
     }
     return {
       data: profileToUserProfile(profile),

@@ -29,6 +29,7 @@ export interface UserPreferences {
 
 interface AuthContextType {
   user: User | null
+  isAdmin: boolean
   isLoading: boolean
   isAuthReady: boolean
   needsOnboarding: boolean
@@ -61,6 +62,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isAuthReady, setIsAuthReady] = useState(false)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
@@ -76,6 +78,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const profileResult = await getCurrentUserProfileAction()
         if (cancelled) return
         setNeedsOnboarding(profileResult.data ? !profileResult.data.onboardingCompleted : true)
+        const admin = profileResult.data?.role === "admin"
+        setIsAdmin(admin)
+        if (process.env.NODE_ENV === "development") {
+          console.info("[auth] profile role → isAdmin", profileResult.data?.role, admin)
+        }
+      } else {
+        setIsAdmin(false)
       }
       setIsAuthReady(true)
     }
@@ -94,6 +103,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(authUserToUser(result.data))
         const profileResult = await getCurrentUserProfileAction()
         setNeedsOnboarding(profileResult.data ? !profileResult.data.onboardingCompleted : true)
+        const admin = profileResult.data?.role === "admin"
+        setIsAdmin(admin)
+        if (process.env.NODE_ENV === "development") {
+          console.info("[auth] profile role → isAdmin", profileResult.data?.role, admin)
+        }
       }
     } finally {
       setIsLoading(false)
@@ -108,6 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result.data) {
         setUser(authUserToUser(result.data, name.trim() || undefined))
         setNeedsOnboarding(true)
+        setIsAdmin(false)
       }
     } finally {
       setIsLoading(false)
@@ -117,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await signOutAction()
     setUser(null)
+    setIsAdmin(false)
     setNeedsOnboarding(false)
     setPreferences(null)
     window.location.href = "/login"
@@ -142,6 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        isAdmin,
         isLoading,
         isAuthReady,
         needsOnboarding,

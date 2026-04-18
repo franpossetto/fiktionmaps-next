@@ -1,10 +1,27 @@
 import { cache } from "react"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
-import type { Database } from "@/supabase/database.types"
+import type { Database, Tables } from "@/supabase/database.types"
 import type { Profile } from "@/src/users/domain/user.entity"
-import type { UpdateProfileData } from "@/src/users/domain/user.dtos"
+import type { UpdateProfileData, UserRole } from "@/src/users/domain/user.dtos"
 import type { UsersRepositoryPort } from "@/src/users/domain/user.repository"
+
+function mapProfileRow(row: Tables<"profiles">): Profile {
+  const role: UserRole = row.role === "admin" ? "admin" : "user"
+  return {
+    id: row.id,
+    username: row.username,
+    avatar_url: row.avatar_url,
+    bio: row.bio,
+    gender: row.gender,
+    phone: row.phone,
+    date_of_birth: row.date_of_birth,
+    onboarding_completed: row.onboarding_completed,
+    role,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }
+}
 
 export function createUsersSupabaseAdapter(
   getSupabase: () => Promise<SupabaseClient<Database>>
@@ -19,7 +36,7 @@ export function createUsersSupabaseAdapter(
         .single()
 
       if (error || !data) return null
-      return data as Profile
+      return mapProfileRow(data)
     }),
 
     async updateProfile(
@@ -35,7 +52,7 @@ export function createUsersSupabaseAdapter(
         .single()
 
       if (error || !data) return null
-      return data as Profile
+      return mapProfileRow(data)
     },
   }
 }
