@@ -1,6 +1,8 @@
 import type { NextConfig } from "next"
 import createNextIntlPlugin from "next-intl/plugin"
 
+// Use `next build --webpack` / `next dev --webpack` (package.json). Default Turbopack can emit Edge middleware where `next/server` pulls in ua-parser-js and hits `__dirname is not defined` on Vercel.
+
 const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
