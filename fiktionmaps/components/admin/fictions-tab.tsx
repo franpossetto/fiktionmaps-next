@@ -8,7 +8,7 @@ import type { Fiction, FictionWithMedia } from "@/src/fictions/domain/fiction.en
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
 import { FICTION_GENRES } from "@/lib/constants/fiction-genres"
-import { createFictionAction, deleteFictionAction, setFictionActiveAction, uploadFictionImageAction } from "@/src/fictions/infrastructure/next/fiction.actions"
+import { createFictionWithImagesAction, deleteFictionAction, setFictionActiveAction } from "@/src/fictions/infrastructure/next/fiction.actions"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import {
   AlertDialog,
@@ -173,38 +173,17 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
     fd.set("description", formData.description)
     fd.set("active", formData.active ? "true" : "false")
     fd.set("runtimeMinutes", formData.runtimeMinutes ?? "")
-    const result = await createFictionAction(fd)
+    if (coverFile) fd.set("coverFile", coverFile)
+    if (bannerFile) fd.set("bannerFile", bannerFile)
+    const result = await createFictionWithImagesAction(fd)
     if (!result.success) {
       setSubmitting(false)
       setSubmitError(result.error)
       return
     }
-    if (result.success && result.fiction.id) {
-      if (coverFile) {
-        const coverFd = new FormData()
-        coverFd.set("file", coverFile)
-        const coverResult = await uploadFictionImageAction(result.fiction.id, "cover", coverFd)
-        if (!coverResult.success) {
-          setSubmitError(coverResult.error)
-          setSubmitting(false)
-          return
-        }
-      }
-      if (bannerFile) {
-        const bannerFd = new FormData()
-        bannerFd.set("file", bannerFile)
-        const bannerResult = await uploadFictionImageAction(result.fiction.id, "banner", bannerFd)
-        if (!bannerResult.success) {
-          setSubmitError(bannerResult.error)
-          setSubmitting(false)
-          return
-        }
-      }
-    }
     setSubmitting(false)
     closeWizard()
     resetForm()
-    router.refresh()
     const newId = result.success ? result.fiction?.id : undefined
     if (newId && onOpenFiction) onOpenFiction(newId)
   }

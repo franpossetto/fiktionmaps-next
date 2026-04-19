@@ -8,6 +8,46 @@ import type { CreateFictionData, UpdateFictionData } from "@/src/fictions/domain
 import { mapAssetImagesToFiction, type AssetImageRow } from "./fiction.mappers"
 import type { FictionsRepositoryPort } from "@/src/fictions/domain/fiction.repository"
 
+function extractStoragePath(url: string | null | undefined): string | null {
+  const pathMatch = url?.match(/\/storage\/v1\/object\/public\/[^/]+\/(.+)$/)
+  return pathMatch?.[1] ?? null
+}
+
+async function removeEntityImages(
+  supabase: SupabaseClient<Database>,
+  entityType: "fiction" | "place",
+  entityIds: string[]
+): Promise<void> {
+  if (entityIds.length === 0) return
+
+  const { data: assetRows } = await supabase
+    .from("asset_images")
+    .select("url")
+    .eq("entity_type", entityType)
+    .in("entity_id", entityIds)
+
+  if (assetRows?.length) {
+    const paths: string[] = []
+    for (const row of assetRows) {
+      const path = extractStoragePath(row.url)
+      if (path) paths.push(path)
+    }
+    if (paths.length) {
+      try {
+        await supabase.storage.from(ASSET_IMAGES_BUCKET).remove(paths)
+      } catch {
+        // continue even if storage remove fails (e.g. bucket missing)
+      }
+    }
+  }
+
+  await supabase
+    .from("asset_images")
+    .delete()
+    .eq("entity_type", entityType)
+    .in("entity_id", entityIds)
+}
+
 async function loadAllFictionsWithImages(
   supabase: SupabaseClient<Database>
 ): Promise<FictionWithMedia[]> {
@@ -142,32 +182,14 @@ export function createFictionsSupabaseAdapter(
     async delete(id: string): Promise<boolean> {
       const supabase = await getSupabase()
 
-      const { data: assetRows } = await supabase
-        .from("asset_images")
-        .select("id, url")
-        .eq("entity_type", "fiction")
-        .eq("entity_id", id)
+      const { data: placeRows } = await supabase
+        .from("places")
+        .select("id")
+        .eq("fiction_id", id)
+      const placeIds = (placeRows ?? []).map((r) => r.id).filter(Boolean)
+      await removeEntityImages(supabase, "place", placeIds)
 
-      if (assetRows?.length) {
-        const paths: string[] = []
-        for (const row of assetRows) {
-          const pathMatch = row.url?.match(/\/storage\/v1\/object\/public\/[^/]+\/(.+)$/)
-          if (pathMatch?.[1]) paths.push(pathMatch[1])
-        }
-        if (paths.length) {
-          try {
-            await supabase.storage.from(ASSET_IMAGES_BUCKET).remove(paths)
-          } catch {
-            // continue even if storage remove fails (e.g. bucket missing)
-          }
-        }
-
-        await supabase
-          .from("asset_images")
-          .delete()
-          .eq("entity_type", "fiction")
-          .eq("entity_id", id)
-      }
+      await removeEntityImages(supabase, "fiction", [id])
 
       const { data, error } = await supabase
         .from("fictions")

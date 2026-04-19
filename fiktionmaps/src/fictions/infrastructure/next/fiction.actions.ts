@@ -19,6 +19,7 @@ import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-v
 import { getFictionLikeCountsByIds, getActiveFictionsCached, loadRecommendedFictionsDeps } from "./fiction.queries"
 import type {
   CreateFictionResult,
+  CreateFictionWithImagesResult,
   UpdateFictionResult,
   DeleteFictionResult,
   SetFictionActiveResult,
@@ -30,6 +31,7 @@ import type {
 
 export type {
   CreateFictionResult,
+  CreateFictionWithImagesResult,
   UpdateFictionResult,
   DeleteFictionResult,
   SetFictionActiveResult,
@@ -56,7 +58,6 @@ export async function uploadFictionImageAction(
 
   if (!result.success) return result
 
-  revalidatePath("/admin")
   revalidatePath(`/admin/fiction/${fictionId}`)
   updateTag("fictions")
 
@@ -87,6 +88,51 @@ export async function createFictionAction(formData: FormData): Promise<CreateFic
   if (!fiction) return { success: false, error: "Failed to create fiction" }
 
   revalidatePath("/admin")
+  updateTag("fictions")
+  return { success: true, fiction }
+}
+
+export async function createFictionWithImagesAction(formData: FormData): Promise<CreateFictionWithImagesResult> {
+  const parsed = parseCreateFictionFormData(formData)
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+
+  const fiction = await createFictionUseCase(parsed.data, fictionsRepo)
+  if (!fiction) return { success: false, error: "Failed to create fiction" }
+
+  const coverFile = formData.get("coverFile")
+  if (coverFile instanceof File && coverFile.size > 0) {
+    const coverValidationError = validateImageFile(coverFile)
+    if (coverValidationError) return { success: false, error: coverValidationError }
+
+    const coverUpload = await uploadEntityImage({
+      entityType: "fiction",
+      entityId: fiction.id,
+      role: "cover",
+      variants: ["sm", "lg"],
+      file: coverFile,
+      replace: true,
+    })
+    if (!coverUpload.success) return { success: false, error: coverUpload.error }
+  }
+
+  const bannerFile = formData.get("bannerFile")
+  if (bannerFile instanceof File && bannerFile.size > 0) {
+    const bannerValidationError = validateImageFile(bannerFile)
+    if (bannerValidationError) return { success: false, error: bannerValidationError }
+
+    const bannerUpload = await uploadEntityImage({
+      entityType: "fiction",
+      entityId: fiction.id,
+      role: "banner",
+      variants: ["lg"],
+      file: bannerFile,
+      replace: true,
+    })
+    if (!bannerUpload.success) return { success: false, error: bannerUpload.error }
+  }
+
+  revalidatePath("/admin")
+  revalidatePath(`/admin/fiction/${fiction.id}`)
   updateTag("fictions")
   return { success: true, fiction }
 }

@@ -69,7 +69,7 @@ export default function MapPage() {
       .then((citiesList: City[]) => {
         setCities(citiesList)
         if (citiesList.length > 0) {
-          const city = citiesList[5]
+          const city = citiesList[0]
           setSelectedCity(city)
           return getCityFictionsAction(city.id).then((fics: FictionWithMedia[]) => {
             setAvailableFictions(fics)
@@ -141,11 +141,13 @@ export default function MapPage() {
   useEffect(() => {
     if (!isNavigationModeActive) return
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement
+      const target = e.target
+      const isHTMLElement = target instanceof HTMLElement
       const isInputLike =
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.getAttribute("contenteditable") === "true"
+        isHTMLElement &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.getAttribute("contenteditable") === "true")
 
       if (e.key === "Enter" || e.key === " ") {
         if (isInputLike) return
@@ -175,16 +177,13 @@ export default function MapPage() {
     setPlaceSelectorCollapsed,
   ])
 
-  if (citiesLoading || !selectedCity) {
-    return (
-      <div className="flex min-h-full items-center justify-center bg-background">
-        <p className="text-muted-foreground">Loading map…</p>
-      </div>
-    )
-  }
-
   return (
     <MapProvider>
+      {citiesLoading || !selectedCity ? (
+        <div className="flex min-h-full items-center justify-center bg-background">
+          <p className="text-muted-foreground">Loading map…</p>
+        </div>
+      ) : (
       <div className="absolute inset-0 min-h-0 flex flex-col">
       <motion.div
         className="absolute left-4 top-4 z-[1000] flex items-center gap-2"
@@ -255,6 +254,7 @@ export default function MapPage() {
       )}
 
       </div>
+      )}
     </MapProvider>
   )
 }

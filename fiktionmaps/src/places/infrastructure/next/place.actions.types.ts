@@ -8,6 +8,10 @@ export type UpdatePlaceResult =
   | { success: true }
   | { success: false; error: string }
 
+export type DeletePlaceResult =
+  | { success: true }
+  | { success: false; error: string }
+
 export type UploadPlaceImageResult =
   | { success: true; avatarUrl?: string }
   | { success: false; error: string }

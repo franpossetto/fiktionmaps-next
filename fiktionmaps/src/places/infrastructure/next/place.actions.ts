@@ -6,13 +6,14 @@ import type { MapBbox } from "@/lib/validation/map-query"
 import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
 import { createPlaceUseCase } from "@/src/places/application/create-place.usecase"
 import { updatePlaceUseCase } from "@/src/places/application/update-place.usecase"
+import { deletePlaceUseCase } from "@/src/places/application/delete-place.usecase"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
 import { getAllPlacesCached, getPlaceLocationByIdCached, listPlacesInBboxForFictionIds } from "./place.queries"
 import type { Location } from "@/src/locations/domain/location.entity"
 import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
-import type { CreatePlaceResult, UpdatePlaceResult, UploadPlaceImageResult } from "./place.actions.types"
+import type { CreatePlaceResult, UpdatePlaceResult, DeletePlaceResult, UploadPlaceImageResult } from "./place.actions.types"
 
-export type { CreatePlaceResult, UpdatePlaceResult, UploadPlaceImageResult } from "./place.actions.types"
+export type { CreatePlaceResult, UpdatePlaceResult, DeletePlaceResult, UploadPlaceImageResult } from "./place.actions.types"
 
 export async function uploadPlaceImageAction(
   placeId: string,
@@ -67,6 +68,13 @@ export async function createPlaceAction(data: CreatePlaceData): Promise<CreatePl
 export async function updatePlaceAction(placeId: string, data: UpdatePlaceData): Promise<UpdatePlaceResult> {
   const ok = await updatePlaceUseCase(placeId, data, placesRepo)
   if (!ok) return { success: false, error: "Place not found or update failed" }
+  updateTag("places")
+  return { success: true }
+}
+
+export async function deletePlaceAction(placeId: string): Promise<DeletePlaceResult> {
+  const ok = await deletePlaceUseCase(placeId, placesRepo)
+  if (!ok) return { success: false, error: "Place not found or delete failed" }
   updateTag("places")
   return { success: true }
 }

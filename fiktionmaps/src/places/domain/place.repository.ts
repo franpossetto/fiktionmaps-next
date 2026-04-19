@@ -19,4 +19,6 @@ export interface PlacesRepositoryPort {
   create(data: CreatePlaceData): Promise<{ placeId: string } | null>
   /** Update place and its linked location. */
   update(placeId: string, data: UpdatePlaceData): Promise<boolean>
+  /** Delete place and related media. */
+  delete(placeId: string): Promise<boolean>
 }

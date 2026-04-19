@@ -2,6 +2,7 @@ import { cache } from "react"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/supabase/database.types"
 import { createClient } from "@/lib/supabase/server"
+import { ASSET_IMAGES_BUCKET } from "@/lib/asset-images/variant-sizes"
 import type { MapBbox } from "@/lib/validation/map-query"
 import type { Location } from "@/src/locations/domain/location.entity"
 import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
@@ -406,6 +407,44 @@ export function createPlacesSupabaseAdapter(
         .eq("id", placeId)
 
       return !placeError
+    },
+
+    async delete(placeId: string): Promise<boolean> {
+      const supabase = await getSupabase()
+
+      const { data: assetRows } = await supabase
+        .from("asset_images")
+        .select("url")
+        .eq("entity_type", "place")
+        .eq("entity_id", placeId)
+
+      if (assetRows?.length) {
+        const paths: string[] = []
+        for (const row of assetRows) {
+          const pathMatch = row.url?.match(/\/storage\/v1\/object\/public\/[^/]+\/(.+)$/)
+          if (pathMatch?.[1]) paths.push(pathMatch[1])
+        }
+        if (paths.length) {
+          try {
+            await supabase.storage.from(ASSET_IMAGES_BUCKET).remove(paths)
+          } catch {
+            // continue even if storage remove fails (e.g. bucket missing)
+          }
+        }
+        await supabase
+          .from("asset_images")
+          .delete()
+          .eq("entity_type", "place")
+          .eq("entity_id", placeId)
+      }
+
+      const { data, error } = await supabase
+        .from("places")
+        .delete()
+        .eq("id", placeId)
+        .select("id")
+      if (error) return false
+      return Array.isArray(data) && data.length === 1
     },
   }
 }

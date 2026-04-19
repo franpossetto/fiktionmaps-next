@@ -11,6 +11,7 @@ import { uploadPlaceImageAction } from "@/src/places/infrastructure/next/place.a
 import {
   createPlaceAction,
   updatePlaceAction,
+  deletePlaceAction,
   getAllPlacesAction,
 } from "@/src/places/infrastructure/next/place.actions"
 
@@ -31,6 +32,7 @@ export function LocationsTab({ initialLocations, initialFictions = [], initialCi
   const [searchTerm, setSearchTerm] = useState("")
   const [fictionFilter, setFictionFilter] = useState("all")
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [deletingPlaceId, setDeletingPlaceId] = useState<string | null>(null)
 
   useEffect(() => {
     setLocations(initialLocations ?? [])
@@ -106,6 +108,21 @@ export function LocationsTab({ initialLocations, initialFictions = [], initialCi
     // Refetch list so new place shows with image (or placeholder)
     setLocations(await getAllPlacesAction())
     setWorkflowStep("list")
+  }
+
+  const handleDeletePlace = async (placeId: string) => {
+    const confirmed = window.confirm("Delete this place? This action cannot be undone.")
+    if (!confirmed) return
+
+    setSubmitError(null)
+    setDeletingPlaceId(placeId)
+    const result = await deletePlaceAction(placeId)
+    setDeletingPlaceId(null)
+    if (!result.success) {
+      setSubmitError(result.error)
+      return
+    }
+    setLocations(await getAllPlacesAction())
   }
 
   const filteredLocations = locations.filter((loc) => {
@@ -250,9 +267,14 @@ export function LocationsTab({ initialLocations, initialFictions = [], initialCi
                     <Edit2 className="h-3 w-3" />
                     Edit
                   </button>
-                  <button className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => handleDeletePlace(loc.id)}
+                    disabled={deletingPlaceId === loc.id}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors disabled:opacity-60"
+                  >
                     <Trash2 className="h-3 w-3" />
-                    Delete
+                    {deletingPlaceId === loc.id ? "Deleting..." : "Delete"}
                   </button>
                 </div>
               </div>

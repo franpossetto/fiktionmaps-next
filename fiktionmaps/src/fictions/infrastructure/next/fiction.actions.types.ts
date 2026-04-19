@@ -4,6 +4,10 @@ export type CreateFictionResult =
   | { success: true; fiction: Fiction }
   | { success: false; error: string }
 
+export type CreateFictionWithImagesResult =
+  | { success: true; fiction: Fiction }
+  | { success: false; error: string }
+
 export type UpdateFictionResult =
   | { success: true; fiction: Fiction }
   | { success: false; error: string }
