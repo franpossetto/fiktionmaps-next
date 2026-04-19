@@ -65,6 +65,7 @@ export async function uploadEntityImage(options: UploadImageOptions): Promise<
 
   const urls: Partial<Record<ImageVariant, string>> = {}
   const inserts: { entity_type: string; entity_id: string; role: string; variant: string; url: string }[] = []
+  const version = Date.now()
 
   for (const variant of variants) {
     const width = VARIANT_SIZES[variant]
@@ -73,7 +74,7 @@ export async function uploadEntityImage(options: UploadImageOptions): Promise<
       .webp({ quality: 85 })
       .toBuffer()
 
-    const fileName = `${variant}.webp`
+    const fileName = `${variant}_${version}.webp`
     const storagePath = `${basePath}/${fileName}`
 
     const { error: uploadError } = await supabase.storage
@@ -81,7 +82,7 @@ export async function uploadEntityImage(options: UploadImageOptions): Promise<
       .upload(storagePath, webpBuffer, {
         contentType: "image/webp",
         upsert: true,
-        cacheControl: "31536000", // 1 year: browser + CDN cache when URL is requested
+        cacheControl: "31536000",
       })
 
     if (uploadError) {

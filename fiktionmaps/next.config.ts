@@ -4,6 +4,12 @@ import createNextIntlPlugin from "next-intl/plugin"
 // Use `next build --webpack` / `next dev --webpack` (package.json). Default Turbopack can emit Edge middleware where `next/server` pulls in ua-parser-js and hits `__dirname is not defined` on Vercel.
 
 const nextConfig: NextConfig = {
+  // Server Actions default body limit is 1MB; image uploads via FormData need more headroom.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

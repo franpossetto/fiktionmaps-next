@@ -173,6 +173,9 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
     e.target.value = ""
     if (result.success && result.coverImage) {
       setCoverImage(result.coverImage)
+      if (!initialFiction.bannerImage && result.coverImageLarge) {
+        setBannerImage(result.coverImageLarge)
+      }
       router.refresh()
     } else if (!result.success) {
       setImageError(result.error ?? null)

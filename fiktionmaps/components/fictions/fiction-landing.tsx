@@ -225,9 +225,36 @@ export function FictionLanding({
     async (fictionId: string) => {
       if (!user) return
 
-      const result = await toggleFictionLikeAction(fictionId)
-      if (!result.success) return
+      const wasLiked = likedFictionIdSet.has(fictionId)
+      const prevCount = likeCountByFictionId[fictionId] ?? 0
 
+      // Optimistic update — instant feedback
+      setLikedFictionIds((prev) => {
+        const set = new Set(prev)
+        if (wasLiked) set.delete(fictionId)
+        else set.add(fictionId)
+        return Array.from(set)
+      })
+      setLikeCountByFictionId((prev) => ({
+        ...prev,
+        [fictionId]: wasLiked ? Math.max(0, prevCount - 1) : prevCount + 1,
+      }))
+
+      const result = await toggleFictionLikeAction(fictionId)
+
+      if (!result.success) {
+        // Revert on error
+        setLikedFictionIds((prev) => {
+          const set = new Set(prev)
+          if (wasLiked) set.add(fictionId)
+          else set.delete(fictionId)
+          return Array.from(set)
+        })
+        setLikeCountByFictionId((prev) => ({ ...prev, [fictionId]: prevCount }))
+        return
+      }
+
+      // Reconcile with authoritative server values
       setLikeCountByFictionId((prev) => ({ ...prev, [fictionId]: result.likeCount }))
       setLikedFictionIds((prev) => {
         const set = new Set(prev)
@@ -236,7 +263,7 @@ export function FictionLanding({
         return Array.from(set)
       })
     },
-    [user?.id],
+    [user?.id, likedFictionIdSet, likeCountByFictionId],
   )
 
   if (view === "detail" && selectedFiction) {
