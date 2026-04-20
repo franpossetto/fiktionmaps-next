@@ -4,6 +4,9 @@ import { scenesSupabaseAdapter } from "@/src/scenes/infrastructure/supabase/scen
 import { getSceneByIdUseCase } from "@/src/scenes/application/get-scene-by-id.usecase"
 import { getCitiesWithScenesUseCase } from "@/src/scenes/application/get-cities-with-scenes.usecase"
 import { getCityFictionsWithScenesUseCase } from "@/src/scenes/application/get-city-fictions-with-scenes.usecase"
+import { getSceneCountsByFictionIdsUseCase } from "@/src/scenes/application/get-scene-counts-by-fiction-ids.usecase"
+import { CacheKeys } from "@/src/shared/infrastructure/next/cache.keys"
+import { CacheConfig } from "@/src/shared/infrastructure/next/cache.config"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 
 const repo = scenesSupabaseAdapter
@@ -37,5 +40,16 @@ export function getCityFictionsWithScenesForViewer(cityId: string) {
       }),
     ["city-fictions-with-scenes", cityId],
     { revalidate: 60, tags: ["cities", "fictions", "scenes"] }
+  )()
+}
+
+/** Active scene counts per fiction id, batched in a single query (public read). */
+export function getSceneCountsByFictionIdsCached(fictionIds: string[]): Promise<Record<string, number>> {
+  if (fictionIds.length === 0) return Promise.resolve({})
+  const key = fictionIds.slice().sort().join(",")
+  return unstable_cache(
+    () => getSceneCountsByFictionIdsUseCase(fictionIds, repo),
+    CacheKeys.scene(`counts:${key}`),
+    { ...CacheConfig.short, tags: ["scenes"] }
   )()
 }

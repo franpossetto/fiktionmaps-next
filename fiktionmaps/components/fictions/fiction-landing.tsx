@@ -13,7 +13,6 @@ import { useAuth } from "@/context/auth-context"
 import { getAllPlacesAction } from "@/src/places/infrastructure/next/place.actions"
 import { getFictionLikeCountsAction, getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
 import { getMyLikedFictionIdsAction, toggleFictionLikeAction } from "@/src/users/infrastructure/next/user.actions"
-import { listScenesAction } from "@/src/scenes/infrastructure/next/scene.actions"
 
 type FictionLandingView = "browse" | "detail"
 
@@ -29,6 +28,10 @@ const emptyState = (
 interface FictionLandingProps {
   /** Fictions from DB (server). When provided, no client fetch for list. */
   initialFictions?: FictionWithMedia[]
+  /** Scene counts per fiction id pre-fetched server-side. */
+  initialSceneCounts?: Record<string, number>
+  /** Like counts per fiction id pre-fetched server-side. */
+  initialLikeCounts?: Record<string, number>
   onViewPlace?: (location: Location) => void
   focusFictionId?: string | null
   onFocusHandled?: () => void
@@ -36,6 +39,8 @@ interface FictionLandingProps {
 
 export function FictionLanding({
   initialFictions,
+  initialSceneCounts,
+  initialLikeCounts,
   onViewPlace,
   focusFictionId,
   onFocusHandled,
@@ -43,8 +48,12 @@ export function FictionLanding({
   const { user } = useAuth()
   const [allFictions, setAllFictions] = useState<FictionWithMedia[]>(initialFictions ?? [])
   const [locationCountMap, setLocationCountMap] = useState<Map<string, number>>(new Map())
-  const [sceneCountMap, setSceneCountMap] = useState<Map<string, number>>(new Map())
-  const [likeCountByFictionId, setLikeCountByFictionId] = useState<Record<string, number>>({})
+  const [sceneCountMap] = useState<Map<string, number>>(
+    () => new Map(Object.entries(initialSceneCounts ?? {}))
+  )
+  const [likeCountByFictionId, setLikeCountByFictionId] = useState<Record<string, number>>(
+    initialLikeCounts ?? {}
+  )
   const [likedFictionIds, setLikedFictionIds] = useState<string[]>([])
 
   const likedFictionIdSet = useMemo(() => new Set(likedFictionIds), [likedFictionIds])
@@ -55,6 +64,7 @@ export function FictionLanding({
     }
   }, [initialFictions])
 
+  // Fetch location counts (single request — not N+1, kept client-side).
   useEffect(() => {
     async function load() {
       let list: FictionWithMedia[]
@@ -70,32 +80,17 @@ export function FictionLanding({
           list = []
         }
       }
-      const counts = new Map<string, number>()
-      const sceneCounts = new Map<string, number>()
       let locations: Location[] = []
       try {
         locations = await getAllPlacesAction()
       } catch {
         locations = []
       }
+      const counts = new Map<string, number>()
       for (const f of list) {
-        counts.set(
-          f.id,
-          locations.filter((loc) => loc.fictionId === f.id).length,
-        )
+        counts.set(f.id, locations.filter((loc) => loc.fictionId === f.id).length)
       }
-      await Promise.all(
-        list.map(async (f) => {
-          try {
-            const scenes = await listScenesAction({ fictionId: f.id, active: "true" })
-            sceneCounts.set(f.id, scenes.length)
-          } catch {
-            sceneCounts.set(f.id, 0)
-          }
-        }),
-      )
       setLocationCountMap(counts)
-      setSceneCountMap(sceneCounts)
     }
     load()
   }, [initialFictions])
@@ -193,26 +188,31 @@ export function FictionLanding({
     }
   }, [user?.id])
 
-  // Public like counts for currently displayed items.
+  // Track which fiction ids already have their like count loaded.
+  // Initialised with the server-provided ids to avoid redundant fetches on scroll.
+  const fetchedLikeIdsRef = useRef<Set<string>>(new Set(Object.keys(initialLikeCounts ?? {})))
+
   const displayedFictionIdsKey = useMemo(
     () => displayedItems.map((f) => f.id).join(","),
     [displayedItems],
   )
 
+  // Public like counts — only fetch ids that haven't been loaded yet.
   useEffect(() => {
     const ids = displayedFictionIdsKey ? displayedFictionIdsKey.split(",").filter(Boolean) : []
-    if (ids.length === 0) {
-      setLikeCountByFictionId({})
-      return
-    }
+    const newIds = ids.filter((id) => !fetchedLikeIdsRef.current.has(id))
+    if (newIds.length === 0) return
 
     let cancelled = false
     ;(async () => {
       try {
-        const likeCountByFictionId = await getFictionLikeCountsAction(ids)
-        if (!cancelled) setLikeCountByFictionId(likeCountByFictionId)
+        const newCounts = await getFictionLikeCountsAction(newIds)
+        if (!cancelled) {
+          for (const id of newIds) fetchedLikeIdsRef.current.add(id)
+          setLikeCountByFictionId((prev) => ({ ...prev, ...newCounts }))
+        }
       } catch {
-        if (!cancelled) setLikeCountByFictionId({})
+        // noop — stale counts remain visible
       }
     })()
 
@@ -343,4 +343,3 @@ export function FictionLanding({
     </div>
   )
 }
-

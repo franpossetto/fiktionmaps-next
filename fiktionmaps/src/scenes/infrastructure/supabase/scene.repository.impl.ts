@@ -411,6 +411,27 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
     return true
   },
 
+  async countByFictionIds(fictionIds: string[]): Promise<Record<string, number>> {
+    if (fictionIds.length === 0) return {}
+    const supabase = createAnonymousClient()
+    const { data, error } = await supabase
+      .from("scenes")
+      .select("fiction_id")
+      .in("fiction_id", fictionIds)
+      .eq("active", true)
+    if (error) {
+      console.error("[scenes repo] countByFictionIds:", error.message)
+      return {}
+    }
+    const counts: Record<string, number> = {}
+    for (const id of fictionIds) counts[id] = 0
+    for (const r of data ?? []) {
+      const id = (r as { fiction_id?: string }).fiction_id
+      if (id) counts[id] = (counts[id] ?? 0) + 1
+    }
+    return counts
+  },
+
   async listCitiesWithActiveScenes(fictionIds: string[] | null): Promise<City[]> {
     const supabase = createAnonymousClient()
 

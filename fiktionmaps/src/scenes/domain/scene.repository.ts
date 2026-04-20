@@ -18,6 +18,7 @@ export interface ScenesRepositoryPort {
   getByPlaceId(placeId: string): Promise<Scene[]>
   getById(id: string): Promise<Scene | null>
   list(filters: SceneListFilters): Promise<Scene[]>
+  countByFictionIds(fictionIds: string[]): Promise<Record<string, number>>
   create(data: CreateSceneData, createdBy?: string | null): Promise<Scene | null>
   update(id: string, data: UpdateSceneData): Promise<Scene | null>
   delete(id: string): Promise<boolean>
