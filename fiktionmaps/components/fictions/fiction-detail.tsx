@@ -175,11 +175,11 @@ export function FictionDetail({ fiction, onBack, onViewPlace }: FictionDetailPro
           <ArrowLeft className="h-4 w-4" />
         </button>
 
-        {/* Info overlay: cover poster + title, meta, description */}
+        {/* Info overlay: cover poster + title, meta */}
         <div className="absolute bottom-0 left-0 right-0 z-10 px-8 pb-8">
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-end">
-            {/* Cover poster (as before - visible from DB or placeholder) */}
-            <div className="relative h-[200px] w-[133px] flex-shrink-0 overflow-hidden rounded-lg border border-border/60 shadow-xl md:h-[240px] md:w-[160px]">
+          <div className="flex flex-row items-end gap-4">
+            {/* Cover poster */}
+            <div className="relative h-[120px] w-[80px] flex-shrink-0 overflow-hidden rounded-lg border border-border/60 shadow-xl sm:h-[200px] sm:w-[133px] md:h-[240px] md:w-[160px]">
               <Image
                 src={coverSrc}
                 alt={fiction.title}
@@ -228,15 +228,19 @@ export function FictionDetail({ fiction, onBack, onViewPlace }: FictionDetailPro
                   )}
                 </span>
               </div>
-              {fiction.description && (
-                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                  {fiction.description}
-                </p>
-              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Description */}
+      {fiction.description && (
+        <div className="px-8 pb-2 pt-6">
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            {fiction.description}
+          </p>
+        </div>
+      )}
 
       {/* Locations - full page scroll */}
       <div className="px-8 py-6">
