@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import Image from "next/image"
 import { useRouter } from "@/i18n/navigation"
-import { Plus, MoreVertical, Edit2, Trash2, Book, Search, Loader2, CheckCircle, CircleOff, ArrowLeft, ArrowRight, ImagePlus, Film } from "lucide-react"
+import { Plus, MoreVertical, Edit2, Trash2, Book, Search, Loader2, CheckCircle, CircleOff, ArrowLeft, ArrowRight, ImagePlus, Film, Pencil } from "lucide-react"
 import type { Fiction, FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { generateSlug } from "@/src/fictions/domain/fiction-slug"
 
 const FICTION_TYPES: { value: Fiction["type"]; label: string }[] = [
   { value: "movie", label: "Movie" },
@@ -42,6 +43,7 @@ interface FictionFormData {
   description: string
   active: boolean
   runtimeMinutes: string
+  slug: string
 }
 
 type ViewMode = "cards" | "table"
@@ -66,7 +68,10 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
     description: "",
     active: true,
     runtimeMinutes: "",
+    slug: "",
   })
+  const [slugEdited, setSlugEdited] = useState(false)
+  const [slugEditing, setSlugEditing] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -85,6 +90,12 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
   useEffect(() => {
     setFictions(initialFictions ?? [])
   }, [initialFictions])
+
+  useEffect(() => {
+    if (slugEdited) return
+    const generated = generateSlug(formData.title) ?? ""
+    setFormData((prev) => ({ ...prev, slug: generated }))
+  }, [formData.title, slugEdited])
 
   useEffect(() => {
     if (!coverFile) {
@@ -117,7 +128,10 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
       description: "",
       active: true,
       runtimeMinutes: "",
+      slug: "",
     })
+    setSlugEdited(false)
+    setSlugEditing(false)
     setCoverFile(null)
     setCoverPreviewUrl(null)
     setBannerFile(null)
@@ -173,6 +187,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
     fd.set("description", formData.description)
     fd.set("active", formData.active ? "true" : "false")
     fd.set("runtimeMinutes", formData.runtimeMinutes ?? "")
+    fd.set("slug", formData.slug ?? "")
     if (coverFile) fd.set("coverFile", coverFile)
     if (bannerFile) fd.set("bannerFile", bannerFile)
     const result = await createFictionWithImagesAction(fd)
@@ -454,6 +469,41 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                     rows={4}
                     className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground/20 transition-all resize-none"
                   />
+                </FormField>
+
+                <FormField label="Slug">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={formData.slug}
+                        disabled={!slugEditing}
+                        onChange={(e) => {
+                          const raw = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")
+                          setSlugEdited(true)
+                          setFormData({ ...formData, slug: raw })
+                        }}
+                        placeholder="auto-generated-from-title"
+                        className={cn(
+                          "w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground/20 transition-all",
+                          !slugEditing && "opacity-60 cursor-not-allowed"
+                        )}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setSlugEditing((v) => !v)}
+                        className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-1.5 transition-colors"
+                      >
+                        <Pencil className="h-3 w-3" />
+                        {slugEditing ? "Done" : "Edit"}
+                      </button>
+                    </div>
+                    {formData.slug && (
+                      <p className="text-xs text-muted-foreground">
+                        fiktionmaps.com/en/fictions/<span className="text-foreground">{formData.slug}</span>
+                      </p>
+                    )}
+                  </div>
                 </FormField>
 
                 <div className="rounded-lg border border-border bg-muted/30 p-4">

@@ -94,6 +94,34 @@ export async function createFictionAction(formData: FormData): Promise<CreateFic
   return { success: true, fiction }
 }
 
+export async function createFictionWithImagesAction(formData: FormData): Promise<CreateFictionResult> {
+  const parsed = parseCreateFictionFormData(formData)
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+
+  const fiction = await createFictionUseCase(parsed.data, fictionsRepo)
+  if (!fiction) return { success: false, error: "Failed to create fiction" }
+
+  const coverFile = formData.get("coverFile")
+  const bannerFile = formData.get("bannerFile")
+
+  if (coverFile instanceof File && coverFile.size > 0) {
+    const validationError = validateImageFile(coverFile)
+    if (!validationError) {
+      await uploadEntityImage({ entityType: "fiction", entityId: fiction.id, role: "cover", variants: ["sm", "lg"], file: coverFile, replace: true })
+    }
+  }
+  if (bannerFile instanceof File && bannerFile.size > 0) {
+    const validationError = validateImageFile(bannerFile)
+    if (!validationError) {
+      await uploadEntityImage({ entityType: "fiction", entityId: fiction.id, role: "banner", variants: ["lg"], file: bannerFile, replace: true })
+    }
+  }
+
+  revalidatePath("/admin")
+  updateTag("fictions")
+  return { success: true, fiction }
+}
+
 export async function deleteFictionAction(id: string): Promise<DeleteFictionResult> {
   const ok = await deleteFictionUseCase(id, fictionsRepo)
   if (!ok) return { success: false, error: "Failed to delete fiction" }

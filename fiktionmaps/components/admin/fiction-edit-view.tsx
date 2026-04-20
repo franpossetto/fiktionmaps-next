@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useMemo, useRef, useEffect } from "react"
+import { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import Image from "next/image"
 import { useRouter, Link } from "@/i18n/navigation"
-import { ArrowLeft, ArrowRight, Loader2, ImagePlus, Film, Trash2, Check } from "lucide-react"
+import { ArrowLeft, ArrowRight, Loader2, ImagePlus, Film, Trash2, Check, Pencil } from "lucide-react"
 import type { Fiction, FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
@@ -49,6 +49,7 @@ function toFormState(f: Fiction) {
     genre: f.genre,
     description: f.description,
     active: f.active,
+    slug: f.slug ?? "",
     runtimeMinutes:
       f.duration_sec != null && f.duration_sec > 0
         ? String(Math.round(f.duration_sec / 60))
@@ -75,6 +76,7 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmTitle, setDeleteConfirmTitle] = useState("")
   const [deleting, setDeleting] = useState(false)
+  const [slugEditing, setSlugEditing] = useState(false)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const bannerInputRef = useRef<HTMLInputElement>(null)
 
@@ -215,6 +217,7 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
     fd.set("author", formData.author)
     fd.set("active", formData.active ? "true" : "false")
     fd.set("runtimeMinutes", formData.runtimeMinutes ?? "")
+    fd.set("slug", formData.slug ?? "")
     const result = await updateFictionAction(initialFiction.id, fd)
     setSaving(false)
     if (result.success) {
@@ -527,6 +530,42 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
                   rows={4}
                   className={cn(inputClass, "resize-none")}
                 />
+              </FormField>
+
+              <FormField label="Slug" error={errors.slug}>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={formData.slug}
+                      disabled={!slugEditing}
+                      onChange={(e) => {
+                        const raw = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")
+                        setFormData((p) => ({ ...p, slug: raw }))
+                      }}
+                      placeholder="auto-generated-from-title"
+                      className={cn(inputClass, !slugEditing && "opacity-60 cursor-not-allowed")}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setSlugEditing((v) => !v)}
+                      className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-1.5 transition-colors"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      {slugEditing ? "Done" : "Edit"}
+                    </button>
+                  </div>
+                  {formData.slug && (
+                    <p className="text-xs text-muted-foreground">
+                      fiktionmaps.com/en/fictions/<span className="text-foreground">{formData.slug}</span>
+                    </p>
+                  )}
+                  {slugEditing && initialFiction.slug && (
+                    <p className="text-xs text-amber-500">
+                      Changing the slug may break existing external links.
+                    </p>
+                  )}
+                </div>
               </FormField>
 
               <div className="rounded-lg border border-border bg-muted/30 p-4">

@@ -1,15 +1,30 @@
 import type { Metadata } from "next"
-import { notFound } from "next/navigation"
-import { getFictionByIdCached } from "@/src/fictions/infrastructure/next/fiction.queries"
+import { notFound, redirect } from "next/navigation"
+import { RedirectType } from "next/dist/client/components/redirect"
+import { getFictionByIdCached, getFictionBySlugCached } from "@/src/fictions/infrastructure/next/fiction.queries"
+import { isUuidString } from "@/lib/validation/primitives"
 import { FictionDetailPageClient } from "./fiction-detail-page-client"
 
 type Props = {
   params: Promise<{ locale: string; slug: string }>
 }
 
+async function resolveFiction(slug: string, locale: string) {
+  // Legacy UUID URLs: redirect permanently to slug URL
+  if (isUuidString(slug)) {
+    const fiction = await getFictionByIdCached(slug)
+    if (!fiction || !fiction.active) return null
+    if (fiction.slug) {
+      redirect(`/${locale}/fictions/${fiction.slug}`, RedirectType.replace)
+    }
+    return fiction
+  }
+  return getFictionBySlugCached(slug)
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params
-  const fiction = await getFictionByIdCached(slug)
+  const { slug, locale } = await params
+  const fiction = await resolveFiction(slug, locale)
   if (!fiction || !fiction.active) {
     return { title: "Fiction not found" }
   }
@@ -36,8 +51,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function FictionSlugPage({ params }: Props) {
-  const { slug } = await params
-  const fiction = await getFictionByIdCached(slug)
+  const { slug, locale } = await params
+  const fiction = await resolveFiction(slug, locale)
   if (!fiction || !fiction.active) {
     notFound()
   }

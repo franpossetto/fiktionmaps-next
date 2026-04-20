@@ -321,7 +321,7 @@ export function FictionLanding({
                   fiction={fiction}
                   locationCount={locationCountMap.get(fiction.id) ?? 0}
                   sceneCount={sceneCountMap.get(fiction.id) ?? 0}
-                  href={`/fictions/${fiction.id}`}
+                  href={`/fictions/${fiction.slug ?? fiction.id}`}
                   likeCount={likeCountByFictionId[fiction.id] ?? 0}
                   liked={likedFictionIdSet.has(fiction.id)}
                   onToggleLike={user ? toggleLike : undefined}

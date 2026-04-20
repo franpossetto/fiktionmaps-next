@@ -1,5 +1,10 @@
 import { z } from "zod"
 
+const slugField = z
+  .string()
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Only lowercase letters, numbers and hyphens")
+  .nullable()
+
 export const createFictionFormSchema = z.object({
   title: z.string().trim().min(1),
   type: z.enum(["movie", "book", "tv-series"]),
@@ -9,6 +14,7 @@ export const createFictionFormSchema = z.object({
   active: z.boolean(),
   duration_sec: z.number().nullable(),
   author: z.string().nullable(),
+  slug: slugField,
 })
 
 export const updateFictionFormSchema = z.object({
@@ -20,6 +26,7 @@ export const updateFictionFormSchema = z.object({
   author: z.string().nullable(),
   active: z.boolean(),
   duration_sec: z.number().nullable(),
+  slug: slugField,
 })
 
 export type CreateFictionData = z.infer<typeof createFictionFormSchema>

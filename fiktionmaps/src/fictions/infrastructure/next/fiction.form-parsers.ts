@@ -8,6 +8,12 @@ function parseRuntimeSec(runtimeMinutes: FormDataEntryValue | null): number | nu
   return Number.isNaN(n) || n <= 0 ? null : n * 60
 }
 
+function parseSlug(raw: FormDataEntryValue | null): string | null {
+  if (!raw) return null
+  const s = String(raw).trim()
+  return s.length > 0 ? s : null
+}
+
 export function parseCreateFictionFormData(formData: FormData) {
   return createFictionFormSchema.safeParse({
     title: String(formData.get("title") ?? ""),
@@ -18,6 +24,7 @@ export function parseCreateFictionFormData(formData: FormData) {
     active: formData.get("active") !== "false",
     duration_sec: parseRuntimeSec(formData.get("runtimeMinutes")),
     author: null,
+    slug: parseSlug(formData.get("slug")),
   })
 }
 
@@ -35,5 +42,6 @@ export function parseUpdateFictionFormData(formData: FormData) {
     author: type === "movie" ? director || null : author || null,
     active: formData.get("active") !== "false",
     duration_sec: parseRuntimeSec(formData.get("runtimeMinutes")),
+    slug: parseSlug(formData.get("slug")),
   })
 }

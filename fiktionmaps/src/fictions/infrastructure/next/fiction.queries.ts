@@ -9,6 +9,7 @@ import { createPlacesSupabaseAdapter } from "@/src/places/infrastructure/supabas
 import { getAllFictionsUseCase } from "@/src/fictions/application/get-all-fictions.usecase"
 import { getActiveFictionsUseCase } from "@/src/fictions/application/get-active-fictions.usecase"
 import { getFictionByIdUseCase } from "@/src/fictions/application/get-fiction-by-id.usecase"
+import { getFictionBySlugUseCase } from "@/src/fictions/application/get-fiction-by-slug.usecase"
 import { getFictionsByIdsUseCase } from "@/src/fictions/application/get-fictions-by-ids.usecase"
 import { getFictionCitiesUseCase } from "@/src/fictions/application/get-fiction-cities.usecase"
 import { getFictionLikeCountsUseCase } from "@/src/fiction-likes/application/get-fiction-like-counts.usecase"
@@ -45,6 +46,14 @@ export function getFictionByIdCached(id: string) {
     () => getFictionByIdUseCase(id, fictionsRepo),
     CacheKeys.fiction(id),
     { ...CacheConfig.long, tags: ["fictions", `fiction-${id}`] }
+  )()
+}
+
+export function getFictionBySlugCached(slug: string) {
+  return unstable_cache(
+    () => getFictionBySlugUseCase(slug, fictionsRepo),
+    CacheKeys.fiction(`slug:${slug}`),
+    { ...CacheConfig.long, tags: ["fictions", `fiction-slug-${slug}`] }
   )()
 }
 

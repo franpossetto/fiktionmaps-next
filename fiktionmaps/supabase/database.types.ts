@@ -84,6 +84,7 @@ export type Database = {
           genre: string
           description: string
           active: boolean
+          slug: string | null
           duration_sec: number | null
           created_at: string
           updated_at: string
@@ -97,6 +98,7 @@ export type Database = {
           genre: string
           description: string
           active?: boolean
+          slug?: string | null
           duration_sec?: number | null
           created_at?: string
           updated_at?: string
@@ -110,6 +112,7 @@ export type Database = {
           genre?: string
           description?: string
           active?: boolean
+          slug?: string | null
           duration_sec?: number | null
           created_at?: string
           updated_at?: string

@@ -142,6 +142,35 @@ export function createFictionsSupabaseAdapter(
       return mapAssetImagesToFiction(fictionData, (imagesData ?? []) as AssetImageRow[])
     }),
 
+    async getBySlug(slug: string): Promise<FictionWithMedia | null> {
+      const supabase = await getSupabase()
+      const { data: fictionData, error } = await supabase
+        .from("fictions")
+        .select("*")
+        .eq("slug", slug)
+        .single()
+      if (error || !fictionData) return null
+
+      const { data: imagesData } = await supabase
+        .from("asset_images")
+        .select("entity_id, role, variant, url")
+        .eq("entity_type", "fiction")
+        .eq("entity_id", fictionData.id)
+
+      return mapAssetImagesToFiction(fictionData, (imagesData ?? []) as AssetImageRow[])
+    },
+
+    async findSlugsByPrefix(prefix: string, excludeId?: string): Promise<string[]> {
+      const supabase = await getSupabase()
+      let query = supabase
+        .from("fictions")
+        .select("slug")
+        .like("slug", `${prefix}%`)
+      if (excludeId) query = query.neq("id", excludeId)
+      const { data } = await query
+      return (data ?? []).map((r) => r.slug).filter(Boolean) as string[]
+    },
+
     async create(data: CreateFictionData): Promise<FictionWithMedia | null> {
       const supabase = await getSupabase()
       const { data: row, error } = await supabase
@@ -155,6 +184,7 @@ export function createFictionsSupabaseAdapter(
           description: data.description,
           active: data.active ?? true,
           duration_sec: data.duration_sec ?? null,
+          slug: data.slug ?? null,
         })
         .select()
         .single()
