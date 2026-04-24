@@ -411,6 +411,81 @@ export type Database = {
           },
         ]
       }
+      persons: {
+        Row: {
+          id: string
+          name: string
+          bio: string | null
+          photo_url: string | null
+          birth_year: number | null
+          nationality: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          bio?: string | null
+          photo_url?: string | null
+          birth_year?: number | null
+          nationality?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          bio?: string | null
+          photo_url?: string | null
+          birth_year?: number | null
+          nationality?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fiction_persons: {
+        Row: {
+          id: string
+          fiction_id: string
+          person_id: string
+          role: string
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          fiction_id: string
+          person_id: string
+          role: string
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          fiction_id?: string
+          person_id?: string
+          role?: string
+          sort_order?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiction_persons_fiction_id_fkey"
+            columns: ["fiction_id"]
+            isOneToOne: false
+            referencedRelation: "fictions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiction_persons_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "persons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fiction_interests: {
         Row: {
           fiction_id: string
@@ -798,6 +873,14 @@ export type UserInterestUpdate = TablesUpdate<"user_interests">
 export type FictionLikeRow = Tables<"fiction_likes">
 export type FictionLikeInsert = TablesInsert<"fiction_likes">
 export type FictionLikeUpdate = TablesUpdate<"fiction_likes">
+
+export type PersonRow = Tables<"persons">
+export type PersonInsert = TablesInsert<"persons">
+export type PersonUpdate = TablesUpdate<"persons">
+
+export type FictionPersonRow = Tables<"fiction_persons">
+export type FictionPersonInsert = TablesInsert<"fiction_persons">
+export type FictionPersonUpdate = TablesUpdate<"fiction_persons">
 
 export type UserHomeRow = Tables<"user_homes">
 export type UserHomeInsert = TablesInsert<"user_homes">

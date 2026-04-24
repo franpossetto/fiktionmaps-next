@@ -3,8 +3,10 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import Image from "next/image"
 import { useRouter, Link } from "@/i18n/navigation"
-import { ArrowLeft, ArrowRight, Loader2, ImagePlus, Film, Trash2, Check, Pencil } from "lucide-react"
+import { ArrowLeft, ArrowRight, Loader2, ImagePlus, Film, Trash2, Check, Pencil, Plus, X } from "lucide-react"
 import type { Fiction, FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import type { FictionPerson } from "@/src/persons/domain/person.entity"
+import { FICTION_PERSON_ROLES } from "@/src/persons/domain/person.entity"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
 import { FICTION_GENRES } from "@/lib/constants/fiction-genres"
@@ -15,6 +17,12 @@ import {
   getFictionInterestsAction,
   setFictionInterestsAction,
 } from "@/src/fictions/infrastructure/next/fiction.actions"
+import {
+  searchPersonsAction,
+  createPersonAction,
+  getFictionPersonsAction,
+  setFictionPersonsAction,
+} from "@/src/persons/infrastructure/next/person.actions"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -28,6 +36,7 @@ import { cn } from "@/lib/utils"
 import { useLocale } from "next-intl"
 import type { InterestCatalogItem } from "@/src/interests"
 import { getInterestCatalogAction } from "@/src/interests/infrastructure/next/interest.actions"
+import type { Person } from "@/src/persons"
 
 const FICTION_TYPES: { value: Fiction["type"]; label: string }[] = [
   { value: "movie", label: "Movie" },
@@ -44,8 +53,6 @@ function toFormState(f: Fiction) {
     title: f.title,
     type: f.type,
     year: f.year,
-    director: f.type === "movie" ? (f.author ?? "") : "",
-    author: f.type !== "movie" ? (f.author ?? "") : "",
     genre: f.genre,
     description: f.description,
     active: f.active,
@@ -80,11 +87,36 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
   const coverInputRef = useRef<HTMLInputElement>(null)
   const bannerInputRef = useRef<HTMLInputElement>(null)
 
+  // Persons (admin selector)
+  const [persons, setPersons] = useState<FictionPerson[]>([])
+  const [loadingPersons, setLoadingPersons] = useState(false)
+  const [savingPersons, setSavingPersons] = useState(false)
+  const [personSearch, setPersonSearch] = useState("")
+  const [personSearchResults, setPersonSearchResults] = useState<Person[]>([])
+  const [searchingPersons, setSearchingPersons] = useState(false)
+  const [newPersonRole, setNewPersonRole] = useState<string>("director")
+
   // Interests (admin selector)
   const [allInterests, setAllInterests] = useState<InterestCatalogItem[]>([])
   const [selectedInterestIds, setSelectedInterestIds] = useState<string[]>([])
   const [loadingInterests, setLoadingInterests] = useState(false)
   const [savingInterests, setSavingInterests] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoadingPersons(true)
+      try {
+        const result = await getFictionPersonsAction(initialFiction.id)
+        if (!cancelled) {
+          setPersons(result.success ? result.persons : [])
+        }
+      } finally {
+        if (!cancelled) setLoadingPersons(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [initialFiction.id])
 
   useEffect(() => {
     let cancelled = false
@@ -116,6 +148,55 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
       cancelled = true
     }
   }, [initialFiction.id, locale])
+
+  const handlePersonSearch = async (query: string) => {
+    setPersonSearch(query)
+    if (query.trim().length < 1) {
+      setPersonSearchResults([])
+      return
+    }
+    setSearchingPersons(true)
+    const result = await searchPersonsAction(query)
+    setSearchingPersons(false)
+    setPersonSearchResults(result.success ? result.persons : [])
+  }
+
+  const addPersonToList = (person: Person) => {
+    if (persons.some((p) => p.person_id === person.id && p.role === newPersonRole)) return
+    setPersons((prev) => [
+      ...prev,
+      { id: `tmp-${person.id}-${newPersonRole}`, person_id: person.id, name: person.name, role: newPersonRole, sort_order: prev.length },
+    ])
+    setPersonSearch("")
+    setPersonSearchResults([])
+  }
+
+  const createAndAddPerson = async () => {
+    const name = personSearch.trim()
+    if (!name) return
+    const result = await createPersonAction({ name })
+    if (!result.success) return
+    addPersonToList(result.person)
+  }
+
+  const removePersonFromList = (personId: string, role: string) => {
+    setPersons((prev) => prev.filter((p) => !(p.person_id === personId && p.role === role)))
+  }
+
+  const savePersons = async () => {
+    if (savingPersons || loadingPersons) return
+    setSavingPersons(true)
+    try {
+      const result = await setFictionPersonsAction(
+        initialFiction.id,
+        persons.map((p, i) => ({ person_id: p.person_id, role: p.role, sort_order: i }))
+      )
+      if (!result.success) throw new Error(result.error)
+      router.refresh()
+    } finally {
+      setSavingPersons(false)
+    }
+  }
 
   const toggleInterest = (interestId: string) => {
     setSelectedInterestIds((prev) => {
@@ -213,8 +294,6 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
     fd.set("year", String(formData.year))
     fd.set("genre", formData.genre)
     fd.set("description", formData.description)
-    fd.set("director", formData.director)
-    fd.set("author", formData.author)
     fd.set("active", formData.active ? "true" : "false")
     fd.set("runtimeMinutes", formData.runtimeMinutes ?? "")
     fd.set("slug", formData.slug ?? "")
@@ -417,28 +496,107 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
                 </div>
               </section>
 
-              {formData.type === "movie" && (
-                <FormField label="Director">
-                  <input
-                    type="text"
-                    value={formData.director}
-                    onChange={(e) => setFormData((p) => ({ ...p, director: e.target.value }))}
-                    placeholder="Director name"
-                    className={inputClass}
-                  />
-                </FormField>
-              )}
-              {(formData.type === "book" || formData.type === "tv-series") && (
-                <FormField label="Author / Creator">
-                  <input
-                    type="text"
-                    value={formData.author}
-                    onChange={(e) => setFormData((p) => ({ ...p, author: e.target.value }))}
-                    placeholder="Author or show creator"
-                    className={inputClass}
-                  />
-                </FormField>
-              )}
+              <FormField label="People">
+                <div className="rounded-lg border border-border bg-card/50 p-3 space-y-3">
+                  {loadingPersons ? (
+                    <div className="text-sm text-muted-foreground">Loading…</div>
+                  ) : (
+                    <>
+                      {/* Current persons list */}
+                      {persons.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {persons.map((p) => (
+                            <span
+                              key={`${p.person_id}-${p.role}`}
+                              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium bg-cyan-500/10 border border-cyan-500 text-cyan-500"
+                            >
+                              {p.name}
+                              <span className="opacity-60">· {p.role}</span>
+                              <button
+                                type="button"
+                                onClick={() => removePersonFromList(p.person_id, p.role)}
+                                className="ml-0.5 hover:text-red-400 transition-colors"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Role selector */}
+                      <div className="flex gap-2">
+                        <select
+                          value={newPersonRole}
+                          onChange={(e) => setNewPersonRole(e.target.value)}
+                          className={cn(inputClass, "text-foreground text-sm py-1.5 flex-none w-auto")}
+                        >
+                          {FICTION_PERSON_ROLES.map((r) => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Search input */}
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={personSearch}
+                          onChange={(e) => handlePersonSearch(e.target.value)}
+                          placeholder="Search or type a name to add…"
+                          className={cn(inputClass, "text-sm py-1.5")}
+                        />
+                        {(personSearchResults.length > 0 || (personSearch.trim().length > 0 && !searchingPersons)) && (
+                          <div className="absolute z-10 top-full left-0 right-0 mt-1 rounded-lg border border-border bg-card shadow-lg overflow-hidden">
+                            {personSearchResults.map((person) => (
+                              <button
+                                key={person.id}
+                                type="button"
+                                onClick={() => addPersonToList(person)}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                              >
+                                {person.name}
+                              </button>
+                            ))}
+                            {personSearch.trim().length > 0 &&
+                              !personSearchResults.some(
+                                (p) => p.name.toLowerCase() === personSearch.trim().toLowerCase()
+                              ) && (
+                                <button
+                                  type="button"
+                                  onClick={createAndAddPerson}
+                                  className="w-full text-left px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors flex items-center gap-2"
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                  Create "{personSearch.trim()}"
+                                </button>
+                              )}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={savePersons}
+                    disabled={savingPersons || loadingPersons}
+                    className="rounded-xl"
+                  >
+                    {savingPersons ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Saving…
+                      </>
+                    ) : (
+                      "Save people"
+                    )}
+                  </Button>
+                </div>
+              </FormField>
 
               {(formData.type === "movie" || formData.type === "tv-series") && (
                 <FormField label="Runtime (minutes)">
