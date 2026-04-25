@@ -111,6 +111,26 @@ export function createPlacesSupabaseAdapter(
       return mapPlaceRowsToLocations(places, avatarByPlaceId)
     }),
 
+    getCountsByFictionIds: cache(async (fictionIds: string[]): Promise<Record<string, number>> => {
+      if (fictionIds.length === 0) return {}
+      const supabase = await getSupabase()
+      const { data, error } = await supabase
+        .from("places")
+        .select("fiction_id")
+        .in("fiction_id", fictionIds)
+        .eq("active", true)
+
+      if (error || !data) return {}
+
+      const counts: Record<string, number> = {}
+      for (const row of data) {
+        const fictionId = row.fiction_id
+        if (!fictionId) continue
+        counts[fictionId] = (counts[fictionId] ?? 0) + 1
+      }
+      return counts
+    }),
+
     getByFictionId: cache(async (fictionId: string): Promise<Location[]> => {
       const supabase = await getSupabase()
       const { data: placeRows, error } = await supabase

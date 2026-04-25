@@ -4,6 +4,7 @@ import { isUuidString } from "@/lib/validation/primitives"
 import type { MapBbox } from "@/lib/validation/map-query"
 import { createPlacesSupabaseAdapter } from "@/src/places/infrastructure/supabase/place.repository.impl"
 import { listAllLocationsUseCase } from "@/src/places/application/list-all-locations.usecase"
+import { getPlaceCountsByFictionIdsUseCase } from "@/src/places/application/get-place-counts-by-fiction-ids.usecase"
 import { getPlaceByIdUseCase } from "@/src/places/application/get-place-by-id.usecase"
 import { getFictionLocationsUseCase } from "@/src/places/application/get-fiction-locations.usecase"
 import { getCityLocationsUseCase } from "@/src/places/application/get-city-locations.usecase"
@@ -20,6 +21,16 @@ export function getAllPlacesCached() {
     () => listAllLocationsUseCase(anonRepo),
     ["places", "all"],
     { ...CacheConfig.medium, tags: ["places"] }
+  )()
+}
+
+export function getPlaceCountsByFictionIdsCached(fictionIds: string[]): Promise<Record<string, number>> {
+  if (fictionIds.length === 0) return Promise.resolve({})
+  const key = fictionIds.slice().sort().join(",")
+  return unstable_cache(
+    () => getPlaceCountsByFictionIdsUseCase(fictionIds, anonRepo),
+    CacheKeys.place(`counts:${key}`),
+    { ...CacheConfig.short, tags: ["places"] }
   )()
 }
 

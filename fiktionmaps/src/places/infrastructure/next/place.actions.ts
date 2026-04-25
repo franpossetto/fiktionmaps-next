@@ -8,7 +8,12 @@ import { createPlaceUseCase } from "@/src/places/application/create-place.usecas
 import { updatePlaceUseCase } from "@/src/places/application/update-place.usecase"
 import { deletePlaceUseCase } from "@/src/places/application/delete-place.usecase"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
-import { getAllPlacesCached, getPlaceLocationByIdCached, listPlacesInBboxForFictionIds } from "./place.queries"
+import {
+  getAllPlacesCached,
+  getFictionLocationsCached,
+  getPlaceLocationByIdCached,
+  listPlacesInBboxForFictionIds,
+} from "./place.queries"
 import type { Location } from "@/src/locations/domain/location.entity"
 import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
 import type { CreatePlaceResult, UpdatePlaceResult, DeletePlaceResult, UploadPlaceImageResult } from "./place.actions.types"
@@ -49,6 +54,11 @@ export async function getAllPlacesAction(): Promise<Location[]> {
 export async function getPlaceLocationAction(placeId: string): Promise<Location | null> {
   if (!uuidSchema.safeParse(placeId).success) return null
   return getPlaceLocationByIdCached(placeId)
+}
+
+export async function getFictionLocationsAction(fictionId: string): Promise<Location[]> {
+  if (!uuidSchema.safeParse(fictionId).success) return []
+  return getFictionLocationsCached(fictionId)
 }
 
 export async function getPlacesInBboxAction(fictionIds: string[], bbox: MapBbox): Promise<Location[]> {

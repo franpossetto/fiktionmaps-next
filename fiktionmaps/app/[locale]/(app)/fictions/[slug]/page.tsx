@@ -1,7 +1,12 @@
 import type { Metadata } from "next"
 import { notFound, redirect } from "next/navigation"
 import { RedirectType } from "next/dist/client/components/redirect"
-import { getFictionByIdCached, getFictionBySlugCached } from "@/src/fictions/infrastructure/next/fiction.queries"
+import {
+  getFictionByIdCached,
+  getFictionBySlugCached,
+  getFictionCitiesCached,
+} from "@/src/fictions/infrastructure/next/fiction.queries"
+import { getFictionLocationsCached } from "@/src/places/infrastructure/next/place.queries"
 import { isUuidString } from "@/lib/validation/primitives"
 import { FictionDetailPageClient } from "./fiction-detail-page-client"
 
@@ -56,5 +61,15 @@ export default async function FictionSlugPage({ params }: Props) {
   if (!fiction || !fiction.active) {
     notFound()
   }
-  return <FictionDetailPageClient fiction={fiction} />
+  const [initialLocations, initialCities] = await Promise.all([
+    getFictionLocationsCached(fiction.id),
+    getFictionCitiesCached(fiction.id),
+  ])
+  return (
+    <FictionDetailPageClient
+      fiction={fiction}
+      initialLocations={initialLocations}
+      initialCities={initialCities}
+    />
+  )
 }

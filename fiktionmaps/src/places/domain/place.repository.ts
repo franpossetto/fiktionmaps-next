@@ -5,6 +5,8 @@ import type { CreatePlaceData, UpdatePlaceData } from "./place.schemas"
 export interface PlacesRepositoryPort {
   /** List all places as Location[] (place + location + avatar). */
   listAllAsLocations(): Promise<Location[]>
+  /** Active place counts per fiction id. */
+  getCountsByFictionIds(fictionIds: string[]): Promise<Record<string, number>>
   /** Single place as Location (place + location + avatar). */
   getById(placeId: string): Promise<Location | null>
   /** All places for a specific fiction. */
