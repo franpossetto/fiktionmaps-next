@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { Suspense, useState, useCallback, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
@@ -46,8 +47,11 @@ function bboxUnion(a: Bbox, b: Bbox): Bbox {
 
 const MIN_LOAD_RADIUS_KM = 50
 
-export default function MapPage() {
+function MapPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialFictionId = searchParams.get("fiction")
+  const initialCityId = searchParams.get("city")
   const [placeSelectorCollapsed, setPlaceSelectorCollapsed] = usePlaceSelectorCollapsedStorage()
 
   const [cities, setCities] = useState<City[]>([])
@@ -62,23 +66,29 @@ export default function MapPage() {
   const [bounds, setBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
   const [citiesLoading, setCitiesLoading] = useState(true)
 
-  // Load cities from DB, then fictions for first city
+  // Load cities, then open city/fictions (optionally from ?city= & ?fiction= when opening from a fiction page)
   useEffect(() => {
     setCitiesLoading(true)
     getAllCitiesAction()
       .then((citiesList: City[]) => {
         setCities(citiesList)
-        if (citiesList.length > 0) {
-          const city = citiesList[0]
-          setSelectedCity(city)
-          return getCityFictionsAction(city.id).then((fics: FictionWithMedia[]) => {
-            setAvailableFictions(fics)
+        if (citiesList.length === 0) return
+        const city =
+          (initialCityId && citiesList.find((c) => c.id === initialCityId)) || citiesList[0]
+        setSelectedCity(city)
+        return getCityFictionsAction(city.id).then((fics: FictionWithMedia[]) => {
+          setAvailableFictions(fics)
+          if (initialFictionId && fics.some((f) => f.id === initialFictionId)) {
+            setSelectedFictionIds([initialFictionId])
+          } else {
             setSelectedFictionIds(fics.map((f) => f.id))
-          })
-        }
+          }
+        })
       })
       .catch(() => {})
       .finally(() => setCitiesLoading(false))
+    // Intentionally only on mount; query is read once for initial state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -256,5 +266,19 @@ export default function MapPage() {
       </div>
       )}
     </MapProvider>
+  )
+}
+
+export default function MapPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-full items-center justify-center bg-background">
+          <p className="text-muted-foreground">Loading map…</p>
+        </div>
+      }
+    >
+      <MapPageInner />
+    </Suspense>
   )
 }

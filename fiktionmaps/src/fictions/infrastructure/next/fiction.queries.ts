@@ -12,6 +12,7 @@ import { getFictionByIdUseCase } from "@/src/fictions/application/get-fiction-by
 import { getFictionBySlugUseCase } from "@/src/fictions/application/get-fiction-by-slug.usecase"
 import { getFictionsByIdsUseCase } from "@/src/fictions/application/get-fictions-by-ids.usecase"
 import { getFictionCitiesUseCase } from "@/src/fictions/application/get-fiction-cities.usecase"
+import { getSameCityMovieRecommendationsUseCase } from "@/src/fictions/application/get-same-city-movie-recommendations.usecase"
 import { getFictionLikeCountsUseCase } from "@/src/fiction-likes/application/get-fiction-like-counts.usecase"
 import { isUuidString } from "@/lib/validation/primitives"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
@@ -71,6 +72,20 @@ export function getFictionCitiesCached(fictionId: string) {
     () => getFictionCitiesUseCase(fictionId, { locationsRepo: placesRepo, citiesRepo }),
     CacheKeys.fiction(`cities:${fictionId}`),
     { ...CacheConfig.long, tags: ["fictions", "cities", `fiction-${fictionId}`] }
+  )()
+}
+
+/** Active movies that share at least one city with this fiction (by place locations). */
+export function getSameCityMovieRecommendationsCached(fictionId: string) {
+  return unstable_cache(
+    () =>
+      getSameCityMovieRecommendationsUseCase(fictionId, {
+        locationsRepo: placesRepo,
+        placesRepo,
+        fictionsRepo,
+      }),
+    CacheKeys.fiction(`same-city-movies:${fictionId}`),
+    { ...CacheConfig.long, tags: ["fictions", "cities", "places", `fiction-${fictionId}`] }
   )()
 }
 

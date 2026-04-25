@@ -230,7 +230,9 @@
   "Fictions": {
     "title": "Ficciones",
     "loading": "Cargando ficciones...",
-    "exploreFictions": "Explorar ficciones"
+    "exploreFictions": "Explorar ficciones",
+    "sameCityRecommendationsTitle": "Películas recomendadas",
+    "sameCityRecommendationsDescription": "Otras películas con lugares en las mismas ciudades que esta historia."
   },
   "Scenes": {
     "title": "Escenas",

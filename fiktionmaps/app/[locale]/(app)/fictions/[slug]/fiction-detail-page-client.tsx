@@ -10,10 +10,14 @@ export function FictionDetailPageClient({
   fiction,
   initialLocations,
   initialCities,
+  sameCityRecommendations,
+  sameCityRecommendationPlaceCounts,
 }: {
   fiction: FictionWithMedia
   initialLocations: Location[]
   initialCities: City[]
+  sameCityRecommendations?: FictionWithMedia[]
+  sameCityRecommendationPlaceCounts?: Record<string, number>
 }) {
   const router = useRouter()
   return (
@@ -22,6 +26,8 @@ export function FictionDetailPageClient({
         fiction={fiction}
         initialLocations={initialLocations}
         initialCities={initialCities}
+        sameCityRecommendations={sameCityRecommendations}
+        sameCityRecommendationPlaceCounts={sameCityRecommendationPlaceCounts}
         onBack={() => router.push("/fictions")}
       />
     </div>

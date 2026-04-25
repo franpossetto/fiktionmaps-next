@@ -5,8 +5,12 @@ import {
   getFictionByIdCached,
   getFictionBySlugCached,
   getFictionCitiesCached,
+  getSameCityMovieRecommendationsCached,
 } from "@/src/fictions/infrastructure/next/fiction.queries"
-import { getFictionLocationsCached } from "@/src/places/infrastructure/next/place.queries"
+import {
+  getFictionLocationsCached,
+  getPlaceCountsByFictionIdsCached,
+} from "@/src/places/infrastructure/next/place.queries"
 import { isUuidString } from "@/lib/validation/primitives"
 import { FictionDetailPageClient } from "./fiction-detail-page-client"
 
@@ -61,15 +65,23 @@ export default async function FictionSlugPage({ params }: Props) {
   if (!fiction || !fiction.active) {
     notFound()
   }
-  const [initialLocations, initialCities] = await Promise.all([
+  const [initialLocations, initialCities, sameCityRecommendations] = await Promise.all([
     getFictionLocationsCached(fiction.id),
     getFictionCitiesCached(fiction.id),
+    getSameCityMovieRecommendationsCached(fiction.id),
   ])
+  const recommendationIds = sameCityRecommendations.map((f) => f.id)
+  const sameCityRecommendationPlaceCounts =
+    recommendationIds.length > 0
+      ? await getPlaceCountsByFictionIdsCached(recommendationIds)
+      : {}
   return (
     <FictionDetailPageClient
       fiction={fiction}
       initialLocations={initialLocations}
       initialCities={initialCities}
+      sameCityRecommendations={sameCityRecommendations}
+      sameCityRecommendationPlaceCounts={sameCityRecommendationPlaceCounts}
     />
   )
 }
