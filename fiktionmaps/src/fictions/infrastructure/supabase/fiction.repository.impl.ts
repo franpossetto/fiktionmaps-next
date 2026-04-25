@@ -71,9 +71,7 @@ async function loadAllFictionsWithImages(
     imagesByEntity.set(row.entity_id, list)
   }
 
-  return fictionsData.map((f) =>
-    mapAssetImagesToFiction(f, imagesByEntity.get(f.id) ?? [])
-  )
+  return fictionsData.map((f) => mapAssetImagesToFiction(f, imagesByEntity.get(f.id) ?? []))
 }
 
 async function loadFictionsByIdsWithImages(
@@ -105,9 +103,7 @@ async function loadFictionsByIdsWithImages(
     imagesByEntity.set(row.entity_id, list)
   }
 
-  return fictionsData.map((f) =>
-    mapAssetImagesToFiction(f, imagesByEntity.get(f.id) ?? [])
-  )
+  return fictionsData.map((f) => mapAssetImagesToFiction(f, imagesByEntity.get(f.id) ?? []))
 }
 
 export function createFictionsSupabaseAdapter(
@@ -179,7 +175,6 @@ export function createFictionsSupabaseAdapter(
           title: data.title,
           type: data.type,
           year: data.year,
-          author: data.author ?? null,
           genre: data.genre,
           description: data.description,
           active: data.active ?? true,

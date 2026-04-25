@@ -13,7 +13,6 @@ export const createFictionFormSchema = z.object({
   description: z.string().trim().min(1),
   active: z.boolean(),
   duration_sec: z.number().nullable(),
-  author: z.string().nullable(),
   slug: slugField,
 })
 
@@ -23,7 +22,6 @@ export const updateFictionFormSchema = z.object({
   year: z.coerce.number().int().min(1900).refine((y) => y <= new Date().getFullYear(), "Invalid year"),
   genre: z.string().trim().min(1),
   description: z.string().trim().min(1),
-  author: z.string().nullable(),
   active: z.boolean(),
   duration_sec: z.number().nullable(),
   slug: slugField,

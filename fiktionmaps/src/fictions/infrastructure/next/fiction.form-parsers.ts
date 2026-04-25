@@ -23,23 +23,17 @@ export function parseCreateFictionFormData(formData: FormData) {
     description: String(formData.get("description") ?? ""),
     active: formData.get("active") !== "false",
     duration_sec: parseRuntimeSec(formData.get("runtimeMinutes")),
-    author: null,
     slug: parseSlug(formData.get("slug")),
   })
 }
 
 export function parseUpdateFictionFormData(formData: FormData) {
-  const type = String(formData.get("type") ?? "")
-  const director = String(formData.get("director") ?? "").trim()
-  const author = String(formData.get("author") ?? "").trim()
-
   return updateFictionFormSchema.safeParse({
     title: String(formData.get("title") ?? ""),
-    type,
+    type: String(formData.get("type") ?? ""),
     year: String(formData.get("year") ?? ""),
     genre: String(formData.get("genre") ?? ""),
     description: String(formData.get("description") ?? ""),
-    author: type === "movie" ? director || null : author || null,
     active: formData.get("active") !== "false",
     duration_sec: parseRuntimeSec(formData.get("runtimeMinutes")),
     slug: parseSlug(formData.get("slug")),
