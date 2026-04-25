@@ -175,8 +175,8 @@ export function FictionDetail({
           priority
           onError={() => setCoverError(true)}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/20" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/80 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/35 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/30 to-transparent" />
 
         {/* Back button */}
         <button
