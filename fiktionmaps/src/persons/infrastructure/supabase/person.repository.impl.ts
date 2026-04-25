@@ -89,22 +89,47 @@ export function createPersonsSupabaseAdapter(
 
     async setForFiction(fictionId: string, entries: FictionPersonEntry[]): Promise<void> {
       const supabase = await getSupabase()
-      const { error: delError } = await supabase
-        .from("fiction_persons")
-        .delete()
-        .eq("fiction_id", fictionId)
-      if (delError) throw new Error(delError.message)
+      const dedupedByKey = new Map<
+        string,
+        { fiction_id: string; person_id: string; role: string; sort_order: number }
+      >()
 
-      if (entries.length > 0) {
-        const { error: insError } = await supabase.from("fiction_persons").insert(
-          entries.map((e, i) => ({
-            fiction_id: fictionId,
-            person_id: e.person_id,
-            role: e.role,
-            sort_order: e.sort_order ?? i,
-          }))
-        )
-        if (insError) throw new Error(insError.message)
+      entries.forEach((entry, index) => {
+        const key = `${entry.person_id}::${entry.role}`
+        dedupedByKey.set(key, {
+          fiction_id: fictionId,
+          person_id: entry.person_id,
+          role: entry.role,
+          sort_order: entry.sort_order ?? index,
+        })
+      })
+
+      const dedupedEntries = Array.from(dedupedByKey.values())
+
+      if (dedupedEntries.length > 0) {
+        const { error: upsertError } = await supabase
+          .from("fiction_persons")
+          .upsert(dedupedEntries, { onConflict: "fiction_id,person_id,role" })
+        if (upsertError) throw new Error(upsertError.message)
+      }
+
+      const { data: existingRows, error: existingRowsError } = await supabase
+        .from("fiction_persons")
+        .select("id, person_id, role")
+        .eq("fiction_id", fictionId)
+      if (existingRowsError) throw new Error(existingRowsError.message)
+
+      const validKeys = new Set(dedupedByKey.keys())
+      const idsToDelete = (existingRows ?? [])
+        .filter((row) => !validKeys.has(`${row.person_id}::${row.role}`))
+        .map((row) => row.id)
+
+      if (idsToDelete.length > 0) {
+        const { error: pruneError } = await supabase
+          .from("fiction_persons")
+          .delete()
+          .in("id", idsToDelete)
+        if (pruneError) throw new Error(pruneError.message)
       }
     },
   }
