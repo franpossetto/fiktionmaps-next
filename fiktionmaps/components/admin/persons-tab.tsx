@@ -150,7 +150,7 @@ export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabPro
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="flex-1 px-4 sm:px-6 pb-28 space-y-6 max-w-2xl">
+          <form id="person-create-form" onSubmit={handleSubmit} className="flex-1 px-4 sm:px-6 pb-28 space-y-6 max-w-2xl">
             {submitError && (
               <p className="text-sm text-red-500 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2">
                 {submitError}
@@ -228,7 +228,6 @@ export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabPro
               variant="cta"
               disabled={submitting}
               className="gap-2 rounded-xl px-6"
-              onClick={handleSubmit}
             >
               {submitting ? (
                 <>
