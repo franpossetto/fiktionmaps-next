@@ -5,6 +5,11 @@ import { uuidSchema } from "@/lib/validation/primitives"
 import { zodErrorMessage } from "@/lib/validation/http"
 import { createPersonSchema, fictionPersonEntrySchema } from "@/src/persons/domain/person.schemas"
 import { supabaseRepositoryAdapter as personsRepo } from "@/src/persons/infrastructure/supabase/person.repository.impl"
+import { deletePerson } from "@/src/persons/application/delete-person.usecase"
+import { searchPersons } from "@/src/persons/application/search-persons.usecase"
+import { createPerson } from "@/src/persons/application/create-person.usecase"
+import { getFictionPersons } from "@/src/persons/application/get-fiction-persons.usecase"
+import { setFictionPersons } from "@/src/persons/application/set-fiction-persons.usecase"
 import { z } from "zod"
 import type {
   SearchPersonsResult,
@@ -23,11 +28,12 @@ export type {
 } from "./person.actions.types"
 
 export async function deletePersonAction(id: string): Promise<DeletePersonResult> {
-  if (!uuidSchema.safeParse(id).success) {
+  const parsedId = uuidSchema.safeParse(id)
+  if (!parsedId.success) {
     return { success: false, error: "Invalid id" }
   }
   try {
-    const ok = await personsRepo.delete(id)
+    const ok = await deletePerson({ id: parsedId.data }, personsRepo)
     if (!ok) return { success: false, error: "Failed to delete person" }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Delete failed" }
@@ -38,10 +44,11 @@ export async function deletePersonAction(id: string): Promise<DeletePersonResult
 }
 
 export async function searchPersonsAction(query: string): Promise<SearchPersonsResult> {
-  const q = query.trim()
-  if (q.length < 1) return { success: true, persons: [] }
+  const parsedQuery = z.string().trim().safeParse(query)
+  if (!parsedQuery.success) return { success: false, error: zodErrorMessage(parsedQuery.error) }
+  if (parsedQuery.data.length < 1) return { success: true, persons: [] }
   try {
-    const persons = await personsRepo.search(q)
+    const persons = await searchPersons({ query: parsedQuery.data }, personsRepo)
     return { success: true, persons }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Search failed" }
@@ -54,7 +61,7 @@ export async function createPersonAction(
   const parsed = createPersonSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
   try {
-    const person = await personsRepo.create(parsed.data)
+    const person = await createPerson(parsed.data, personsRepo)
     if (!person) return { success: false, error: "Failed to create person" }
     return { success: true, person }
   } catch (e) {
@@ -63,11 +70,12 @@ export async function createPersonAction(
 }
 
 export async function getFictionPersonsAction(fictionId: string): Promise<GetFictionPersonsResult> {
-  if (!uuidSchema.safeParse(fictionId).success) {
+  const parsedFictionId = uuidSchema.safeParse(fictionId)
+  if (!parsedFictionId.success) {
     return { success: false, error: "Invalid fictionId" }
   }
   try {
-    const persons = await personsRepo.getByFictionId(fictionId)
+    const persons = await getFictionPersons({ fictionId: parsedFictionId.data }, personsRepo)
     return { success: true, persons }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed to load persons" }
@@ -78,15 +86,19 @@ export async function setFictionPersonsAction(
   fictionId: string,
   entries: { person_id: string; role: string; sort_order?: number }[]
 ): Promise<SetFictionPersonsResult> {
-  if (!uuidSchema.safeParse(fictionId).success) {
+  const parsedFictionId = uuidSchema.safeParse(fictionId)
+  if (!parsedFictionId.success) {
     return { success: false, error: "Invalid fictionId" }
   }
 
-  const parsed = z.array(fictionPersonEntrySchema).safeParse(entries)
-  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+  const parsedEntries = z.array(fictionPersonEntrySchema).safeParse(entries)
+  if (!parsedEntries.success) return { success: false, error: zodErrorMessage(parsedEntries.error) }
 
   try {
-    await personsRepo.setForFiction(fictionId, parsed.data)
+    await setFictionPersons(
+      { fictionId: parsedFictionId.data, entries: parsedEntries.data },
+      personsRepo
+    )
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed to set persons" }
   }
