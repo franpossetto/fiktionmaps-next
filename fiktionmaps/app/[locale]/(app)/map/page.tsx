@@ -18,7 +18,8 @@ import {
   getAllCitiesAction,
   getCityFictionsAction,
 } from "@/src/cities/infrastructure/next/city.actions"
-import { getPlacesInBboxAction } from "@/src/places/infrastructure/next/place.actions"
+import { getPlaceLocationAction, getPlacesInBboxAction } from "@/src/places/infrastructure/next/place.actions"
+import { isUuidString } from "@/lib/validation/primitives"
 
 type Bbox = { west: number; south: number; east: number; north: number }
 
@@ -52,6 +53,7 @@ function MapPageInner() {
   const searchParams = useSearchParams()
   const initialFictionId = searchParams.get("fiction")
   const initialCityId = searchParams.get("city")
+  const placeParam = searchParams.get("place")
   const [placeSelectorCollapsed, setPlaceSelectorCollapsed] = usePlaceSelectorCollapsedStorage()
 
   const [cities, setCities] = useState<City[]>([])
@@ -91,6 +93,13 @@ function MapPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Deep link ?place=: sync focus and ensure the pin is in the list (bbox query can omit it or SSR had no searchParams).
+  useEffect(() => {
+    if (placeParam && isUuidString(placeParam)) {
+      setFocusedLocationId(placeParam)
+    }
+  }, [placeParam])
+
   useEffect(() => {
     if (!selectedCity || selectedFictionIds.length === 0) {
       setFilteredLocations([])
@@ -98,16 +107,24 @@ function MapPageInner() {
     }
     const minBbox = bboxAround(selectedCity.lat, selectedCity.lng, MIN_LOAD_RADIUS_KM)
     const bbox = bounds ? bboxUnion(bounds, minBbox) : minBbox
+    const deepPlaceId = placeParam && isUuidString(placeParam) ? placeParam : null
     let cancelled = false
     getPlacesInBboxAction(selectedFictionIds, bbox)
-      .then((data) => {
-        if (!cancelled) setFilteredLocations(data ?? [])
+      .then(async (data) => {
+        if (cancelled) return
+        let list = data ?? []
+        if (deepPlaceId && !list.some((l) => l.id === deepPlaceId)) {
+          const loc = await getPlaceLocationAction(deepPlaceId)
+          if (cancelled) return
+          if (loc) list = [...list, loc]
+        }
+        if (!cancelled) setFilteredLocations(list)
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [selectedCity?.id, selectedCity?.lat, selectedCity?.lng, selectedFictionIds, bounds])
+  }, [selectedCity?.id, selectedCity?.lat, selectedCity?.lng, selectedFictionIds, bounds, placeParam])
 
   const handleCityChange = useCallback(async (city: City) => {
     setSelectedCity(city)

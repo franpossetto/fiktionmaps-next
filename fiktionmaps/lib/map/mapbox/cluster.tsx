@@ -83,6 +83,21 @@ export function MapboxClusterLayer<T extends ClusterItem>({
     }
   }, [mapRef, updateClusters])
 
+  /** When items or clustering input changes, re-run after the next idle (valid bbox after fly/style). */
+  useEffect(() => {
+    if (!mapRef || items.length === 0) return
+    try {
+      const map = mapRef.getMap()
+      const onIdle = () => updateClusters()
+      map.once("idle", onIdle)
+      return () => {
+        map.off("idle", onIdle)
+      }
+    } catch {
+      // Map not initialized yet
+    }
+  }, [mapRef, items.length, supercluster, updateClusters])
+
   return (
     <>
       {clusters.map((feature) => {

@@ -12,7 +12,8 @@ import type { City } from "@/src/cities/domain/city.entity"
 import { Map3DToggle } from "./map-3d-toggle"
 import { NavMap, NavMapSlot } from "./nav-map"
 
-const FOCUS_ZOOM = 16
+/** High enough to break most pixel clusters and show the photo pin (not a numbered cluster). */
+const FOCUS_ZOOM = 18
 
 interface MapViewProps {
   city: City
@@ -31,9 +32,11 @@ interface MapViewProps {
 
 /** Flies the map to a location when focusLocationId changes. Must be rendered inside MapContainer. */
 function MapFocusController({
+  cityId,
   locations,
   focusLocationId,
 }: {
+  cityId: string
   locations: Location[]
   focusLocationId: string | null | undefined
 }) {
@@ -41,16 +44,40 @@ function MapFocusController({
   const prevFocusRef = useRef<string | null | undefined>(null)
 
   useEffect(() => {
+    prevFocusRef.current = null
+  }, [cityId])
+
+  useEffect(() => {
     if (!focusLocationId || !control) return
-    if (prevFocusRef.current === focusLocationId) return
-    prevFocusRef.current = focusLocationId
     const loc = locations.find((l) => l.id === focusLocationId)
     if (!loc) return
-    control.flyTo({
-      center: { lat: loc.lat, lng: loc.lng },
-      zoom: FOCUS_ZOOM,
-      duration: 1000,
-    })
+    if (prevFocusRef.current === focusLocationId) return
+
+    const { lat, lng } = loc
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+
+    let cancelled = false
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const tryFly = (attempt: number) => {
+      if (cancelled) return
+      const ok = control.flyTo({
+        center: { lat, lng },
+        zoom: FOCUS_ZOOM,
+        duration: 1000,
+      })
+      if (ok) {
+        prevFocusRef.current = focusLocationId
+        return
+      }
+      if (attempt < 8) {
+        timeoutId = setTimeout(() => tryFly(attempt + 1), 100)
+      }
+    }
+    tryFly(0)
+    return () => {
+      cancelled = true
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+    }
   }, [focusLocationId, locations, control])
 
   return null
@@ -384,12 +411,16 @@ export function MapView({
     >
       <MapLoadReporter onLoaded={onMapLoaded} />
       <MapBoundsReporter onBoundsChange={onBoundsChange} />
-      <MapFocusController locations={locations} focusLocationId={focusLocationId} />
+      <MapFocusController
+        cityId={city.id}
+        locations={locations}
+        focusLocationId={focusLocationId}
+      />
       <MapViewPins
         cityId={city.id}
         is3D={is3D}
         clusterItems={clusterItems}
-        selectedLocationId={selectedLocationId}
+        selectedLocationId={selectedLocationId ?? focusLocationId}
         onLocationClick={onLocationClick}
         renderMarker={renderMarker}
       />
