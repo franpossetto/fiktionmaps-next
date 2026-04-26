@@ -19,6 +19,12 @@ type Props = {
   params: Promise<{ locale: string; slug: string }>
 }
 
+function mapLocaleToOpenGraph(locale: string): string {
+  if (locale === "en") return "en_US"
+  if (locale === "es") return "es_ES"
+  return locale
+}
+
 async function resolveFiction(slug: string, locale: string) {
   // Legacy UUID URLs: redirect permanently to slug URL
   if (isUuidString(slug)) {
@@ -76,7 +82,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description,
       url: canonicalUrl,
       type: "article",
-      locale,
+      locale: mapLocaleToOpenGraph(locale),
       ...(image && { images: [{ url: image, width: 1200, height: 630, alt: fiction.title }] }),
     },
     twitter: {
@@ -90,10 +96,49 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function FictionSlugPage({ params }: Props) {
   const { slug, locale } = await params
+  const siteUrl = getSiteUrl()
   const fiction = await resolveFiction(slug, locale)
   if (!fiction || !fiction.active) {
     notFound()
   }
+  const canonicalSlug = fiction.slug?.trim() || slug
+  const canonicalUrl = `${siteUrl}/${locale}/fictions/${canonicalSlug}`
+
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: locale === "es" ? "Inicio" : "Home",
+        item: `${siteUrl}/${locale}`,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: locale === "es" ? "Ficciones" : "Fictions",
+        item: `${siteUrl}/${locale}/fictions`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: fiction.title,
+        item: canonicalUrl,
+      },
+    ],
+  }
+
+  const creativeWorkSchema = {
+    "@context": "https://schema.org",
+    "@type": fiction.type === "book" ? "Book" : "Movie",
+    name: fiction.title,
+    description: fiction.description || undefined,
+    url: canonicalUrl,
+    image: fiction.coverImage || fiction.bannerImage || undefined,
+    inLanguage: locale,
+  }
+
   const [initialLocations, initialCities, sameCityRecommendations] = await Promise.all([
     getFictionLocationsCached(fiction.id),
     getFictionCitiesCached(fiction.id),
@@ -105,12 +150,22 @@ export default async function FictionSlugPage({ params }: Props) {
       ? await getPlaceCountsByFictionIdsCached(recommendationIds)
       : {}
   return (
-    <FictionDetailPageClient
-      fiction={fiction}
-      initialLocations={initialLocations}
-      initialCities={initialCities}
-      sameCityRecommendations={sameCityRecommendations}
-      sameCityRecommendationPlaceCounts={sameCityRecommendationPlaceCounts}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(creativeWorkSchema) }}
+      />
+      <FictionDetailPageClient
+        fiction={fiction}
+        initialLocations={initialLocations}
+        initialCities={initialCities}
+        sameCityRecommendations={sameCityRecommendations}
+        sameCityRecommendationPlaceCounts={sameCityRecommendationPlaceCounts}
+      />
+    </>
   )
 }

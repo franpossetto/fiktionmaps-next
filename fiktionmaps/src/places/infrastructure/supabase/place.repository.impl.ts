@@ -114,20 +114,29 @@ export function createPlacesSupabaseAdapter(
     getCountsByFictionIds: cache(async (fictionIds: string[]): Promise<Record<string, number>> => {
       if (fictionIds.length === 0) return {}
       const supabase = await getSupabase()
-      const { data, error } = await supabase
-        .from("places")
-        .select("fiction_id")
-        .in("fiction_id", fictionIds)
-        .eq("active", true)
-
-      if (error || !data) return {}
-
       const counts: Record<string, number> = {}
-      for (const row of data) {
-        const fictionId = row.fiction_id
-        if (!fictionId) continue
-        counts[fictionId] = (counts[fictionId] ?? 0) + 1
+
+      const pageSize = 1000
+      for (let from = 0; ; from += pageSize) {
+        const to = from + pageSize - 1
+        const { data, error } = await supabase
+          .from("places")
+          .select("fiction_id")
+          .in("fiction_id", fictionIds)
+          .eq("active", true)
+          .range(from, to)
+
+        if (error || !data) return {}
+
+        for (const row of data) {
+          const fictionId = row.fiction_id
+          if (!fictionId) continue
+          counts[fictionId] = (counts[fictionId] ?? 0) + 1
+        }
+
+        if (data.length < pageSize) break
       }
+
       return counts
     }),
 

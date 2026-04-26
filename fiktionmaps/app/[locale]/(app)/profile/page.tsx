@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { getAllCitiesCached } from "@/src/cities/infrastructure/next/city.queries"
 import { getCurrentUserProfileAction } from "@/src/users/infrastructure/next/user.actions"
 import {
@@ -7,6 +8,13 @@ import {
 import { getUserHomesAction } from "@/src/homes/infrastructure/next/home.actions"
 import { getProfileScenesPreviewAction } from "@/src/scenes/infrastructure/next/profile-scene-previews.actions"
 import { UserProfileComponent } from "@/components/profile/user-profile"
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+}
 
 export default async function ProfilePage() {
   const [cities, scenePreviews, profileRes, cityCheckinsRes, placeCheckinsRes, homesRes] = await Promise.all([

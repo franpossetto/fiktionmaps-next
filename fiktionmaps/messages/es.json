@@ -231,6 +231,11 @@
     "title": "Ficciones",
     "loading": "Cargando ficciones...",
     "exploreFictions": "Explorar ficciones",
+    "locationLabelBook": "Ubicaciones del mundo real",
+    "locationLabelFilming": "Locaciones de rodaje",
+    "howToVisitTitle": "Como visitar {title}: {locationLabel}",
+    "howToVisitDescription": "Explora cada lugar en el mapa, planifica tu ruta ciudad por ciudad y abre cada ficha para ver detalles practicos antes de tu viaje.",
+    "placeCount": "{count, plural, one {# lugar} other {# lugares}}",
     "sameCityRecommendationsTitle": "Películas recomendadas",
     "sameCityRecommendationsDescription": "Otras películas con lugares en las mismas ciudades que esta historia."
   },

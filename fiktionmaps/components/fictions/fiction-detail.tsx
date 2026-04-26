@@ -187,7 +187,7 @@ export function FictionDetail({
     ? `/map?fiction=${encodeURIComponent(fiction.id)}&city=${encodeURIComponent(firstCityId)}`
     : `/map?fiction=${encodeURIComponent(fiction.id)}`
   const isBook = fiction.type === "book"
-  const locationLabel = isBook ? "Real-World Locations" : "Filming Locations"
+  const locationLabel = isBook ? t("locationLabelBook") : t("locationLabelFilming")
 
   async function handleToggleLike() {
     if (!user || likeBusy) return
@@ -394,11 +394,10 @@ export function FictionDetail({
       <div className="px-8 py-6">
         <div className="mb-6 max-w-3xl">
           <h2 className="text-xl font-semibold text-foreground">
-            How to Visit {fiction.title} {locationLabel}
+            {t("howToVisitTitle", { title: fiction.title, locationLabel })}
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Explore each place on the map, plan your route city by city, and open each location card for
-            practical details before your trip.
+            {t("howToVisitDescription")}
           </p>
         </div>
         {Array.from(locationsByCity.entries()).map(([cityId, locs]) => {
@@ -412,7 +411,7 @@ export function FictionDetail({
                   {city?.name}, {city?.country}
                 </h3>
                 <span className="text-sm text-muted-foreground">
-                  &middot; {locs.length} place{locs.length > 1 ? "s" : ""}
+                  &middot; {t("placeCount", { count: locs.length })}
                 </span>
               </div>
 

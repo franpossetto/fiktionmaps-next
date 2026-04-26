@@ -1,4 +1,5 @@
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+import tailwindcssAnimate from "tailwindcss-animate"
+
 const config = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   darkMode: ['class'] as any,
@@ -95,6 +96,6 @@ const config = {
       },
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [tailwindcssAnimate],
 }
 export default config

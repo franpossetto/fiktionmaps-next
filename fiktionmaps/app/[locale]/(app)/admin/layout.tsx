@@ -1,7 +1,15 @@
 import type { ReactNode } from "react"
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { getSessionUserId } from "@/lib/auth/auth.service"
 import { getIsUserAdmin } from "@/src/users/infrastructure/next/user.queries"
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+}
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const userId = await getSessionUserId()

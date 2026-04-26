@@ -3,6 +3,19 @@ import type { CityCheckin, EnrichedPlaceCheckin, PlaceCheckin } from "@/src/chec
 import type { CheckinsRepositoryPort } from "@/src/checkins/domain/checkin.repository"
 import type { AssetImageRow } from "@/src/fictions/infrastructure/supabase/fiction.mappers"
 
+type EnrichedPlaceCheckinRow = {
+  id: string
+  place_id: string
+  verified: boolean | null
+  distance_m: number | null
+  checked_at: string
+  places?: {
+    fiction_id?: string | null
+    fictions?: { id?: string | null; title?: string | null } | null
+    locations?: { name?: string | null; formatted_address?: string | null; city_id?: string | null } | null
+  } | null
+}
+
 function toCityCheckin(row: {
   id: string
   user_id: string
@@ -162,7 +175,7 @@ export const checkinsSupabaseAdapter: CheckinsRepositoryPort = {
 
     if (error) throw new Error(error.message)
 
-    const rows = (data ?? []) as any[]
+    const rows = (data ?? []) as EnrichedPlaceCheckinRow[]
     const cityIds = [
       ...new Set(
         rows
@@ -216,7 +229,7 @@ export const checkinsSupabaseAdapter: CheckinsRepositoryPort = {
       if (r.entity_id && r.url) placeImageById.set(r.entity_id, r.url)
     }
 
-    return rows.map((row: any) => {
+    return rows.map((row) => {
       const place = row.places
       const fiction = place?.fictions
       const location = place?.locations

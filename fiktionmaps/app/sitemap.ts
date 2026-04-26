@@ -1,52 +1,49 @@
 import type { MetadataRoute } from "next"
 import { getActiveFictionsCached } from "@/src/fictions/infrastructure/next/fiction.queries"
+import { getSiteUrl } from "@/lib/site"
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fiktions.com"
+const BASE_URL = getSiteUrl()
 
-const staticPages: MetadataRoute.Sitemap = [
-  {
-    url: `${BASE_URL}/en`,
-    changeFrequency: "weekly",
-    priority: 1,
-    alternates: { languages: { en: `${BASE_URL}/en`, es: `${BASE_URL}/es` } },
-  },
-  {
-    url: `${BASE_URL}/en/fictions`,
-    changeFrequency: "daily",
-    priority: 0.9,
-    alternates: { languages: { en: `${BASE_URL}/en/fictions`, es: `${BASE_URL}/es/fictions` } },
-  },
-  {
-    url: `${BASE_URL}/en/map`,
-    changeFrequency: "weekly",
-    priority: 0.8,
-    alternates: { languages: { en: `${BASE_URL}/en/map`, es: `${BASE_URL}/es/map` } },
-  },
-  {
-    url: `${BASE_URL}/en/scenes`,
-    changeFrequency: "weekly",
-    priority: 0.7,
-    alternates: { languages: { en: `${BASE_URL}/en/scenes`, es: `${BASE_URL}/es/scenes` } },
-  },
+const locales = ["en", "es"] as const
+const staticPaths = [
+  { path: "", priority: 1, changeFrequency: "weekly" as const },
+  { path: "/fictions", priority: 0.9, changeFrequency: "daily" as const },
+  { path: "/map", priority: 0.8, changeFrequency: "weekly" as const },
 ]
+
+const staticPages: MetadataRoute.Sitemap = locales.flatMap((locale) =>
+  staticPaths.map((entry) => ({
+    url: `${BASE_URL}/${locale}${entry.path}`,
+    changeFrequency: entry.changeFrequency,
+    priority: entry.priority,
+    alternates: {
+      languages: {
+        en: `${BASE_URL}/en${entry.path}`,
+        es: `${BASE_URL}/es${entry.path}`,
+      },
+    },
+  })),
+)
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const fictions = await getActiveFictionsCached()
 
   const fictionPages: MetadataRoute.Sitemap = fictions
     .filter((fiction) => fiction.slug)
-    .map((fiction) => ({
-      url: `${BASE_URL}/en/fictions/${fiction.slug}`,
-      lastModified: new Date(fiction.updated_at),
-      changeFrequency: "weekly",
-      priority: 0.8,
-      alternates: {
-        languages: {
-          en: `${BASE_URL}/en/fictions/${fiction.slug}`,
-          es: `${BASE_URL}/es/fictions/${fiction.slug}`,
+    .flatMap((fiction) =>
+      locales.map((locale) => ({
+        url: `${BASE_URL}/${locale}/fictions/${fiction.slug}`,
+        lastModified: new Date(fiction.updated_at),
+        changeFrequency: "weekly" as const,
+        priority: 0.8,
+        alternates: {
+          languages: {
+            en: `${BASE_URL}/en/fictions/${fiction.slug}`,
+            es: `${BASE_URL}/es/fictions/${fiction.slug}`,
+          },
         },
-      },
-    }))
+      })),
+    )
 
   return [...staticPages, ...fictionPages]
 }

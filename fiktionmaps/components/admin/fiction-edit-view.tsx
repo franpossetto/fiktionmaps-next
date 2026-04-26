@@ -568,7 +568,7 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
                                   className="w-full text-left px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors flex items-center gap-2"
                                 >
                                   <Plus className="h-3.5 w-3.5" />
-                                  Create "{personSearch.trim()}"
+                                  Create &quot;{personSearch.trim()}&quot;
                                 </button>
                               )}
                           </div>
