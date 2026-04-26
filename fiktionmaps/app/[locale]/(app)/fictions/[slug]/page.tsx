@@ -25,6 +25,15 @@ function mapLocaleToOpenGraph(locale: string): string {
   return locale
 }
 
+function serializeJsonLd(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029")
+}
+
 async function resolveFiction(slug: string, locale: string) {
   // Legacy UUID URLs: redirect permanently to slug URL
   if (isUuidString(slug)) {
@@ -153,11 +162,11 @@ export default async function FictionSlugPage({ params }: Props) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(creativeWorkSchema) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(creativeWorkSchema) }}
       />
       <FictionDetailPageClient
         fiction={fiction}

@@ -9,11 +9,25 @@ type EnrichedPlaceCheckinRow = {
   verified: boolean | null
   distance_m: number | null
   checked_at: string
-  places?: {
-    fiction_id?: string | null
-    fictions?: { id?: string | null; title?: string | null } | null
-    locations?: { name?: string | null; formatted_address?: string | null; city_id?: string | null } | null
-  } | null
+  places: {
+    fiction_id: string | null
+    fictions: { id: string | null; title: string | null } | { id: string | null; title: string | null }[]
+    locations:
+      | { name: string | null; formatted_address: string | null; city_id: string | null }
+      | { name: string | null; formatted_address: string | null; city_id: string | null }[]
+  }[]
+    | {
+        fiction_id: string | null
+        fictions: { id: string | null; title: string | null } | { id: string | null; title: string | null }[]
+        locations:
+          | { name: string | null; formatted_address: string | null; city_id: string | null }
+          | { name: string | null; formatted_address: string | null; city_id: string | null }[]
+      }
+}
+
+function firstOrSelf<T>(value: T | T[] | null | undefined): T | undefined {
+  if (!value) return undefined
+  return Array.isArray(value) ? value[0] : value
 }
 
 function toCityCheckin(row: {
@@ -179,14 +193,14 @@ export const checkinsSupabaseAdapter: CheckinsRepositoryPort = {
     const cityIds = [
       ...new Set(
         rows
-          .map((row) => row.places?.locations?.city_id as string | undefined)
+          .map((row) => firstOrSelf(firstOrSelf(row.places)?.locations)?.city_id ?? undefined)
           .filter((id): id is string => !!id),
       ),
     ]
     const fictionIds = [
       ...new Set(
         rows
-          .map((row) => row.places?.fiction_id as string | undefined)
+          .map((row) => firstOrSelf(row.places)?.fiction_id ?? undefined)
           .filter((id): id is string => !!id),
       ),
     ]
@@ -230,12 +244,12 @@ export const checkinsSupabaseAdapter: CheckinsRepositoryPort = {
     }
 
     return rows.map((row) => {
-      const place = row.places
-      const fiction = place?.fictions
-      const location = place?.locations
-      const cid = location?.city_id as string | undefined
+      const place = firstOrSelf(row.places)
+      const fiction = firstOrSelf(place?.fictions)
+      const location = firstOrSelf(place?.locations)
+      const cid = location?.city_id ?? undefined
       const city = cid ? cityById.get(cid) : undefined
-      const fid = place?.fiction_id as string | undefined
+      const fid = place?.fiction_id ?? undefined
       return {
         id: row.id,
         placeId: row.place_id,
