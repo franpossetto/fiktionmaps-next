@@ -500,7 +500,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                     </div>
                     {formData.slug && (
                       <p className="text-xs text-muted-foreground">
-                        fiktionmaps.com/en/fictions/<span className="text-foreground">{formData.slug}</span>
+                        fiktions.com/en/fictions/<span className="text-foreground">{formData.slug}</span>
                       </p>
                     )}
                   </div>

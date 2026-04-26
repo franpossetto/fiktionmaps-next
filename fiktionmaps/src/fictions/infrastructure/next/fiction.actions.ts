@@ -16,7 +16,13 @@ import { getFictionInterestsUseCase } from "@/src/fiction-interests/application/
 import { setFictionInterestsUseCase } from "@/src/fiction-interests/application/set-fiction-interests.usecase"
 import { getRecommendedFictionsUseCase } from "@/src/fictions/application/get-recommended-fictions.usecase"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
-import { getFictionLikeCountsByIds, getActiveFictionsCached, loadRecommendedFictionsDeps } from "./fiction.queries"
+import {
+  getFictionCitiesCached,
+  getFictionLikeCountsByIds,
+  getActiveFictionsCached,
+  loadRecommendedFictionsDeps,
+} from "./fiction.queries"
+import type { City } from "@/src/cities/domain/city.entity"
 import type {
   CreateFictionResult,
   UpdateFictionResult,
@@ -163,6 +169,11 @@ export async function getFictionLikeCountsAction(fictionIds: string[]): Promise<
 
 export async function getActiveFictionsAction(): Promise<FictionWithMedia[]> {
   return getActiveFictionsCached()
+}
+
+export async function getFictionCitiesAction(fictionId: string): Promise<City[]> {
+  if (!uuidSchema.safeParse(fictionId).success) return []
+  return getFictionCitiesCached(fictionId)
 }
 
 export async function setFictionInterestsAction(fictionId: string, interestIds: string[]): Promise<SetFictionInterestsResult> {

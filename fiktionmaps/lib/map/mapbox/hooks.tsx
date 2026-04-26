@@ -40,7 +40,10 @@ export function useMapboxMapControl(id?: string): MapControl | null {
             duration,
             essential: true,
           })
-        } catch { /* map not ready */ }
+          return true
+        } catch {
+          return false
+        }
       },
       fitBounds(points: LatLng[], padding = 64) {
         try {

@@ -10,8 +10,7 @@ import { PageStickyBar } from "@/components/layout/page-sticky-bar"
 import { SearchInput } from "@/components/ui/search-input"
 import { Film } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
-import { getAllPlacesAction } from "@/src/places/infrastructure/next/place.actions"
-import { getFictionLikeCountsAction, getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
+import { getFictionLikeCountsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
 import { getMyLikedFictionIdsAction, toggleFictionLikeAction } from "@/src/users/infrastructure/next/user.actions"
 
 type FictionLandingView = "browse" | "detail"
@@ -32,6 +31,8 @@ interface FictionLandingProps {
   initialSceneCounts?: Record<string, number>
   /** Like counts per fiction id pre-fetched server-side. */
   initialLikeCounts?: Record<string, number>
+  /** Place counts per fiction id pre-fetched server-side. */
+  initialPlaceCounts?: Record<string, number>
   onViewPlace?: (location: Location) => void
   focusFictionId?: string | null
   onFocusHandled?: () => void
@@ -41,13 +42,16 @@ export function FictionLanding({
   initialFictions,
   initialSceneCounts,
   initialLikeCounts,
+  initialPlaceCounts,
   onViewPlace,
   focusFictionId,
   onFocusHandled,
 }: FictionLandingProps) {
   const { user } = useAuth()
   const [allFictions, setAllFictions] = useState<FictionWithMedia[]>(initialFictions ?? [])
-  const [locationCountMap, setLocationCountMap] = useState<Map<string, number>>(new Map())
+  const [locationCountMap, setLocationCountMap] = useState<Map<string, number>>(
+    () => new Map(Object.entries(initialPlaceCounts ?? {}).map(([id, count]) => [id, Number(count)]))
+  )
   const [sceneCountMap] = useState<Map<string, number>>(
     () => new Map(Object.entries(initialSceneCounts ?? {}))
   )
@@ -64,36 +68,12 @@ export function FictionLanding({
     }
   }, [initialFictions])
 
-  // Fetch location counts (single request — not N+1, kept client-side).
   useEffect(() => {
-    async function load() {
-      let list: FictionWithMedia[]
-      if (initialFictions !== undefined) {
-        list = initialFictions
-      } else {
-        try {
-          const fictions = await getActiveFictionsAction()
-          setAllFictions(Array.isArray(fictions) ? fictions : [])
-          list = Array.isArray(fictions) ? fictions : []
-        } catch {
-          setAllFictions([])
-          list = []
-        }
-      }
-      let locations: Location[] = []
-      try {
-        locations = await getAllPlacesAction()
-      } catch {
-        locations = []
-      }
-      const counts = new Map<string, number>()
-      for (const f of list) {
-        counts.set(f.id, locations.filter((loc) => loc.fictionId === f.id).length)
-      }
-      setLocationCountMap(counts)
-    }
-    load()
-  }, [initialFictions])
+    if (initialPlaceCounts === undefined) return
+    setLocationCountMap(
+      new Map(Object.entries(initialPlaceCounts).map(([id, count]) => [id, Number(count)]))
+    )
+  }, [initialPlaceCounts])
 
   const [view, setView] = useState<FictionLandingView>("browse")
   const [selectedFiction, setSelectedFiction] = useState<FictionWithMedia | null>(null)

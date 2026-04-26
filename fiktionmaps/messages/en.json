@@ -230,7 +230,14 @@
   "Fictions": {
     "title": "Fictions",
     "loading": "Loading fictions...",
-    "exploreFictions": "Explore fictions"
+    "exploreFictions": "Explore fictions",
+    "locationLabelBook": "Real-World Locations",
+    "locationLabelFilming": "Filming Locations",
+    "howToVisitTitle": "How to Visit {title} {locationLabel}",
+    "howToVisitDescription": "Explore each place on the map, plan your route city by city, and open each location card for practical details before your trip.",
+    "placeCount": "{count, plural, one {# place} other {# places}}",
+    "sameCityRecommendationsTitle": "Recommended movies",
+    "sameCityRecommendationsDescription": "Other films mapped in the same cities as this story."
   },
   "Scenes": {
     "title": "Scenes",

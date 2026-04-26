@@ -3,8 +3,20 @@ import { NextResponse, type NextRequest } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import type { Database } from "./supabase/database.types"
 import { routing } from "./i18n/routing"
+import { getSiteUrl } from "./lib/site"
 
 const intlMiddleware = createIntlMiddleware(routing)
+const CANONICAL_HOST = (() => {
+  try {
+    return new URL(getSiteUrl()).hostname.toLowerCase()
+  } catch {
+    return "fiktions.com"
+  }
+})()
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"])
+const ENFORCE_CANONICAL_HOST = process.env.VERCEL_ENV
+  ? process.env.VERCEL_ENV === "production"
+  : process.env.NODE_ENV === "production"
 
 const PROTECTED_PATHS = ["/profile", "/settings", "/admin"]
 
@@ -44,6 +56,18 @@ function isValidSupabaseUrl(url: string | undefined): url is string {
 }
 
 export async function middleware(request: NextRequest) {
+  if (ENFORCE_CANONICAL_HOST) {
+    const hostHeader = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? ""
+    const hostname = hostHeader.split(":")[0].toLowerCase()
+    const isLocalHost = LOCAL_HOSTS.has(hostname)
+    if (!isLocalHost && hostname !== CANONICAL_HOST) {
+      const canonicalUrl = request.nextUrl.clone()
+      canonicalUrl.protocol = "https"
+      canonicalUrl.host = CANONICAL_HOST
+      return NextResponse.redirect(canonicalUrl, 308)
+    }
+  }
+
   const response = await intlMiddleware(request)
   if (response.status >= 300 && response.status < 400) {
     const location = response.headers.get("location")

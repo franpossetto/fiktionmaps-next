@@ -8,7 +8,7 @@ export interface LatLng {
 export interface MapControlHandle {
   panTo(position: LatLng): void
   setZoom(zoom: number): void
-  flyTo(options: { center: LatLng; zoom?: number; duration?: number }): void
+  flyTo(options: { center: LatLng; zoom?: number; duration?: number }): boolean
   getCenter?(): LatLng
   setCenter?(pos: LatLng): void
 }
@@ -60,8 +60,8 @@ export interface MapControl {
   setZoom(zoom: number): void
   getZoom(): number | undefined
   fitBounds(points: LatLng[], padding?: number): void
-  /** Animate map to center and optional zoom. */
-  flyTo(options: { center: LatLng; zoom?: number; duration?: number }): void
+  /** Animate map to center and optional zoom. Returns false if the map was not ready. */
+  flyTo(options: { center: LatLng; zoom?: number; duration?: number }): boolean
   setTilt?(tilt: number): void
   getTilt?(): number | undefined
   setHeading?(heading: number): void

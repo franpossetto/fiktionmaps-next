@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { Suspense, useState, useCallback, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
@@ -17,7 +18,8 @@ import {
   getAllCitiesAction,
   getCityFictionsAction,
 } from "@/src/cities/infrastructure/next/city.actions"
-import { getPlacesInBboxAction } from "@/src/places/infrastructure/next/place.actions"
+import { getPlaceLocationAction, getPlacesInBboxAction } from "@/src/places/infrastructure/next/place.actions"
+import { isUuidString } from "@/lib/validation/primitives"
 
 type Bbox = { west: number; south: number; east: number; north: number }
 
@@ -46,8 +48,12 @@ function bboxUnion(a: Bbox, b: Bbox): Bbox {
 
 const MIN_LOAD_RADIUS_KM = 50
 
-export default function MapPage() {
+function MapPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialFictionId = searchParams.get("fiction")
+  const initialCityId = searchParams.get("city")
+  const placeParam = searchParams.get("place")
   const [placeSelectorCollapsed, setPlaceSelectorCollapsed] = usePlaceSelectorCollapsedStorage()
 
   const [cities, setCities] = useState<City[]>([])
@@ -62,24 +68,37 @@ export default function MapPage() {
   const [bounds, setBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
   const [citiesLoading, setCitiesLoading] = useState(true)
 
-  // Load cities from DB, then fictions for first city
+  // Load cities, then open city/fictions (optionally from ?city= & ?fiction= when opening from a fiction page)
   useEffect(() => {
     setCitiesLoading(true)
     getAllCitiesAction()
       .then((citiesList: City[]) => {
         setCities(citiesList)
-        if (citiesList.length > 0) {
-          const city = citiesList[0]
-          setSelectedCity(city)
-          return getCityFictionsAction(city.id).then((fics: FictionWithMedia[]) => {
-            setAvailableFictions(fics)
+        if (citiesList.length === 0) return
+        const city =
+          (initialCityId && citiesList.find((c) => c.id === initialCityId)) || citiesList[0]
+        setSelectedCity(city)
+        return getCityFictionsAction(city.id).then((fics: FictionWithMedia[]) => {
+          setAvailableFictions(fics)
+          if (initialFictionId && fics.some((f) => f.id === initialFictionId)) {
+            setSelectedFictionIds([initialFictionId])
+          } else {
             setSelectedFictionIds(fics.map((f) => f.id))
-          })
-        }
+          }
+        })
       })
       .catch(() => {})
       .finally(() => setCitiesLoading(false))
+    // Intentionally only on mount; query is read once for initial state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Deep link ?place=: sync focus and ensure the pin is in the list (bbox query can omit it or SSR had no searchParams).
+  useEffect(() => {
+    if (placeParam && isUuidString(placeParam)) {
+      setFocusedLocationId(placeParam)
+    }
+  }, [placeParam])
 
   useEffect(() => {
     if (!selectedCity || selectedFictionIds.length === 0) {
@@ -88,16 +107,24 @@ export default function MapPage() {
     }
     const minBbox = bboxAround(selectedCity.lat, selectedCity.lng, MIN_LOAD_RADIUS_KM)
     const bbox = bounds ? bboxUnion(bounds, minBbox) : minBbox
+    const deepPlaceId = placeParam && isUuidString(placeParam) ? placeParam : null
     let cancelled = false
     getPlacesInBboxAction(selectedFictionIds, bbox)
-      .then((data) => {
-        if (!cancelled) setFilteredLocations(data ?? [])
+      .then(async (data) => {
+        if (cancelled) return
+        let list = data ?? []
+        if (deepPlaceId && !list.some((l) => l.id === deepPlaceId)) {
+          const loc = await getPlaceLocationAction(deepPlaceId)
+          if (cancelled) return
+          if (loc) list = [...list, loc]
+        }
+        if (!cancelled) setFilteredLocations(list)
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [selectedCity?.id, selectedCity?.lat, selectedCity?.lng, selectedFictionIds, bounds])
+  }, [selectedCity?.id, selectedCity?.lat, selectedCity?.lng, selectedFictionIds, bounds, placeParam])
 
   const handleCityChange = useCallback(async (city: City) => {
     setSelectedCity(city)
@@ -256,5 +283,19 @@ export default function MapPage() {
       </div>
       )}
     </MapProvider>
+  )
+}
+
+export default function MapPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-full items-center justify-center bg-background">
+          <p className="text-muted-foreground">Loading map…</p>
+        </div>
+      }
+    >
+      <MapPageInner />
+    </Suspense>
   )
 }

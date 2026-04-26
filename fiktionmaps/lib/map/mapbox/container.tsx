@@ -44,13 +44,19 @@ export function MapboxContainer({
         const handle: MapControlHandle = {
           panTo: (pos) => map.panTo([pos.lng, pos.lat]),
           setZoom: (z) => map.setZoom(z),
-          flyTo: (opts) =>
-            map.flyTo({
-              center: [opts.center.lng, opts.center.lat],
-              zoom: opts.zoom ?? map.getZoom(),
-              duration: opts.duration ?? 600,
-              essential: true,
-            }),
+          flyTo: (opts) => {
+            try {
+              map.flyTo({
+                center: [opts.center.lng, opts.center.lat],
+                zoom: opts.zoom ?? map.getZoom(),
+                duration: opts.duration ?? 600,
+                essential: true,
+              })
+              return true
+            } catch {
+              return false
+            }
+          },
           getCenter: () => {
             const c = map.getCenter()
             return { lat: c.lat, lng: c.lng }
