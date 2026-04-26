@@ -25,12 +25,13 @@ import {
   getMyLikedFictionIdsAction,
   toggleFictionLikeAction,
 } from "@/src/users/infrastructure/next/user.actions"
-import { listScenesAction } from "@/src/scenes/infrastructure/next/scene.actions"
 
 export interface FictionDetailProps {
   fiction: FictionWithMedia
   initialLocations?: Location[]
   initialCities?: City[]
+  initialLikeCount?: number
+  initialLiked?: boolean
   /** Server-loaded: other active movies that share a city with this fiction. */
   sameCityRecommendations?: FictionWithMedia[]
   sameCityRecommendationPlaceCounts?: Record<string, number>
@@ -42,21 +43,22 @@ export function FictionDetail({
   fiction,
   initialLocations,
   initialCities,
+  initialLikeCount,
+  initialLiked,
   sameCityRecommendations,
   sameCityRecommendationPlaceCounts,
   onBack,
   onViewPlace,
 }: FictionDetailProps) {
-  const { user } = useAuth()
+  const { user, isAuthReady } = useAuth()
   const t = useTranslations("Fictions")
   const [allLocations, setAllLocations] = useState<Location[]>(initialLocations ?? [])
   const [fictionCities, setFictionCities] = useState<City[]>(initialCities ?? [])
   const [cityMap, setCityMap] = useState<Map<string, City>>(
     () => new Map((initialCities ?? []).map((c) => [c.id, c]))
   )
-  const [sceneCount, setSceneCount] = useState(0)
-  const [likeCount, setLikeCount] = useState(0)
-  const [liked, setLiked] = useState(false)
+  const [likeCount, setLikeCount] = useState(initialLikeCount ?? 0)
+  const [liked, setLiked] = useState(initialLiked ?? false)
   const [likeBusy, setLikeBusy] = useState(false)
 
   useEffect(() => {
@@ -94,20 +96,12 @@ export function FictionDetail({
 
   useEffect(() => {
     let cancelled = false
-    listScenesAction({ fictionId: fiction.id, active: "true" })
-      .then((scenes) => {
-        if (!cancelled) setSceneCount(scenes.length)
-      })
-      .catch(() => {
-        if (!cancelled) setSceneCount(0)
-      })
-    return () => {
-      cancelled = true
+    if (initialLikeCount !== undefined) {
+      setLikeCount(initialLikeCount)
+      return () => {
+        cancelled = true
+      }
     }
-  }, [fiction.id])
-
-  useEffect(() => {
-    let cancelled = false
     getFictionLikeCountsAction([fiction.id])
       .then((counts) => {
         if (!cancelled) setLikeCount(counts[fiction.id] ?? 0)
@@ -118,9 +112,10 @@ export function FictionDetail({
     return () => {
       cancelled = true
     }
-  }, [fiction.id])
+  }, [fiction.id, initialLikeCount])
 
   useEffect(() => {
+    if (!isAuthReady) return
     if (!user) {
       setLiked(false)
       return
@@ -136,7 +131,7 @@ export function FictionDetail({
     return () => {
       cancelled = true
     }
-  }, [user?.id, fiction.id])
+  }, [isAuthReady, user?.id, fiction.id])
 
   const [expandedLocation, setExpandedLocation] = useState<string | null>(null)
   const [heroVisible, setHeroVisible] = useState(true)
@@ -343,12 +338,6 @@ export function FictionDetail({
                     <MapPin className="h-3.5 w-3.5" />
                     {allLocations.length} location{allLocations.length > 1 ? "s" : ""} in{" "}
                     {fictionCities.length} cit{fictionCities.length > 1 ? "ies" : "y"}
-                    {(fiction.type === "movie" || fiction.type === "tv-series") && sceneCount > 0 && (
-                      <>
-                        {" "}
-                        &middot; {sceneCount} scene{sceneCount > 1 ? "s" : ""}
-                      </>
-                    )}
                   </span>
                 </div>
               </div>

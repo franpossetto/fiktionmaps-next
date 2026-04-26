@@ -7,10 +7,12 @@ import {
   getFictionCitiesCached,
   getSameCityMovieRecommendationsCached,
 } from "@/src/fictions/infrastructure/next/fiction.queries"
+import { getFictionLikeCountsCached } from "@/src/fiction-likes/infrastructure/next/fiction-likes.queries"
 import {
   getFictionLocationsCached,
   getPlaceCountsByFictionIdsCached,
 } from "@/src/places/infrastructure/next/place.queries"
+import { getCurrentUserHasLikedFiction } from "@/src/users/infrastructure/next/user.queries"
 import { isUuidString } from "@/lib/validation/primitives"
 import { getSiteUrl } from "@/lib/site"
 import { FictionDetailPageClient } from "./fiction-detail-page-client"
@@ -148,11 +150,14 @@ export default async function FictionSlugPage({ params }: Props) {
     inLanguage: locale,
   }
 
-  const [initialLocations, initialCities, sameCityRecommendations] = await Promise.all([
+  const [initialLocations, initialCities, sameCityRecommendations, likeCounts, initialLiked] = await Promise.all([
     getFictionLocationsCached(fiction.id),
     getFictionCitiesCached(fiction.id),
     getSameCityMovieRecommendationsCached(fiction.id),
+    getFictionLikeCountsCached([fiction.id]),
+    getCurrentUserHasLikedFiction(fiction.id),
   ])
+  const initialLikeCount = likeCounts[fiction.id] ?? 0
   const recommendationIds = sameCityRecommendations.map((f) => f.id)
   const sameCityRecommendationPlaceCounts =
     recommendationIds.length > 0
@@ -172,6 +177,8 @@ export default async function FictionSlugPage({ params }: Props) {
         fiction={fiction}
         initialLocations={initialLocations}
         initialCities={initialCities}
+        initialLikeCount={initialLikeCount}
+        initialLiked={initialLiked}
         sameCityRecommendations={sameCityRecommendations}
         sameCityRecommendationPlaceCounts={sameCityRecommendationPlaceCounts}
       />

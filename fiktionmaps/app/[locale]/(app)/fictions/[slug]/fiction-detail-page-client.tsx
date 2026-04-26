@@ -10,12 +10,16 @@ export function FictionDetailPageClient({
   fiction,
   initialLocations,
   initialCities,
+  initialLikeCount,
+  initialLiked,
   sameCityRecommendations,
   sameCityRecommendationPlaceCounts,
 }: {
   fiction: FictionWithMedia
   initialLocations: Location[]
   initialCities: City[]
+  initialLikeCount: number
+  initialLiked: boolean
   sameCityRecommendations?: FictionWithMedia[]
   sameCityRecommendationPlaceCounts?: Record<string, number>
 }) {
@@ -26,6 +30,8 @@ export function FictionDetailPageClient({
         fiction={fiction}
         initialLocations={initialLocations}
         initialCities={initialCities}
+        initialLikeCount={initialLikeCount}
+        initialLiked={initialLiked}
         sameCityRecommendations={sameCityRecommendations}
         sameCityRecommendationPlaceCounts={sameCityRecommendationPlaceCounts}
         onBack={() => router.push("/fictions")}
