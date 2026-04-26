@@ -5,6 +5,8 @@ import type { Database } from "./supabase/database.types"
 import { routing } from "./i18n/routing"
 
 const intlMiddleware = createIntlMiddleware(routing)
+const CANONICAL_HOST = "fiktions.com"
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"])
 
 const PROTECTED_PATHS = ["/profile", "/settings", "/admin"]
 
@@ -44,6 +46,16 @@ function isValidSupabaseUrl(url: string | undefined): url is string {
 }
 
 export async function middleware(request: NextRequest) {
+  const hostHeader = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? ""
+  const hostname = hostHeader.split(":")[0].toLowerCase()
+  const isLocalHost = LOCAL_HOSTS.has(hostname)
+  if (!isLocalHost && hostname !== CANONICAL_HOST) {
+    const canonicalUrl = request.nextUrl.clone()
+    canonicalUrl.protocol = "https"
+    canonicalUrl.host = CANONICAL_HOST
+    return NextResponse.redirect(canonicalUrl, 308)
+  }
+
   const response = await intlMiddleware(request)
   if (response.status >= 300 && response.status < 400) {
     const location = response.headers.get("location")

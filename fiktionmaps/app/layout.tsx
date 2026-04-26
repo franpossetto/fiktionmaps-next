@@ -6,8 +6,10 @@ import "./globals.css"
 
 const _inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
 const _spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk" })
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fiktions.com"
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "FiktionMaps - Discover Movie & Book Locations",
   description:
     "Explore real-world locations from your favorite movies and books on an interactive map.",

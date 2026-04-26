@@ -715,7 +715,7 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
                   </div>
                   {formData.slug && (
                     <p className="text-xs text-muted-foreground">
-                      fiktionmaps.com/en/fictions/<span className="text-foreground">{formData.slug}</span>
+                      fiktions.com/en/fictions/<span className="text-foreground">{formData.slug}</span>
                     </p>
                   )}
                   {slugEditing && initialFiction.slug && (

@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next"
 import { getActiveFictionsCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fiktionmaps.com"
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://fiktions.com"
 
 const staticPages: MetadataRoute.Sitemap = [
   {

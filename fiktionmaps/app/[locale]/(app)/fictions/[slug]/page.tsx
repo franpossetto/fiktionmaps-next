@@ -12,6 +12,7 @@ import {
   getPlaceCountsByFictionIdsCached,
 } from "@/src/places/infrastructure/next/place.queries"
 import { isUuidString } from "@/lib/validation/primitives"
+import { getSiteUrl } from "@/lib/site"
 import { FictionDetailPageClient } from "./fiction-detail-page-client"
 
 type Props = {
@@ -33,21 +34,49 @@ async function resolveFiction(slug: string, locale: string) {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug, locale } = await params
+  const siteUrl = getSiteUrl()
   const fiction = await resolveFiction(slug, locale)
   if (!fiction || !fiction.active) {
-    return { title: "Fiction not found" }
+    return {
+      title: "Fiction not found",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    }
   }
-  const title = `${fiction.title} - FiktionMaps`
+  const isBook = fiction.type === "book"
+  const locationLabel = isBook ? "Real-World Locations" : "Filming Locations"
+  const title = isBook
+    ? `Where Was ${fiction.title} Set?`
+    : `Where Was ${fiction.title} Filmed?`
   const description =
     fiction.description?.slice(0, 160) ||
-    `Explore real-world locations from ${fiction.title} on the map.`
+    `Discover ${fiction.title} ${locationLabel.toLowerCase()}, explore them on the map, and plan your visit with practical travel tips.`
   const image = fiction.coverImage?.trim() || fiction.bannerImage?.trim()
+  const effectiveSlug = fiction.slug?.trim() || slug
+  const canonicalPath = `/${locale}/fictions/${effectiveSlug}`
+  const canonicalUrl = `${siteUrl}${canonicalPath}`
   return {
     title,
     description,
+    alternates: {
+      canonical: canonicalUrl,
+      languages: {
+        en: `${siteUrl}/en/fictions/${effectiveSlug}`,
+        es: `${siteUrl}/es/fictions/${effectiveSlug}`,
+      },
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
     openGraph: {
       title,
       description,
+      url: canonicalUrl,
+      type: "article",
+      locale,
       ...(image && { images: [{ url: image, width: 1200, height: 630, alt: fiction.title }] }),
     },
     twitter: {

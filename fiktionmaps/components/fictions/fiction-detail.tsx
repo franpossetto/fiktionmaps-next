@@ -186,6 +186,8 @@ export function FictionDetail({
   const exploreMapHref = firstCityId
     ? `/map?fiction=${encodeURIComponent(fiction.id)}&city=${encodeURIComponent(firstCityId)}`
     : `/map?fiction=${encodeURIComponent(fiction.id)}`
+  const isBook = fiction.type === "book"
+  const locationLabel = isBook ? "Real-World Locations" : "Filming Locations"
 
   async function handleToggleLike() {
     if (!user || likeBusy) return
@@ -390,6 +392,15 @@ export function FictionDetail({
 
       {/* Locations - full page scroll */}
       <div className="px-8 py-6">
+        <div className="mb-6 max-w-3xl">
+          <h2 className="text-xl font-semibold text-foreground">
+            How to Visit {fiction.title} {locationLabel}
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Explore each place on the map, plan your route city by city, and open each location card for
+            practical details before your trip.
+          </p>
+        </div>
         {Array.from(locationsByCity.entries()).map(([cityId, locs]) => {
           const city = cityMap.get(cityId)
           const activeLocation = locs.find((loc) => loc.id === expandedLocation)
@@ -397,9 +408,9 @@ export function FictionDetail({
             <div key={cityId} className="mb-8">
               <div className="mb-4 flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-primary" />
-                <h2 className="text-lg font-semibold text-foreground">
+                <h3 className="text-lg font-semibold text-foreground">
                   {city?.name}, {city?.country}
-                </h2>
+                </h3>
                 <span className="text-sm text-muted-foreground">
                   &middot; {locs.length} place{locs.length > 1 ? "s" : ""}
                 </span>
