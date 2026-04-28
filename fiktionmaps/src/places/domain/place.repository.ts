@@ -7,8 +7,8 @@ export interface PlacesRepositoryPort {
   listAllAsLocations(): Promise<Location[]>
   /** Active place counts per fiction id. */
   getCountsByFictionIds(fictionIds: string[]): Promise<Record<string, number>>
-  /** Single place as Location (place + location + avatar). */
-  getById(placeId: string): Promise<Location | null>
+  /** Single place as Location (place + location + avatar `asset_images` variant). Default `sm`; use `lg` for hero/detail pages. */
+  getById(placeId: string, avatarVariant?: "sm" | "lg"): Promise<Location | null>
   /** All places for a specific fiction. */
   getByFictionId(fictionId: string): Promise<Location[]>
   /** All places in a specific city. */

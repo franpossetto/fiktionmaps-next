@@ -79,11 +79,52 @@ type AnonSupabase = ReturnType<typeof createAnonymousClient>
 type ImgRow = { entity_id: string; role: string; variant: string; url: string }
 
 function pickThumb(rows: ImgRow[]): string | null {
-  if (!rows.length) return null
-  const sm = rows.filter((r) => r.variant === "sm")
-  const pool = sm.length ? sm : rows
+  const valid = rows.filter((r) => typeof r.url === "string" && r.url.trim().length > 0)
+  if (!valid.length) return null
+  const sm = valid.filter((r) => r.variant === "sm")
+  const pool = sm.length ? sm : valid
   const byRole = (role: string) => pool.find((r) => r.role === role)
-  return byRole("hero")?.url ?? byRole("cover")?.url ?? byRole("avatar")?.url ?? pool[0]?.url ?? null
+  const picked =
+    byRole("hero")?.url ??
+    byRole("cover")?.url ??
+    byRole("avatar")?.url ??
+    pool[0]?.url ??
+    null
+  return picked?.trim() || null
+}
+
+async function attachThumbnailsToScenes(
+  supabase: SupabaseLike | AnonSupabase,
+  scenes: Scene[],
+): Promise<Scene[]> {
+  if (scenes.length === 0) return scenes
+  const sceneIds = scenes.map((s) => s.id)
+  const { data: imgs } = await supabase
+    .from("asset_images")
+    .select("entity_id, role, variant, url")
+    .eq("entity_type", "scene")
+    .in("entity_id", sceneIds)
+
+  const byScene = new Map<string, ImgRow[]>()
+  for (const row of imgs ?? []) {
+    const raw = row as Record<string, unknown>
+    const entityId =
+      typeof raw.entity_id === "string"
+        ? raw.entity_id
+        : typeof raw.entityId === "string"
+          ? raw.entityId
+          : ""
+    if (!entityId) continue
+    const r = row as ImgRow
+    const list = byScene.get(entityId) ?? []
+    list.push({ ...r, entity_id: entityId })
+    byScene.set(entityId, list)
+  }
+
+  return scenes.map((s) => ({
+    ...s,
+    thumbnail: pickThumb(byScene.get(s.id) ?? []) ?? s.thumbnail,
+  }))
 }
 
 async function removeVideoObjectIfAny(supabase: SupabaseLike, videoUrl: string | null) {
@@ -103,7 +144,9 @@ async function fetchSceneById(
     return null
   }
   if (!data) return null
-  return mapRow(data as SceneRowWithPlace)
+  const scene = mapRow(data as SceneRowWithPlace)
+  const enriched = await attachThumbnailsToScenes(supabase, [scene])
+  return enriched[0] ?? null
 }
 
 type LocFromJoin = {
@@ -231,7 +274,8 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       console.error("[scenes repo] getAll:", error.message)
       return []
     }
-    return (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    const mapped = (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    return attachThumbnailsToScenes(supabase, mapped)
   },
 
   async getByLocationId(locationId: string): Promise<Scene[]> {
@@ -257,7 +301,8 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       console.error("[scenes repo] getByLocationId:", error.message)
       return []
     }
-    return (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    const mapped = (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    return attachThumbnailsToScenes(supabase, mapped)
   },
 
   async getByFictionId(fictionId: string): Promise<Scene[]> {
@@ -273,7 +318,8 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       console.error("[scenes repo] getByFictionId:", error.message)
       return []
     }
-    return (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    const mapped = (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    return attachThumbnailsToScenes(supabase, mapped)
   },
 
   async getByPlaceId(placeId: string): Promise<Scene[]> {
@@ -289,7 +335,8 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       console.error("[scenes repo] getByPlaceId:", error.message)
       return []
     }
-    return (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    const mapped = (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    return attachThumbnailsToScenes(supabase, mapped)
   },
 
   async getById(id: string): Promise<Scene | null> {
@@ -329,7 +376,8 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       console.error("[scenes repo] list:", error.message)
       return []
     }
-    return (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    const mapped = (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    return attachThumbnailsToScenes(supabase, mapped)
   },
 
   async create(data: CreateSceneData, createdBy?: string | null): Promise<Scene | null> {
@@ -625,7 +673,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       const supabase = await createClient()
       const { data: scenes, error } = await supabase
         .from("scenes")
-        .select("id, title, place_id, fiction_id, fictions ( title )")
+        .select("id, title, place_id, fiction_id, fictions ( title, slug )")
         .eq("active", true)
         .eq("created_by", userId)
         .order("created_at", { ascending: false })
@@ -654,6 +702,10 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
           fictions && typeof fictions === "object" && "title" in fictions
             ? String((fictions as { title?: string }).title ?? "")
             : ""
+        const fictionSlug =
+          fictions && typeof fictions === "object" && "slug" in fictions
+            ? ((fictions as { slug?: string | null }).slug ?? null)
+            : null
         const placeId = (s as { place_id?: string }).place_id
         const fictionId = (s as { fiction_id?: string }).fiction_id
         if (!placeId || !fictionId) return []
@@ -661,6 +713,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
           {
             id: s.id,
             fictionId,
+            fictionSlug,
             placeId,
             title: s.title,
             fictionTitle,

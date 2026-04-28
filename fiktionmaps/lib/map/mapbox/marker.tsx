@@ -5,6 +5,7 @@ import type { MarkerProps } from "../types"
 
 export function MapboxMarker({
   position,
+  anchor = "bottom",
   onClick,
   children,
 }: MarkerProps) {
@@ -13,7 +14,7 @@ export function MapboxMarker({
       longitude={position.lng}
       latitude={position.lat}
       onClick={onClick ? (e) => { e.originalEvent.stopPropagation(); onClick() } : undefined}
-      anchor="bottom"
+      anchor={anchor}
     >
       {children}
     </Marker>

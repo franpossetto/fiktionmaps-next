@@ -42,6 +42,8 @@ export interface MapContainerProps {
 
 export interface MarkerProps {
   position: LatLng
+  /** Defaults to `bottom` (pin tip on coords). Use `center` for previews where the marker block should sit in the viewport middle. */
+  anchor?: "center" | "top" | "bottom" | "left" | "right"
   onClick?: () => void
   zIndex?: number
   children?: ReactNode

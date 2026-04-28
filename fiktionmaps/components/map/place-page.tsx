@@ -23,6 +23,11 @@ export interface PlacePageProps {
   /** When provided (e.g. from map), used instead of fetching. */
   city?: City | null
   onBack: () => void
+  /**
+   * When true, vertical scroll is handled by `[data-detail-main-scroll]` (e.g. `AppDetailRailsShell`)
+   * instead of this component’s root.
+   */
+  useShellMainScroll?: boolean
 }
 
 export function PlacePage({
@@ -30,6 +35,7 @@ export function PlacePage({
   fiction: fictionProp,
   city: cityProp,
   onBack,
+  useShellMainScroll = false,
 }: PlacePageProps) {
   const [fiction, setFiction] = useState<Fiction | undefined>(fictionProp ?? undefined)
   const [city, setCity] = useState<City | undefined>(cityProp ?? undefined)
@@ -115,8 +121,11 @@ export function PlacePage({
 
   // Detect when hero leaves viewport for sticky header
   useEffect(() => {
-    const container = scrollRef.current
-    if (!container) return
+    const root = scrollRef.current
+    if (!root) return
+    const container = useShellMainScroll
+      ? (root.closest("[data-detail-main-scroll]") as HTMLElement | null) ?? root
+      : root
     const handleScroll = () => {
       const hero = heroRef.current
       if (!hero) return
@@ -124,7 +133,7 @@ export function PlacePage({
     }
     container.addEventListener("scroll", handleScroll, { passive: true })
     return () => container.removeEventListener("scroll", handleScroll)
-  }, [])
+  }, [useShellMainScroll, location.id])
   const [stickyHeader, setStickyHeader] = useState(false)
 
   const displayedScenes = isTvSeries
@@ -151,12 +160,20 @@ export function PlacePage({
         sceneLocations={sceneLocations}
         onBack={() => setWatchSceneId(null)}
         onSelectScene={(scene) => setWatchSceneId(scene.id)}
+        useShellMainScroll={useShellMainScroll}
       />
     )
   }
 
   return (
-    <div ref={scrollRef} className="relative h-full overflow-y-auto bg-background">
+    <div
+      ref={scrollRef}
+      className={
+        useShellMainScroll
+          ? "relative min-h-0 bg-background"
+          : "relative h-full overflow-y-auto bg-background"
+      }
+    >
       {/* Sticky header */}
       {stickyHeader && (
         <PageStickyBar

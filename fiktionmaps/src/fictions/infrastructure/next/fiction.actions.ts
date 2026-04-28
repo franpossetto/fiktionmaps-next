@@ -3,7 +3,7 @@
 import { revalidatePath, updateTag } from "next/cache"
 import { zodErrorMessage } from "@/lib/validation/http"
 import { interestIdsBodySchema } from "@/lib/validation/api-payloads"
-import { uuidSchema } from "@/lib/validation/primitives"
+import { isUuidString, uuidSchema } from "@/lib/validation/primitives"
 import { createClient } from "@/lib/supabase/server"
 import { supabaseRepositoryAdapter as fictionsRepo } from "@/src/fictions/infrastructure/supabase/fiction.repository.impl"
 import { supabaseRepositoryAdapter as fictionInterestsRepo } from "@/src/fiction-interests/infrastructure/supabase/fiction-interests.repository.impl"
@@ -17,6 +17,8 @@ import { setFictionInterestsUseCase } from "@/src/fiction-interests/application/
 import { getRecommendedFictionsUseCase } from "@/src/fictions/application/get-recommended-fictions.usecase"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
 import {
+  getFictionByIdCached,
+  getFictionBySlugCached,
   getFictionCitiesCached,
   getFictionLikeCountsByIds,
   getActiveFictionsCached,
@@ -169,6 +171,17 @@ export async function getFictionLikeCountsAction(fictionIds: string[]): Promise<
 
 export async function getActiveFictionsAction(): Promise<FictionWithMedia[]> {
   return getActiveFictionsCached()
+}
+
+/** Public read: resolve an active fiction from URL segment (slug or legacy UUID). */
+export async function resolvePublicFictionFromSlugOrIdAction(
+  slugOrId: string,
+): Promise<FictionWithMedia | null> {
+  const raw = slugOrId.trim()
+  if (!raw) return null
+  const fiction = isUuidString(raw) ? await getFictionByIdCached(raw) : await getFictionBySlugCached(raw)
+  if (!fiction?.active) return null
+  return fiction
 }
 
 export async function getFictionCitiesAction(fictionId: string): Promise<City[]> {

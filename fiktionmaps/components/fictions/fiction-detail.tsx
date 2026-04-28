@@ -1,42 +1,32 @@
 "use client"
 
-import { useState, useMemo, useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
+import { ArrowLeft, ChevronRight, Compass, Heart } from "lucide-react"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
-import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
-import type { City } from "@/src/cities/domain/city.entity"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { LocationCard } from "@/components/locations/location-card"
-import { LocationDetailPanel } from "@/components/locations/location-detail-panel"
-import { PageStickyBar } from "@/components/layout/page-sticky-bar"
 import { Link } from "@/i18n/navigation"
 import { useAuth } from "@/context/auth-context"
-import { MapPin, ArrowLeft, Clock, Compass, Heart, Sparkles } from "lucide-react"
 import { useTranslations } from "next-intl"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { FictionCard } from "@/components/fictions/fiction-card"
-import { getFictionLocationsAction } from "@/src/places/infrastructure/next/place.actions"
-import {
-  getFictionCitiesAction,
-  getFictionLikeCountsAction,
-} from "@/src/fictions/infrastructure/next/fiction.actions"
-import {
-  getMyLikedFictionIdsAction,
-  toggleFictionLikeAction,
-} from "@/src/users/infrastructure/next/user.actions"
+import { FictionInterestTags, type FictionInterestTagItem } from "@/components/fictions/fiction-interest-tags"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import type { City } from "@/src/cities/domain/city.entity"
+import type { Location } from "@/src/locations/domain/location.entity"
+import { getFictionLikeCountsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
+import { getMyLikedFictionIdsAction, toggleFictionLikeAction } from "@/src/users/infrastructure/next/user.actions"
 
 export interface FictionDetailProps {
   fiction: FictionWithMedia
-  initialLocations?: Location[]
-  initialCities?: City[]
-  initialLikeCount?: number
-  initialLiked?: boolean
-  /** Server-loaded: other active movies that share a city with this fiction. */
+  initialLocations: Location[]
+  initialCities: City[]
+  initialLikeCount: number
+  initialLiked: boolean
+  /** Shown in main column below `xl` (right rail is `xl`+ only). */
+  fictionInterestTags?: FictionInterestTagItem[]
   sameCityRecommendations?: FictionWithMedia[]
   sameCityRecommendationPlaceCounts?: Record<string, number>
-  onBack: () => void
-  onViewPlace?: (location: Location) => void
 }
 
 export function FictionDetail({
@@ -45,63 +35,28 @@ export function FictionDetail({
   initialCities,
   initialLikeCount,
   initialLiked,
+  fictionInterestTags = [],
   sameCityRecommendations,
   sameCityRecommendationPlaceCounts,
-  onBack,
-  onViewPlace,
 }: FictionDetailProps) {
   const { user, isAuthReady } = useAuth()
   const t = useTranslations("Fictions")
-  const [allLocations, setAllLocations] = useState<Location[]>(initialLocations ?? [])
-  const [fictionCities, setFictionCities] = useState<City[]>(initialCities ?? [])
-  const [cityMap, setCityMap] = useState<Map<string, City>>(
-    () => new Map((initialCities ?? []).map((c) => [c.id, c]))
-  )
-  const [likeCount, setLikeCount] = useState(initialLikeCount ?? 0)
-  const [liked, setLiked] = useState(initialLiked ?? false)
+  const tCommon = useTranslations("Common")
+  const [liked, setLiked] = useState(initialLiked)
+  const [likeCount, setLikeCount] = useState(initialLikeCount)
   const [likeBusy, setLikeBusy] = useState(false)
+  const [coverError, setCoverError] = useState(false)
+  const [likedPlaces, setLikedPlaces] = useState<Record<string, boolean>>({})
+  const previousUserId = useRef<string | null | undefined>(undefined)
 
   useEffect(() => {
-    let cancelled = false
-    async function load() {
-      if (initialLocations && initialCities) {
-        if (cancelled) return
-        setAllLocations(initialLocations)
-        setFictionCities(initialCities)
-        setCityMap(new Map(initialCities.map((c) => [c.id, c])))
-        return
-      }
-
-      try {
-        const [locations, cities] = await Promise.all([
-          getFictionLocationsAction(fiction.id),
-          getFictionCitiesAction(fiction.id),
-        ])
-        if (cancelled) return
-        setAllLocations(locations)
-        setFictionCities(cities)
-        setCityMap(new Map(cities.map((c) => [c.id, c])))
-      } catch {
-        if (cancelled) return
-        setAllLocations([])
-        setFictionCities([])
-        setCityMap(new Map())
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [fiction.id, initialLocations, initialCities])
+    setLiked(initialLiked)
+    setLikeCount(initialLikeCount)
+  }, [fiction.id, initialLiked, initialLikeCount])
 
   useEffect(() => {
+    if (initialLikeCount !== undefined) return
     let cancelled = false
-    if (initialLikeCount !== undefined) {
-      setLikeCount(initialLikeCount)
-      return () => {
-        cancelled = true
-      }
-    }
     getFictionLikeCountsAction([fiction.id])
       .then((counts) => {
         if (!cancelled) setLikeCount(counts[fiction.id] ?? 0)
@@ -116,73 +71,37 @@ export function FictionDetail({
 
   useEffect(() => {
     if (!isAuthReady) return
+
     if (!user) {
       setLiked(false)
+      previousUserId.current = null
       return
     }
-    let cancelled = false
-    getMyLikedFictionIdsAction()
-      .then((ids) => {
-        if (!cancelled) setLiked(ids.includes(fiction.id))
-      })
-      .catch(() => {
-        if (!cancelled) setLiked(false)
-      })
-    return () => {
-      cancelled = true
+
+    const prev = previousUserId.current
+    const uid = user.id
+
+    if (prev === undefined) {
+      previousUserId.current = uid
+      setLiked(initialLiked)
+      return
     }
-  }, [isAuthReady, user?.id, fiction.id])
 
-  const [expandedLocation, setExpandedLocation] = useState<string | null>(null)
-  const [heroVisible, setHeroVisible] = useState(true)
-  const [coverError, setCoverError] = useState(false)
-  const heroRef = useRef<HTMLDivElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  const heroSrc =
-    !coverError &&
-    (fiction.bannerImage?.trim() || fiction.coverImageLarge?.trim() || fiction.coverImage?.trim())
-      ? (fiction.bannerImage?.trim() ||
-          fiction.coverImageLarge?.trim() ||
-          fiction.coverImage?.trim())!
-      : DEFAULT_FICTION_COVER
-  const coverSrc =
-    !coverError && fiction.coverImage?.trim()
-      ? fiction.coverImage.trim()
-      : DEFAULT_FICTION_COVER
-
-  const locationsByCity = useMemo(() => {
-    const map = new Map<string, Location[]>()
-    for (const loc of allLocations) {
-      const arr = map.get(loc.cityId) || []
-      arr.push(loc)
-      map.set(loc.cityId, arr)
+    if (prev === null || prev !== uid) {
+      previousUserId.current = uid
+      let cancelled = false
+      getMyLikedFictionIdsAction()
+        .then((ids) => {
+          if (!cancelled) setLiked(ids.includes(fiction.id))
+        })
+        .catch(() => {
+          if (!cancelled) setLiked(false)
+        })
+      return () => {
+        cancelled = true
+      }
     }
-    return map
-  }, [allLocations])
-
-  // Detect when hero goes out of view for sticky header (within scroll container)
-  useEffect(() => {
-    const root = scrollRef.current
-    const hero = heroRef.current
-    if (!root || !hero) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setHeroVisible(entry.isIntersecting)
-      },
-      { threshold: 0.1, root },
-    )
-
-    observer.observe(hero)
-    return () => observer.disconnect()
-  }, [])
-
-  const firstCityId = fictionCities[0]?.id ?? allLocations[0]?.cityId
-  const exploreMapHref = firstCityId
-    ? `/map?fiction=${encodeURIComponent(fiction.id)}&city=${encodeURIComponent(firstCityId)}`
-    : `/map?fiction=${encodeURIComponent(fiction.id)}`
-  const isBook = fiction.type === "book"
-  const locationLabel = isBook ? t("locationLabelBook") : t("locationLabelFilming")
+  }, [isAuthReady, user, fiction.id, initialLiked])
 
   async function handleToggleLike() {
     if (!user || likeBusy) return
@@ -208,260 +127,210 @@ export function FictionDetail({
     }
   }
 
+  function togglePlaceLike(locationId: string) {
+    setLikedPlaces((prev) => ({
+      ...prev,
+      [locationId]: !prev[locationId],
+    }))
+  }
+
+  const locationRows = useMemo(() => {
+    const cityById = new Map(initialCities.map((city) => [city.id, city]))
+    return initialLocations.map((location, index) => ({
+      index: index + 1,
+      location,
+      city: cityById.get(location.cityId),
+    }))
+  }, [initialLocations, initialCities])
+
+  const heroSrc =
+    !coverError &&
+    (fiction.bannerImage?.trim() || fiction.coverImageLarge?.trim() || fiction.coverImage?.trim())
+      ? (fiction.bannerImage?.trim() || fiction.coverImageLarge?.trim() || fiction.coverImage?.trim())!
+      : DEFAULT_FICTION_COVER
+
+  const firstCityId = initialCities[0]?.id ?? initialLocations[0]?.cityId
+  const exploreMapHref = firstCityId
+    ? `/map?fiction=${encodeURIComponent(fiction.id)}&city=${encodeURIComponent(firstCityId)}`
+    : `/map?fiction=${encodeURIComponent(fiction.id)}`
+
+  const firstCityName = initialCities[0]?.name ?? ""
+  const headlineKey = (() => {
+    if (fiction.type === "book") {
+      return firstCityName ? "headlineSetInCity" : "headlineSet"
+    }
+    return firstCityName ? "headlineFilmedInCity" : "headlineFilmed"
+  })()
+  const headline = t(headlineKey, { title: fiction.title, city: firstCityName })
+
+  const pathSlug = fiction.slug?.trim() || fiction.id
+
+  const backClassName =
+    "inline-flex h-9 items-center gap-1 rounded-full px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+
   return (
-    <div ref={scrollRef} className="relative h-full overflow-y-auto bg-background">
-      {/* Sticky header (appears when hero is out of view) */}
-      {!heroVisible && (
-        <PageStickyBar
-          className="px-6"
-          leading={
-            <>
-              <button
-                onClick={onBack}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-secondary"
-                aria-label="Back"
+    <main className="px-6 py-8 sm:px-8 lg:px-10">
+      <div className="mx-auto w-full max-w-[900px]">
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <Link href="/fictions" className={backClassName}>
+            <ArrowLeft className="h-4 w-4" />
+            {tCommon("back")}
+          </Link>
+          <div className="flex items-center gap-2">
+            {user && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleToggleLike}
+                disabled={likeBusy}
+                aria-label={liked ? t("unlike") : t("like")}
+                className="gap-1.5"
               >
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-              <div className="relative h-10 w-7 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted/40">
-                <Image
-                  src={coverSrc}
-                  alt={fiction.title}
-                  fill
-                  className="object-cover"
-                  sizes="28px"
-                  onError={() => setCoverError(true)}
-                />
-              </div>
-            </>
-          }
-          title={
-            <div className="min-w-0">
-              <h2 className="truncate text-sm font-semibold text-foreground">{fiction.title}</h2>
-              <p className="line-clamp-1 text-xs text-muted-foreground">{fiction.description}</p>
-            </div>
-          }
-          trailing={
-            <div className="flex items-center gap-2">
-              {user && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleToggleLike}
-                  disabled={likeBusy}
-                  aria-label={liked ? "Unlike" : "Like"}
-                  className="gap-1.5"
-                >
-                  <Heart
-                    className={`h-4 w-4 ${liked ? "text-rose-500" : ""}`}
-                    fill={liked ? "currentColor" : "transparent"}
-                  />
-                  {likeCount > 0 && <span className="text-xs tabular-nums">{likeCount}</span>}
-                </Button>
-              )}
-              <Button asChild size="sm" variant="cta">
-                <Link href={exploreMapHref}>
-                  <Compass className="h-4 w-4" />
-                  <span>Explore Map</span>
-                </Link>
+                <Heart className={`h-4 w-4 ${liked ? "text-rose-500" : ""}`} fill={liked ? "currentColor" : "none"} />
+                {likeCount > 0 && <span className="text-xs tabular-nums">{likeCount}</span>}
               </Button>
-            </div>
-          }
-        />
-      )}
-
-      {/* Hero: banner when set, else cover */}
-      <div ref={heroRef} className="relative h-[320px] md:h-[380px] flex-shrink-0 overflow-hidden">
-        <Image
-          src={heroSrc}
-          alt={fiction.title}
-          fill
-          className="object-cover"
-          sizes="100vw"
-          priority
-          onError={() => setCoverError(true)}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/35 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/30 to-transparent" />
-
-        {/* Back button */}
-        <button
-          onClick={onBack}
-          className="absolute left-6 top-6 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-background/60 text-foreground backdrop-blur-sm transition-colors hover:bg-background/80"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-
-        {/* Info overlay: cover poster + title, meta */}
-        <div className="absolute bottom-0 left-0 right-0 z-10 px-8 pb-8">
-          <div className="flex flex-row items-end justify-between gap-4">
-            <div className="flex min-w-0 flex-1 flex-row items-end gap-4">
-              {/* Cover poster */}
-              <div className="relative h-[112px] w-[75px] flex-shrink-0 overflow-hidden rounded-lg border border-border/60 shadow-xl sm:h-[186px] sm:w-[124px] md:h-[222px] md:w-[148px]">
-                <Image
-                  src={coverSrc}
-                  alt={fiction.title}
-                  fill
-                  className="object-cover"
-                  sizes="148px"
-                  onError={() => setCoverError(true)}
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">
-                    {fiction.type === "tv-series" ? "TV Series" : fiction.type === "book" ? "Book" : "Movie"}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {fiction.genre}
-                  </Badge>
-                </div>
-                <h1 className="mt-2 font-sans text-4xl font-bold tracking-tight text-foreground md:text-5xl">
-                  {fiction.title}
-                </h1>
-                <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5" />
-                    {fiction.year}
-                  </span>
-                  {fiction.author && (
-                    <span>
-                      {fiction.type === "movie"
-                        ? "Directed by "
-                        : fiction.type === "tv-series"
-                          ? "Created by "
-                          : "By "}
-                      <span className="text-foreground">{fiction.author}</span>
-                    </span>
-                  )}
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {allLocations.length} location{allLocations.length > 1 ? "s" : ""} in{" "}
-                    {fictionCities.length} cit{fictionCities.length > 1 ? "ies" : "y"}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              {user && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleToggleLike}
-                  disabled={likeBusy}
-                  aria-label={liked ? "Unlike" : "Like"}
-                  className="gap-1.5"
-                >
-                  <Heart
-                    className={`h-4 w-4 ${liked ? "text-rose-500" : ""}`}
-                    fill={liked ? "currentColor" : "transparent"}
-                  />
-                  {likeCount > 0 && <span className="text-xs tabular-nums">{likeCount}</span>}
-                </Button>
-              )}
-              <Button asChild size="sm" variant="cta">
-                <Link href={exploreMapHref}>
-                  <Compass className="h-4 w-4" />
-                  <span>Explore Map</span>
-                </Link>
-              </Button>
-            </div>
+            )}
+            <Button asChild size="sm" variant="cta">
+              <Link href={exploreMapHref}>
+                <Compass className="h-4 w-4" />
+                <span>{t("exploreMap")}</span>
+              </Link>
+            </Button>
           </div>
         </div>
-      </div>
 
-      {/* Description */}
-      {fiction.description && (
-        <div className="px-8 pb-2 pt-6">
-          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            {fiction.description}
-          </p>
-        </div>
-      )}
-
-      {/* Locations - full page scroll */}
-      <div className="px-8 py-6">
-        <div className="mb-6 max-w-3xl">
-          <h2 className="text-xl font-semibold text-foreground">
-            {t("howToVisitTitle", { title: fiction.title, locationLabel })}
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t("howToVisitDescription")}
-          </p>
-        </div>
-        {Array.from(locationsByCity.entries()).map(([cityId, locs]) => {
-          const city = cityMap.get(cityId)
-          const activeLocation = locs.find((loc) => loc.id === expandedLocation)
-          return (
-            <div key={cityId} className="mb-8">
-              <div className="mb-4 flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-primary" />
-                <h3 className="text-lg font-semibold text-foreground">
-                  {city?.name}, {city?.country}
-                </h3>
-                <span className="text-sm text-muted-foreground">
-                  &middot; {t("placeCount", { count: locs.length })}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                {locs.map((loc) => {
-                  const isExpanded = expandedLocation === loc.id
-                  const handleClick = () => {
-                    if (onViewPlace) {
-                      onViewPlace(loc)
-                      return
-                    }
-                    setExpandedLocation(isExpanded ? null : loc.id)
-                  }
-                  const hoverLabel = onViewPlace
-                    ? "Explore this place"
-                    : isExpanded
-                      ? "Hide details"
-                      : "View details"
-                  return (
-                    <LocationCard
-                      key={loc.id}
-                      location={loc}
-                      compact
-                      onClick={handleClick}
-                      hoverLabel={hoverLabel}
-                    />
-                  )
-                })}
-              </div>
-
-              {activeLocation && !onViewPlace && (
-                <LocationDetailPanel location={activeLocation} />
+        <article className="space-y-8">
+          <header className="space-y-5 border-b border-border/60 pb-8">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="secondary" className="text-xs">
+                {fiction.type === "tv-series"
+                  ? t("typeTvSeries")
+                  : fiction.type === "book"
+                    ? t("typeBook")
+                    : t("typeMovie")}
+              </Badge>
+              {fiction.genre && (
+                <Badge variant="outline" className="text-xs">
+                  {fiction.genre}
+                </Badge>
               )}
+              {fiction.year && <span>{fiction.year}</span>}
             </div>
-          )
-        })}
-      </div>
-
-      {sameCityRecommendations && sameCityRecommendations.length > 0 && (
-        <div className="border-t border-border/60 px-8 py-5 pb-8">
-          <div className="mb-1.5 flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
-            <h2 className="text-sm font-semibold text-foreground">
-              {t("sameCityRecommendationsTitle")}
-            </h2>
-          </div>
-          <p className="mb-3 max-w-xl text-xs leading-snug text-muted-foreground">
-            {t("sameCityRecommendationsDescription")}
-          </p>
-          <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
-            {sameCityRecommendations.map((rec) => (
-              <FictionCard
-                key={rec.id}
-                fiction={rec}
-                locationCount={sameCityRecommendationPlaceCounts?.[rec.id] ?? 0}
-                href={`/fictions/${rec.slug ?? rec.id}`}
+            <h1 className="w-full max-w-[min(100%,45rem)] text-balance break-words text-4xl font-bold leading-tight tracking-tight text-foreground sm:text-5xl xl:text-[3.25rem]">
+              {headline}
+            </h1>
+            <div className="relative aspect-[21/9] overflow-hidden rounded-xl border border-border/60">
+              <Image
+                src={heroSrc}
+                alt={fiction.title}
+                fill
+                className="object-cover"
+                sizes="(max-width: 1024px) 100vw, 40vw"
+                onError={() => setCoverError(true)}
               />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+            </div>
+            {fiction.description && (
+              <p className="max-w-[75ch] text-base leading-8 text-muted-foreground">{fiction.description}</p>
+            )}
+            <FictionInterestTags tags={fictionInterestTags} className="xl:hidden border-t border-border/60 pt-6" />
+          </header>
+
+          <section className="space-y-5">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="h-7 w-1 rounded-full bg-yellow-500" aria-hidden />
+                <h2 className="text-3xl font-semibold tracking-tight text-foreground">{t("filmingLocationsHeading")}</h2>
+                <span className="text-base font-medium text-muted-foreground">{locationRows.length}</span>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="mt-1.5 text-base text-muted-foreground">
+                {t("placesAcrossCities", {
+                  placeCount: locationRows.length,
+                  cityCount: initialCities.length,
+                })}
+              </p>
+            </div>
+
+            <ol className="divide-y divide-border/60 rounded-xl border border-border/40 bg-card/30">
+              {locationRows.map(({ index, location, city }) => {
+                const googleMapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${location.lat},${location.lng}`)}`
+                return (
+                  <li key={location.id} className="px-4 py-4 sm:px-5 sm:py-5">
+                    <div className="flex items-center gap-4">
+                      <Link
+                        href={`/fictions/${pathSlug}/places/${location.id}`}
+                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-4 rounded-lg outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      >
+                        <p className="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground">
+                          {index}
+                        </p>
+                        <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted/30 sm:h-18 sm:w-24">
+                          <Image
+                            src={location.image || "/placeholder.svg"}
+                            alt={location.name}
+                            fill
+                            className="object-cover"
+                            sizes="96px"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                            {city?.name}
+                            {city?.country ? `, ${city.country}` : ""}
+                          </p>
+                          <p className="mt-1 text-base font-semibold leading-snug text-foreground sm:text-lg">{location.name}</p>
+                          <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{location.address}</p>
+                        </div>
+                      </Link>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button asChild size="sm" variant="outline" className="h-9 border-border bg-background px-3 text-sm shadow-none">
+                          <a href={googleMapsHref} target="_blank" rel="noopener noreferrer">
+                            {t("mapsShort")}
+                          </a>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-9 w-9 p-0"
+                          aria-label={likedPlaces[location.id] ? t("unlikePlace") : t("likePlace")}
+                          onClick={() => togglePlaceLike(location.id)}
+                        >
+                          <Heart
+                            className={`h-4 w-4 ${likedPlaces[location.id] ? "text-rose-500" : ""}`}
+                            fill={likedPlaces[location.id] ? "currentColor" : "none"}
+                          />
+                        </Button>
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ol>
+          </section>
+
+          {sameCityRecommendations && sameCityRecommendations.length > 0 && (
+            <section className="space-y-5 border-t border-border/60 pt-8">
+              <div className="flex items-center gap-3">
+                <span className="h-7 w-1 rounded-full bg-yellow-500" aria-hidden />
+                <h2 className="text-3xl font-semibold tracking-tight text-foreground">{t("sameCityRecommendationsTitle")}</h2>
+                <span className="text-base font-medium text-muted-foreground">{sameCityRecommendations.length}</span>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="text-base text-muted-foreground">{t("sameCityRecommendationsDescription")}</p>
+              <div className="grid grid-cols-[repeat(2,minmax(0,172px))] gap-3 sm:grid-cols-[repeat(3,minmax(0,172px))]">
+                {sameCityRecommendations.map((rec) => (
+                  <FictionCard
+                    key={rec.id}
+                    fiction={rec}
+                    locationCount={sameCityRecommendationPlaceCounts?.[rec.id] ?? 0}
+                    href={`/fictions/${rec.slug ?? rec.id}`}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+        </article>
+      </div>
+    </main>
   )
 }

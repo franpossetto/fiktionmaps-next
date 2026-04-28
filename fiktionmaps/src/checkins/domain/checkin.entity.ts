@@ -28,6 +28,8 @@ export interface EnrichedPlaceCheckin {
   placeAddress: string
   placeImage: string | null
   fictionId: string
+  /** Canonical URL segment when present; otherwise callers may fall back to `fictionId`. */
+  fictionSlug?: string | null
   fictionTitle: string
   fictionCover: string | null
   cityId: string | null

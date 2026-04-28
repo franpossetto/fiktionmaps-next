@@ -14,6 +14,7 @@ import { getFictionsByIdsUseCase } from "@/src/fictions/application/get-fictions
 import { getFictionCitiesUseCase } from "@/src/fictions/application/get-fiction-cities.usecase"
 import { getSameCityMovieRecommendationsUseCase } from "@/src/fictions/application/get-same-city-movie-recommendations.usecase"
 import { getFictionLikeCountsUseCase } from "@/src/fiction-likes/application/get-fiction-like-counts.usecase"
+import { getFictionInterestsUseCase } from "@/src/fiction-interests/application/get-fiction-interests.usecase"
 import { isUuidString } from "@/lib/validation/primitives"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { CacheKeys } from "@/src/shared/infrastructure/next/cache.keys"
@@ -72,6 +73,15 @@ export function getFictionCitiesCached(fictionId: string) {
     () => getFictionCitiesUseCase(fictionId, { locationsRepo: placesRepo, citiesRepo }),
     CacheKeys.fiction(`cities:${fictionId}`),
     { ...CacheConfig.long, tags: ["fictions", "cities", `fiction-${fictionId}`] }
+  )()
+}
+
+/** Interest ids linked to this fiction (`fiction_interests`). */
+export function getFictionInterestsCached(fictionId: string) {
+  return unstable_cache(
+    () => getFictionInterestsUseCase(fictionId, fictionInterestsRepo),
+    CacheKeys.fiction(`interests:${fictionId}`),
+    { ...CacheConfig.long, tags: ["fictions", `fiction-${fictionId}`] }
   )()
 }
 

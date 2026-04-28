@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useRef } from "react"
-import Image from "next/image"
 import { ArrowLeft, Play, Pause, Volume2, VolumeX } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { ScenePreviewThumb } from "@/components/scenes/scene-preview-thumb"
 import { PageStickyBar } from "@/components/layout/page-sticky-bar"
 import type { Location } from "@/src/locations/domain/location.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
@@ -18,6 +18,7 @@ export function SceneWatchView({
   sceneLocations,
   onBack,
   onSelectScene,
+  useShellMainScroll = false,
 }: {
   currentWatchScene: Scene
   fiction?: Fiction
@@ -26,6 +27,8 @@ export function SceneWatchView({
   sceneLocations: Map<string, Location>
   onBack: () => void
   onSelectScene: (scene: Scene) => void
+  /** When true, ancestor `[data-detail-main-scroll]` scrolls instead of this root. */
+  useShellMainScroll?: boolean
 }) {
   const [muted, setMuted] = useState(true)
   const [paused, setPaused] = useState(false)
@@ -44,7 +47,11 @@ export function SceneWatchView({
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-background">
+    <div
+      className={
+        useShellMainScroll ? "min-h-0 h-full bg-background" : "h-full overflow-y-auto bg-background"
+      }
+    >
       <PageStickyBar
         className="px-6"
         leading={
@@ -150,15 +157,7 @@ export function SceneWatchView({
                     onClick={() => onSelectScene(scene)}
                     className="flex w-full gap-2 rounded-lg border border-border bg-card p-2 text-left transition-colors hover:border-primary/40 hover:bg-secondary/40"
                   >
-                    <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded-md bg-black">
-                      <Image
-                        src={scene.thumbnail || "/placeholder.svg"}
-                        alt={scene.title}
-                        fill
-                        sizes="112px"
-                        className="object-cover"
-                      />
-                    </div>
+                    <ScenePreviewThumb scene={scene} className="h-16 w-28 bg-black" sizes="112px" />
                     <div className="min-w-0">
                       <p className="line-clamp-2 text-xs font-semibold text-foreground">{scene.title}</p>
                       <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">

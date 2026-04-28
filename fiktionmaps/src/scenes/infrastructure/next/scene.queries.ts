@@ -5,6 +5,7 @@ import { getSceneByIdUseCase } from "@/src/scenes/application/get-scene-by-id.us
 import { getCitiesWithScenesUseCase } from "@/src/scenes/application/get-cities-with-scenes.usecase"
 import { getCityFictionsWithScenesUseCase } from "@/src/scenes/application/get-city-fictions-with-scenes.usecase"
 import { getSceneCountsByFictionIdsUseCase } from "@/src/scenes/application/get-scene-counts-by-fiction-ids.usecase"
+import { listScenesUseCase } from "@/src/scenes/application/list-scenes.usecase"
 import { CacheKeys } from "@/src/shared/infrastructure/next/cache.keys"
 import { CacheConfig } from "@/src/shared/infrastructure/next/cache.config"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
@@ -52,4 +53,12 @@ export function getSceneCountsByFictionIdsCached(fictionIds: string[]): Promise<
     CacheKeys.scene(`counts:${key}`),
     { ...CacheConfig.short, tags: ["scenes"] }
   )()
+}
+
+/**
+ * Active scenes for a place (`locations.id` / `places.id`).
+ * Not wrapped in `unstable_cache`: `repo.list` uses the cookie-backed Supabase client; dynamic data sources are not allowed inside Next cache scopes.
+ */
+export async function getScenesForPlace(placeId: string): Promise<Scene[]> {
+  return listScenesUseCase({ placeId, active: true }, repo)
 }

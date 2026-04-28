@@ -40,12 +40,12 @@ export function MapboxClusterLayer<T extends ClusterItem>({
   const superclusterRef = useRef(supercluster)
   superclusterRef.current = supercluster
 
-  const updateClusters = useCallback(() => {
-    if (!mapRef) return
+  const updateClusters = useCallback((): boolean => {
+    if (!mapRef) return false
     try {
       const map = mapRef.getMap()
       const bounds = map.getBounds()
-      if (!bounds) return
+      if (!bounds) return false
       const bbox: [number, number, number, number] = [
         bounds.getWest(),
         bounds.getSouth(),
@@ -54,28 +54,50 @@ export function MapboxClusterLayer<T extends ClusterItem>({
       ]
       const zoom = Math.floor(map.getZoom())
       setClusters(superclusterRef.current.getClusters(bbox, zoom))
+      return true
     } catch {
       // Map not ready yet — skip this update
+      return false
     }
   }, [mapRef])
 
   useEffect(() => {
-    updateClusters()
-  }, [updateClusters, supercluster])
+    let cancelled = false
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    const maxAttempts = 20
+
+    const tryUpdate = (attempt: number) => {
+      if (cancelled) return
+      const ready = updateClusters()
+      if (ready || attempt >= maxAttempts) return
+      timeoutId = setTimeout(() => tryUpdate(attempt + 1), 80)
+    }
+
+    tryUpdate(0)
+
+    return () => {
+      cancelled = true
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }, [updateClusters, supercluster, items.length])
 
   useEffect(() => {
     if (!mapRef) return
     try {
       const map = mapRef.getMap()
-      const onMove = () => updateClusters()
+      const onMove = () => {
+        updateClusters()
+      }
       map.on("moveend", onMove)
       map.on("load", onMove)
+      map.on("idle", onMove)
       if (!map.isStyleLoaded()) {
         map.once("styledata", onMove)
       }
       return () => {
         map.off("moveend", onMove)
         map.off("load", onMove)
+        map.off("idle", onMove)
         map.off("styledata", onMove)
       }
     } catch {

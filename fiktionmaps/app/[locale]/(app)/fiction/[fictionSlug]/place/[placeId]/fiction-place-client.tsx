@@ -8,13 +8,13 @@ import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import { PlacePage } from "@/components/map/place-page"
 import { getAllCitiesAction } from "@/src/cities/infrastructure/next/city.actions"
-import { getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
+import { resolvePublicFictionFromSlugOrIdAction } from "@/src/fictions/infrastructure/next/fiction.actions"
 import { getPlaceLocationAction } from "@/src/places/infrastructure/next/place.actions"
 
 export function FictionPlaceClient() {
   const params = useParams()
   const router = useRouter()
-  const fictionId = params.fictionId as string
+  const fictionSlug = params.fictionSlug as string
   const placeId = params.placeId as string
 
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -30,31 +30,34 @@ export function FictionPlaceClient() {
     setCity(null)
 
     ;(async () => {
+      const resolvedFiction = await resolvePublicFictionFromSlugOrIdAction(fictionSlug)
+      if (!resolvedFiction) {
+        if (!cancelled) setLoadError("not_found")
+        return
+      }
+
       const loc = await getPlaceLocationAction(placeId)
       if (!loc) {
         if (!cancelled) setLoadError("not_found")
         return
       }
       if (cancelled) return
-      if (loc.id !== placeId || loc.fictionId !== fictionId) {
+      if (loc.id !== placeId || loc.fictionId !== resolvedFiction.id) {
         setLoadError("not_found")
         return
       }
 
-      const [f, c] = await Promise.all([
-        getActiveFictionsAction().then((rows) => rows.find((item) => item.id === fictionId) ?? null),
-        getAllCitiesAction().then((rows) => rows.find((item) => item.id === loc.cityId) ?? null),
-      ])
+      const c = await getAllCitiesAction().then((rows) => rows.find((item) => item.id === loc.cityId) ?? null)
       if (cancelled) return
       setLocation(loc)
-      setFiction(f ?? null)
-      setCity(c ?? null)
+      setFiction(resolvedFiction)
+      setCity(c)
     })()
 
     return () => {
       cancelled = true
     }
-  }, [fictionId, placeId])
+  }, [fictionSlug, placeId])
 
   if (loadError === "not_found") {
     return (
@@ -85,6 +88,7 @@ export function FictionPlaceClient() {
       fiction={fiction}
       city={city}
       onBack={() => router.back()}
+      useShellMainScroll
     />
   )
 }

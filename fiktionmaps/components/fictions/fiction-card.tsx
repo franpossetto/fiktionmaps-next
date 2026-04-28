@@ -2,11 +2,12 @@
 
 import { useState } from "react"
 import Image from "next/image"
+import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { Link } from "@/i18n/navigation"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
-import { ThumbsUp } from "lucide-react"
+import { Heart } from "lucide-react"
 
 interface FictionCardProps {
   fiction: FictionWithMedia
@@ -31,9 +32,18 @@ export function FictionCard({
   liked = false,
   onToggleLike,
 }: FictionCardProps) {
+  const t = useTranslations("Fictions")
   const [coverError, setCoverError] = useState(false)
   const coverSrc = fiction.coverImage?.trim() || DEFAULT_FICTION_COVER
   const showPlaceholder = coverError || !fiction.coverImage?.trim()
+  const typeBadgeLabel =
+    fiction.type === "tv-series"
+      ? t("typeTvBadge")
+      : fiction.type === "movie"
+        ? t("typeMovie")
+        : fiction.type === "book"
+          ? t("typeBook")
+          : fiction.type
 
   const content = (
     <>
@@ -49,17 +59,17 @@ export function FictionCard({
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
         <div className="absolute bottom-0 left-0 right-0 flex flex-wrap items-center gap-x-2 gap-y-0.5 p-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
           <span className="text-xs font-medium text-foreground">
-            {locationCount} location{locationCount > 1 ? "s" : ""}
+            {t("placeCountInline", { count: locationCount })}
           </span>
           {(fiction.type === "movie" || fiction.type === "tv-series") && sceneCount > 0 && (
             <span className="text-xs font-medium text-foreground">
-              {sceneCount} scene{sceneCount > 1 ? "s" : ""}
+              {t("sceneCountInline", { count: sceneCount })}
             </span>
           )}
         </div>
         <div className="absolute right-2 top-2 flex items-center gap-2">
           <Badge variant="secondary" className="bg-background/70 px-1.5 py-0 text-[10px] backdrop-blur-sm">
-            {fiction.type === "tv-series" ? "TV" : fiction.type}
+            {typeBadgeLabel}
           </Badge>
         </div>
       </div>
@@ -80,11 +90,11 @@ export function FictionCard({
                 onToggleLike(fiction.id)
               }}
               className="flex items-center gap-1 rounded-full px-1 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-              aria-label={liked ? "Unlike fiction" : "Like fiction"}
-              title={liked ? "You like this fiction" : "Like this fiction"}
+              aria-label={liked ? t("unlikeFiction") : t("likeFiction")}
+              title={liked ? t("youLikeFiction") : t("likeThisFiction")}
             >
-              <ThumbsUp
-                className={`h-4 w-4 transition-colors ${liked ? "text-foreground" : "text-muted-foreground"}`}
+              <Heart
+                className={`h-4 w-4 transition-colors ${liked ? "text-rose-500" : "text-muted-foreground"}`}
                 fill={liked ? "currentColor" : "transparent"}
               />
               <span className="text-[10px] font-semibold text-foreground/90">{likeCount ?? 0}</span>

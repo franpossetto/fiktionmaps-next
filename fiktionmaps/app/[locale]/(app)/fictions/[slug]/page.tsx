@@ -1,12 +1,15 @@
 import type { Metadata } from "next"
 import { notFound, redirect } from "next/navigation"
 import { RedirectType } from "next/dist/client/components/redirect"
+import { getTranslations } from "next-intl/server"
 import {
   getFictionByIdCached,
   getFictionBySlugCached,
   getFictionCitiesCached,
+  getFictionInterestsCached,
   getSameCityMovieRecommendationsCached,
 } from "@/src/fictions/infrastructure/next/fiction.queries"
+import { getInterestCatalogCached } from "@/src/interests/infrastructure/next/interest.queries"
 import { getFictionLikeCountsCached } from "@/src/fiction-likes/infrastructure/next/fiction-likes.queries"
 import {
   getFictionLocationsCached,
@@ -15,7 +18,11 @@ import {
 import { getCurrentUserHasLikedFiction } from "@/src/users/infrastructure/next/user.queries"
 import { isUuidString } from "@/lib/validation/primitives"
 import { getSiteUrl } from "@/lib/site"
-import { FictionDetailPageClient } from "./fiction-detail-page-client"
+import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import { FictionDetail } from "@/components/fictions/fiction-detail"
+import { FictionDetailRightRail } from "@/components/fictions/fiction-detail-right-rail"
+import { FictionSlugDetailShell } from "@/components/fictions/fiction-slug-detail-shell"
+import { getFictionSidebarSummaryText } from "@/lib/fictions/get-fiction-sidebar-summary-text"
 
 type Props = {
   params: Promise<{ locale: string; slug: string }>
@@ -53,9 +60,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug, locale } = await params
   const siteUrl = getSiteUrl()
   const fiction = await resolveFiction(slug, locale)
+  const tMeta = await getTranslations({ locale, namespace: "Metadata" })
   if (!fiction || !fiction.active) {
     return {
-      title: "Fiction not found",
+      title: tMeta("fictionNotFound"),
       robots: {
         index: false,
         follow: false,
@@ -63,13 +71,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   }
   const isBook = fiction.type === "book"
-  const locationLabel = isBook ? "Real-World Locations" : "Filming Locations"
   const title = isBook
-    ? `Where Was ${fiction.title} Set?`
-    : `Where Was ${fiction.title} Filmed?`
-  const description =
-    fiction.description?.slice(0, 160) ||
-    `Discover ${fiction.title} ${locationLabel.toLowerCase()}, explore them on the map, and plan your visit with practical travel tips.`
+    ? tMeta("fictionDetailTitleBook", { title: fiction.title })
+    : tMeta("fictionDetailTitleFilm", { title: fiction.title })
+  const fallbackDescription = isBook
+    ? tMeta("fictionDetailDescriptionBook", { title: fiction.title })
+    : tMeta("fictionDetailDescriptionFilm", { title: fiction.title })
+  const description = fiction.description?.slice(0, 160) || fallbackDescription
   const image = fiction.coverImage?.trim() || fiction.bannerImage?.trim()
   const effectiveSlug = fiction.slug?.trim() || slug
   const canonicalPath = `/${locale}/fictions/${effectiveSlug}`
@@ -114,6 +122,7 @@ export default async function FictionSlugPage({ params }: Props) {
   }
   const canonicalSlug = fiction.slug?.trim() || slug
   const canonicalUrl = `${siteUrl}/${locale}/fictions/${canonicalSlug}`
+  const tMeta = await getTranslations({ locale, namespace: "Metadata" })
 
   const breadcrumbSchema = {
     "@context": "https://schema.org",
@@ -122,13 +131,13 @@ export default async function FictionSlugPage({ params }: Props) {
       {
         "@type": "ListItem",
         position: 1,
-        name: locale === "es" ? "Inicio" : "Home",
+        name: tMeta("breadcrumbHome"),
         item: `${siteUrl}/${locale}`,
       },
       {
         "@type": "ListItem",
         position: 2,
-        name: locale === "es" ? "Ficciones" : "Fictions",
+        name: tMeta("breadcrumbFictions"),
         item: `${siteUrl}/${locale}/fictions`,
       },
       {
@@ -150,19 +159,35 @@ export default async function FictionSlugPage({ params }: Props) {
     inLanguage: locale,
   }
 
-  const [initialLocations, initialCities, sameCityRecommendations, likeCounts, initialLiked] = await Promise.all([
+  const [
+    initialLocations,
+    initialCities,
+    sameCityRecommendations,
+    likeCounts,
+    initialLiked,
+    fictionInterestIds,
+    interestCatalog,
+  ] = await Promise.all([
     getFictionLocationsCached(fiction.id),
     getFictionCitiesCached(fiction.id),
     getSameCityMovieRecommendationsCached(fiction.id),
     getFictionLikeCountsCached([fiction.id]),
     getCurrentUserHasLikedFiction(fiction.id),
+    getFictionInterestsCached(fiction.id),
+    getInterestCatalogCached(locale),
   ])
+  const labelByInterestId = new Map(interestCatalog.map((i) => [i.id, i.label]))
+  const fictionInterestTags = fictionInterestIds.flatMap((id) => {
+    const label = labelByInterestId.get(id)
+    return label != null ? [{ id, label }] : []
+  })
   const initialLikeCount = likeCounts[fiction.id] ?? 0
   const recommendationIds = sameCityRecommendations.map((f) => f.id)
   const sameCityRecommendationPlaceCounts =
     recommendationIds.length > 0
       ? await getPlaceCountsByFictionIdsCached(recommendationIds)
       : {}
+  const sidebarSummary = await getFictionSidebarSummaryText(fiction, locale)
   return (
     <>
       <script
@@ -173,15 +198,28 @@ export default async function FictionSlugPage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(creativeWorkSchema) }}
       />
-      <FictionDetailPageClient
+      <FictionSlugDetailShell
         fiction={fiction}
-        initialLocations={initialLocations}
-        initialCities={initialCities}
-        initialLikeCount={initialLikeCount}
-        initialLiked={initialLiked}
-        sameCityRecommendations={sameCityRecommendations}
-        sameCityRecommendationPlaceCounts={sameCityRecommendationPlaceCounts}
-      />
+        summaryText={sidebarSummary}
+        rightAside={
+          <FictionDetailRightRail
+            fictionInterestTags={fictionInterestTags}
+            initialCities={initialCities}
+            sameCityRecommendations={sameCityRecommendations}
+          />
+        }
+      >
+        <FictionDetail
+          fiction={fiction}
+          initialLocations={initialLocations}
+          initialCities={initialCities}
+          initialLikeCount={initialLikeCount}
+          initialLiked={initialLiked}
+          fictionInterestTags={fictionInterestTags}
+          sameCityRecommendations={sameCityRecommendations}
+          sameCityRecommendationPlaceCounts={sameCityRecommendationPlaceCounts}
+        />
+      </FictionSlugDetailShell>
     </>
   )
 }

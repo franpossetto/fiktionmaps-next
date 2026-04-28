@@ -5,24 +5,27 @@ import { useParams } from "next/navigation"
 import { useRouter } from "@/i18n/navigation"
 import type { Location } from "@/src/locations/domain/location.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
-import type { Fiction } from "@/src/fictions/domain/fiction.entity"
+import type { Fiction, FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { SceneWatchView } from "@/components/scenes/scene-watch-view"
-import { getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
+import { resolvePublicFictionFromSlugOrIdAction } from "@/src/fictions/infrastructure/next/fiction.actions"
 import { getPlaceLocationAction } from "@/src/places/infrastructure/next/place.actions"
 import { getSceneByIdAction, listScenesAction } from "@/src/scenes/infrastructure/next/scene.actions"
+
+function fictionUrlSegment(f: FictionWithMedia): string {
+  return (f.slug?.trim() || f.id).trim()
+}
 
 export function FictionSceneClient() {
   const params = useParams()
   const router = useRouter()
-  const fictionId = params.fictionId as string
+  const fictionSlug = params.fictionSlug as string
   const routePlaceId =
-    typeof params.placeId === "string" && params.placeId.length > 0
-      ? params.placeId
-      : null
+    typeof params.placeId === "string" && params.placeId.length > 0 ? params.placeId : null
   const sceneId = params.sceneId as string
 
   const [loadError, setLoadError] = useState<string | null>(null)
   const [location, setLocation] = useState<Location | null>(null)
+  const [resolvedFiction, setResolvedFiction] = useState<FictionWithMedia | null>(null)
   const [fiction, setFiction] = useState<Fiction | undefined>(undefined)
   /** Loaded by id so direct links work even when scene.active is false */
   const [sceneFromUrl, setSceneFromUrl] = useState<Scene | null>(null)
@@ -33,16 +36,25 @@ export function FictionSceneClient() {
     let cancelled = false
     setLoadError(null)
     setLocation(null)
+    setResolvedFiction(null)
     setSceneFromUrl(null)
 
     ;(async () => {
+      const resolved = await resolvePublicFictionFromSlugOrIdAction(fictionSlug)
+      if (!resolved) {
+        if (!cancelled) setLoadError("not_found")
+        return
+      }
+      if (cancelled) return
+      setResolvedFiction(resolved)
+
       const scene = await getSceneByIdAction(sceneId)
       if (!scene) {
         if (!cancelled) setLoadError("not_found")
         return
       }
       if (cancelled) return
-      if (scene.fictionId !== fictionId) {
+      if (scene.fictionId !== resolved.id) {
         setLoadError("not_found")
         return
       }
@@ -59,19 +71,16 @@ export function FictionSceneClient() {
         return
       }
       if (cancelled) return
-      if (loc.id !== resolvedPlaceId || loc.fictionId !== fictionId) {
+      if (loc.id !== resolvedPlaceId || loc.fictionId !== resolved.id) {
         setLoadError("not_found")
         return
       }
 
       setLocation(loc)
 
-      const [f, fs] = await Promise.all([
-        getActiveFictionsAction().then((rows) => rows.find((item) => item.id === loc.fictionId) ?? null),
-        listScenesAction({ fictionId: loc.fictionId, active: "true" }),
-      ])
+      const fs = await listScenesAction({ fictionId: loc.fictionId, active: "true" })
       if (cancelled) return
-      setFiction(f ?? undefined)
+      setFiction(resolved)
       setFictionScenes(fs)
 
       const placeIds = [...new Set([...fs.map((s) => s.placeId), scene.placeId])]
@@ -96,7 +105,7 @@ export function FictionSceneClient() {
     return () => {
       cancelled = true
     }
-  }, [fictionId, routePlaceId, sceneId])
+  }, [fictionSlug, routePlaceId, sceneId])
 
   const currentWatchScene = useMemo(
     () => fictionScenes.find((s) => s.id === sceneId) ?? sceneFromUrl,
@@ -110,8 +119,10 @@ export function FictionSceneClient() {
     return fictionScenes.filter((s) => s.id !== currentWatchScene.id)
   }, [fictionScenes, currentWatchScene])
 
-  const scenePath = (scene: Scene) =>
-    `/fiction/${encodeURIComponent(scene.fictionId)}/scene/${encodeURIComponent(scene.id)}`
+  const scenePath = (scene: Scene) => {
+    const segment = resolvedFiction ? fictionUrlSegment(resolvedFiction) : scene.fictionId
+    return `/fiction/${encodeURIComponent(segment)}/scene/${encodeURIComponent(scene.id)}`
+  }
 
   if (loadError === "not_found") {
     return (
@@ -145,6 +156,7 @@ export function FictionSceneClient() {
       sceneLocations={sceneLocations}
       onBack={() => router.back()}
       onSelectScene={(scene) => router.push(scenePath(scene))}
+      useShellMainScroll
     />
   )
 }

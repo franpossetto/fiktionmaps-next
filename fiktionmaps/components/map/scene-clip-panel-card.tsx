@@ -143,13 +143,12 @@ export function SceneClipPanelCard({
             <DialogTitle className="pr-8 text-lg font-semibold leading-snug text-foreground">
               {scene.title}
             </DialogTitle>
-            <FilmMomentTimeline
-              timestampLabel={scene.timestamp}
-              caption={filmTimelineCaption}
-              durationSec={fiction?.duration_sec ?? null}
-              showFallbackHint={false}
-              className="text-zinc-400 [&_.text-foreground]:text-zinc-100"
-            />
+            {scene.timestamp ? (
+              <p className="text-[12px] text-zinc-400">
+                {filmTimelineCaption ? `${filmTimelineCaption}: ` : ""}
+                <span className="text-zinc-100">{scene.timestamp}</span>
+              </p>
+            ) : null}
             {isTv && scene.season != null && scene.episode != null ? (
               <p className="text-[12px] text-muted-foreground">
                 S{scene.season} · E{scene.episode}

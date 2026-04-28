@@ -234,7 +234,7 @@ export function createPlacesSupabaseAdapter(
       return [...new Set((placeRows ?? []).map((r) => r.fiction_id).filter(Boolean))]
     }),
 
-    getById: cache(async (placeId: string): Promise<Location | null> => {
+    getById: cache(async (placeId: string, avatarVariant: "sm" | "lg" = "sm"): Promise<Location | null> => {
       const supabase = await getSupabase()
       const { data: row, error } = await supabase
         .from("places")
@@ -258,14 +258,23 @@ export function createPlacesSupabaseAdapter(
         is_landmark: boolean | null
       }
 
-      const { data: avatarRows } = await supabase
-        .from("asset_images")
-        .select("url")
-        .eq("entity_type", "place")
-        .eq("role", "avatar")
-        .eq("variant", "sm")
-        .eq("entity_id", placeId)
-        .limit(1)
+      const fetchAvatarUrl = async (variant: "sm" | "lg"): Promise<string | null> => {
+        const { data: avatarRows } = await supabase
+          .from("asset_images")
+          .select("url")
+          .eq("entity_type", "place")
+          .eq("role", "avatar")
+          .eq("variant", variant)
+          .eq("entity_id", placeId)
+          .limit(1)
+        const url = (avatarRows?.[0] as { url?: string } | undefined)?.url?.trim()
+        return url || null
+      }
+
+      let imageUrl = await fetchAvatarUrl(avatarVariant)
+      if (!imageUrl && avatarVariant === "lg") {
+        imageUrl = await fetchAvatarUrl("sm")
+      }
 
       return {
         id: row.id as string,
@@ -275,7 +284,7 @@ export function createPlacesSupabaseAdapter(
         lng: loc?.longitude ?? 0,
         cityId: loc?.city_id ?? "",
         fictionId: row.fiction_id as string,
-        image: (avatarRows?.[0] as { url?: string } | undefined)?.url ?? "/placeholder.svg",
+        image: imageUrl ?? "/placeholder.svg",
         videoUrl: "",
         description: (row.description as string | null) ?? "",
         sceneDescription: "",
@@ -286,19 +295,8 @@ export function createPlacesSupabaseAdapter(
     }),
 
     async getByBboxAndFictionIds(fictionIds: string[], bbox: MapBbox): Promise<Location[]> {
+      if (fictionIds.length === 0) return []
       const supabase = await getSupabase()
-      const { data: locationRows, error: locError } = await supabase
-        .from("locations")
-        .select("id")
-        .gte("latitude", bbox.south)
-        .lte("latitude", bbox.north)
-        .gte("longitude", bbox.west)
-        .lte("longitude", bbox.east)
-
-      if (locError) return []
-      const locationIds = (locationRows ?? []).map((r) => r.id).filter(Boolean)
-      if (locationIds.length === 0) return []
-
       const { data: rows, error } = await supabase
         .from("places")
         .select(
@@ -308,11 +306,15 @@ export function createPlacesSupabaseAdapter(
            )`
         )
         .in("fiction_id", fictionIds)
-        .in("location_id", locationIds)
+        .gte("location.latitude", bbox.south)
+        .lte("location.latitude", bbox.north)
+        .gte("location.longitude", bbox.west)
+        .lte("location.longitude", bbox.east)
 
       if (error) return []
 
       const placeIds = (rows ?? []).map((r) => r.id as string)
+      if (placeIds.length === 0) return []
       const { data: avatarRows } = await supabase
         .from("asset_images")
         .select("entity_id, url")

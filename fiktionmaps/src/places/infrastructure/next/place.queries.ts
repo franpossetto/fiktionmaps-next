@@ -36,8 +36,17 @@ export function getPlaceCountsByFictionIdsCached(fictionIds: string[]): Promise<
 
 export function getPlaceLocationByIdCached(placeId: string) {
   return unstable_cache(
-    () => getPlaceByIdUseCase(placeId, anonRepo),
+    () => getPlaceByIdUseCase(placeId, anonRepo, "sm"),
     CacheKeys.place(placeId),
+    { ...CacheConfig.medium, tags: ["places", `place-${placeId}`] }
+  )()
+}
+
+/** Fiction place detail (`/fictions/.../places/...`): avatar uses `lg` when present (falls back to `sm` in repo). */
+export function getPlaceLocationByIdDetailCached(placeId: string) {
+  return unstable_cache(
+    () => getPlaceByIdUseCase(placeId, anonRepo, "lg"),
+    CacheKeys.place(`${placeId}:detail-lg`),
     { ...CacheConfig.medium, tags: ["places", `place-${placeId}`] }
   )()
 }
