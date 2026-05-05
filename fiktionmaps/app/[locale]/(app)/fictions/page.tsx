@@ -1,14 +1,13 @@
 import type { Metadata } from "next"
-import Image from "next/image"
 import { getTranslations } from "next-intl/server"
 import { getAllFictionsCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { getSceneCountsByFictionIdsCached } from "@/src/scenes/infrastructure/next/scene.queries"
 import { getFictionLikeCountsCached } from "@/src/fiction-likes/infrastructure/next/fiction-likes.queries"
 import { getPlaceCountsByFictionIdsCached } from "@/src/places/infrastructure/next/place.queries"
 import { FictionLanding } from "@/components/fictions/fiction-landing"
+import { RecentFictionsSidebar } from "@/components/fictions/recent-fictions-sidebar"
 import { getSiteUrl } from "@/lib/site"
 import { Link } from "@/i18n/navigation"
-import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 
 type Props = {
   params: Promise<{ locale: string }>
@@ -53,7 +52,6 @@ export default async function FictionsPage({ params, searchParams }: Props) {
   const all = await getAllFictionsCached()
   const fictions = all.filter((f) => f.active)
   const allIds = fictions.map((f) => f.id)
-  const latestVisitedMock = fictions.slice(0, 4)
   const t = await getTranslations({ locale, namespace: "Fictions" })
 
   const [sceneCounts, likeCounts, placeCounts] = await Promise.all([
@@ -81,36 +79,7 @@ export default async function FictionsPage({ params, searchParams }: Props) {
         </main>
         <aside className="hidden border-l border-border/50 px-2.5 pb-8 pt-14 xl:block">
           <div className="sticky top-14 w-full max-w-[208px]">
-            <section className="space-y-1.5">
-              <h3 className="text-base font-bold tracking-tight text-foreground">{t("latestVisited")}</h3>
-              <ul className="space-y-1">
-                {latestVisitedMock.map((fiction) => (
-                  <li key={fiction.id}>
-                    <Link
-                      href={`/fictions/${fiction.slug ?? fiction.id}`}
-                      className="flex items-start gap-1.5 rounded-md px-1 py-1 text-sm leading-snug text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-                    >
-                      <div className="relative mt-0.5 h-7 w-7 shrink-0 overflow-hidden rounded-full border border-border/60 bg-muted/30">
-                        <Image
-                          src={fiction.coverImage?.trim() || fiction.coverImageLarge?.trim() || DEFAULT_FICTION_COVER}
-                          alt={fiction.title}
-                          fill
-                          className="object-cover"
-                          sizes="28px"
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="line-clamp-2 text-[13px] font-medium text-foreground">{fiction.title}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {fiction.year ? `${fiction.year} · ` : ""}
-                          {fiction.genre}
-                        </p>
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
+            <RecentFictionsSidebar initialFictions={fictions} />
 
             <section className="mt-4 rounded-md bg-muted/40 p-3">
               <h4 className="text-sm font-semibold text-foreground">{t("becomeContributor")}</h4>

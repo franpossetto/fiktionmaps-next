@@ -6,6 +6,7 @@ import {
   type MapStyleValue,
   type ThemeValue,
   type AdminViewMode,
+  type RecentFictionItem,
 } from "./local-storage-service"
 
 /**
@@ -106,4 +107,30 @@ export function useAdminViewModeStorage(): [AdminViewMode, (v: AdminViewMode) =>
   }, [])
 
   return [value, setValue]
+}
+
+export function useRecentFictionsStorage(): {
+  items: readonly RecentFictionItem[]
+  add: (args: { id: string; slug?: string | null }) => void
+  clear: () => void
+} {
+  const [items, setItems] = useState<readonly RecentFictionItem[]>(
+    localStorageService.recentFictions.getDefault,
+  )
+
+  useEffect(() => {
+    setItems(localStorageService.recentFictions.get())
+  }, [])
+
+  const add = useCallback(({ id, slug }: { id: string; slug?: string | null }) => {
+    localStorageService.recentFictions.add({ id, slug })
+    setItems(localStorageService.recentFictions.get())
+  }, [])
+
+  const clear = useCallback(() => {
+    localStorageService.recentFictions.clear()
+    setItems([])
+  }, [])
+
+  return { items, add, clear }
 }

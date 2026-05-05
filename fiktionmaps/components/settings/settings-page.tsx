@@ -65,27 +65,24 @@ export function SettingsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto bg-background">
-      {/* Header — minimal like Notion */}
-      <header className="shrink-0 border-b border-border/60 bg-background/95 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-8">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">
-              Settings
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Appearance and preferences
-            </p>
+      <div className="px-6 py-8 sm:px-8 lg:px-10">
+        <div className="mx-auto max-w-2xl">
+          <div className="mb-8 flex items-center justify-between gap-3">
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight text-foreground">
+                Settings
+              </h1>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Appearance and preferences
+              </p>
+            </div>
+            <Button onClick={handleSave} size="sm">
+              Save changes
+            </Button>
           </div>
-          <Button onClick={handleSave} size="sm">
-            Save changes
-          </Button>
-        </div>
-      </header>
-
-      <div className="flex-1 px-4 py-8 md:px-8 md:py-10">
-        <div className="mx-auto max-w-2xl space-y-10">
-          {/* Section: Theme mode */}
-          <section>
+          <div className="space-y-10">
+            {/* Section: Theme mode */}
+            <section>
             <h2 className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Theme mode
             </h2>
@@ -237,6 +234,7 @@ export function SettingsPage() {
               </div>
             </section>
           )}
+          </div>
         </div>
       </div>
     </div>

@@ -16,6 +16,7 @@ import type { City } from "@/src/cities/domain/city.entity"
 import type { Location } from "@/src/locations/domain/location.entity"
 import { getFictionLikeCountsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
 import { getMyLikedFictionIdsAction, toggleFictionLikeAction } from "@/src/users/infrastructure/next/user.actions"
+import { localStorageService } from "@/lib/local-storage-service"
 
 export interface FictionDetailProps {
   fiction: FictionWithMedia
@@ -48,6 +49,10 @@ export function FictionDetail({
   const [coverError, setCoverError] = useState(false)
   const [likedPlaces, setLikedPlaces] = useState<Record<string, boolean>>({})
   const previousUserId = useRef<string | null | undefined>(undefined)
+
+  useEffect(() => {
+    localStorageService.recentFictions.add({ id: fiction.id, slug: fiction.slug })
+  }, [fiction.id, fiction.slug])
 
   useEffect(() => {
     setLiked(initialLiked)
