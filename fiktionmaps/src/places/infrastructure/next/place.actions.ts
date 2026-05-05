@@ -10,11 +10,11 @@ import { deletePlaceUseCase } from "@/src/places/application/delete-place.usecas
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
 import {
   getAllPlacesCached,
-  getFictionLocationsCached,
+  getFictionPlacesCached,
   getPlaceLocationByIdCached,
   listPlacesInBboxForFictionIds,
 } from "./place.queries"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
 import type { CreatePlaceResult, UpdatePlaceResult, DeletePlaceResult, UploadPlaceImageResult } from "./place.actions.types"
 
@@ -47,21 +47,21 @@ export async function uploadPlaceImageAction(
   return { success: true, avatarUrl: result.urls.sm }
 }
 
-export async function getAllPlacesAction(): Promise<Location[]> {
+export async function getAllPlacesAction(): Promise<Place[]> {
   return getAllPlacesCached()
 }
 
-export async function getPlaceLocationAction(placeId: string): Promise<Location | null> {
+export async function getPlaceLocationAction(placeId: string): Promise<Place | null> {
   if (!uuidSchema.safeParse(placeId).success) return null
   return getPlaceLocationByIdCached(placeId)
 }
 
-export async function getFictionLocationsAction(fictionId: string): Promise<Location[]> {
+export async function getFictionPlacesAction(fictionId: string): Promise<Place[]> {
   if (!uuidSchema.safeParse(fictionId).success) return []
-  return getFictionLocationsCached(fictionId)
+  return getFictionPlacesCached(fictionId)
 }
 
-export async function getPlacesInBboxAction(fictionIds: string[], bbox: MapBbox): Promise<Location[]> {
+export async function getPlacesInBboxAction(fictionIds: string[], bbox: MapBbox): Promise<Place[]> {
   const { west, south, east, north } = bbox
   if (![west, south, east, north].every((n) => Number.isFinite(n))) return []
   return listPlacesInBboxForFictionIds(fictionIds, bbox)
@@ -71,8 +71,8 @@ export async function createPlaceAction(data: CreatePlaceData): Promise<CreatePl
   const result = await createPlaceUseCase(data, placesRepo)
   if (!result) return { success: false, error: "Failed to create place" }
   updateTag("places")
-  const locations = await getAllPlacesCached()
-  return { success: true, createdPlaceId: result.placeId, locations }
+  const places = await getAllPlacesCached()
+  return { success: true, createdPlaceId: result.placeId, places }
 }
 
 export async function updatePlaceAction(placeId: string, data: UpdatePlaceData): Promise<UpdatePlaceResult> {

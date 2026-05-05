@@ -1,7 +1,7 @@
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 
 export type CreatePlaceResult =
-  | { success: true; createdPlaceId: string; locations: Location[] }
+  | { success: true; createdPlaceId: string; places: Place[] }
   | { success: false; error: string }
 
 export type UpdatePlaceResult =

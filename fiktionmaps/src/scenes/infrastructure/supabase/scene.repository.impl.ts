@@ -5,7 +5,7 @@ import {
 import type { MapBbox } from "@/lib/validation/map-query"
 import { createAnonymousClient, createClient } from "@/lib/supabase/server"
 import type { City } from "@/src/cities/domain/city.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { ProfileScenePreview, Scene } from "@/src/scenes/domain/scene.entity"
 import type { CreateSceneData, UpdateSceneData } from "@/src/scenes/domain/scene.schemas"
 import type { SceneListFilters, ScenesRepositoryPort } from "@/src/scenes/domain/scene.repository"
@@ -158,22 +158,30 @@ type LocFromJoin = {
   city_id?: string
 }
 
-function locationFromSceneJoinRow(r: unknown): LocFromJoin | null {
+function placeGeoFromSceneJoinRow(r: unknown): {
+  placeId: string
+  placeName: string | null
+  loc: LocFromJoin | null
+} | null {
   const row = r as { places?: unknown }
   const pRaw = row.places
   const placeObj = Array.isArray(pRaw) ? pRaw[0] : pRaw
   if (!placeObj || typeof placeObj !== "object") return null
+  const pid = (placeObj as { id?: string }).id
+  if (!pid) return null
+  const rawName = (placeObj as { name?: string | null }).name
+  const placeName = rawName == null || rawName === "" ? null : String(rawName)
   const locRaw = "locations" in placeObj ? (placeObj as { locations?: unknown }).locations : undefined
   const locObj = Array.isArray(locRaw) ? locRaw[0] : locRaw
-  if (!locObj || typeof locObj !== "object") return null
-  return locObj as LocFromJoin
+  if (!locObj || typeof locObj !== "object") return { placeId: pid, placeName, loc: null }
+  return { placeId: pid, placeName, loc: locObj as LocFromJoin }
 }
 
 async function fetchScenesWithVideoForPlaceIds(
   supabase: AnonSupabase,
   fictionIds: string[],
   placeIds: string[],
-): Promise<Location[]> {
+): Promise<Place[]> {
   if (placeIds.length === 0 || fictionIds.length === 0) return []
 
   const { data: sceneRows, error: sceneError } = await supabase
@@ -189,6 +197,8 @@ async function fetchScenesWithVideoForPlaceIds(
         video_url,
         sort_order,
         places!inner (
+          id,
+          name,
           location_id,
           locations!inner (
             id,
@@ -241,22 +251,28 @@ async function fetchScenesWithVideoForPlaceIds(
       quote: string | null
       video_url: string
     }
-    const loc = locationFromSceneJoinRow(raw)
+    const geo = placeGeoFromSceneJoinRow(raw)
+    const loc = geo?.loc
     const poster = thumbBySceneId.get(r.id) ?? ""
     return {
       id: r.id,
-      name: r.title?.trim() || loc?.name || "Scene",
-      address: loc?.formatted_address ?? "",
-      lat: loc?.latitude ?? 0,
-      lng: loc?.longitude ?? 0,
-      cityId: loc?.city_id ?? "",
+      placeId: geo?.placeId ?? "",
+      name: geo?.placeName ?? null,
       fictionId: r.fiction_id ?? "",
+      location: {
+        name: loc?.name ?? "Unknown place",
+        address: loc?.formatted_address ?? "",
+        lat: loc?.latitude ?? 0,
+        lng: loc?.longitude ?? 0,
+        cityId: loc?.city_id ?? "",
+      },
       image: poster,
       videoUrl: String(r.video_url).trim(),
       description: r.description ?? "",
       sceneDescription: r.description ?? "",
       sceneQuote: r.quote ?? undefined,
       visitTip: undefined,
+      sceneTitle: r.title?.trim() || null,
     }
   })
 }
@@ -590,7 +606,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
     return [...ids].sort()
   },
 
-  async listScenesWithVideoInBbox(params: { fictionIds: string[]; bbox: MapBbox }): Promise<Location[]> {
+  async listScenesWithVideoInBbox(params: { fictionIds: string[]; bbox: MapBbox }): Promise<Place[]> {
     const { fictionIds, bbox } = params
     if (fictionIds.length === 0) return []
 
@@ -632,7 +648,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
   async listScenesWithVideoInCity(params: {
     fictionIds: string[]
     cityId: string
-  }): Promise<Location[]> {
+  }): Promise<Place[]> {
     const { fictionIds, cityId } = params
     if (fictionIds.length === 0) return []
 

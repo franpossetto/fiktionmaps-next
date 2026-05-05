@@ -4,7 +4,7 @@ import { X, MapPin, Quote, Lightbulb, ArrowRight } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { useTranslations } from "next-intl"
 import { Link } from "@/i18n/navigation"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import { Badge } from "@/components/ui/badge"
@@ -17,24 +17,23 @@ import { getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fict
 import { listScenesAction } from "@/src/scenes/infrastructure/next/scene.actions"
 
 interface LocationDetailProps {
-  location: Location
-  /** When provided (e.g. from map page), used instead of fetching. */
+  place: Place
   fiction?: FictionWithMedia | null
-  relatedLocations?: Location[]
+  relatedPlaces?: Place[]
   relatedFictions?: FictionWithMedia[]
   onClose: () => void
-  onSelectRelatedLocation?: (location: Location) => void
-  onViewPlace?: (location: Location) => void
+  onSelectRelatedPlace?: (place: Place) => void
+  onViewPlace?: (place: Place) => void
   onView3D?: () => void
 }
 
 export function LocationDetail({
-  location,
+  place,
   fiction: fictionProp,
-  relatedLocations = [],
+  relatedPlaces = [],
   relatedFictions = [],
   onClose,
-  onSelectRelatedLocation,
+  onSelectRelatedPlace,
   onViewPlace,
   onView3D: _onView3D,
 }: LocationDetailProps) {
@@ -54,7 +53,7 @@ export function LocationDetail({
       getActiveFictionsAction()
         .then((rows) => {
           if (cancelled) return
-          const hit = rows.find((f) => f.id === location.fictionId)
+          const hit = rows.find((f) => f.id === place.fictionId)
           setFiction(hit ?? undefined)
         })
         .catch(() => {
@@ -64,11 +63,11 @@ export function LocationDetail({
     return () => {
       cancelled = true
     }
-  }, [location.fictionId, fictionProp])
+  }, [place.fictionId, fictionProp])
 
   useEffect(() => {
     let cancelled = false
-    listScenesAction({ placeId: location.id, active: "true" })
+    listScenesAction({ placeId: place.id, active: "true" })
       .then((s) => {
         if (!cancelled) setPlaceScenes(s)
       })
@@ -78,17 +77,17 @@ export function LocationDetail({
     return () => {
       cancelled = true
     }
-  }, [location.id])
+  }, [place.id])
 
   const sceneCount = placeScenes.length
   const fictionMeta = [fiction?.year, fiction?.genre, fiction?.author].filter(Boolean).join(" · ")
   const fictionCoverSrc =
     fiction?.coverImage?.trim() || fiction?.coverImageLarge?.trim() || "/placeholder.svg"
-  const hasSceneNarrative = Boolean(location.sceneDescription?.trim() || location.sceneQuote?.trim())
+  const hasSceneNarrative = Boolean(place.sceneDescription?.trim() || place.sceneQuote?.trim())
 
   useEffect(() => {
     closeButtonRef.current?.focus()
-  }, [location.id])
+  }, [place.id])
 
   return (
     <>
@@ -101,12 +100,14 @@ export function LocationDetail({
         className="absolute inset-y-0 right-0 z-[2000] flex w-full flex-col border-l border-border/70 bg-background sm:w-[440px]"
         role="dialog"
         aria-modal="true"
-        aria-label={t("locationDetailDialogTitle", { name: location.name })}
+        aria-label={t("locationDetailDialogTitle", {
+          name: place.name ?? place.location.name,
+        })}
       >
         <div className="relative h-56 shrink-0">
           <Image
-            src={location.image || "/placeholder.svg"}
-            alt={location.name}
+            src={place.image || "/placeholder.svg"}
+            alt={place.name ?? place.location.name}
             fill
             className="object-cover"
           />
@@ -143,11 +144,11 @@ export function LocationDetail({
               </div>
               <div className="space-y-2">
                 <h2 className="text-xl font-bold leading-tight tracking-tight text-foreground text-balance sm:text-[1.35rem]">
-                  {location.name}
+                  {place.name ?? place.location.name}
                 </h2>
                 <div className="flex items-start gap-1.5 text-muted-foreground">
                   <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  <span className="text-xs leading-relaxed">{location.address}</span>
+                  <span className="text-xs leading-relaxed">{place.location.address}</span>
                 </div>
               </div>
 
@@ -210,7 +211,7 @@ export function LocationDetail({
               </section>
             )}
 
-            {relatedLocations.length > 0 && (
+            {relatedPlaces.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-center gap-3">
                   <span className="h-7 w-1 rounded-full bg-yellow-500" aria-hidden />
@@ -218,29 +219,31 @@ export function LocationDetail({
                     {t("nextPlacesHeading")}
                   </h3>
                   <span className="text-sm text-muted-foreground">
-                    ({Math.min(3, relatedLocations.length)})
+                    ({Math.min(3, relatedPlaces.length)})
                   </span>
                 </div>
                 <ul className="space-y-2">
-                  {relatedLocations.slice(0, 3).map((related) => (
+                  {relatedPlaces.slice(0, 3).map((related) => (
                     <li key={related.id}>
                       <button
                         type="button"
-                        onClick={() => onSelectRelatedLocation?.(related)}
+                        onClick={() => onSelectRelatedPlace?.(related)}
                         className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-card/30 p-2.5 text-left transition-colors hover:bg-card/60"
                       >
                         <div className="relative h-14 w-18 shrink-0 overflow-hidden rounded-md border border-border/60">
                           <Image
                             src={related.image || "/placeholder.svg"}
-                            alt={related.name}
+                            alt={related.name ?? related.location.name}
                             fill
                             className="object-cover"
                             sizes="72px"
                           />
                         </div>
                         <div className="min-w-0">
-                          <p className="line-clamp-1 text-sm font-semibold text-foreground">{related.name}</p>
-                          <p className="line-clamp-1 text-xs text-muted-foreground">{related.address}</p>
+                          <p className="line-clamp-1 text-sm font-semibold text-foreground">
+                            {related.name ?? related.location.name}
+                          </p>
+                          <p className="line-clamp-1 text-xs text-muted-foreground">{related.location.address}</p>
                         </div>
                       </button>
                     </li>
@@ -252,7 +255,7 @@ export function LocationDetail({
                     variant="secondary"
                     size="sm"
                     className="h-9 w-full justify-between"
-                    onClick={() => onViewPlace(location)}
+                    onClick={() => onViewPlace(place)}
                   >
                     <span>{t("viewMore")}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -313,16 +316,16 @@ export function LocationDetail({
                   </h3>
                 </div>
                 <div className="space-y-3 rounded-xl border border-border/60 bg-card/30 p-4">
-                  {location.sceneDescription?.trim() ? (
+                  {place.sceneDescription?.trim() ? (
                     <p className="text-sm leading-relaxed text-secondary-foreground">
-                      {location.sceneDescription}
+                      {place.sceneDescription}
                     </p>
                   ) : null}
-                  {location.sceneQuote && (
+                  {place.sceneQuote && (
                     <div className="flex gap-2 rounded-lg border border-border/60 bg-background/70 p-3">
                       <Quote className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                       <p className="text-sm italic text-foreground">
-                        {location.sceneQuote}
+                        {place.sceneQuote}
                       </p>
                     </div>
                   )}
@@ -330,7 +333,7 @@ export function LocationDetail({
               </section>
             )}
 
-            {location.visitTip && (
+            {place.visitTip && (
               <section className="flex gap-2.5 rounded-xl border border-primary/20 bg-primary/5 p-4">
                 <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <div className="flex flex-col gap-1">
@@ -338,7 +341,7 @@ export function LocationDetail({
                     {t("visitorTip")}
                   </h3>
                   <p className="text-sm leading-relaxed text-secondary-foreground">
-                    {location.visitTip}
+                    {place.visitTip}
                   </p>
                 </div>
               </section>

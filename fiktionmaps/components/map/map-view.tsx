@@ -7,37 +7,32 @@ import { motion } from "framer-motion"
 import { useMap } from "react-map-gl/mapbox"
 import { MapContainer, MapClusterLayer, useMapControl, useMapLoaded } from "@/lib/map"
 import type { ClusterItem } from "@/lib/map"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import { Map3DToggle } from "./map-3d-toggle"
 import { NavMap, NavMapSlot } from "./nav-map"
 
-/** High enough to break most pixel clusters and show the photo pin (not a numbered cluster). */
 const FOCUS_ZOOM = 18
 
 interface MapViewProps {
   city: City
-  locations: Location[]
-  onLocationClick: (location: Location) => void
+  places: Place[]
+  onLocationClick: (location: Place) => void
   selectedLocationId?: string | null
-  /** When set, map flies to this location and zooms in (e.g. from place navigator). */
   focusLocationId?: string | null
   is3D?: boolean
   onToggle3D?: (is3D: boolean) => void
-  /** Called when the map has finished loading; use to animate in overlay controls. */
   onMapLoaded?: () => void
-  /** Reports current map bounds (west,south,east,north) on move end. */
   onBoundsChange?: (bounds: { west: number; south: number; east: number; north: number }) => void
 }
 
-/** Flies the map to a location when focusLocationId changes. Must be rendered inside MapContainer. */
 function MapFocusController({
   cityId,
-  locations,
+  places,
   focusLocationId,
 }: {
   cityId: string
-  locations: Location[]
+  places: Place[]
   focusLocationId: string | null | undefined
 }) {
   const control = useMapControl()
@@ -49,11 +44,11 @@ function MapFocusController({
 
   useEffect(() => {
     if (!focusLocationId || !control) return
-    const loc = locations.find((l) => l.id === focusLocationId)
+    const loc = places.find((l) => l.id === focusLocationId)
     if (!loc) return
     if (prevFocusRef.current === focusLocationId) return
 
-    const { lat, lng } = loc
+    const { lat, lng } = loc.location
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
 
     let cancelled = false
@@ -78,28 +73,26 @@ function MapFocusController({
       cancelled = true
       if (timeoutId !== undefined) clearTimeout(timeoutId)
     }
-  }, [focusLocationId, locations, control])
+  }, [focusLocationId, places, control])
 
   return null
 }
 
 const ZOOM_2D_MIN = 12
 const ZOOM_2D_MAX = 20
-/** Pitch (tilt) above this is considered 3D so pins match when user manually rotates the map */
 const PITCH_3D_THRESHOLD = 20
 
-type LocationClusterItem = ClusterItem & { location: Location }
+type MapPinClusterItem = ClusterItem & { place: Place }
 
-function toClusterItems(locations: Location[]): LocationClusterItem[] {
-  return locations.map((loc) => ({
-    id: loc.id,
-    position: { lat: loc.lat, lng: loc.lng },
-    imageUrl: loc.image,
-    location: loc,
+function toClusterItems(places: Place[]): MapPinClusterItem[] {
+  return places.map((p) => ({
+    id: p.id,
+    position: { lat: p.location.lat, lng: p.location.lng },
+    imageUrl: p.image,
+    place: p,
   }))
 }
 
-/** Reports map loaded to parent; must be rendered inside MapContainer. */
 function MapLoadReporter({ onLoaded }: { onLoaded?: () => void }) {
   const mapLoaded = useMapLoaded()
   useEffect(() => {
@@ -128,6 +121,7 @@ function MapBoundsReporter({
     const report = () => {
       try {
         const b = map.getBounds()
+        if (!b) return
         onBoundsChange({
           west: b.getWest(),
           south: b.getSouth(),
@@ -151,7 +145,6 @@ function MapBoundsReporter({
   return null
 }
 
-/** Renders pins only after the map has loaded, so they animate in after tiles. */
 function MapViewPins({
   cityId,
   is3D,
@@ -162,10 +155,10 @@ function MapViewPins({
 }: {
   cityId: string
   is3D: boolean
-  clusterItems: LocationClusterItem[]
+  clusterItems: MapPinClusterItem[]
   selectedLocationId: string | null | undefined
-  onLocationClick: (location: Location) => void
-  renderMarker: (item: LocationClusterItem, state: { isSelected: boolean; isHovered: boolean }) => ReactNode
+  onLocationClick: (location: Place) => void
+  renderMarker: (item: MapPinClusterItem, state: { isSelected: boolean; isHovered: boolean }) => ReactNode
 }) {
   const mapLoaded = useMapLoaded()
   if (!mapLoaded) return null
@@ -176,11 +169,11 @@ function MapViewPins({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
     >
-      <MapClusterLayer<LocationClusterItem>
+      <MapClusterLayer<MapPinClusterItem>
         key={`pins-${cityId}-${is3D ? "3d" : "2d"}`}
         items={clusterItems}
         selectedItemId={selectedLocationId}
-        onItemClick={(item) => onLocationClick(item.location)}
+        onItemClick={(item) => onLocationClick(item.place)}
         renderItem={renderMarker}
       />
     </motion.div>
@@ -196,7 +189,7 @@ const pinHoverScale = 1.08
 const pinTapScale = 0.96
 
 function renderLocationMarker2D(
-  item: LocationClusterItem,
+  item: MapPinClusterItem,
   state: { isSelected: boolean; isHovered: boolean },
 ) {
   const { isSelected, isHovered } = state
@@ -225,8 +218,8 @@ function renderLocationMarker2D(
         style={{ filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.5))" }}
       >
         <Image
-          src={item.location.image}
-          alt={item.location.name}
+          src={item.place.image}
+          alt={item.place.name ?? item.place.location.name}
           fill
           className="object-cover"
           sizes="64px"
@@ -248,7 +241,7 @@ function renderLocationMarker2D(
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
         >
-          {item.location.name}
+          {item.place.name ?? item.place.location.name}
         </motion.div>
       )}
     </motion.div>
@@ -256,7 +249,7 @@ function renderLocationMarker2D(
 }
 
 function renderLocationMarker3D(
-  item: LocationClusterItem,
+  item: MapPinClusterItem,
   state: { isSelected: boolean; isHovered: boolean },
 ) {
   const { isSelected, isHovered } = state
@@ -285,7 +278,7 @@ function renderLocationMarker3D(
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
         >
-          {item.location.name}
+          {item.place.name ?? item.place.location.name}
         </motion.div>
       )}
       {/* Outer ring + image bubble */}
@@ -316,8 +309,8 @@ function renderLocationMarker3D(
           }}
         >
           <Image
-            src={item.location.image}
-            alt={item.location.name}
+            src={item.place.image}
+            alt={item.place.name ?? item.place.location.name}
             fill
             className="object-cover"
             sizes="56px"
@@ -372,7 +365,7 @@ function renderLocationMarker3D(
 
 export function MapView({
   city,
-  locations,
+  places,
   onLocationClick,
   selectedLocationId,
   focusLocationId,
@@ -381,7 +374,7 @@ export function MapView({
   onMapLoaded,
   onBoundsChange,
 }: MapViewProps) {
-  const clusterItems = useMemo(() => toClusterItems(locations), [locations])
+  const clusterItems = useMemo(() => toClusterItems(places), [places])
   const renderMarker = is3D ? renderLocationMarker3D : renderLocationMarker2D
 
   const effectiveZoom = is3D ? 18 : 14
@@ -413,7 +406,7 @@ export function MapView({
       <MapBoundsReporter onBoundsChange={onBoundsChange} />
       <MapFocusController
         cityId={city.id}
-        locations={locations}
+        places={places}
         focusLocationId={focusLocationId}
       />
       <MapViewPins
@@ -430,7 +423,7 @@ export function MapView({
           <Map3DTogglePortal is3D={is3D} onToggle={onToggle3D} cityId={city.id} />
         </>
       )}
-      <NavMapPortal city={city} viewportCenter={viewportCenter} locations={locations} />
+      <NavMapPortal city={city} viewportCenter={viewportCenter} places={places} />
     </MapContainer>
   )
 }
@@ -445,15 +438,14 @@ export function MapMinimapSlot() {
   return <NavMapSlot />
 }
 
-/** Renders NavMap portaled into the slot; must be inside MapContainer to get main map control. */
 function NavMapPortal({
   city,
   viewportCenter,
-  locations,
+  places,
 }: {
   city: City
   viewportCenter: { lat: number; lng: number }
-  locations: Location[]
+  places: Place[]
 }) {
   const control = useMapControl()
   const onMinimapClick = useCallback(
@@ -466,13 +458,12 @@ function NavMapPortal({
     <NavMap
       city={city}
       viewportCenter={viewportCenter}
-      locations={locations}
+      places={places}
       onMinimapClick={onMinimapClick}
     />
   )
 }
 
-/** Syncs is3D state with actual map pitch so pins switch to 3D when user manually tilts/rotates the map */
 function SyncPitchTo3D({ onToggle3D }: { onToggle3D: (is3D: boolean) => void }) {
   const maps = useMap()
   const mapRef = maps?.current

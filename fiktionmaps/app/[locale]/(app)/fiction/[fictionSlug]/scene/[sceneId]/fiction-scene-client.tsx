@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react"
 import { useParams } from "next/navigation"
 import { useRouter } from "@/i18n/navigation"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import type { Fiction, FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { SceneWatchView } from "@/components/scenes/scene-watch-view"
@@ -24,13 +24,13 @@ export function FictionSceneClient() {
   const sceneId = params.sceneId as string
 
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [location, setLocation] = useState<Location | null>(null)
+  const [location, setLocation] = useState<Place | null>(null)
   const [resolvedFiction, setResolvedFiction] = useState<FictionWithMedia | null>(null)
   const [fiction, setFiction] = useState<Fiction | undefined>(undefined)
   /** Loaded by id so direct links work even when scene.active is false */
   const [sceneFromUrl, setSceneFromUrl] = useState<Scene | null>(null)
   const [fictionScenes, setFictionScenes] = useState<Scene[]>([])
-  const [sceneLocations, setSceneLocations] = useState<Map<string, Location>>(new Map())
+  const [sceneLocations, setSceneLocations] = useState<Map<string, Place>>(new Map())
 
   useEffect(() => {
     let cancelled = false
@@ -92,7 +92,7 @@ export function FictionSceneClient() {
         }),
       )
       if (cancelled) return
-      const locMap = new Map<string, Location>()
+      const locMap = new Map<string, Place>()
       for (const entry of placeEntries) {
         if (!entry) continue
         const matchingScene = [...fs, scene].find((item) => item.placeId === entry.placeId)

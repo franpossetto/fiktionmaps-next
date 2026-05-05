@@ -10,7 +10,7 @@ import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import { ScenePreviewThumb } from "@/components/scenes/scene-preview-thumb"
@@ -49,7 +49,7 @@ export interface FictionPlaceDetailViewProps {
   fiction: FictionWithMedia
   /** Segment for `/fictions/...` and `/fiction/...` paths (slug preferred). */
   fictionPathSlug: string
-  location: Location
+  location: Place
   city: City | undefined
   scenes: Scene[]
   exploreMapHref: string
@@ -65,11 +65,11 @@ export function FictionPlaceDetailView({
 }: FictionPlaceDetailViewProps) {
   const t = useTranslations("Fictions")
   const tCommon = useTranslations("Common")
-  const displayName = location.placeName ?? location.name ?? "Sin nombre"
+  const displayName = location.name?.trim() || location.location.name || "Sin nombre"
   const heroSrc = location.image?.trim() ? location.image.trim() : DEFAULT_FICTION_COVER
-  const coordsOk = hasValidPlaceCoordinates(location.lat, location.lng)
+  const coordsOk = hasValidPlaceCoordinates(location.location.lat, location.location.lng)
   const addressLine =
-    location.address?.trim() ||
+    location.location.address?.trim() ||
     (city ? [city.name, city.country].filter(Boolean).join(", ") : "") ||
     ""
 
@@ -153,7 +153,7 @@ export function FictionPlaceDetailView({
               {coordsOk ? (
                 <FictionPlaceDirectionsMap
                   mapInstanceId={`fiction-place-directions-${location.id}`}
-                  center={{ lat: location.lat, lng: location.lng }}
+                  center={{ lat: location.location.lat, lng: location.location.lng }}
                   placeName={displayName}
                   imageSrc={heroSrc}
                 />
@@ -161,7 +161,7 @@ export function FictionPlaceDetailView({
               {addressLine ? (
                 <p className="text-sm leading-relaxed sm:text-base">
                   <a
-                    href={googleMapsHref(coordsOk, location.lat, location.lng, addressLine)}
+                    href={googleMapsHref(coordsOk, location.location.lat, location.location.lng, addressLine)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-foreground underline-offset-4 transition-colors hover:text-primary hover:underline"
@@ -172,7 +172,7 @@ export function FictionPlaceDetailView({
               ) : coordsOk ? (
                 <p className="text-sm leading-relaxed sm:text-base">
                   <a
-                    href={googleMapsHref(true, location.lat, location.lng, "")}
+                    href={googleMapsHref(true, location.location.lat, location.location.lng, "")}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-foreground underline-offset-4 transition-colors hover:text-primary hover:underline"

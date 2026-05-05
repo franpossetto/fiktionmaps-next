@@ -83,7 +83,6 @@ function searchBoxContextToV5(
   return out
 }
 
-/** Location type options for the Create Place form (stored on locations.type). */
 export const LOCATION_TYPE_OPTIONS = [
   { value: "", label: "Select type" },
   { value: "street", label: "Street" },

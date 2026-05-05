@@ -2,10 +2,10 @@
 
 import Image from "next/image"
 import { ArrowRight } from "lucide-react"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 
 interface LocationCardProps {
-  location: Location
+  location: Place
   onClick?: () => void
   hoverLabel?: string
   /** Slightly tighter layout and smaller type (e.g. fiction detail grid). */
@@ -29,7 +29,7 @@ export function LocationCard({
       >
         <Image
           src={location.image}
-          alt={location.name}
+          alt={location.name ?? location.location.name}
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
@@ -50,10 +50,10 @@ export function LocationCard({
         <h3
           className={`font-semibold text-foreground transition-colors group-hover:text-primary ${compact ? "text-xs" : "text-sm"}`}
         >
-          {location.name}
+          {location.name ?? location.location.name}
         </h3>
         <p className={`line-clamp-1 text-muted-foreground ${compact ? "text-[11px]" : "text-xs"}`}>
-          {location.address}
+          {location.location.address}
         </p>
       </div>
     </button>

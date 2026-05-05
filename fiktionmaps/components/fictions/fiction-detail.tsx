@@ -13,14 +13,14 @@ import { FictionCard } from "@/components/fictions/fiction-card"
 import { FictionInterestTags, type FictionInterestTagItem } from "@/components/fictions/fiction-interest-tags"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { City } from "@/src/cities/domain/city.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import { getFictionLikeCountsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
 import { getMyLikedFictionIdsAction, toggleFictionLikeAction } from "@/src/users/infrastructure/next/user.actions"
 import { localStorageService } from "@/lib/local-storage-service"
 
 export interface FictionDetailProps {
   fiction: FictionWithMedia
-  initialLocations: Location[]
+  initialPlaces: Place[]
   initialCities: City[]
   initialLikeCount: number
   initialLiked: boolean
@@ -32,7 +32,7 @@ export interface FictionDetailProps {
 
 export function FictionDetail({
   fiction,
-  initialLocations,
+  initialPlaces,
   initialCities,
   initialLikeCount,
   initialLiked,
@@ -141,12 +141,12 @@ export function FictionDetail({
 
   const locationRows = useMemo(() => {
     const cityById = new Map(initialCities.map((city) => [city.id, city]))
-    return initialLocations.map((location, index) => ({
+    return initialPlaces.map((location, index) => ({
       index: index + 1,
       location,
-      city: cityById.get(location.cityId),
+      city: cityById.get(location.location.cityId),
     }))
-  }, [initialLocations, initialCities])
+  }, [initialPlaces, initialCities])
 
   const heroSrc =
     !coverError &&
@@ -154,7 +154,7 @@ export function FictionDetail({
       ? (fiction.bannerImage?.trim() || fiction.coverImageLarge?.trim() || fiction.coverImage?.trim())!
       : DEFAULT_FICTION_COVER
 
-  const firstCityId = initialCities[0]?.id ?? initialLocations[0]?.cityId
+  const firstCityId = initialCities[0]?.id ?? initialPlaces[0]?.location.cityId
   const exploreMapHref = firstCityId
     ? `/map?fiction=${encodeURIComponent(fiction.id)}&city=${encodeURIComponent(firstCityId)}`
     : `/map?fiction=${encodeURIComponent(fiction.id)}`
@@ -258,7 +258,7 @@ export function FictionDetail({
 
             <ol className="divide-y divide-border/60 rounded-xl border border-border/40 bg-card/30">
               {locationRows.map(({ index, location, city }) => {
-                const googleMapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${location.lat},${location.lng}`)}`
+                const googleMapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${location.location.lat},${location.location.lng}`)}`
                 return (
                   <li key={location.id} className="px-4 py-4 sm:px-5 sm:py-5">
                     <div className="flex items-center gap-4">
@@ -272,7 +272,7 @@ export function FictionDetail({
                         <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted/30 sm:h-18 sm:w-24">
                           <Image
                             src={location.image || "/placeholder.svg"}
-                            alt={location.name}
+                            alt={location.name ?? location.location.name}
                             fill
                             className="object-cover"
                             sizes="96px"
@@ -283,8 +283,10 @@ export function FictionDetail({
                             {city?.name}
                             {city?.country ? `, ${city.country}` : ""}
                           </p>
-                          <p className="mt-1 text-base font-semibold leading-snug text-foreground sm:text-lg">{location.name}</p>
-                          <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{location.address}</p>
+                          <p className="mt-1 text-base font-semibold leading-snug text-foreground sm:text-lg">
+                            {location.name ?? location.location.name}
+                          </p>
+                          <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{location.location.address}</p>
                         </div>
                       </Link>
                       <div className="flex shrink-0 items-center gap-2">

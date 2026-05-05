@@ -4,7 +4,7 @@ import type { Database } from "@/supabase/database.types"
 import { createClient } from "@/lib/supabase/server"
 import { ASSET_IMAGES_BUCKET } from "@/lib/asset-images/variant-sizes"
 import type { MapBbox } from "@/lib/validation/map-query"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
 import type { PlacesRepositoryPort } from "@/src/places/domain/place.repository"
 
@@ -25,10 +25,10 @@ function optStr(row: Record<string, unknown>, snake: string, camel: string): str
   return typeof v === "string" ? v : null
 }
 
-function mapPlaceRowsToLocations(
+function mapPlaceRowsToPlaces(
   placeRows: Record<string, unknown>[],
   avatarByPlaceId: Map<string, string>
-): Location[] {
+): Place[] {
   return placeRows.map((p) => {
     const placeId = (p.id as string) ?? ""
     const fictionId = (p.fiction_id ?? p.fictionId) as string
@@ -41,32 +41,34 @@ function mapPlaceRowsToLocations(
         ? (locRow as Record<string, unknown>)
         : null
 
-    const name = loc ? str(loc, "name", "name") || "Unknown place" : "Unknown place"
+    const geoName = loc ? str(loc, "name", "name") || "Unknown place" : "Unknown place"
     const address = loc ? str(loc, "formatted_address", "formattedAddress") : ""
     const lat = loc ? num(loc, "latitude", "latitude") : 0
     const lng = loc ? num(loc, "longitude", "longitude") : 0
     const cityId = loc ? str(loc, "city_id", "cityId") : ""
     const locationType = loc ? optStr(loc, "type", "type") : null
     const isLandmark = loc ? Boolean(loc.is_landmark ?? loc.isLandmark) : false
-    const placeName = optStr(p, "name", "name")
 
     return {
       id: placeId,
-      placeName,
-      name,
-      address,
-      lat,
-      lng,
-      cityId,
+      placeId,
+      name: optStr(p, "name", "name"),
       fictionId,
+      location: {
+        name: geoName,
+        address,
+        lat,
+        lng,
+        cityId,
+        locationType,
+        isLandmark,
+      },
       image: avatarByPlaceId.get(placeId) ?? "/placeholder.svg",
       videoUrl: "",
       description,
       sceneDescription: "",
       sceneQuote: undefined,
       visitTip: undefined,
-      locationType,
-      isLandmark,
     }
   })
 }
@@ -75,7 +77,7 @@ export function createPlacesSupabaseAdapter(
   getSupabase: () => Promise<SupabaseClient<Database>>
 ): PlacesRepositoryPort {
   return {
-    listAllAsLocations: cache(async (): Promise<Location[]> => {
+    listAllPlaces: cache(async (): Promise<Place[]> => {
       const supabase = await getSupabase()
       const { data: placeRows, error: placesError } = await supabase
         .from("places")
@@ -86,7 +88,7 @@ export function createPlacesSupabaseAdapter(
         .range(0, 9999)
 
       if (placesError) {
-        console.error("[places repo] listAllAsLocations query error:", placesError.message)
+        console.error("[places repo] listAllPlaces query error:", placesError.message)
         return []
       }
 
@@ -110,7 +112,7 @@ export function createPlacesSupabaseAdapter(
         }
       }
 
-      return mapPlaceRowsToLocations(places, avatarByPlaceId)
+      return mapPlaceRowsToPlaces(places, avatarByPlaceId)
     }),
 
     getCountsByFictionIds: cache(async (fictionIds: string[]): Promise<Record<string, number>> => {
@@ -142,7 +144,7 @@ export function createPlacesSupabaseAdapter(
       return counts
     }),
 
-    getByFictionId: cache(async (fictionId: string): Promise<Location[]> => {
+    getByFictionId: cache(async (fictionId: string): Promise<Place[]> => {
       const supabase = await getSupabase()
       const { data: placeRows, error } = await supabase
         .from("places")
@@ -172,10 +174,10 @@ export function createPlacesSupabaseAdapter(
           if (eid && url) avatarByPlaceId.set(String(eid), String(url))
         }
       }
-      return mapPlaceRowsToLocations(places, avatarByPlaceId)
+      return mapPlaceRowsToPlaces(places, avatarByPlaceId)
     }),
 
-    getByCityId: cache(async (cityId: string): Promise<Location[]> => {
+    getByCityId: cache(async (cityId: string): Promise<Place[]> => {
       const supabase = await getSupabase()
       const { data: locRows } = await supabase
         .from("locations")
@@ -213,7 +215,7 @@ export function createPlacesSupabaseAdapter(
           if (eid && url) avatarByPlaceId.set(String(eid), String(url))
         }
       }
-      return mapPlaceRowsToLocations(places, avatarByPlaceId)
+      return mapPlaceRowsToPlaces(places, avatarByPlaceId)
     }),
 
     getFictionIdsByCityId: cache(async (cityId: string): Promise<string[]> => {
@@ -236,7 +238,7 @@ export function createPlacesSupabaseAdapter(
       return [...new Set((placeRows ?? []).map((r) => r.fiction_id).filter(Boolean))]
     }),
 
-    getById: cache(async (placeId: string, avatarVariant: "sm" | "lg" = "sm"): Promise<Location | null> => {
+    getById: cache(async (placeId: string, avatarVariant: "sm" | "lg" = "sm"): Promise<Place | null> => {
       const supabase = await getSupabase()
       const { data: row, error } = await supabase
         .from("places")
@@ -258,6 +260,7 @@ export function createPlacesSupabaseAdapter(
         longitude: number | null
         city_id: string | null
         is_landmark: boolean | null
+        type: string | null
       }
 
       const fetchAvatarUrl = async (variant: "sm" | "lg"): Promise<string | null> => {
@@ -278,28 +281,32 @@ export function createPlacesSupabaseAdapter(
         imageUrl = await fetchAvatarUrl("sm")
       }
 
-      const placeName = optStr(row as Record<string, unknown>, "name", "name")
+      const pid = row.id as string
 
       return {
-        id: row.id as string,
-        placeName,
-        name: loc?.name ?? "Unknown place",
-        address: loc?.formatted_address ?? "",
-        lat: loc?.latitude ?? 0,
-        lng: loc?.longitude ?? 0,
-        cityId: loc?.city_id ?? "",
+        id: pid,
+        placeId: pid,
+        name: optStr(row as Record<string, unknown>, "name", "name"),
         fictionId: row.fiction_id as string,
+        location: {
+          name: loc?.name ?? "Unknown place",
+          address: loc?.formatted_address ?? "",
+          lat: loc?.latitude ?? 0,
+          lng: loc?.longitude ?? 0,
+          cityId: loc?.city_id ?? "",
+          locationType: loc?.type ?? null,
+          isLandmark: loc?.is_landmark ?? undefined,
+        },
         image: imageUrl ?? "/placeholder.svg",
         videoUrl: "",
         description: (row.description as string | null) ?? "",
         sceneDescription: "",
         sceneQuote: undefined,
         visitTip: undefined,
-        isLandmark: loc?.is_landmark ?? undefined,
       }
     }),
 
-    async getByBboxAndFictionIds(fictionIds: string[], bbox: MapBbox): Promise<Location[]> {
+    async getByBboxAndFictionIds(fictionIds: string[], bbox: MapBbox): Promise<Place[]> {
       if (fictionIds.length === 0) return []
       const supabase = await getSupabase()
       const { data: rows, error } = await supabase
@@ -311,12 +318,15 @@ export function createPlacesSupabaseAdapter(
            )`
         )
         .in("fiction_id", fictionIds)
-        .gte("location.latitude", bbox.south)
-        .lte("location.latitude", bbox.north)
-        .gte("location.longitude", bbox.west)
-        .lte("location.longitude", bbox.east)
+        .gte("locations.latitude", bbox.south)
+        .lte("locations.latitude", bbox.north)
+        .gte("locations.longitude", bbox.west)
+        .lte("locations.longitude", bbox.east)
 
-      if (error) return []
+      if (error) {
+        console.error("[places repo] getByBboxAndFictionIds:", error.message)
+        return []
+      }
 
       const placeIds = (rows ?? []).map((r) => r.id as string)
       if (placeIds.length === 0) return []
@@ -340,18 +350,24 @@ export function createPlacesSupabaseAdapter(
           latitude?: number | null
           longitude?: number | null
           city_id?: string | null
+          is_landmark?: boolean | null
+          type?: string | null
         }
         const pid = r.id as string
-        const placeName = optStr(r as Record<string, unknown>, "name", "name")
         return {
           id: pid,
-          placeName,
-          name: loc?.name ?? "Unknown place",
-          address: loc?.formatted_address ?? "",
-          lat: loc?.latitude ?? 0,
-          lng: loc?.longitude ?? 0,
-          cityId: loc?.city_id ?? "",
+          placeId: pid,
+          name: optStr(r as Record<string, unknown>, "name", "name"),
           fictionId: (r.fiction_id as string) ?? "",
+          location: {
+            name: loc?.name ?? "Unknown place",
+            address: loc?.formatted_address ?? "",
+            lat: loc?.latitude ?? 0,
+            lng: loc?.longitude ?? 0,
+            cityId: loc?.city_id ?? "",
+            locationType: loc?.type ?? null,
+            isLandmark: loc?.is_landmark ?? undefined,
+          },
           image: avatarByPlaceId.get(pid) ?? "/placeholder.svg",
           videoUrl: "",
           description: (r.description as string | null) ?? "",
@@ -391,6 +407,7 @@ export function createPlacesSupabaseAdapter(
         .insert({
           fiction_id: data.fictionId,
           location_id: locationRow.id,
+          name: data.name.trim(),
           description: data.description.trim(),
           active: true,
         })

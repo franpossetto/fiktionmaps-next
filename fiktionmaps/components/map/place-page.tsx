@@ -5,7 +5,7 @@ import Image from "next/image"
 import { ArrowLeft, MapPin, Play, Lightbulb, Quote, Film, Tv, Clock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { PageStickyBar } from "@/components/layout/page-sticky-bar"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import type { Fiction, FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { City } from "@/src/cities/domain/city.entity"
@@ -17,7 +17,7 @@ import { getPlaceLocationAction } from "@/src/places/infrastructure/next/place.a
 import { listScenesAction } from "@/src/scenes/infrastructure/next/scene.actions"
 
 export interface PlacePageProps {
-  location: Location
+  location: Place
   /** When provided (e.g. from map), used instead of fetching. */
   fiction?: Fiction | FictionWithMedia | null
   /** When provided (e.g. from map), used instead of fetching. */
@@ -41,7 +41,7 @@ export function PlacePage({
   const [city, setCity] = useState<City | undefined>(cityProp ?? undefined)
   const [scenes, setScenes] = useState<Scene[]>([])
   const [fictionScenes, setFictionScenes] = useState<Scene[]>([])
-  const [sceneLocations, setSceneLocations] = useState<Map<string, Location>>(new Map())
+  const [sceneLocations, setSceneLocations] = useState<Map<string, Place>>(new Map())
 
   useEffect(() => {
     if (fictionProp !== undefined) setFiction(fictionProp ?? undefined)
@@ -58,7 +58,7 @@ export function PlacePage({
         cityProp !== undefined
           ? Promise.resolve(cityProp ?? null)
           : getAllCitiesAction()
-              .then((rows) => rows.find((item) => item.id === location.cityId) ?? null),
+              .then((rows) => rows.find((item) => item.id === location.location.cityId) ?? null),
       ])
       if (cancelled) return
       setFiction(f ?? undefined)
@@ -83,7 +83,7 @@ export function PlacePage({
         }),
       )
       if (cancelled) return
-      const locMap = new Map<string, Location>()
+      const locMap = new Map<string, Place>()
       for (const entry of placeEntries) {
         if (!entry) continue
         const matchingScene = fs.find((scene) => scene.placeId === entry.placeId)
@@ -96,7 +96,7 @@ export function PlacePage({
     return () => {
       cancelled = true
     }
-  }, [location.id, location.fictionId, location.cityId, fictionProp, cityProp])
+  }, [location.id, location.fictionId, location.location.cityId, fictionProp, cityProp])
 
   // For TV series group by season; for movies/books keep flat
   const isTvSeries = fiction?.type === "tv-series"
@@ -188,7 +188,11 @@ export function PlacePage({
               <ArrowLeft className="h-4 w-4" />
             </button>
           }
-          title={<span className="text-sm font-semibold text-foreground">{location.name}</span>}
+          title={
+            <span className="text-sm font-semibold text-foreground">
+              {location.name ?? location.location.name}
+            </span>
+          }
           trailing={
             fiction ? (
               <Badge
@@ -206,7 +210,7 @@ export function PlacePage({
       <div ref={heroRef} className="relative h-64 shrink-0 overflow-hidden md:h-80">
         <Image
           src={location.image}
-          alt={location.name}
+          alt={location.name ?? location.location.name}
           fill
           className="object-cover"
           priority
@@ -248,12 +252,12 @@ export function PlacePage({
           )}
 
           <h1 className="text-2xl font-bold leading-tight text-foreground text-balance md:text-3xl">
-            {location.name}
+            {location.name ?? location.location.name}
           </h1>
 
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <MapPin className="h-3.5 w-3.5 shrink-0" />
-            <span className="text-xs">{location.address}</span>
+            <span className="text-xs">{location.location.address}</span>
             {city && (
               <>
                 <span className="text-xs opacity-40">&middot;</span>

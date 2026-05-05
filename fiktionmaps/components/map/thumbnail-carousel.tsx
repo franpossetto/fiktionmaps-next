@@ -3,28 +3,26 @@
 import { useRef, useState, useEffect, useCallback } from "react"
 import { ChevronLeft, ChevronRight, Images, X } from "lucide-react"
 import { useTranslations } from "next-intl"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { usePlaceSelectorCollapsedStorage } from "@/lib/local-storage-service-hooks"
 
-/** Match nav map small height (SIZE_SMALL.height in nav-map.tsx) */
 const CAROUSEL_HEIGHT = 140
 const THUMB_SIZE = CAROUSEL_HEIGHT - 16 // minus py-2
 const THUMB_SIZE_PX = `${THUMB_SIZE}px`
 
 interface ThumbnailCarouselProps {
-  locations: Location[]
+  places: Place[]
   selectedLocationId?: string | null
-  onLocationClick: (location: Location) => void
-  /** When provided (e.g. from map page), parent owns state for Enter/Escape handling. */
+  onLocationClick: (location: Place) => void
   placeSelectorCollapsed?: boolean
   setPlaceSelectorCollapsed?: (collapsed: boolean) => void
 }
 
 export function ThumbnailCarousel({
-  locations,
+  places,
   selectedLocationId,
   onLocationClick,
   placeSelectorCollapsed: controlledCollapsed,
@@ -46,36 +44,35 @@ export function ThumbnailCarousel({
 
   const selectedIndex =
     selectedLocationId != null
-      ? locations.findIndex((loc) => loc.id === selectedLocationId)
+      ? places.findIndex((loc) => loc.id === selectedLocationId)
       : -1
   const effectiveIndex = selectedIndex >= 0 ? selectedIndex : 0
-  const selectedLocation = selectedIndex >= 0 ? locations[selectedIndex] : null
+  const selectedLocation = selectedIndex >= 0 ? places[selectedIndex] : null
 
   const goToPrevPlace = useCallback(() => {
-    if (locations.length === 0) return
-    const nextIndex = selectedIndex > 0 ? selectedIndex - 1 : locations.length - 1
-    onLocationClick(locations[nextIndex])
+    if (places.length === 0) return
+    const nextIndex = selectedIndex > 0 ? selectedIndex - 1 : places.length - 1
+    onLocationClick(places[nextIndex])
     thumbRefs.current[nextIndex]?.focus()
-  }, [locations, selectedIndex, onLocationClick])
+  }, [places, selectedIndex, onLocationClick])
 
   const goToNextPlace = useCallback(() => {
-    if (locations.length === 0) return
+    if (places.length === 0) return
     const nextIndex =
-      selectedIndex >= 0 && selectedIndex < locations.length - 1 ? selectedIndex + 1 : 0
-    onLocationClick(locations[nextIndex])
+      selectedIndex >= 0 && selectedIndex < places.length - 1 ? selectedIndex + 1 : 0
+    onLocationClick(places[nextIndex])
     thumbRefs.current[nextIndex]?.focus()
-  }, [locations, selectedIndex, onLocationClick])
+  }, [places, selectedIndex, onLocationClick])
 
   useEffect(() => {
-    if (effectiveIndex < 0 || !scrollRef.current || !locations[effectiveIndex]) return
-    const id = locations[effectiveIndex].id
-    const thumb = scrollRef.current.querySelector(`[data-location-id="${id}"]`)
+    if (effectiveIndex < 0 || !scrollRef.current || !places[effectiveIndex]) return
+    const id = places[effectiveIndex].id
+    const thumb = scrollRef.current.querySelector(`[data-place-id="${id}"]`)
     if (thumb) {
       thumb.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" })
     }
-  }, [effectiveIndex, locations])
+  }, [effectiveIndex, places])
 
-  // Focus expand button when transitioning from expanded to collapsed
   useEffect(() => {
     const wasExpanded = prevCollapsedRef.current === false
     const isNowCollapsed = placeSelectorCollapsed === true
@@ -85,10 +82,9 @@ export function ThumbnailCarousel({
     }
   }, [placeSelectorCollapsed])
 
-  // When opening Navigation mode, focus the current or first thumb and sync map to that place
   useEffect(() => {
-    if (!isVisible || locations.length === 0) return
-    const loc = locations[effectiveIndex]
+    if (!isVisible || places.length === 0) return
+    const loc = places[effectiveIndex]
     if (loc) onLocationClick(loc)
     const toFocus = thumbRefs.current[effectiveIndex] ?? thumbRefs.current[0]
     toFocus?.focus()
@@ -108,7 +104,7 @@ export function ThumbnailCarousel({
     setPlaceSelectorCollapsed(true)
   }
 
-  if (locations.length === 0) return null
+  if (places.length === 0) return null
 
   if (!isVisible) {
     return (
@@ -160,9 +156,9 @@ export function ThumbnailCarousel({
             ref={scrollRef}
             className="flex flex-1 min-w-0 gap-1.5 overflow-x-auto scroll-smooth no-scrollbar py-0.5"
             role="listbox"
-            aria-activedescendant={locations[effectiveIndex]?.id}
+            aria-activedescendant={places[effectiveIndex]?.id}
           >
-            {locations.map((loc, index) => {
+            {places.map((loc, index) => {
               const isSelected = selectedLocationId === loc.id
               const isHovered = hoveredId === loc.id
               const tabIndex = effectiveIndex === index ? 0 : -1
@@ -172,15 +168,15 @@ export function ThumbnailCarousel({
                   ref={(el) => {
                     thumbRefs.current[index] = el
                   }}
-                  data-location-id={loc.id}
+                  data-place-id={loc.id}
                   role="option"
                   tabIndex={tabIndex}
                   id={loc.id}
                   aria-selected={isSelected}
                   aria-label={t("placeOfTotal", {
-                    name: loc.name,
+                    name: loc.sceneTitle ?? loc.name ?? loc.location.name,
                     current: index + 1,
-                    total: locations.length,
+                    total: places.length,
                   })}
                   onClick={() => onLocationClick(loc)}
                   onMouseEnter={() => setHoveredId(loc.id)}

@@ -6,7 +6,7 @@ import { getAllPersonsCached } from "@/src/persons/infrastructure/next/person.qu
 import { AdminDashboard } from "@/components/admin/admin-dashboard"
 
 export default async function AdminPage() {
-  const [initialFictions, initialCities, initialLocations, initialPersons] = await Promise.all([
+  const [initialFictions, initialCities, initialPlaces, initialPersons] = await Promise.all([
     getAllFictionsCached(),
     getAllCitiesCached(),
     getAllPlacesCached(),
@@ -18,7 +18,7 @@ export default async function AdminPage() {
         <AdminDashboard
           initialFictions={initialFictions}
           initialCities={initialCities}
-          initialLocations={initialLocations}
+          initialPlaces={initialPlaces}
           initialPersons={initialPersons}
         />
       </Suspense>

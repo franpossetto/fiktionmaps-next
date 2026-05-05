@@ -5,7 +5,7 @@ import { ArrowLeft, Play, Pause, Volume2, VolumeX } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ScenePreviewThumb } from "@/components/scenes/scene-preview-thumb"
 import { PageStickyBar } from "@/components/layout/page-sticky-bar"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
@@ -24,7 +24,7 @@ export function SceneWatchView({
   fiction?: Fiction
   isTvSeries: boolean
   upNextScenes: Scene[]
-  sceneLocations: Map<string, Location>
+  sceneLocations: Map<string, Place>
   onBack: () => void
   onSelectScene: (scene: Scene) => void
   /** When true, ancestor `[data-detail-main-scroll]` scrolls instead of this root. */
@@ -161,7 +161,7 @@ export function SceneWatchView({
                     <div className="min-w-0">
                       <p className="line-clamp-2 text-xs font-semibold text-foreground">{scene.title}</p>
                       <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">
-                        {sceneLocation?.name || "Unknown location"}
+                        {sceneLocation?.name ?? sceneLocation?.location.name ?? "Unknown location"}
                       </p>
                       {scene.timestamp && (
                         <p className="mt-1 text-[11px] text-muted-foreground">{scene.timestamp}</p>

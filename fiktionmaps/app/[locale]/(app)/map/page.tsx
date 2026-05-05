@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { useTranslations } from "next-intl"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import { MapView, Map3DToggleSlot, MapMinimapSlot } from "@/components/map/map-view"
 import { MapProvider } from "@/lib/map"
 import { CitySelector } from "@/components/map/city-selector"
@@ -24,7 +24,6 @@ import { isUuidString } from "@/lib/validation/primitives"
 
 type Bbox = { west: number; south: number; east: number; north: number }
 
-/** Returns a bbox (west, south, east, north) for a ~radiusKm square around lat/lng. */
 function bboxAround(lat: number, lng: number, radiusKm: number): Bbox {
   const kmPerDegLat = 111.32
   const deltaLat = radiusKm / kmPerDegLat
@@ -37,7 +36,6 @@ function bboxAround(lat: number, lng: number, radiusKm: number): Bbox {
   }
 }
 
-/** Union of two bboxes so the result contains both areas. */
 function bboxUnion(a: Bbox, b: Bbox): Bbox {
   return {
     west: Math.min(a.west, b.west),
@@ -64,15 +62,14 @@ function MapPageInner() {
   const [selectedCity, setSelectedCity] = useState<City | null>(null)
   const [availableFictions, setAvailableFictions] = useState<FictionWithMedia[]>([])
   const [selectedFictionIds, setSelectedFictionIds] = useState<string[]>([])
-  const [filteredLocations, setFilteredLocations] = useState<Location[]>([])
-  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null)
-  const [focusedLocationId, setFocusedLocationId] = useState<string | null>(null)
+  const [filteredPlaces, setFilteredPlaces] = useState<Place[]>([])
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null)
+  const [focusedPlaceId, setFocusedPlaceId] = useState<string | null>(null)
   const [is3D, setIs3D] = useState(false)
   const [bounds, setBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
   const [citiesLoading, setCitiesLoading] = useState(true)
   const [hasAppliedInitialPlaceOpen, setHasAppliedInitialPlaceOpen] = useState(false)
 
-  // Load cities, then open city/fictions (optionally from ?city= & ?fiction= when opening from a fiction page)
   useEffect(() => {
     setCitiesLoading(true)
     let cancelled = false
@@ -87,12 +84,10 @@ function MapPageInner() {
         const city =
           (initialCityId && citiesList.find((c) => c.id === initialCityId)) || citiesList[0]
         setSelectedCity(city)
-        // Render map shell as soon as city is known; keep fictions loading in the background.
         setCitiesLoading(false)
 
         const canPrefillInitialFiction = Boolean(initialFictionId && isUuidString(initialFictionId))
         if (canPrefillInitialFiction) {
-          // Optimistic preselection for Explore Map deep links to start loading pins earlier.
           setSelectedFictionIds([initialFictionId!])
         }
 
@@ -112,14 +107,12 @@ function MapPageInner() {
     return () => {
       cancelled = true
     }
-    // Intentionally only on mount; query is read once for initial state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Deep link ?place=: sync focus and ensure the pin is in the list (bbox query can omit it or SSR had no searchParams).
   useEffect(() => {
     if (placeParam && isUuidString(placeParam)) {
-      setFocusedLocationId(placeParam)
+      setFocusedPlaceId(placeParam)
     }
   }, [placeParam])
 
@@ -130,26 +123,26 @@ function MapPageInner() {
       setHasAppliedInitialPlaceOpen(true)
       return
     }
-    if (selectedLocation?.id === deepPlaceId) {
+    if (selectedPlace?.id === deepPlaceId) {
       setHasAppliedInitialPlaceOpen(true)
       return
     }
-    const targetLocation = filteredLocations.find((location) => location.id === deepPlaceId)
-    if (!targetLocation) return
-    setFocusedLocationId(deepPlaceId)
-    setSelectedLocation(targetLocation)
+    const targetPlace = filteredPlaces.find((p) => p.id === deepPlaceId)
+    if (!targetPlace) return
+    setFocusedPlaceId(deepPlaceId)
+    setSelectedPlace(targetPlace)
     setHasAppliedInitialPlaceOpen(true)
   }, [
     shouldOpenSidebarFromQuery,
     hasAppliedInitialPlaceOpen,
     placeParam,
-    filteredLocations,
-    selectedLocation?.id,
+    filteredPlaces,
+    selectedPlace?.id,
   ])
 
   useEffect(() => {
     if (!selectedCity || selectedFictionIds.length === 0) {
-      setFilteredLocations([])
+      setFilteredPlaces([])
       return
     }
     const minBbox = bboxAround(selectedCity.lat, selectedCity.lng, MIN_LOAD_RADIUS_KM)
@@ -165,7 +158,7 @@ function MapPageInner() {
           if (cancelled) return
           if (loc) list = [...list, loc]
         }
-        if (!cancelled) setFilteredLocations(list)
+        if (!cancelled) setFilteredPlaces(list)
       })
       .catch(() => {})
     return () => {
@@ -175,8 +168,8 @@ function MapPageInner() {
 
   const handleCityChange = useCallback(async (city: City) => {
     setSelectedCity(city)
-    setSelectedLocation(null)
-    setFocusedLocationId(null)
+    setSelectedPlace(null)
+    setFocusedPlaceId(null)
     const fics = await getCityFictionsAction(city.id)
     setAvailableFictions(fics)
     setSelectedFictionIds(fics.map((f) => f.id))
@@ -186,32 +179,31 @@ function MapPageInner() {
     setSelectedFictionIds((prev) =>
       prev.includes(fictionId) ? prev.filter((id) => id !== fictionId) : [...prev, fictionId],
     )
-    setSelectedLocation(null)
-    setFocusedLocationId(null)
+    setSelectedPlace(null)
+    setFocusedPlaceId(null)
   }
 
-  const handleLocationClick = useCallback((location: Location) => {
-    setSelectedLocation(location)
-    setFocusedLocationId(location.id)
+  const handleLocationClick = useCallback((place: Place) => {
+    setSelectedPlace(place)
+    setFocusedPlaceId(place.id)
   }, [])
 
-  /** Navigate map to place (from carousel) without opening sidebar. */
-  const handleNavigateToPlace = useCallback((location: Location) => {
-    setFocusedLocationId(location.id)
+  const handleNavigateToPlace = useCallback((place: Place) => {
+    setFocusedPlaceId(place.id)
   }, [])
 
   const handleExplorePlace = useCallback(
-    (location: Location) => {
-      setSelectedLocation(null)
-      const targetFiction = availableFictions.find((fiction) => fiction.id === location.fictionId)
+    (place: Place) => {
+      setSelectedPlace(null)
+      const targetFiction = availableFictions.find((fiction) => fiction.id === place.fictionId)
       router.push(
-        `/fictions/${encodeURIComponent(targetFiction?.slug ?? location.fictionId)}`,
+        `/fictions/${encodeURIComponent(targetFiction?.slug ?? place.fictionId)}`,
       )
     },
     [router, availableFictions],
   )
 
-  const isNavigationModeActive = !placeSelectorCollapsed && filteredLocations.length > 0
+  const isNavigationModeActive = !placeSelectorCollapsed && filteredPlaces.length > 0
 
   useEffect(() => {
     if (!isNavigationModeActive) return
@@ -226,17 +218,17 @@ function MapPageInner() {
 
       if (e.key === "Enter" || e.key === " ") {
         if (isInputLike) return
-        if (focusedLocationId && !selectedLocation) {
-          const loc = filteredLocations.find((l) => l.id === focusedLocationId)
-          if (loc) {
+        if (focusedPlaceId && !selectedPlace) {
+          const p = filteredPlaces.find((x) => x.id === focusedPlaceId)
+          if (p) {
             e.preventDefault()
-            setSelectedLocation(loc)
+            setSelectedPlace(p)
           }
         }
       } else if (e.key === "Escape") {
         e.preventDefault()
-        if (selectedLocation) {
-          setSelectedLocation(null)
+        if (selectedPlace) {
+          setSelectedPlace(null)
         } else {
           setPlaceSelectorCollapsed(true)
         }
@@ -246,9 +238,9 @@ function MapPageInner() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [
     isNavigationModeActive,
-    focusedLocationId,
-    selectedLocation,
-    filteredLocations,
+    focusedPlaceId,
+    selectedPlace,
+    filteredPlaces,
     setPlaceSelectorCollapsed,
   ])
 
@@ -289,10 +281,10 @@ function MapPageInner() {
           <div className="relative flex-1 min-h-0 w-full">
             <MapView
               city={selectedCity}
-              locations={filteredLocations}
+              places={filteredPlaces}
               onLocationClick={handleLocationClick}
-              selectedLocationId={selectedLocation?.id}
-              focusLocationId={focusedLocationId}
+              selectedLocationId={selectedPlace?.id}
+              focusLocationId={focusedPlaceId}
               is3D={is3D}
               onToggle3D={setIs3D}
               onBoundsChange={setBounds}
@@ -302,21 +294,21 @@ function MapPageInner() {
           <MapMinimapSlot />
 
           <ThumbnailCarousel
-            locations={filteredLocations}
-            selectedLocationId={focusedLocationId ?? selectedLocation?.id}
+            places={filteredPlaces}
+            selectedLocationId={focusedPlaceId ?? selectedPlace?.id}
             onLocationClick={handleNavigateToPlace}
             placeSelectorCollapsed={placeSelectorCollapsed}
             setPlaceSelectorCollapsed={setPlaceSelectorCollapsed}
           />
 
-          {selectedLocation && (
+          {selectedPlace && (
             <LocationDetail
-              location={selectedLocation}
-              fiction={availableFictions.find((f) => f.id === selectedLocation.fictionId)}
-              relatedLocations={filteredLocations.filter((l) => l.id !== selectedLocation.id)}
-              relatedFictions={availableFictions.filter((f) => f.id !== selectedLocation.fictionId)}
-              onClose={() => setSelectedLocation(null)}
-              onSelectRelatedLocation={handleLocationClick}
+              place={selectedPlace}
+              fiction={availableFictions.find((f) => f.id === selectedPlace.fictionId)}
+              relatedPlaces={filteredPlaces.filter((p) => p.id !== selectedPlace.id)}
+              relatedFictions={availableFictions.filter((f) => f.id !== selectedPlace.fictionId)}
+              onClose={() => setSelectedPlace(null)}
+              onSelectRelatedPlace={handleLocationClick}
               onViewPlace={handleExplorePlace}
             />
           )}

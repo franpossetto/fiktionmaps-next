@@ -12,7 +12,7 @@ import {
 import { getInterestCatalogCached } from "@/src/interests/infrastructure/next/interest.queries"
 import { getFictionLikeCountsCached } from "@/src/fiction-likes/infrastructure/next/fiction-likes.queries"
 import {
-  getFictionLocationsCached,
+  getFictionPlacesCached,
   getPlaceCountsByFictionIdsCached,
 } from "@/src/places/infrastructure/next/place.queries"
 import { getCurrentUserHasLikedFiction } from "@/src/users/infrastructure/next/user.queries"
@@ -160,7 +160,7 @@ export default async function FictionSlugPage({ params }: Props) {
   }
 
   const [
-    initialLocations,
+    initialPlaces,
     initialCities,
     sameCityRecommendations,
     likeCounts,
@@ -168,7 +168,7 @@ export default async function FictionSlugPage({ params }: Props) {
     fictionInterestIds,
     interestCatalog,
   ] = await Promise.all([
-    getFictionLocationsCached(fiction.id),
+    getFictionPlacesCached(fiction.id),
     getFictionCitiesCached(fiction.id),
     getSameCityMovieRecommendationsCached(fiction.id),
     getFictionLikeCountsCached([fiction.id]),
@@ -211,7 +211,7 @@ export default async function FictionSlugPage({ params }: Props) {
       >
         <FictionDetail
           fiction={fiction}
-          initialLocations={initialLocations}
+          initialPlaces={initialPlaces}
           initialCities={initialCities}
           initialLikeCount={initialLikeCount}
           initialLiked={initialLiked}

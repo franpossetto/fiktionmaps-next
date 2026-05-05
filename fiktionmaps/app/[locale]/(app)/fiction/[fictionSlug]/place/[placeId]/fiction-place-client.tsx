@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { useRouter } from "@/i18n/navigation"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import { PlacePage } from "@/components/map/place-page"
@@ -18,7 +18,7 @@ export function FictionPlaceClient() {
   const placeId = params.placeId as string
 
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [location, setLocation] = useState<Location | null>(null)
+  const [location, setLocation] = useState<Place | null>(null)
   const [fiction, setFiction] = useState<FictionWithMedia | null>(null)
   const [city, setCity] = useState<City | null>(null)
 
@@ -47,7 +47,7 @@ export function FictionPlaceClient() {
         return
       }
 
-      const c = await getAllCitiesAction().then((rows) => rows.find((item) => item.id === loc.cityId) ?? null)
+      const c = await getAllCitiesAction().then((rows) => rows.find((item) => item.id === loc.location.cityId) ?? null)
       if (cancelled) return
       setLocation(loc)
       setFiction(resolvedFiction)

@@ -26,7 +26,6 @@ export type ProfileScenePreview = {
   id: string
   fictionId: string
   fictionSlug?: string | null
-  /** `places.id` — same as `Location.id` on the map. */
   placeId: string
   title: string
   fictionTitle: string

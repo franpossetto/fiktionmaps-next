@@ -12,7 +12,7 @@ import { createSceneBodySchema, patchSceneBodySchema } from "@/src/scenes/domain
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import { listScenesUseCase } from "@/src/scenes/application/list-scenes.usecase"
 import { getSceneByIdUseCase } from "@/src/scenes/application/get-scene-by-id.usecase"
 import { createSceneUseCase } from "@/src/scenes/application/create-scene.usecase"
@@ -124,7 +124,7 @@ export async function getCityFictionsWithScenesForViewerAction(cityId: string): 
 export async function listScenesForViewerAction(
   fictionIds: string[],
   opts: { cityId: string } | { bbox: MapBbox },
-): Promise<Location[]> {
+): Promise<Place[]> {
   const ids = fictionIds.filter(isUuidString)
   if (ids.length === 0) return []
 

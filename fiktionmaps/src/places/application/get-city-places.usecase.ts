@@ -1,9 +1,9 @@
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { PlacesRepositoryPort } from "@/src/places/domain/place.repository"
 
-export async function getCityLocationsUseCase(
+export async function getCityPlacesUseCase(
   cityId: string,
   repo: PlacesRepositoryPort
-): Promise<Location[]> {
+): Promise<Place[]> {
   return repo.getByCityId(cityId)
 }

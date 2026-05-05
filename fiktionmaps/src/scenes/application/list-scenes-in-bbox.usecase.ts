@@ -1,11 +1,11 @@
 import type { MapBbox } from "@/lib/validation/map-query"
 import type { ScenesRepositoryPort } from "@/src/scenes/domain/scene.repository"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 
 export async function listScenesInBboxUseCase(
   fictionIds: string[],
   bbox: MapBbox,
   repo: ScenesRepositoryPort,
-): Promise<Location[]> {
+): Promise<Place[]> {
   return repo.listScenesWithVideoInBbox({ fictionIds, bbox })
 }

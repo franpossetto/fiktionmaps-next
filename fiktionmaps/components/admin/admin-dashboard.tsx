@@ -11,7 +11,7 @@ import { ScenesTab } from "./scenes-tab"
 import { PersonsTab } from "./persons-tab"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 import type { City } from "@/src/cities/domain/city.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { Person } from "@/src/persons/domain/person.entity"
 import { useAdminViewModeStorage } from "@/lib/local-storage-service-hooks"
 
@@ -66,13 +66,13 @@ const sections: SectionItem[] = [
 interface AdminDashboardProps {
   initialFictions?: Fiction[]
   initialCities?: City[]
-  initialLocations?: Location[]
+  initialPlaces?: Place[]
   initialPersons?: Person[]
   onOpenFiction?: (fictionId: string) => void
   onOpenCity?: (cityId: string) => void
 }
 
-export function AdminDashboard({ initialFictions, initialCities, initialLocations, initialPersons, onOpenFiction, onOpenCity }: AdminDashboardProps) {
+export function AdminDashboard({ initialFictions, initialCities, initialPlaces, initialPersons, onOpenFiction, onOpenCity }: AdminDashboardProps) {
   const searchParams = useSearchParams()
   const [activeSection, setActiveSection] = useState<AdminSection>(() => {
     const tab = searchParams.get("tab")
@@ -172,8 +172,8 @@ export function AdminDashboard({ initialFictions, initialCities, initialLocation
               viewMode={viewMode}
             />
           )}
-          {activeSection === "locations" && <LocationsTab initialLocations={initialLocations} initialFictions={initialFictions} initialCities={initialCities} />}
-          {activeSection === "scenes" && <ScenesTab initialFictions={initialFictions} initialPlaces={initialLocations} />}
+          {activeSection === "locations" && <LocationsTab initialPlaces={initialPlaces} initialFictions={initialFictions} initialCities={initialCities} />}
+          {activeSection === "scenes" && <ScenesTab initialFictions={initialFictions} initialPlaces={initialPlaces} />}
           {activeSection === "persons" && <PersonsTab initialPersons={initialPersons} viewMode={viewMode} />}
         </div>
       </div>

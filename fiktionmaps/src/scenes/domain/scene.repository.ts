@@ -1,6 +1,6 @@
 import type { MapBbox } from "@/lib/validation/map-query"
 import type { City } from "@/src/cities/domain/city.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { ProfileScenePreview, Scene } from "./scene.entity"
 import type { CreateSceneData, UpdateSceneData } from "./scene.schemas"
 
@@ -27,9 +27,9 @@ export interface ScenesRepositoryPort {
 
   listFictionIdsWithScenesInCity(cityId: string): Promise<string[]>
 
-  listScenesWithVideoInBbox(params: { fictionIds: string[]; bbox: MapBbox }): Promise<Location[]>
+  listScenesWithVideoInBbox(params: { fictionIds: string[]; bbox: MapBbox }): Promise<Place[]>
 
   /** All scenes with video for fictions in this city (no geographic radius). */
-  listScenesWithVideoInCity(params: { fictionIds: string[]; cityId: string }): Promise<Location[]>
+  listScenesWithVideoInCity(params: { fictionIds: string[]; cityId: string }): Promise<Place[]>
   getScenesCreatedByUserId(userId: string): Promise<ProfileScenePreview[]>
 }

@@ -1,12 +1,12 @@
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { FictionsRepositoryPort } from "@/src/fictions/domain/fiction.repository"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 
 const DEFAULT_LIMIT = 12
 
 interface GetSameCityMovieRecommendationsDeps {
   locationsRepo: {
-    getByFictionId(fictionId: string): Promise<Location[]>
+    getByFictionId(fictionId: string): Promise<Place[]>
   }
   placesRepo: {
     getFictionIdsByCityId(cityId: string): Promise<string[]>
@@ -20,8 +20,8 @@ export async function getSameCityMovieRecommendationsUseCase(
   options?: { limit?: number },
 ): Promise<FictionWithMedia[]> {
   const limit = options?.limit ?? DEFAULT_LIMIT
-  const locations = await deps.locationsRepo.getByFictionId(fictionId)
-  const cityIds = [...new Set(locations.map((l) => l.cityId))]
+  const places = await deps.locationsRepo.getByFictionId(fictionId)
+  const cityIds = [...new Set(places.map((p) => p.location.cityId))]
   if (cityIds.length === 0) return []
 
   const idSet = new Set<string>()
