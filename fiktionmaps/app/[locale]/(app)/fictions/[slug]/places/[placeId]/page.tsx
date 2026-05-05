@@ -52,7 +52,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const effectiveSlug = fiction.slug?.trim() || slug
   const canonicalPath = `/${locale}/fictions/${effectiveSlug}/places/${placeId}`
   const canonicalUrl = `${siteUrl}${canonicalPath}`
-  const title = tMeta("placeDetailTitle", { placeName: location.name, fictionTitle: fiction.title })
+  const displayName = location.placeName ?? location.name ?? "Sin nombre"
+  const title = tMeta("placeDetailTitle", { placeName: displayName, fictionTitle: fiction.title })
   const description =
     location.description?.slice(0, 160) || tMeta("fictionDetailDescriptionFilm", { title: fiction.title })
   const image = location.image?.trim() || fiction.coverImage?.trim() || fiction.bannerImage?.trim()
@@ -73,7 +74,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url: canonicalUrl,
       type: "website",
       locale: mapLocaleToOpenGraph(locale),
-      ...(image && { images: [{ url: image, width: 1200, height: 630, alt: location.name }] }),
+      ...(image && { images: [{ url: image, width: 1200, height: 630, alt: displayName }] }),
     },
     twitter: {
       card: "summary_large_image",

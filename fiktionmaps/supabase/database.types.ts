@@ -245,6 +245,7 @@ export type Database = {
           location_id: string | null
           description: string | null
           active: boolean
+          name: string | null
           created_at: string
           updated_at: string
         }
@@ -254,6 +255,7 @@ export type Database = {
           location_id?: string | null
           description?: string | null
           active?: boolean
+          name?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -263,6 +265,7 @@ export type Database = {
           location_id?: string | null
           description?: string | null
           active?: boolean
+          name?: string | null
           created_at?: string
           updated_at?: string
         }

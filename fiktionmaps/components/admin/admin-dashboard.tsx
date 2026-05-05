@@ -90,16 +90,6 @@ export function AdminDashboard({ initialFictions, initialCities, initialLocation
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-gradient-to-b from-background to-background/50">
-      {/* Header — sticky within the centered column (same canvas rhythm as profile) */}
-      <div className="sticky top-0 z-40 border-b border-border bg-card/50 py-6 backdrop-blur-sm">
-        <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-          Content Management
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Edit and manage fictions, cities, locations, and scenes
-        </p>
-      </div>
-
       {/* Tabs bar */}
       <div className="border-b border-border bg-card/30">
         <div className="flex items-center justify-between gap-4">

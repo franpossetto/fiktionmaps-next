@@ -1,5 +1,7 @@
 export interface Location {
   id: string
+  /** From places.name (place-level name, separate from locations.name). */
+  placeName?: string | null
   name: string
   address: string
   lat: number

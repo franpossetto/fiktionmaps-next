@@ -48,9 +48,11 @@ function mapPlaceRowsToLocations(
     const cityId = loc ? str(loc, "city_id", "cityId") : ""
     const locationType = loc ? optStr(loc, "type", "type") : null
     const isLandmark = loc ? Boolean(loc.is_landmark ?? loc.isLandmark) : false
+    const placeName = optStr(p, "name", "name")
 
     return {
       id: placeId,
+      placeName,
       name,
       address,
       lat,
@@ -78,7 +80,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error: placesError } = await supabase
         .from("places")
         .select(
-          "id, fiction_id, description, active, location_id, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark)"
+          "id, fiction_id, description, active, location_id, name, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark)"
         )
         .order("created_at", { ascending: false })
         .range(0, 9999)
@@ -145,7 +147,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error } = await supabase
         .from("places")
         .select(
-          "id, fiction_id, description, active, location_id, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark)"
+          "id, fiction_id, description, active, location_id, name, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark)"
         )
         .eq("fiction_id", fictionId)
         .order("created_at", { ascending: false })
@@ -186,7 +188,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error } = await supabase
         .from("places")
         .select(
-          "id, fiction_id, description, active, location_id, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark)"
+          "id, fiction_id, description, active, location_id, name, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark)"
         )
         .in("location_id", locationIds)
         .order("created_at", { ascending: false })
@@ -239,7 +241,7 @@ export function createPlacesSupabaseAdapter(
       const { data: row, error } = await supabase
         .from("places")
         .select(
-          `id, fiction_id, description, active,
+          `id, fiction_id, description, active, name,
            location:locations!inner (
              id, name, formatted_address, latitude, longitude, city_id, is_landmark
            )`
@@ -276,8 +278,11 @@ export function createPlacesSupabaseAdapter(
         imageUrl = await fetchAvatarUrl("sm")
       }
 
+      const placeName = optStr(row as Record<string, unknown>, "name", "name")
+
       return {
         id: row.id as string,
+        placeName,
         name: loc?.name ?? "Unknown place",
         address: loc?.formatted_address ?? "",
         lat: loc?.latitude ?? 0,
@@ -300,7 +305,7 @@ export function createPlacesSupabaseAdapter(
       const { data: rows, error } = await supabase
         .from("places")
         .select(
-          `id, fiction_id, description, active,
+          `id, fiction_id, description, active, name,
            location:locations!inner (
              id, name, formatted_address, latitude, longitude, city_id, is_landmark
            )`
@@ -337,8 +342,10 @@ export function createPlacesSupabaseAdapter(
           city_id?: string | null
         }
         const pid = r.id as string
+        const placeName = optStr(r as Record<string, unknown>, "name", "name")
         return {
           id: pid,
+          placeName,
           name: loc?.name ?? "Unknown place",
           address: loc?.formatted_address ?? "",
           lat: loc?.latitude ?? 0,

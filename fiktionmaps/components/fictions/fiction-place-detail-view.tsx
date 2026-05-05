@@ -65,6 +65,7 @@ export function FictionPlaceDetailView({
 }: FictionPlaceDetailViewProps) {
   const t = useTranslations("Fictions")
   const tCommon = useTranslations("Common")
+  const displayName = location.placeName ?? location.name ?? "Sin nombre"
   const heroSrc = location.image?.trim() ? location.image.trim() : DEFAULT_FICTION_COVER
   const coordsOk = hasValidPlaceCoordinates(location.lat, location.lng)
   const addressLine =
@@ -112,14 +113,14 @@ export function FictionPlaceDetailView({
             </div>
             <h1 className="w-full max-w-[min(100%,45rem)] text-balance text-3xl font-bold leading-[1.15] tracking-tight text-foreground sm:text-4xl xl:text-[2.65rem]">
               {t("placeDetailCatchyHeading", {
-                placeName: location.name,
+                placeName: displayName,
                 fictionName: fiction.title,
               })}
             </h1>
             <div className="relative aspect-[21/9] overflow-hidden rounded-xl border border-border/60">
               <Image
                 src={heroSrc}
-                alt={location.name}
+                alt={displayName}
                 fill
                 className="object-cover"
                 sizes="(max-width: 1024px) 100vw, 40vw"
@@ -153,7 +154,7 @@ export function FictionPlaceDetailView({
                 <FictionPlaceDirectionsMap
                   mapInstanceId={`fiction-place-directions-${location.id}`}
                   center={{ lat: location.lat, lng: location.lng }}
-                  placeName={location.name}
+                  placeName={displayName}
                   imageSrc={heroSrc}
                 />
               ) : null}
