@@ -10,6 +10,7 @@ import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import type { Location } from "@/src/locations/domain/location.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
@@ -65,11 +66,21 @@ export function FictionPlaceDetailView({
 }: FictionPlaceDetailViewProps) {
   const t = useTranslations("Fictions")
   const tCommon = useTranslations("Common")
-  const displayName = location.name?.trim() || location.location.name || "Sin nombre"
+  const geo: Location =
+    location.location ?? {
+      name: "",
+      address: "",
+      lat: 0,
+      lng: 0,
+      cityId: "",
+      locationType: null,
+      isLandmark: undefined,
+    }
+  const displayName = location.name?.trim() || geo.name || "Sin nombre"
   const heroSrc = location.image?.trim() ? location.image.trim() : DEFAULT_FICTION_COVER
-  const coordsOk = hasValidPlaceCoordinates(location.location.lat, location.location.lng)
+  const coordsOk = hasValidPlaceCoordinates(geo.lat, geo.lng)
   const addressLine =
-    location.location.address?.trim() ||
+    geo.address?.trim() ||
     (city ? [city.name, city.country].filter(Boolean).join(", ") : "") ||
     ""
 
@@ -153,7 +164,7 @@ export function FictionPlaceDetailView({
               {coordsOk ? (
                 <FictionPlaceDirectionsMap
                   mapInstanceId={`fiction-place-directions-${location.id}`}
-                  center={{ lat: location.location.lat, lng: location.location.lng }}
+                  center={{ lat: geo.lat, lng: geo.lng }}
                   placeName={displayName}
                   imageSrc={heroSrc}
                 />
@@ -161,7 +172,7 @@ export function FictionPlaceDetailView({
               {addressLine ? (
                 <p className="text-sm leading-relaxed sm:text-base">
                   <a
-                    href={googleMapsHref(coordsOk, location.location.lat, location.location.lng, addressLine)}
+                    href={googleMapsHref(coordsOk, geo.lat, geo.lng, addressLine)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-foreground underline-offset-4 transition-colors hover:text-primary hover:underline"
@@ -172,7 +183,7 @@ export function FictionPlaceDetailView({
               ) : coordsOk ? (
                 <p className="text-sm leading-relaxed sm:text-base">
                   <a
-                    href={googleMapsHref(true, location.location.lat, location.location.lng, "")}
+                    href={googleMapsHref(true, geo.lat, geo.lng, "")}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-foreground underline-offset-4 transition-colors hover:text-primary hover:underline"

@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const effectiveSlug = fiction.slug?.trim() || slug
   const canonicalPath = `/${locale}/fictions/${effectiveSlug}/places/${placeId}`
   const canonicalUrl = `${siteUrl}${canonicalPath}`
-  const displayName = location.name?.trim() || location.location.name || "Sin nombre"
+  const displayName = location.name?.trim() || location.location?.name || "Sin nombre"
   const title = tMeta("placeDetailTitle", { placeName: displayName, fictionTitle: fiction.title })
   const description =
     location.description?.slice(0, 160) || tMeta("fictionDetailDescriptionFilm", { title: fiction.title })
@@ -101,7 +101,8 @@ export default async function FictionPlaceUnderSlugPage({ params }: Props) {
   ])
 
   const cityById = new Map(initialCities.map((c) => [c.id, c]))
-  const city = cityById.get(location.location.cityId)
+  const geo = location.location
+  const city = geo?.cityId ? cityById.get(geo.cityId) : undefined
   const canonicalSlug = fiction.slug?.trim() || slug
   const baseMapParams = new URLSearchParams({
     fiction: fiction.id,

@@ -37,7 +37,7 @@ export function getPlaceCountsByFictionIdsCached(fictionIds: string[]): Promise<
 export function getPlaceLocationByIdCached(placeId: string) {
   return unstable_cache(
     () => getPlaceByIdUseCase(placeId, anonRepo, "sm"),
-    CacheKeys.place(placeId),
+    CacheKeys.place(`${placeId}:v2`),
     { ...CacheConfig.medium, tags: ["places", `place-${placeId}`] }
   )()
 }
@@ -45,7 +45,7 @@ export function getPlaceLocationByIdCached(placeId: string) {
 export function getPlaceLocationByIdDetailCached(placeId: string) {
   return unstable_cache(
     () => getPlaceByIdUseCase(placeId, anonRepo, "lg"),
-    CacheKeys.place(`${placeId}:detail-lg`),
+    CacheKeys.place(`${placeId}:detail-lg:v2`),
     { ...CacheConfig.medium, tags: ["places", `place-${placeId}`] }
   )()
 }

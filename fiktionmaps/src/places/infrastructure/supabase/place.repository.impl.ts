@@ -25,6 +25,16 @@ function optStr(row: Record<string, unknown>, snake: string, camel: string): str
   return typeof v === "string" ? v : null
 }
 
+/** Embed column may appear as `location`, `locations`, object or single-element array. */
+function parseLocationEmbedFromPlaceRow(row: Record<string, unknown>): Record<string, unknown> | null {
+  const rawLoc = row.location ?? row.locations
+  const locRow = Array.isArray(rawLoc) ? rawLoc[0] : rawLoc
+  if (locRow && typeof locRow === "object" && !Array.isArray(locRow)) {
+    return locRow as Record<string, unknown>
+  }
+  return null
+}
+
 function mapPlaceRowsToPlaces(
   placeRows: Record<string, unknown>[],
   avatarByPlaceId: Map<string, string>
@@ -253,15 +263,7 @@ export function createPlacesSupabaseAdapter(
 
       if (error || !row) return null
 
-      const loc = row.location as {
-        name: string
-        formatted_address: string | null
-        latitude: number | null
-        longitude: number | null
-        city_id: string | null
-        is_landmark: boolean | null
-        type: string | null
-      }
+      const loc = parseLocationEmbedFromPlaceRow(row as Record<string, unknown>)
 
       const fetchAvatarUrl = async (variant: "sm" | "lg"): Promise<string | null> => {
         const { data: avatarRows } = await supabase
@@ -289,13 +291,13 @@ export function createPlacesSupabaseAdapter(
         name: optStr(row as Record<string, unknown>, "name", "name"),
         fictionId: row.fiction_id as string,
         location: {
-          name: loc?.name ?? "Unknown place",
-          address: loc?.formatted_address ?? "",
-          lat: loc?.latitude ?? 0,
-          lng: loc?.longitude ?? 0,
-          cityId: loc?.city_id ?? "",
-          locationType: loc?.type ?? null,
-          isLandmark: loc?.is_landmark ?? undefined,
+          name: loc ? str(loc, "name", "name") || "Unknown place" : "Unknown place",
+          address: loc ? str(loc, "formatted_address", "formattedAddress") : "",
+          lat: loc ? num(loc, "latitude", "latitude") : 0,
+          lng: loc ? num(loc, "longitude", "longitude") : 0,
+          cityId: loc ? str(loc, "city_id", "cityId") : "",
+          locationType: loc ? optStr(loc, "type", "type") : null,
+          isLandmark: loc ? Boolean(loc.is_landmark ?? loc.isLandmark) : false,
         },
         image: imageUrl ?? "/placeholder.svg",
         videoUrl: "",
@@ -344,29 +346,22 @@ export function createPlacesSupabaseAdapter(
       }
 
       return (rows ?? []).map((r) => {
-        const loc = r.location as {
-          name?: string
-          formatted_address?: string | null
-          latitude?: number | null
-          longitude?: number | null
-          city_id?: string | null
-          is_landmark?: boolean | null
-          type?: string | null
-        }
+        const rRec = r as Record<string, unknown>
+        const loc = parseLocationEmbedFromPlaceRow(rRec)
         const pid = r.id as string
         return {
           id: pid,
           placeId: pid,
-          name: optStr(r as Record<string, unknown>, "name", "name"),
+          name: optStr(rRec, "name", "name"),
           fictionId: (r.fiction_id as string) ?? "",
           location: {
-            name: loc?.name ?? "Unknown place",
-            address: loc?.formatted_address ?? "",
-            lat: loc?.latitude ?? 0,
-            lng: loc?.longitude ?? 0,
-            cityId: loc?.city_id ?? "",
-            locationType: loc?.type ?? null,
-            isLandmark: loc?.is_landmark ?? undefined,
+            name: loc ? str(loc, "name", "name") || "Unknown place" : "Unknown place",
+            address: loc ? str(loc, "formatted_address", "formattedAddress") : "",
+            lat: loc ? num(loc, "latitude", "latitude") : 0,
+            lng: loc ? num(loc, "longitude", "longitude") : 0,
+            cityId: loc ? str(loc, "city_id", "cityId") : "",
+            locationType: loc ? optStr(loc, "type", "type") : null,
+            isLandmark: loc ? Boolean(loc.is_landmark ?? loc.isLandmark) : false,
           },
           image: avatarByPlaceId.get(pid) ?? "/placeholder.svg",
           videoUrl: "",
