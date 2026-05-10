@@ -1,5 +1,10 @@
 "use client"
 
+/**
+ * Legacy fictions catalog (rails layout + dense filters). Kept only as reference — not imported by any route.
+ * TODO: remove when no longer needed.
+ */
+
 import { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { FictionCard } from "@/components/fictions/fiction-card"
@@ -16,7 +21,7 @@ const DEFAULT_SORT_VALUE = "popular"
 const FILTER_SELECT_CLASSNAME =
   "h-7 min-w-[98px] rounded-md border border-transparent bg-muted/70 pl-7 pr-2 text-xs text-foreground outline-none transition-colors hover:bg-accent/60 focus:bg-accent/70"
 
-interface FictionLandingProps {
+interface FictionLandingV2ReferenceProps {
   /** Fictions from DB (server). When provided, no client fetch for list. */
   initialFictions?: FictionWithMedia[]
   /** Scene counts per fiction id pre-fetched server-side. */
@@ -30,7 +35,7 @@ interface FictionLandingProps {
   initialSearch?: string
 }
 
-export function FictionLanding({
+export function FictionLandingV2Reference({
   initialFictions,
   initialSceneCounts,
   initialLikeCounts,
@@ -38,7 +43,7 @@ export function FictionLanding({
   focusFictionId,
   onFocusHandled,
   initialSearch = "",
-}: FictionLandingProps) {
+}: FictionLandingV2ReferenceProps) {
   const { user } = useAuth()
   const router = useRouter()
   const t = useTranslations("Fictions")

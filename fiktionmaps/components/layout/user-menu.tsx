@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { AuthModal } from "@/components/auth/auth-modal"
-import { LogOut, User, Settings, Shield } from "lucide-react"
+import { LogOut, User, Settings, Shield, BookOpen, Map } from "lucide-react"
 import { Link } from "@/i18n/navigation"
 
 export function UserMenu() {
@@ -64,6 +64,18 @@ export function UserMenu() {
       >
         <DropdownMenuItem className="text-xs text-muted-foreground cursor-default" disabled>
           {user.email}
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
+          <Link href="/fictions">
+            <BookOpen className="mr-2 h-4 w-4" />
+            {t("fictions")}
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
+          <Link href="/map">
+            <Map className="mr-2 h-4 w-4" />
+            {t("exploreMap")}
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
           <Link href="/profile">
