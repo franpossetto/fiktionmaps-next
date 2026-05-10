@@ -282,6 +282,7 @@
     "directorPlaceholder": "Director",
     "yearPlaceholder": "Year",
     "latestVisited": "Latest visited",
+    "topContributors": "Top contributors",
     "becomeContributor": "Become a contributor",
     "contributorBody": "Help the community discover more filming spots by sharing places, fixing details, and adding context to existing fictions.",
     "startContributing": "Start contributing",
@@ -302,6 +303,9 @@
     "likePlace": "Like place",
     "unlikePlace": "Unlike place",
     "citiesHeading": "Cities",
+    "contributorsHeading": "Contributors",
+    "placeDetailCreatedPlaceVerbPhrase": "created this place",
+    "contributorNameFallback": "Member",
     "interestsHeading": "Interests",
     "recommendedInCities": "Recommended fictions in {cities}",
     "viewMore": "View more",
@@ -430,6 +434,7 @@
     "placeNotFound": "Place not found",
     "placeDetailTitle": "{placeName} · {fictionTitle}",
     "breadcrumbHome": "Home",
-    "breadcrumbFictions": "Fictions"
+    "breadcrumbFictions": "Fictions",
+    "breadcrumbNavAriaLabel": "Breadcrumb"
   }
 }

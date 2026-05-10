@@ -1,33 +1,76 @@
 import type { ReactNode } from "react"
+import { cn } from "@/lib/utils"
 
 export interface AppDetailRailsShellProps {
   /** Center column (main content). */
   children: ReactNode
-  /** Left rail (e.g. summary card). Hidden below `lg`; keeps grid track when empty. */
+  /** Left rail (e.g. summary card). Hidden below the 1200px container breakpoint. */
   leftAside?: ReactNode
-  /** Right rail (e.g. meta lists). Hidden below `xl`; fourth grid track is 0% at `lg`. */
+  /** Right rail (e.g. meta lists). Hidden below the 1500px container breakpoint. */
   rightAside?: ReactNode
+  /**
+   * Where vertical scroll lives:
+   *  - `"main"` (default): only the center column scrolls; rails stay visually fixed.
+   *  - `"page"`: the whole shell scrolls; consumers can wrap aside content in
+   *    `position: sticky` to pin it during scroll.
+   */
+  scrollMode?: "main" | "page"
 }
 
 /**
- * Shared 5-column grid for detail-style pages (fiction, future place/city).
+ * Shared 5-column grid for detail-style and listing pages.
  *
- * Tracks (lg / xl): outer margin | left rail | main | right rail | outer margin.
- * At `lg` the fourth track is 0% so the right aside is not shown; at `xl` it gains width.
+ * Tracks: outer margin | left rail | main | right rail | outer margin.
+ * Driven by container queries on the shell (`@container/rails`):
+ *   - <  920px: single column, main fills width.
+ *   -  920px –1199: outer margins + main (920px); rails hidden.
+ *   - 1200px –1499: outer margins + left rail + main; right rail hidden.
+ *   - >=1500px: all five columns; outer margins absorb extra space (1fr).
  *
- * Scroll lives only on the main column (`[data-detail-main-scroll]`) so left/right rails stay fixed.
+ * Inner column widths are fixed in px so the main column does not change size when
+ * the rails appear/disappear; the 1fr outer tracks expand/shrink with the viewport.
  */
-export function AppDetailRailsShell({ children, leftAside, rightAside }: AppDetailRailsShellProps) {
+const RAILS_GRID_COLUMNS =
+  "grid-cols-1 @[920px]/rails:[grid-template-columns:1fr_920px_1fr] @[1200px]/rails:[grid-template-columns:1fr_266px_920px_1fr] @[1500px]/rails:[grid-template-columns:1fr_266px_920px_266px_1fr]"
+
+export function AppDetailRailsShell({
+  children,
+  leftAside,
+  rightAside,
+  scrollMode = "main",
+}: AppDetailRailsShellProps) {
+  const isPageScroll = scrollMode === "page"
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
-      <div className="mx-auto grid h-full min-h-0 w-full max-w-[1900px] grid-cols-1 lg:[grid-template-columns:13%_14%_61%_0%_12%] xl:[grid-template-columns:13%_14%_47%_14%_12%]">
-        <div className="hidden min-h-0 lg:block" aria-hidden />
-        <aside className="hidden min-h-0 border-r border-border/50 pl-1 lg:block">{leftAside ?? null}</aside>
-        <div data-detail-main-scroll className="min-h-0 h-full overflow-y-auto bg-background">
-          {children}
-        </div>
-        <aside className="hidden min-h-0 border-l border-border/50 px-5 py-10 xl:block">{rightAside ?? null}</aside>
-        <div className="hidden min-h-0 lg:block" aria-hidden />
+    <div
+      className={cn(
+        "@container/rails bg-background",
+        isPageScroll ? "h-full overflow-y-auto" : "flex h-full min-h-0 flex-col",
+      )}
+    >
+      <div
+        className={cn(
+          "mx-auto grid w-full max-w-[1900px]",
+          isPageScroll ? "min-h-full" : "h-full min-h-0",
+          RAILS_GRID_COLUMNS,
+        )}
+      >
+        <div className="hidden min-h-0 @[920px]/rails:block" aria-hidden />
+        <aside className="hidden min-h-0 border-r border-border/50 pl-1 @[1200px]/rails:block">
+          {leftAside ?? null}
+        </aside>
+        {isPageScroll ? (
+          <div className="min-w-0 border-x border-border/50 max-lg:min-h-full @[1200px]/rails:border-x-0">
+            {children}
+          </div>
+        ) : (
+          <div data-detail-main-scroll className="min-h-0 h-full overflow-y-auto bg-background">
+            {children}
+          </div>
+        )}
+        <aside className="hidden min-h-0 border-l border-border/50 px-5 py-10 @[1500px]/rails:block">
+          {rightAside ?? null}
+        </aside>
+        <div className="hidden min-h-0 @[920px]/rails:block" aria-hidden />
       </div>
     </div>
   )

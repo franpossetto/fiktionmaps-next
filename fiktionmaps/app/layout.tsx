@@ -1,11 +1,14 @@
 import React from "react"
 import type { Metadata, Viewport } from "next"
-import { Inter, Space_Grotesk } from "next/font/google"
+import { Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google"
 import { getSiteUrl } from "@/lib/site"
 
 import "./globals.css"
 
-const _inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
+const _plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-plus-jakarta-sans",
+})
 const _spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk" })
 const SITE_URL = getSiteUrl()
 const GOOGLE_SITE_VERIFICATION = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim()
@@ -91,7 +94,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${_inter.variable} ${_spaceGrotesk.variable} font-sans antialiased overflow-hidden`}
+        className={`${_plusJakartaSans.variable} ${_spaceGrotesk.variable} font-sans antialiased overflow-hidden`}
       >
         {children}
       </body>

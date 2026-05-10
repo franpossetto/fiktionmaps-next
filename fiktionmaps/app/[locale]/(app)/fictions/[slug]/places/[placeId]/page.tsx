@@ -10,6 +10,7 @@ import { getSiteUrl } from "@/lib/site"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { FictionPlaceDetailView } from "@/components/fictions/fiction-place-detail-view"
 import { FictionSlugDetailShell } from "@/components/fictions/fiction-slug-detail-shell"
+import { getPlaceContributorsWithDatesCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { getFictionSidebarSummaryText } from "@/lib/fictions/get-fiction-sidebar-summary-text"
 
 type Props = {
@@ -94,10 +95,11 @@ export default async function FictionPlaceUnderSlugPage({ params }: Props) {
   const location = await getPlaceLocationByIdDetailCached(placeId)
   if (!location || location.id !== placeId || location.fictionId !== fiction.id) notFound()
 
-  const [initialCities, scenes, sidebarSummary] = await Promise.all([
+  const [initialCities, scenes, sidebarSummary, placeContributors] = await Promise.all([
     getFictionCitiesCached(fiction.id),
     getScenesForPlace(placeId),
     getFictionSidebarSummaryText(fiction, locale),
+    getPlaceContributorsWithDatesCached(placeId),
   ])
 
   const cityById = new Map(initialCities.map((c) => [c.id, c]))
@@ -120,6 +122,7 @@ export default async function FictionPlaceUnderSlugPage({ params }: Props) {
         city={city}
         scenes={scenes}
         exploreMapHref={exploreMapHref}
+        placeContributors={placeContributors}
       />
     </FictionSlugDetailShell>
   )

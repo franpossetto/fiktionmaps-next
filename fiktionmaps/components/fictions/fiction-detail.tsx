@@ -2,15 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
-import { ArrowLeft, ChevronRight, Compass, Heart } from "lucide-react"
+import { ChevronRight, Compass, Heart, MapPin } from "lucide-react"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import { Link } from "@/i18n/navigation"
 import { useAuth } from "@/context/auth-context"
-import { useTranslations } from "next-intl"
+import { useFormatter, useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { FictionCard } from "@/components/fictions/fiction-card"
 import { FictionInterestTags, type FictionInterestTagItem } from "@/components/fictions/fiction-interest-tags"
+import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Place } from "@/src/places/domain/place.entity"
@@ -42,7 +43,8 @@ export function FictionDetail({
 }: FictionDetailProps) {
   const { user, isAuthReady } = useAuth()
   const t = useTranslations("Fictions")
-  const tCommon = useTranslations("Common")
+  const tMeta = useTranslations("Metadata")
+  const format = useFormatter()
   const [liked, setLiked] = useState(initialLiked)
   const [likeCount, setLikeCount] = useState(initialLikeCount)
   const [likeBusy, setLikeBusy] = useState(false)
@@ -159,28 +161,35 @@ export function FictionDetail({
     ? `/map?fiction=${encodeURIComponent(fiction.id)}&city=${encodeURIComponent(firstCityId)}`
     : `/map?fiction=${encodeURIComponent(fiction.id)}`
 
-  const firstCityName = initialCities[0]?.name ?? ""
+  const cityNamesForHeadline = initialCities.map((c) => c.name)
+  const headlineCityLabel =
+    cityNamesForHeadline.length === 0
+      ? ""
+      : cityNamesForHeadline.length === 1
+        ? cityNamesForHeadline[0]
+        : format.list(cityNamesForHeadline, { type: "conjunction" })
   const headlineKey = (() => {
     if (fiction.type === "book") {
-      return firstCityName ? "headlineSetInCity" : "headlineSet"
+      return headlineCityLabel ? "headlineSetInCity" : "headlineSet"
     }
-    return firstCityName ? "headlineFilmedInCity" : "headlineFilmed"
+    return headlineCityLabel ? "headlineFilmedInCity" : "headlineFilmed"
   })()
-  const headline = t(headlineKey, { title: fiction.title, city: firstCityName })
+  const headline = t(headlineKey, { title: fiction.title, city: headlineCityLabel })
 
   const pathSlug = fiction.slug?.trim() || fiction.id
 
-  const backClassName =
-    "inline-flex h-9 items-center gap-1 rounded-full px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-
   return (
     <main className="px-6 py-8 sm:px-8 lg:px-10">
-      <div className="mx-auto w-full max-w-[900px]">
+      <div className="mx-auto w-full max-w-[920px]">
         <div className="mb-6 flex items-center justify-between gap-3">
-          <Link href="/fictions" className={backClassName}>
-            <ArrowLeft className="h-4 w-4" />
-            {tCommon("back")}
-          </Link>
+          <PageBreadcrumb
+            ariaLabel={tMeta("breadcrumbNavAriaLabel")}
+            className="min-w-0 flex-1 pr-2"
+            items={[
+              { label: tMeta("breadcrumbFictions"), href: "/fictions" },
+              { label: fiction.title },
+            ]}
+          />
           <div className="flex items-center gap-2">
             {user && (
               <Button
@@ -221,7 +230,7 @@ export function FictionDetail({
               )}
               {fiction.year && <span>{fiction.year}</span>}
             </div>
-            <h1 className="w-full max-w-[min(100%,45rem)] text-balance break-words text-4xl font-bold leading-tight tracking-tight text-foreground sm:text-5xl xl:text-[3.25rem]">
+            <h1 className="w-full text-balance break-words text-4xl font-bold leading-tight tracking-tight text-foreground sm:text-5xl xl:text-[3.25rem]">
               {headline}
             </h1>
             <div className="relative aspect-[21/9] overflow-hidden rounded-xl border border-border/60">
@@ -237,7 +246,24 @@ export function FictionDetail({
             {fiction.description && (
               <p className="max-w-[75ch] text-base leading-8 text-muted-foreground">{fiction.description}</p>
             )}
-            <FictionInterestTags tags={fictionInterestTags} className="xl:hidden border-t border-border/60 pt-6" />
+            <FictionInterestTags tags={fictionInterestTags} className="@[1500px]/rails:hidden border-t border-border/60 pt-6" />
+
+            {initialCities.length > 0 && (
+              <section className="@[1500px]/rails:hidden space-y-2 border-t border-border/60 pt-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">{t("citiesHeading")}</p>
+                <ul className="space-y-2">
+                  {initialCities.map((city) => (
+                    <li key={city.id} className="text-sm text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="h-3.5 w-3.5" />
+                        {city.name}
+                        {city.country ? `, ${city.country}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </header>
 
           <section className="space-y-5">

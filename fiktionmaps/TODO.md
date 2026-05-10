@@ -22,6 +22,8 @@
 
 - [ ] Edit Place: replacing the existing image does not work.
 
+- [ ] **Place likes (persisted)**: Fiction likes are backed by `fiction_likes`, use cases, and server actions. Place hearts in `fiction-detail.tsx` (`likedPlaces` / `togglePlaceLike`) and `PlaceDetailLikeCluster` in `fiction-place-detail-view.tsx` are client-only (no DB). Add a `place_likes`-style table + RLS, domain/repo/application/`infrastructure/next` wiring (same architectural rules as `fiction-likes`), SSR counts and per-user liked state, then replace the placeholder UI.
+
 - [ ] **Separate place display name from real location name**: add `places.name` (fiction/display name) while keeping `locations.name` as the real-world name. Include DB migration with backfill (`places.name <- locations.name`), update Supabase types/repositories/actions, stop overwriting `locations.name` from place edit flow, and update admin/map UI to use `places.name` as primary label (optionally show real name as secondary).
 
 - [ ] User avatar upload: store file in Supabase Storage (dedicated bucket/path per user), save public URL (or storage path) in `profiles.avatar_url`; optional cleanup of previous object on change. Keep DiceBear URLs as alternative or migrate only uploads to Storage.

@@ -1,41 +1,40 @@
+import Image from "next/image"
 import { MapPin } from "lucide-react"
 import { getTranslations } from "next-intl/server"
-import { Link } from "@/i18n/navigation"
 import { FictionInterestTags } from "@/components/fictions/fiction-interest-tags"
-import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { City } from "@/src/cities/domain/city.entity"
+import type { FictionContributorProfile } from "@/src/contributions/domain/contribution.entity"
+import { cn } from "@/lib/utils"
 
 export async function FictionDetailRightRail({
   fictionInterestTags,
+  contributors,
   initialCities,
-  sameCityRecommendations,
 }: {
   fictionInterestTags: { id: string; label: string }[]
+  contributors: FictionContributorProfile[]
   initialCities: City[]
-  sameCityRecommendations: FictionWithMedia[]
 }) {
   const t = await getTranslations("Fictions")
-  const hasRightRail = fictionInterestTags.length > 0 || initialCities.length > 0
+  const showInterests = fictionInterestTags.length > 0
+  const showCities = initialCities.length > 0
+  const showContributors = contributors.length > 0
+  const hasRightRail = showInterests || showCities || showContributors
   if (!hasRightRail) return null
 
-  const recommendedPreview = sameCityRecommendations.slice(0, 3)
-  const citiesLabel =
-    initialCities.length === 1
-      ? (initialCities[0]?.name ?? t("thisCity"))
-      : t("citiesCount", { count: initialCities.length })
-
-  function getCreditLabel(type: FictionWithMedia["type"]): string {
-    if (type === "movie") return t("creditDirector")
-    if (type === "tv-series") return t("creditCreator")
-    return t("creditAuthor")
+  function displayName(p: FictionContributorProfile): string {
+    return p.username?.trim() || t("contributorNameFallback")
   }
+
+  const citiesSectionBorderTop = showInterests
+  const contributorsSectionBorderTop = showInterests || showCities
 
   return (
     <div className="mx-auto w-full max-w-[260px] space-y-4">
       <FictionInterestTags tags={fictionInterestTags} />
 
-      {initialCities.length > 0 && (
-        <section className={fictionInterestTags.length > 0 ? "space-y-2 border-t border-border/60 pt-4" : "space-y-2"}>
+      {showCities && (
+        <section className={cn("space-y-2", citiesSectionBorderTop && "border-t border-border/60 pt-4")}>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">{t("citiesHeading")}</p>
           <ul className="space-y-2">
             {initialCities.map((city) => (
@@ -51,38 +50,31 @@ export async function FictionDetailRightRail({
         </section>
       )}
 
-      {recommendedPreview.length > 0 && initialCities.length > 0 && (
-        <section className="space-y-2 border-t border-border/60 pt-4">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">
-            {t("recommendedInCities", { cities: citiesLabel })}
-          </h3>
+      {showContributors && (
+        <section
+          className={cn("space-y-2", contributorsSectionBorderTop && "border-t border-border/60 pt-4")}
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">{t("contributorsHeading")}</p>
           <ul className="space-y-2">
-            {recommendedPreview.map((rec) => (
-              <li key={rec.id}>
-                <Link
-                  href={`/fictions/${rec.slug ?? rec.id}`}
-                  className="block rounded-md px-1 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-                >
-                  <p className="line-clamp-2 break-words text-sm font-medium leading-snug text-foreground">{rec.title}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {rec.author?.trim()
-                      ? `${getCreditLabel(rec.type)}: ${rec.author.trim()}`
-                      : rec.type === "movie"
-                        ? t("typeMovie")
-                        : rec.type === "tv-series"
-                          ? t("typeTvSeriesShort")
-                          : t("typeBook")}
-                    {rec.year ? ` · ${rec.year}` : ""}
-                  </p>
-                </Link>
-              </li>
-            ))}
+            {contributors.map((p) => {
+              const label = displayName(p)
+              const initial = label.charAt(0).toUpperCase()
+              return (
+                <li key={p.id} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full bg-muted">
+                    {p.avatarUrl?.trim() ? (
+                      <Image src={p.avatarUrl.trim()} alt={label} width={28} height={28} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
+                        {initial}
+                      </span>
+                    )}
+                  </span>
+                  <span className="min-w-0 truncate text-foreground">{label}</span>
+                </li>
+              )
+            })}
           </ul>
-          {sameCityRecommendations.length > 3 && (
-            <Link href="/fictions" className="inline-block text-xs font-medium text-primary hover:underline">
-              {t("viewMore")}
-            </Link>
-          )}
         </section>
       )}
     </div>

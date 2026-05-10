@@ -5,6 +5,7 @@ import { zodErrorMessage } from "@/lib/validation/http"
 import { interestIdsBodySchema } from "@/lib/validation/api-payloads"
 import { isUuidString, uuidSchema } from "@/lib/validation/primitives"
 import { createClient } from "@/lib/supabase/server"
+import { createContributionAction } from "@/src/contributions/infrastructure/next/contribution.actions"
 import { supabaseRepositoryAdapter as fictionsRepo } from "@/src/fictions/infrastructure/supabase/fiction.repository.impl"
 import { supabaseRepositoryAdapter as fictionInterestsRepo } from "@/src/fiction-interests/infrastructure/supabase/fiction-interests.repository.impl"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
@@ -97,6 +98,16 @@ export async function createFictionAction(formData: FormData): Promise<CreateFic
   const fiction = await createFictionUseCase(parsed.data, fictionsRepo)
   if (!fiction) return { success: false, error: "Failed to create fiction" }
 
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    await createContributionAction({
+      type: "create_fiction",
+      entityType: "fiction",
+      entityId: fiction.id,
+    })
+  }
+
   revalidatePath("/admin")
   updateTag("fictions")
   return { success: true, fiction }
@@ -108,6 +119,16 @@ export async function createFictionWithImagesAction(formData: FormData): Promise
 
   const fiction = await createFictionUseCase(parsed.data, fictionsRepo)
   if (!fiction) return { success: false, error: "Failed to create fiction" }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    await createContributionAction({
+      type: "create_fiction",
+      entityType: "fiction",
+      entityId: fiction.id,
+    })
+  }
 
   const coverFile = formData.get("coverFile")
   const bannerFile = formData.get("bannerFile")

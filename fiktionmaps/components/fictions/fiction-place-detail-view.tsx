@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic"
 import Image from "next/image"
-import { ArrowLeft, ChevronRight, Compass } from "lucide-react"
+import { useState } from "react"
+import { ChevronRight, Compass, Heart } from "lucide-react"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import { cn } from "@/lib/utils"
 import { Link } from "@/i18n/navigation"
@@ -14,7 +15,10 @@ import type { Location } from "@/src/locations/domain/location.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
+import type { ContributorProfileWithDate } from "@/src/contributions/domain/contribution.entity"
 import { ScenePreviewThumb } from "@/components/scenes/scene-preview-thumb"
+import { PlaceContributorsByline } from "@/components/fictions/place-contributors-byline"
+import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
 
 const FictionPlaceDirectionsMap = dynamic(
   () =>
@@ -46,6 +50,35 @@ function googleMapsHref(coordsOk: boolean, lat: number, lng: number, addressQuer
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressQuery)}`
 }
 
+function PlaceDetailLikeCluster() {
+  const t = useTranslations("Fictions")
+  const [liked, setLiked] = useState(false)
+  const [likeCount, setLikeCount] = useState(0)
+
+  function toggle() {
+    const next = !liked
+    setLiked(next)
+    setLikeCount((c) => (next ? c + 1 : Math.max(0, c - 1)))
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="h-8 gap-1 px-2 text-muted-foreground hover:text-foreground"
+        aria-label={liked ? t("unlikePlace") : t("likePlace")}
+        aria-pressed={liked}
+        onClick={toggle}
+      >
+        <Heart className={`h-4 w-4 shrink-0 ${liked ? "text-rose-500" : ""}`} fill={liked ? "currentColor" : "none"} />
+        <span className="min-w-[1ch] text-xs font-medium tabular-nums text-foreground">{likeCount}</span>
+      </Button>
+    </div>
+  )
+}
+
 export interface FictionPlaceDetailViewProps {
   fiction: FictionWithMedia
   /** Segment for `/fictions/...` and `/fiction/...` paths (slug preferred). */
@@ -54,6 +87,7 @@ export interface FictionPlaceDetailViewProps {
   city: City | undefined
   scenes: Scene[]
   exploreMapHref: string
+  placeContributors: ContributorProfileWithDate[]
 }
 
 export function FictionPlaceDetailView({
@@ -63,9 +97,10 @@ export function FictionPlaceDetailView({
   city,
   scenes,
   exploreMapHref,
+  placeContributors,
 }: FictionPlaceDetailViewProps) {
   const t = useTranslations("Fictions")
-  const tCommon = useTranslations("Common")
+  const tMeta = useTranslations("Metadata")
   const geo: Location =
     location.location ?? {
       name: "",
@@ -86,17 +121,19 @@ export function FictionPlaceDetailView({
 
   const showDirectionsSection = coordsOk || Boolean(addressLine)
 
-  const backClassName =
-    "inline-flex h-9 items-center gap-1 rounded-full px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-
   return (
     <main className="px-6 py-8 sm:px-8 lg:px-10">
-      <div className="mx-auto w-full max-w-[900px]">
+      <div className="mx-auto w-full max-w-[920px]">
         <div className="mb-6 flex items-center justify-between gap-3">
-          <Link href={`/fictions/${fictionPathSlug}`} className={backClassName}>
-            <ArrowLeft className="h-4 w-4" />
-            {tCommon("back")}
-          </Link>
+          <PageBreadcrumb
+            ariaLabel={tMeta("breadcrumbNavAriaLabel")}
+            className="min-w-0 flex-1 pr-2"
+            items={[
+              { label: tMeta("breadcrumbFictions"), href: "/fictions" },
+              { label: fiction.title, href: `/fictions/${fictionPathSlug}` },
+              { label: displayName },
+            ]}
+          />
           <Button asChild size="sm" variant="cta">
             <Link href={exploreMapHref}>
               <Compass className="h-4 w-4" />
@@ -105,42 +142,53 @@ export function FictionPlaceDetailView({
           </Button>
         </div>
 
-        <article className="space-y-8">
-          <header className="space-y-5 border-b border-border/60 pb-8">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <Badge variant="secondary" className="text-xs">
-                {fiction.type === "tv-series"
-                  ? t("typeTvSeries")
-                  : fiction.type === "book"
-                    ? t("typeBook")
-                    : t("typeMovie")}
-              </Badge>
-              {city && (
-                <span>
-                  {city.name}
-                  {city.country ? `, ${city.country}` : ""}
-                </span>
-              )}
+        <article className="space-y-6">
+          <div className="flex flex-col">
+            <header className="space-y-5 border-b border-border/60 pb-8">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="secondary" className="text-xs">
+                  {fiction.type === "tv-series"
+                    ? t("typeTvSeries")
+                    : fiction.type === "book"
+                      ? t("typeBook")
+                      : t("typeMovie")}
+                </Badge>
+                {city ? (
+                  <span>
+                    {city.name}
+                    {city.country ? `, ${city.country}` : ""}
+                  </span>
+                ) : null}
+              </div>
+              <h1 className="w-full text-balance text-3xl font-bold leading-[1.15] tracking-tight text-foreground sm:text-4xl xl:text-[2.65rem]">
+                {t("placeDetailCatchyHeading", {
+                  placeName: displayName,
+                  fictionName: fiction.title,
+                })}
+              </h1>
+              <div className="relative aspect-[21/9] overflow-hidden rounded-xl border border-border/60">
+                <Image
+                  src={heroSrc}
+                  alt={displayName}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 1024px) 100vw, 40vw"
+                />
+              </div>
+              {location.description ? (
+                <p className="max-w-[75ch] text-base leading-8 text-muted-foreground">{location.description}</p>
+              ) : null}
+            </header>
+
+            <div className="border-b border-border/60 py-3">
+              <div className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <PlaceContributorsByline contributors={placeContributors} className="max-w-full" />
+                </div>
+                <PlaceDetailLikeCluster />
+              </div>
             </div>
-            <h1 className="w-full max-w-[min(100%,45rem)] text-balance text-3xl font-bold leading-[1.15] tracking-tight text-foreground sm:text-4xl xl:text-[2.65rem]">
-              {t("placeDetailCatchyHeading", {
-                placeName: displayName,
-                fictionName: fiction.title,
-              })}
-            </h1>
-            <div className="relative aspect-[21/9] overflow-hidden rounded-xl border border-border/60">
-              <Image
-                src={heroSrc}
-                alt={displayName}
-                fill
-                className="object-cover"
-                sizes="(max-width: 1024px) 100vw, 40vw"
-              />
-            </div>
-            {location.description ? (
-              <p className="max-w-[75ch] text-base leading-8 text-muted-foreground">{location.description}</p>
-            ) : null}
-          </header>
+          </div>
 
           {showDirectionsSection ? (
             <section className="space-y-4 border-b border-border/60 pb-10" aria-labelledby="place-directions-heading">

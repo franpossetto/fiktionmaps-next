@@ -15,6 +15,7 @@ import {
   getFictionPlacesCached,
   getPlaceCountsByFictionIdsCached,
 } from "@/src/places/infrastructure/next/place.queries"
+import { getFictionContributorsCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { getCurrentUserHasLikedFiction } from "@/src/users/infrastructure/next/user.queries"
 import { isUuidString } from "@/lib/validation/primitives"
 import { getSiteUrl } from "@/lib/site"
@@ -23,6 +24,7 @@ import { FictionDetail } from "@/components/fictions/fiction-detail"
 import { FictionDetailRightRail } from "@/components/fictions/fiction-detail-right-rail"
 import { FictionSlugDetailShell } from "@/components/fictions/fiction-slug-detail-shell"
 import { getFictionSidebarSummaryText } from "@/lib/fictions/get-fiction-sidebar-summary-text"
+import { orderCitiesForFictionDetail } from "@/lib/fictions/order-cities-for-fiction-detail"
 
 type Props = {
   params: Promise<{ locale: string; slug: string }>
@@ -167,6 +169,7 @@ export default async function FictionSlugPage({ params }: Props) {
     initialLiked,
     fictionInterestIds,
     interestCatalog,
+    fictionContributors,
   ] = await Promise.all([
     getFictionPlacesCached(fiction.id),
     getFictionCitiesCached(fiction.id),
@@ -175,6 +178,7 @@ export default async function FictionSlugPage({ params }: Props) {
     getCurrentUserHasLikedFiction(fiction.id),
     getFictionInterestsCached(fiction.id),
     getInterestCatalogCached(locale),
+    getFictionContributorsCached(fiction.id),
   ])
   const labelByInterestId = new Map(interestCatalog.map((i) => [i.id, i.label]))
   const fictionInterestTags = fictionInterestIds.flatMap((id) => {
@@ -187,6 +191,7 @@ export default async function FictionSlugPage({ params }: Props) {
     recommendationIds.length > 0
       ? await getPlaceCountsByFictionIdsCached(recommendationIds)
       : {}
+  const fictionCitiesOrdered = orderCitiesForFictionDetail(initialPlaces, initialCities)
   const sidebarSummary = await getFictionSidebarSummaryText(fiction, locale)
   return (
     <>
@@ -204,15 +209,15 @@ export default async function FictionSlugPage({ params }: Props) {
         rightAside={
           <FictionDetailRightRail
             fictionInterestTags={fictionInterestTags}
-            initialCities={initialCities}
-            sameCityRecommendations={sameCityRecommendations}
+            contributors={fictionContributors}
+            initialCities={fictionCitiesOrdered}
           />
         }
       >
         <FictionDetail
           fiction={fiction}
           initialPlaces={initialPlaces}
-          initialCities={initialCities}
+          initialCities={fictionCitiesOrdered}
           initialLikeCount={initialLikeCount}
           initialLiked={initialLiked}
           fictionInterestTags={fictionInterestTags}

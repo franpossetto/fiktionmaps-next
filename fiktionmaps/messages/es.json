@@ -282,6 +282,7 @@
     "directorPlaceholder": "Director",
     "yearPlaceholder": "Año",
     "latestVisited": "Visitas recientes",
+    "topContributors": "Top colaboradores",
     "becomeContributor": "Conviértete en colaborador",
     "contributorBody": "Ayuda a la comunidad a descubrir más lugares de rodaje compartiendo sitios, corrigiendo detalles y aportando contexto a las ficciones existentes.",
     "startContributing": "Empezar a colaborar",
@@ -302,6 +303,9 @@
     "likePlace": "Me gusta este lugar",
     "unlikePlace": "Quitar me gusta del lugar",
     "citiesHeading": "Ciudades",
+    "contributorsHeading": "Colaboradores",
+    "placeDetailCreatedPlaceVerbPhrase": "creó este lugar",
+    "contributorNameFallback": "Miembro",
     "interestsHeading": "Intereses",
     "recommendedInCities": "Ficciones recomendadas en {cities}",
     "viewMore": "Ver más",
@@ -430,6 +434,7 @@
     "placeNotFound": "Lugar no encontrado",
     "placeDetailTitle": "{placeName} · {fictionTitle}",
     "breadcrumbHome": "Inicio",
-    "breadcrumbFictions": "Ficciones"
+    "breadcrumbFictions": "Ficciones",
+    "breadcrumbNavAriaLabel": "Migas de pan"
   }
 }
