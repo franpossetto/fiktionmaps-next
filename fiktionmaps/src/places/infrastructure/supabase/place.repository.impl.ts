@@ -376,12 +376,15 @@ export function createPlacesSupabaseAdapter(
     async create(data: CreatePlaceData): Promise<{ placeId: string } | null> {
       const supabase = await getSupabase()
 
+      const locationName = data.locationName.trim()
+      const placeName = data.placeName.trim()
+
       const { data: locationRow, error: locationError } = await supabase
         .from("locations")
         .insert({
           city_id: data.cityId,
-          name: data.name.trim(),
-          formatted_address: data.formattedAddress?.trim() || data.name.trim(),
+          name: locationName,
+          formatted_address: data.formattedAddress?.trim() || locationName,
           post_code: null,
           latitude: data.latitude,
           longitude: data.longitude,
@@ -402,7 +405,7 @@ export function createPlacesSupabaseAdapter(
         .insert({
           fiction_id: data.fictionId,
           location_id: locationRow.id,
-          name: data.name.trim(),
+          name: placeName,
           description: data.description.trim(),
           active: true,
         })
@@ -428,10 +431,12 @@ export function createPlacesSupabaseAdapter(
 
       if (placeFetchError || !placeRow?.location_id) return false
 
+      const locationName = data.locationName.trim()
+      const placeName = data.placeName.trim()
       const locationId = placeRow.location_id as string
       const locationUpdate: Record<string, unknown> = {
-        name: data.name.trim(),
-        formatted_address: data.formattedAddress?.trim() || data.name.trim(),
+        name: locationName,
+        formatted_address: data.formattedAddress?.trim() || locationName,
         latitude: data.latitude,
         longitude: data.longitude,
         city_id: data.cityId,
@@ -452,6 +457,7 @@ export function createPlacesSupabaseAdapter(
         .from("places")
         .update({
           fiction_id: data.fictionId,
+          name: placeName,
           description: data.description.trim(),
         })
         .eq("id", placeId)

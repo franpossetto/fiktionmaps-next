@@ -104,7 +104,8 @@ export const LOCATION_TYPE_OPTIONS = [
 export interface PlaceFormData {
   fictionId: string
   address: string
-  name: string
+  locationName: string
+  placeName: string
   description: string
   latitude: number
   longitude: number
@@ -372,13 +373,16 @@ export function PlaceCreateView({
   const handleAddressSelect = useCallback(
     (result: { lat: number; lng: number; place_name: string; text: string; context?: Array<{ id: string; text: string }> }) => {
       const cityId = resolveCityId(result.context, result.place_name, cities)
+      const suggestedName =
+        result.text || result.place_name.split(",")[0]?.trim() || "Place"
       setFormData((prev) => ({
         ...prev,
         latitude: result.lat,
         longitude: result.lng,
         formattedAddress: result.place_name,
         address: result.place_name,
-        name: prev.name || result.text || result.place_name.split(",")[0]?.trim() || "Place",
+        locationName: prev.locationName || suggestedName,
+        placeName: prev.placeName || suggestedName,
         cityId,
       }))
       setAddressLocked(true)
@@ -407,7 +411,8 @@ export function PlaceCreateView({
     const next: Record<string, string> = {}
     if (!formData.fictionId) next.fictionId = "Fiction is required"
     if (!formData.address?.trim()) next.address = "Address is required"
-    if (!formData.name?.trim()) next.name = "Place name is required"
+    if (!formData.locationName?.trim()) next.locationName = "Location name is required"
+    if (!formData.placeName?.trim()) next.placeName = "Place name is required"
     if (!formData.description?.trim()) next.description = "Description is required"
     if (!isEdit && !formData.image) next.image = "Place image is required"
     setErrors(next)
@@ -569,11 +574,21 @@ export function PlaceCreateView({
               </Select>
             </FormField>
 
-            <FormField label="Place name" required error={errors.name}>
+            <FormField label="Location name" required error={errors.locationName}>
               <input
                 type="text"
-                value={formData.name}
-                onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+                value={formData.locationName}
+                onChange={(e) => setFormData((p) => ({ ...p, locationName: e.target.value }))}
+                placeholder="e.g. King's Cross Station"
+                className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </FormField>
+
+            <FormField label="Place name" required error={errors.placeName}>
+              <input
+                type="text"
+                value={formData.placeName}
+                onChange={(e) => setFormData((p) => ({ ...p, placeName: e.target.value }))}
                 placeholder="e.g. Platform 9¾"
                 className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
@@ -656,7 +671,7 @@ export function PlaceCreateView({
             <DialogTitle>Confirm place</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Select the city for this place: <strong>{formData.address || formData.name}</strong>
+            Select the city for this place: <strong>{formData.address || formData.placeName}</strong>
           </p>
           <div className="space-y-2">
             <label className="block text-sm font-medium text-foreground">City</label>
@@ -743,7 +758,7 @@ export function PlaceCreateView({
                   </div>
                   <div className="h-0 w-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-border" />
                   <div className="mt-0.5 max-w-[140px] truncate rounded-md bg-overlay/95 px-2 py-0.5 text-center text-[10px] font-semibold text-foreground backdrop-blur-sm shadow-lg">
-                    {formData.name?.trim() || "Place name"}
+                    {formData.placeName?.trim() || "Place name"}
                   </div>
                 </div>
               </MapMarker>

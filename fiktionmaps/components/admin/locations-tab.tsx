@@ -42,7 +42,8 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
   const initialPlaceFormData: PlaceFormData = {
     fictionId: "",
     address: "",
-    name: "",
+    locationName: "",
+    placeName: "",
     description: "",
     latitude: defaultCity?.lat ?? 48.8566,
     longitude: defaultCity?.lng ?? 2.3522,
@@ -57,7 +58,8 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
     const result = await updatePlaceAction(placeId, {
       fictionId: data.fictionId,
       cityId: data.cityId,
-      name: data.name,
+      locationName: data.locationName,
+      placeName: data.placeName,
       formattedAddress: data.formattedAddress || data.address,
       latitude: data.latitude,
       longitude: data.longitude,
@@ -85,7 +87,8 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
     const result = await createPlaceAction({
       fictionId: data.fictionId,
       cityId: data.cityId,
-      name: data.name,
+      locationName: data.locationName,
+      placeName: data.placeName,
       formattedAddress: data.formattedAddress || data.address,
       latitude: data.latitude,
       longitude: data.longitude,
@@ -155,7 +158,8 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
     const editInitialFormData: PlaceFormData = {
       fictionId: editingLocation.fictionId,
       cityId: editingLocation.location.cityId,
-      name: editingLocation.name ?? editingLocation.location.name,
+      locationName: editingLocation.location.name ?? "",
+      placeName: editingLocation.name ?? editingLocation.location.name ?? "",
       address: editingLocation.location.address ?? "",
       formattedAddress: editingLocation.location.address ?? "",
       description: editingLocation.description ?? "",

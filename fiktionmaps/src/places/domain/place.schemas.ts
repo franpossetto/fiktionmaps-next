@@ -4,7 +4,8 @@ import { latitudeSchema, longitudeSchema, uuidSchema } from "@/lib/validation/pr
 export const createPlaceSchema = z.object({
   fictionId: uuidSchema,
   cityId: uuidSchema,
-  name: z.string().trim().min(1),
+  locationName: z.string().trim().min(1),
+  placeName: z.string().trim().min(1),
   formattedAddress: z.string().trim(),
   latitude: z.coerce.number().pipe(latitudeSchema),
   longitude: z.coerce.number().pipe(longitudeSchema),
