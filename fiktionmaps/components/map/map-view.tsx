@@ -1,11 +1,25 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef, useMemo, type ReactNode } from "react"
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+  type CSSProperties,
+  type ReactNode,
+} from "react"
 import { createPortal } from "react-dom"
 import Image from "next/image"
 import { motion } from "framer-motion"
 import { useMap } from "react-map-gl/mapbox"
-import { MapContainer, MapClusterLayer, useMapControl, useMapLoaded } from "@/lib/map"
+import {
+  MapContainer,
+  MapClusterLayer,
+  useMapControl,
+  useMapLoaded,
+  MAP_SPIDERFY_CSS_VARS,
+} from "@/lib/map"
 import type { ClusterItem } from "@/lib/map"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
@@ -158,13 +172,25 @@ function MapViewPins({
   clusterItems: MapPinClusterItem[]
   selectedLocationId: string | null | undefined
   onLocationClick: (location: Place) => void
-  renderMarker: (item: MapPinClusterItem, state: { isSelected: boolean; isHovered: boolean }) => ReactNode
+  renderMarker: (
+    item: MapPinClusterItem,
+    state: { isSelected: boolean; isHovered: boolean; stackSize?: number },
+  ) => ReactNode
 }) {
   const mapLoaded = useMapLoaded()
   if (!mapLoaded) return null
+  const spiderfyVars = {
+    /* Mapbox layer paint.line-color does not accept modern hsl() slash syntax — use rgba */
+    [MAP_SPIDERFY_CSS_VARS.legColor]: "rgba(136, 146, 165, 0.85)",
+    [MAP_SPIDERFY_CSS_VARS.legWidthPx]: "2",
+    [MAP_SPIDERFY_CSS_VARS.radiusPx]: "52",
+    [MAP_SPIDERFY_CSS_VARS.hubClearancePx]: "44",
+    [MAP_SPIDERFY_CSS_VARS.maxLeaves]: "32",
+  } as CSSProperties
   return (
     <motion.div
       className="absolute inset-0 pointer-events-none [&>*]:pointer-events-auto"
+      style={spiderfyVars}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
@@ -175,6 +201,7 @@ function MapViewPins({
         selectedItemId={selectedLocationId}
         onItemClick={(item) => onLocationClick(item.place)}
         renderItem={renderMarker}
+        collocatedSpiderfy={{ enabled: true }}
       />
     </motion.div>
   )
@@ -190,9 +217,10 @@ const pinTapScale = 0.96
 
 function renderLocationMarker2D(
   item: MapPinClusterItem,
-  state: { isSelected: boolean; isHovered: boolean },
+  state: { isSelected: boolean; isHovered: boolean; stackSize?: number },
 ) {
-  const { isSelected, isHovered } = state
+  const { isSelected, isHovered, stackSize } = state
+  const showStackBadge = stackSize != null && stackSize > 1
   return (
     <motion.div
       className="group flex flex-col items-center"
@@ -224,6 +252,11 @@ function renderLocationMarker2D(
           className="object-cover"
           sizes="64px"
         />
+        {showStackBadge && (
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-background bg-[#e8365d] px-1 text-[10px] font-bold text-white shadow-md">
+            {stackSize}
+          </span>
+        )}
       </div>
       <div
         className={`h-0 w-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent transition-colors ${
@@ -250,9 +283,10 @@ function renderLocationMarker2D(
 
 function renderLocationMarker3D(
   item: MapPinClusterItem,
-  state: { isSelected: boolean; isHovered: boolean },
+  state: { isSelected: boolean; isHovered: boolean; stackSize?: number },
 ) {
-  const { isSelected, isHovered } = state
+  const { isSelected, isHovered, stackSize } = state
+  const showStackBadge = stackSize != null && stackSize > 1
   const active = isSelected || isHovered
   const ringColor = isSelected ? "hsl(36, 90%, 55%)" : isHovered ? "hsl(36, 90%, 55%, 0.6)" : "hsl(220, 25%, 35%)"
 
@@ -315,6 +349,11 @@ function renderLocationMarker3D(
             className="object-cover"
             sizes="56px"
           />
+          {showStackBadge && (
+            <span className="absolute -right-0.5 -top-0.5 z-[2] flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0b0f14] bg-[#e8365d] px-1 text-[10px] font-bold text-white shadow-md">
+              {stackSize}
+            </span>
+          )}
           {/* Glass overlay */}
           <div
             className="absolute inset-0 rounded-full"

@@ -19,7 +19,14 @@ export type {
   MapControl,
   ClusterItem,
   ClusterLayerProps,
+  CollocatedSpiderfyOptions,
   GeocodingPrediction,
   GeocodingResult,
   GeocodingAdapter,
 } from "./types"
+
+export {
+  MAP_SPIDERFY_CSS_VARS,
+  resolveCollocatedSpiderfyTheme,
+} from "./collocated-spiderfy-theme"
+export type { CollocatedSpiderfyTheme } from "./collocated-spiderfy-theme"
