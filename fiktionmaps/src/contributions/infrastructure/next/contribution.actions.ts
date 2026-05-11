@@ -8,6 +8,7 @@ import { createContributionUseCase } from "@/src/contributions/application/creat
 import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/ensure-user-is-moderator.usecase"
 import { rejectContributionUseCase } from "@/src/contributions/application/reject-contribution.usecase"
 import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
+import type { ContributionEntityType } from "@/src/contributions/domain/contribution.entity"
 import {
   approveContributionSchema,
   createContributionSchema,
@@ -27,6 +28,27 @@ export type {
   CreateContributionResult,
   RejectContributionResult,
 } from "./contribution.actions.types"
+
+function revalidateContributionEntityTags(entityType: ContributionEntityType, entityId: string) {
+  switch (entityType) {
+    case "fiction":
+      updateTag("fictions")
+      updateTag(`fiction-${entityId}`)
+      break
+    case "place":
+      updateTag("places")
+      updateTag(`place-${entityId}`)
+      break
+    case "scene":
+      updateTag("scenes")
+      updateTag(`scene-${entityId}`)
+      break
+    default: {
+      const _exhaustive: never = entityType
+      void _exhaustive
+    }
+  }
+}
 
 export async function createContributionAction(data: CreateContributionData): Promise<CreateContributionResult> {
   const supabase = await createClient()
@@ -54,6 +76,7 @@ export async function createContributionAction(data: CreateContributionData): Pr
 
   revalidatePath("/admin")
   updateTag("contributions")
+  revalidateContributionEntityTags(parsed.data.entityType, parsed.data.entityId)
   if (result.autoApproved) {
     updateTag("profiles")
   }
@@ -82,12 +105,16 @@ export async function approveContributionAction(data: ApproveContributionData): 
   const parsed = approveContributionSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
 
+  const contributionBefore = await contributionsRepo.getById(parsed.data.id)
+  if (!contributionBefore) return { success: false, error: "Contribution not found" }
+
   const ok = await approveContributionUseCase({ ...parsed.data, moderatorId: user.id }, contributionsRepo)
   if (!ok) return { success: false, error: "Approve failed or contribution is not pending" }
 
   revalidatePath("/admin")
   updateTag("contributions")
   updateTag("profiles")
+  revalidateContributionEntityTags(contributionBefore.entityType, contributionBefore.entityId)
   return { success: true }
 }
 
@@ -113,11 +140,15 @@ export async function rejectContributionAction(data: RejectContributionData): Pr
   const parsed = rejectContributionSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
 
+  const contributionBefore = await contributionsRepo.getById(parsed.data.id)
+  if (!contributionBefore) return { success: false, error: "Contribution not found" }
+
   const ok = await rejectContributionUseCase({ ...parsed.data, moderatorId: user.id }, contributionsRepo)
   if (!ok) return { success: false, error: "Reject failed or contribution is not pending" }
 
   revalidatePath("/admin")
   updateTag("contributions")
   updateTag("profiles")
+  revalidateContributionEntityTags(contributionBefore.entityType, contributionBefore.entityId)
   return { success: true }
 }

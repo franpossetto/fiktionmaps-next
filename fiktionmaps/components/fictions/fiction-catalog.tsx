@@ -55,11 +55,14 @@ export function FictionCatalog({
   useEffect(() => {
     if (!user) { setLikedIds([]); return }
     let cancelled = false
+    setLikedIds([])
     ;(async () => {
       try {
         const data = await getMyLikedFictionIdsAction()
         if (!cancelled) setLikedIds(data)
-      } catch { /* noop */ }
+      } catch {
+        if (!cancelled) setLikedIds([])
+      }
     })()
     return () => { cancelled = true }
   }, [user])

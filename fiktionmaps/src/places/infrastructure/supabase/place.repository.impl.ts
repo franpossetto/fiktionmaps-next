@@ -92,7 +92,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error: placesError } = await supabase
         .from("places")
         .select(
-          "id, fiction_id, description, active, location_id, name, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark)"
+          "id, fiction_id, description, active, location_id, name, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark, type)"
         )
         .order("created_at", { ascending: false })
         .range(0, 9999)
@@ -159,7 +159,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error } = await supabase
         .from("places")
         .select(
-          "id, fiction_id, description, active, location_id, name, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark)"
+          "id, fiction_id, description, active, location_id, name, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark, type)"
         )
         .eq("fiction_id", fictionId)
         .order("created_at", { ascending: false })
@@ -200,7 +200,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error } = await supabase
         .from("places")
         .select(
-          "id, fiction_id, description, active, location_id, name, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark)"
+          "id, fiction_id, description, active, location_id, name, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark, type)"
         )
         .in("location_id", locationIds)
         .order("created_at", { ascending: false })
@@ -255,7 +255,7 @@ export function createPlacesSupabaseAdapter(
         .select(
           `id, fiction_id, description, active, name,
            location:locations!inner (
-             id, name, formatted_address, latitude, longitude, city_id, is_landmark
+             id, name, formatted_address, latitude, longitude, city_id, is_landmark, type
            )`
         )
         .eq("id", placeId)
@@ -316,7 +316,7 @@ export function createPlacesSupabaseAdapter(
         .select(
           `id, fiction_id, description, active, name,
            location:locations!inner (
-             id, name, formatted_address, latitude, longitude, city_id, is_landmark
+             id, name, formatted_address, latitude, longitude, city_id, is_landmark, type
            )`
         )
         .in("fiction_id", fictionIds)

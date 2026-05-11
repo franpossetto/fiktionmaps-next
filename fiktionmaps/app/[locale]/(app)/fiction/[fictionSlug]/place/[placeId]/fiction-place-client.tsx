@@ -30,28 +30,32 @@ export function FictionPlaceClient() {
     setCity(null)
 
     ;(async () => {
-      const resolvedFiction = await resolvePublicFictionFromSlugOrIdAction(fictionSlug)
-      if (!resolvedFiction) {
-        if (!cancelled) setLoadError("not_found")
-        return
-      }
+      try {
+        const resolvedFiction = await resolvePublicFictionFromSlugOrIdAction(fictionSlug)
+        if (!resolvedFiction) {
+          if (!cancelled) setLoadError("not_found")
+          return
+        }
 
-      const loc = await getPlaceLocationAction(placeId)
-      if (!loc) {
-        if (!cancelled) setLoadError("not_found")
-        return
-      }
-      if (cancelled) return
-      if (loc.id !== placeId || loc.fictionId !== resolvedFiction.id) {
-        setLoadError("not_found")
-        return
-      }
+        const loc = await getPlaceLocationAction(placeId)
+        if (!loc) {
+          if (!cancelled) setLoadError("not_found")
+          return
+        }
+        if (cancelled) return
+        if (loc.id !== placeId || loc.fictionId !== resolvedFiction.id) {
+          setLoadError("not_found")
+          return
+        }
 
-      const c = await getAllCitiesAction().then((rows) => rows.find((item) => item.id === loc.location.cityId) ?? null)
-      if (cancelled) return
-      setLocation(loc)
-      setFiction(resolvedFiction)
-      setCity(c)
+        const c = await getAllCitiesAction().then((rows) => rows.find((item) => item.id === loc.location.cityId) ?? null)
+        if (cancelled) return
+        setLocation(loc)
+        setFiction(resolvedFiction)
+        setCity(c)
+      } catch {
+        if (!cancelled) setLoadError("error")
+      }
     })()
 
     return () => {
@@ -59,10 +63,12 @@ export function FictionPlaceClient() {
     }
   }, [fictionSlug, placeId])
 
-  if (loadError === "not_found") {
+  if (loadError) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-        <p className="text-sm font-medium text-foreground">Place not found</p>
+        <p className="text-sm font-medium text-foreground">
+          {loadError === "not_found" ? "Place not found" : "Couldn't load this place"}
+        </p>
         <button
           type="button"
           onClick={() => router.push("/map")}

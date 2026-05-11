@@ -37,6 +37,29 @@ import type {
   GetRecommendedFictionsResult,
 } from "./fiction.actions.types"
 
+const CREATE_FICTION_CONTRIBUTION = {
+  type: "create_fiction" as const,
+  entityType: "fiction" as const,
+}
+
+async function tryRecordCreateFictionContribution(fictionId: string, logContext: string): Promise<void> {
+  const payload = { ...CREATE_FICTION_CONTRIBUTION, entityId: fictionId }
+  try {
+    const res = await createContributionAction(payload)
+    if (!res.success) {
+      console.error(`[${logContext}] createContributionAction failed`, {
+        ...payload,
+        error: res.error,
+      })
+    }
+  } catch (err) {
+    console.error(`[${logContext}] createContributionAction threw`, {
+      ...payload,
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
+
 export type {
   CreateFictionResult,
   UpdateFictionResult,
@@ -101,11 +124,7 @@ export async function createFictionAction(formData: FormData): Promise<CreateFic
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (user) {
-    await createContributionAction({
-      type: "create_fiction",
-      entityType: "fiction",
-      entityId: fiction.id,
-    })
+    await tryRecordCreateFictionContribution(fiction.id, "createFictionAction")
   }
 
   revalidatePath("/admin")
@@ -123,11 +142,7 @@ export async function createFictionWithImagesAction(formData: FormData): Promise
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (user) {
-    await createContributionAction({
-      type: "create_fiction",
-      entityType: "fiction",
-      entityId: fiction.id,
-    })
+    await tryRecordCreateFictionContribution(fiction.id, "createFictionWithImagesAction")
   }
 
   const coverFile = formData.get("coverFile")

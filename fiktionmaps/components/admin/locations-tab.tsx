@@ -155,7 +155,7 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
     const editInitialFormData: PlaceFormData = {
       fictionId: editingLocation.fictionId,
       cityId: editingLocation.location.cityId,
-      name: editingLocation.location.name,
+      name: editingLocation.name ?? editingLocation.location.name,
       address: editingLocation.location.address ?? "",
       formattedAddress: editingLocation.location.address ?? "",
       description: editingLocation.description ?? "",

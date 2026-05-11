@@ -13,10 +13,12 @@ export function AppTopNavbar() {
   const router = useRouter()
   const tNav = useTranslations("Nav")
   const tFictions = useTranslations("Fictions")
+  const tCommon = useTranslations("Common")
   const [search, setSearch] = useState("")
   const [isFocused, setIsFocused] = useState(false)
   const [fictions, setFictions] = useState<FictionWithMedia[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [fictionLoadFailed, setFictionLoadFailed] = useState(false)
 
   const query = search.trim()
   const filtered = useMemo(() => {
@@ -34,11 +36,14 @@ export function AppTopNavbar() {
 
   async function ensureFictionsLoaded() {
     if (loaded) return
+    setFictionLoadFailed(false)
     try {
       const data = await getActiveFictionsAction()
       setFictions(data)
-    } finally {
       setLoaded(true)
+    } catch (err) {
+      console.error("getActiveFictionsAction failed", err)
+      setFictionLoadFailed(true)
     }
   }
 
@@ -84,7 +89,11 @@ export function AppTopNavbar() {
           />
           {isFocused && query.length > 0 ? (
             <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-xl border border-border bg-background shadow-lg">
-              {filtered.length > 0 ? (
+              {fictionLoadFailed ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">{tCommon("error")}</div>
+              ) : !loaded ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">{tCommon("loading")}</div>
+              ) : filtered.length > 0 ? (
                 <ul className="max-h-80 overflow-y-auto p-1">
                   {filtered.map((fiction) => (
                     <li key={fiction.id}>
