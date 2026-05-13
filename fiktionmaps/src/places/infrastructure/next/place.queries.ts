@@ -9,6 +9,7 @@ import { getPlaceByIdUseCase } from "@/src/places/application/get-place-by-id.us
 import { getFictionPlacesUseCase } from "@/src/places/application/get-fiction-places.usecase"
 import { getCityPlacesUseCase } from "@/src/places/application/get-city-places.usecase"
 import { getPlacesInBboxUseCase } from "@/src/places/application/get-places-in-bbox.usecase"
+import { listCityIdsWithPlacesUseCase } from "@/src/places/application/list-city-ids-with-places.usecase"
 import type { Place } from "@/src/places/domain/place.entity"
 import { CacheKeys } from "@/src/shared/infrastructure/next/cache.keys"
 import { CacheConfig } from "@/src/shared/infrastructure/next/cache.config"
@@ -63,6 +64,14 @@ export function getCityPlacesCached(cityId: string) {
     () => getCityPlacesUseCase(cityId, anonRepo),
     CacheKeys.city(`places:${cityId}`),
     { ...CacheConfig.long, tags: ["places", "cities", `city-${cityId}`] }
+  )()
+}
+
+export function listCityIdsWithPlacesCached() {
+  return unstable_cache(
+    () => listCityIdsWithPlacesUseCase(anonRepo),
+    CacheKeys.place("city-ids-with-places"),
+    { ...CacheConfig.long, tags: ["places", "cities"] }
   )()
 }
 

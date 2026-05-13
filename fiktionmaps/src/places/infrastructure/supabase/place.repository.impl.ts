@@ -189,20 +189,12 @@ export function createPlacesSupabaseAdapter(
 
     getByCityId: cache(async (cityId: string): Promise<Place[]> => {
       const supabase = await getSupabase()
-      const { data: locRows } = await supabase
-        .from("locations")
-        .select("id")
-        .eq("city_id", cityId)
-
-      const locationIds = (locRows ?? []).map((r) => r.id).filter(Boolean)
-      if (locationIds.length === 0) return []
-
       const { data: placeRows, error } = await supabase
         .from("places")
         .select(
-          "id, fiction_id, description, active, location_id, name, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark, type)"
+          "id, fiction_id, description, active, location_id, name, locations!inner(id, name, formatted_address, latitude, longitude, city_id, is_landmark, type)"
         )
-        .in("location_id", locationIds)
+        .eq("locations.city_id", cityId)
         .order("created_at", { ascending: false })
 
       if (error || !placeRows) return []
@@ -230,22 +222,45 @@ export function createPlacesSupabaseAdapter(
 
     getFictionIdsByCityId: cache(async (cityId: string): Promise<string[]> => {
       const supabase = await getSupabase()
-      const { data: locationRows, error: locError } = await supabase
-        .from("locations")
-        .select("id")
-        .eq("city_id", cityId)
-
-      if (locError) return []
-      const locationIds = (locationRows ?? []).map((r) => r.id).filter(Boolean)
-      if (locationIds.length === 0) return []
-
-      const { data: placeRows, error: placeError } = await supabase
+      const { data: rows, error } = await supabase
         .from("places")
-        .select("fiction_id")
-        .in("location_id", locationIds)
+        .select("fiction_id, locations!inner(id)")
+        .eq("locations.city_id", cityId)
 
-      if (placeError) return []
-      return [...new Set((placeRows ?? []).map((r) => r.fiction_id).filter(Boolean))]
+      if (error) return []
+      return [...new Set((rows ?? []).map((r) => r.fiction_id).filter(Boolean))]
+    }),
+
+    listCityIdsWithPlaces: cache(async (): Promise<string[]> => {
+      const supabase = await getSupabase()
+      const ids = new Set<string>()
+      const pageSize = 1000
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("places")
+          .select("locations!inner(city_id)")
+          .order("id", { ascending: true })
+          .range(from, from + pageSize - 1)
+
+        if (error) {
+          console.error("[places repo] listCityIdsWithPlaces:", error.message)
+          break
+        }
+        if (!data?.length) break
+
+        for (const row of data as Record<string, unknown>[]) {
+          const rawLoc = row.locations
+          const loc = Array.isArray(rawLoc) ? rawLoc[0] : rawLoc
+          if (loc && typeof loc === "object" && loc !== null && "city_id" in loc) {
+            const cid = (loc as { city_id?: string }).city_id
+            if (typeof cid === "string" && cid) ids.add(cid)
+          }
+        }
+
+        if (data.length < pageSize) break
+      }
+
+      return [...ids]
     }),
 
     getById: cache(async (placeId: string, avatarVariant: "sm" | "lg" = "sm"): Promise<Place | null> => {

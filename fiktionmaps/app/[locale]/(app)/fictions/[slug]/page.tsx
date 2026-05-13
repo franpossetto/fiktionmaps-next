@@ -6,8 +6,8 @@ import {
   getFictionByIdCached,
   getFictionBySlugCached,
   getFictionCitiesCached,
+  getFictionDetailRecommendations,
   getFictionInterestsCached,
-  getSameCityMovieRecommendationsCached,
 } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { getInterestCatalogCached } from "@/src/interests/infrastructure/next/interest.queries"
 import { getFictionLikeCountsCached } from "@/src/fiction-likes/infrastructure/next/fiction-likes.queries"
@@ -19,7 +19,6 @@ import { getFictionContributorsCached } from "@/src/contributions/infrastructure
 import { getCurrentUserHasLikedFiction } from "@/src/users/infrastructure/next/user.queries"
 import { isUuidString } from "@/lib/validation/primitives"
 import { getSiteUrl } from "@/lib/site"
-import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { FictionDetail } from "@/components/fictions/fiction-detail"
 import { FictionDetailRightRail } from "@/components/fictions/fiction-detail-right-rail"
 import { FictionSlugDetailShell } from "@/components/fictions/fiction-slug-detail-shell"
@@ -164,7 +163,6 @@ export default async function FictionSlugPage({ params }: Props) {
   const [
     initialPlaces,
     initialCities,
-    sameCityRecommendations,
     likeCounts,
     initialLiked,
     fictionInterestIds,
@@ -173,7 +171,6 @@ export default async function FictionSlugPage({ params }: Props) {
   ] = await Promise.all([
     getFictionPlacesCached(fiction.id),
     getFictionCitiesCached(fiction.id),
-    getSameCityMovieRecommendationsCached(fiction.id),
     getFictionLikeCountsCached([fiction.id]),
     getCurrentUserHasLikedFiction(fiction.id),
     getFictionInterestsCached(fiction.id),
@@ -186,11 +183,19 @@ export default async function FictionSlugPage({ params }: Props) {
     return label != null ? [{ id, label }] : []
   })
   const initialLikeCount = likeCounts[fiction.id] ?? 0
-  const recommendationIds = sameCityRecommendations.map((f) => f.id)
-  const sameCityRecommendationPlaceCounts =
-    recommendationIds.length > 0
-      ? await getPlaceCountsByFictionIdsCached(recommendationIds)
+
+  const { fictions: fictionRecommendations, reason: fictionRecommendationReason } =
+    await getFictionDetailRecommendations({
+      fictionId: fiction.id,
+      interestIds: fictionInterestIds,
+      places: initialPlaces,
+    })
+  const fictionRecommendationIds = fictionRecommendations.map((f) => f.id)
+  const fictionRecommendationPlaceCounts =
+    fictionRecommendationIds.length > 0
+      ? await getPlaceCountsByFictionIdsCached(fictionRecommendationIds)
       : {}
+
   const fictionCitiesOrdered = orderCitiesForFictionDetail(initialPlaces, initialCities)
   const sidebarSummary = await getFictionSidebarSummaryText(fiction, locale)
   return (
@@ -221,8 +226,9 @@ export default async function FictionSlugPage({ params }: Props) {
           initialLikeCount={initialLikeCount}
           initialLiked={initialLiked}
           fictionInterestTags={fictionInterestTags}
-          sameCityRecommendations={sameCityRecommendations}
-          sameCityRecommendationPlaceCounts={sameCityRecommendationPlaceCounts}
+          fictionRecommendations={fictionRecommendations}
+          fictionRecommendationReason={fictionRecommendationReason}
+          fictionRecommendationPlaceCounts={fictionRecommendationPlaceCounts}
         />
       </FictionSlugDetailShell>
     </>

@@ -12,7 +12,10 @@ import { getFictionByIdUseCase } from "@/src/fictions/application/get-fiction-by
 import { getFictionBySlugUseCase } from "@/src/fictions/application/get-fiction-by-slug.usecase"
 import { getFictionsByIdsUseCase } from "@/src/fictions/application/get-fictions-by-ids.usecase"
 import { getFictionCitiesUseCase } from "@/src/fictions/application/get-fiction-cities.usecase"
-import { getSameCityMovieRecommendationsUseCase } from "@/src/fictions/application/get-same-city-movie-recommendations.usecase"
+import {
+  getFictionDetailRecommendationsUseCase,
+  type GetFictionDetailRecommendationsInput,
+} from "@/src/fictions/application/get-fiction-detail-recommendations.usecase"
 import { getFictionLikeCountsUseCase } from "@/src/fiction-likes/application/get-fiction-like-counts.usecase"
 import { getFictionInterestsUseCase } from "@/src/fiction-interests/application/get-fiction-interests.usecase"
 import { isUuidString } from "@/lib/validation/primitives"
@@ -85,18 +88,17 @@ export function getFictionInterestsCached(fictionId: string) {
   )()
 }
 
-/** Active movies that share at least one city with this fiction (by place locations). */
-export function getSameCityMovieRecommendationsCached(fictionId: string) {
-  return unstable_cache(
-    () =>
-      getSameCityMovieRecommendationsUseCase(fictionId, {
-        locationsRepo: placesRepo,
-        placesRepo,
-        fictionsRepo,
-      }),
-    CacheKeys.fiction(`same-city-movies:${fictionId}`),
-    { ...CacheConfig.long, tags: ["fictions", "cities", "places", `fiction-${fictionId}`] }
-  )()
+/**
+ * Fiction detail movie recommendations: same city → shared interests → random.
+ * Uncached (random branch). Pass `places` when already loaded to avoid an extra fetch.
+ */
+export function getFictionDetailRecommendations(input: GetFictionDetailRecommendationsInput) {
+  return getFictionDetailRecommendationsUseCase(input, {
+    placesRepo,
+    locationsRepo: placesRepo,
+    fictionInterestsRepo,
+    fictionsRepo,
+  })
 }
 
 /** Like counts per fiction id (public read). Not cached — counts change when users like/unlike. */

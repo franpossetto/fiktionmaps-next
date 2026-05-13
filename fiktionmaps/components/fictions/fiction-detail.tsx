@@ -10,6 +10,7 @@ import { useFormatter, useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { FictionCard } from "@/components/fictions/fiction-card"
+import { FictionDetailPlacesEmpty } from "@/components/fictions/fiction-detail-places-empty"
 import { FictionInterestTags, type FictionInterestTagItem } from "@/components/fictions/fiction-interest-tags"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
@@ -18,6 +19,7 @@ import type { Place } from "@/src/places/domain/place.entity"
 import { getFictionLikeCountsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
 import { getMyLikedFictionIdsAction, toggleFictionLikeAction } from "@/src/users/infrastructure/next/user.actions"
 import { localStorageService } from "@/lib/local-storage-service"
+import type { FictionDetailRecommendationReason } from "@/src/fictions/application/get-fiction-detail-recommendations.usecase"
 
 export interface FictionDetailProps {
   fiction: FictionWithMedia
@@ -27,8 +29,10 @@ export interface FictionDetailProps {
   initialLiked: boolean
   /** Shown in main column below `xl` (right rail is `xl`+ only). */
   fictionInterestTags?: FictionInterestTagItem[]
-  sameCityRecommendations?: FictionWithMedia[]
-  sameCityRecommendationPlaceCounts?: Record<string, number>
+  /** Movie recommendations (same city → interests → random); see `fictionRecommendationReason` for copy. */
+  fictionRecommendations?: FictionWithMedia[]
+  fictionRecommendationReason?: FictionDetailRecommendationReason
+  fictionRecommendationPlaceCounts?: Record<string, number>
 }
 
 export function FictionDetail({
@@ -38,8 +42,9 @@ export function FictionDetail({
   initialLikeCount,
   initialLiked,
   fictionInterestTags = [],
-  sameCityRecommendations,
-  sameCityRecommendationPlaceCounts,
+  fictionRecommendations = [],
+  fictionRecommendationReason,
+  fictionRecommendationPlaceCounts = {},
 }: FictionDetailProps) {
   const { user, isAuthReady } = useAuth()
   const t = useTranslations("Fictions")
@@ -178,6 +183,24 @@ export function FictionDetail({
 
   const pathSlug = fiction.slug?.trim() || fiction.id
 
+  const recommendationsDescription = (() => {
+    if (!fictionRecommendationReason) return ""
+    switch (fictionRecommendationReason) {
+      case "same_city":
+        return t("fictionRecommendationsSameCity")
+      case "shared_interests_no_places":
+        return t("fictionRecommendationsSharedInterestsNoPlaces")
+      case "shared_interests_no_city_peers":
+        return t("fictionRecommendationsSharedInterestsNoCityPeers")
+      case "random_no_matches":
+        return t("fictionRecommendationsRandomNoMatches")
+      case "random_no_places_no_interests":
+        return t("fictionRecommendationsRandomNoPlacesNoInterests")
+      default:
+        return ""
+    }
+  })()
+
   return (
     <main className="px-6 py-8 sm:px-8 lg:px-10">
       <div className="mx-auto w-full max-w-[920px]">
@@ -282,80 +305,84 @@ export function FictionDetail({
               </p>
             </div>
 
-            <ol className="divide-y divide-border/60 rounded-xl border border-border/40 bg-card/30">
-              {locationRows.map(({ index, location, city }) => {
-                const googleMapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${location.location.lat},${location.location.lng}`)}`
-                return (
-                  <li key={location.id} className="px-4 py-4 sm:px-5 sm:py-5">
-                    <div className="flex items-center gap-4">
-                      <Link
-                        href={`/fictions/${pathSlug}/places/${location.id}`}
-                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-4 rounded-lg outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        <p className="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground">
-                          {index}
-                        </p>
-                        <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted/30 sm:h-18 sm:w-24">
-                          <Image
-                            src={location.image || "/placeholder.svg"}
-                            alt={location.name ?? location.location.name}
-                            fill
-                            className="object-cover"
-                            sizes="96px"
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                            {city?.name}
-                            {city?.country ? `, ${city.country}` : ""}
-                          </p>
-                          <p className="mt-1 text-base font-semibold leading-snug text-foreground sm:text-lg">
-                            {location.name ?? location.location.name}
-                          </p>
-                          <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{location.location.address}</p>
-                        </div>
-                      </Link>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <Button asChild size="sm" variant="outline" className="h-9 border-border bg-background px-3 text-sm shadow-none">
-                          <a href={googleMapsHref} target="_blank" rel="noopener noreferrer">
-                            {t("mapsShort")}
-                          </a>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="h-9 w-9 p-0"
-                          aria-label={likedPlaces[location.id] ? t("unlikePlace") : t("likePlace")}
-                          onClick={() => togglePlaceLike(location.id)}
+            {locationRows.length === 0 ? (
+              <FictionDetailPlacesEmpty />
+            ) : (
+              <ol className="divide-y divide-border/60 rounded-xl border border-border/40 bg-card/30">
+                {locationRows.map(({ index, location, city }) => {
+                  const googleMapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${location.location.lat},${location.location.lng}`)}`
+                  return (
+                    <li key={location.id} className="px-4 py-4 sm:px-5 sm:py-5">
+                      <div className="flex items-center gap-4">
+                        <Link
+                          href={`/fictions/${pathSlug}/places/${location.id}`}
+                          className="flex min-w-0 flex-1 cursor-pointer items-center gap-4 rounded-lg outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
-                          <Heart
-                            className={`h-4 w-4 ${likedPlaces[location.id] ? "text-rose-500" : ""}`}
-                            fill={likedPlaces[location.id] ? "currentColor" : "none"}
-                          />
-                        </Button>
+                          <p className="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground">
+                            {index}
+                          </p>
+                          <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted/30 sm:h-18 sm:w-24">
+                            <Image
+                              src={location.image || "/placeholder.svg"}
+                              alt={location.name ?? location.location.name}
+                              fill
+                              className="object-cover"
+                              sizes="96px"
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                              {city?.name}
+                              {city?.country ? `, ${city.country}` : ""}
+                            </p>
+                            <p className="mt-1 text-base font-semibold leading-snug text-foreground sm:text-lg">
+                              {location.name ?? location.location.name}
+                            </p>
+                            <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{location.location.address}</p>
+                          </div>
+                        </Link>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Button asChild size="sm" variant="outline" className="h-9 border-border bg-background px-3 text-sm shadow-none">
+                            <a href={googleMapsHref} target="_blank" rel="noopener noreferrer">
+                              {t("mapsShort")}
+                            </a>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-9 w-9 p-0"
+                            aria-label={likedPlaces[location.id] ? t("unlikePlace") : t("likePlace")}
+                            onClick={() => togglePlaceLike(location.id)}
+                          >
+                            <Heart
+                              className={`h-4 w-4 ${likedPlaces[location.id] ? "text-rose-500" : ""}`}
+                              fill={likedPlaces[location.id] ? "currentColor" : "none"}
+                            />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </li>
-                )
-              })}
-            </ol>
+                    </li>
+                  )
+                })}
+              </ol>
+            )}
           </section>
 
-          {sameCityRecommendations && sameCityRecommendations.length > 0 && (
+          {fictionRecommendations.length > 0 && (
             <section className="space-y-5 border-t border-border/60 pt-8">
               <div className="flex items-center gap-3">
                 <span className="h-7 w-1 rounded-full bg-yellow-500" aria-hidden />
-                <h2 className="text-3xl font-semibold tracking-tight text-foreground">{t("sameCityRecommendationsTitle")}</h2>
-                <span className="text-base font-medium text-muted-foreground">{sameCityRecommendations.length}</span>
+                <h2 className="text-3xl font-semibold tracking-tight text-foreground">{t("fictionRecommendationsTitle")}</h2>
+                <span className="text-base font-medium text-muted-foreground">{fictionRecommendations.length}</span>
                 <ChevronRight className="h-5 w-5 text-muted-foreground" />
               </div>
-              <p className="text-base text-muted-foreground">{t("sameCityRecommendationsDescription")}</p>
+              <p className="text-base text-muted-foreground">{recommendationsDescription}</p>
               <div className="grid grid-cols-[repeat(2,minmax(0,172px))] gap-3 sm:grid-cols-[repeat(3,minmax(0,172px))]">
-                {sameCityRecommendations.map((rec) => (
+                {fictionRecommendations.map((rec) => (
                   <FictionCard
                     key={rec.id}
                     fiction={rec}
-                    locationCount={sameCityRecommendationPlaceCounts?.[rec.id] ?? 0}
+                    locationCount={fictionRecommendationPlaceCounts[rec.id] ?? 0}
                     href={`/fictions/${rec.slug ?? rec.id}`}
                   />
                 ))}

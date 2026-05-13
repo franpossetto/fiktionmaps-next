@@ -19,7 +19,7 @@ import {
   getAllCitiesAction,
   getCityFictionsAction,
 } from "@/src/cities/infrastructure/next/city.actions"
-import { getPlaceLocationAction, getPlacesInBboxAction } from "@/src/places/infrastructure/next/place.actions"
+import { getPlaceLocationAction, getPlacesInBboxAction, getCityIdsWithPlacesAction } from "@/src/places/infrastructure/next/place.actions"
 import { isUuidString } from "@/lib/validation/primitives"
 
 type Bbox = { west: number; south: number; east: number; north: number }
@@ -68,21 +68,29 @@ function MapPageInner() {
   const [is3D, setIs3D] = useState(false)
   const [bounds, setBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
   const [citiesLoading, setCitiesLoading] = useState(true)
+  const [cityIdsWithPlaces, setCityIdsWithPlaces] = useState<string[]>([])
   const [hasAppliedInitialPlaceOpen, setHasAppliedInitialPlaceOpen] = useState(false)
 
   useEffect(() => {
     setCitiesLoading(true)
     let cancelled = false
-    getAllCitiesAction()
-      .then((citiesList: City[]) => {
+    Promise.all([getAllCitiesAction(), getCityIdsWithPlacesAction()])
+      .then(([citiesList, withPlacesIds]: [City[], string[]]) => {
         if (cancelled) return
         setCities(citiesList)
+        setCityIdsWithPlaces(withPlacesIds)
         if (citiesList.length === 0) {
           setCitiesLoading(false)
           return
         }
+        const withPlacesSet = new Set(withPlacesIds)
+        const fromUrl = initialCityId
+          ? citiesList.find((c) => c.id === initialCityId)
+          : undefined
         const city =
-          (initialCityId && citiesList.find((c) => c.id === initialCityId)) || citiesList[0]
+          fromUrl ??
+          citiesList.find((c) => withPlacesSet.has(c.id)) ??
+          citiesList[0]
         setSelectedCity(city)
         setCitiesLoading(false)
 
@@ -269,6 +277,8 @@ function MapPageInner() {
                   cities={cities}
                   selectedCity={selectedCity}
                   onCityChange={handleCityChange}
+                  cityIdsWithPlaces={cityIdsWithPlaces}
+                  cityWithoutPlacesHint={tMap("cityWithoutPlaces")}
                 />
                 <Map3DToggleSlot />
                 <div className="rounded-xl border border-border bg-background shadow-sm">

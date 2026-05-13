@@ -12,6 +12,7 @@ import {
   getAllPlacesCached,
   getFictionPlacesCached,
   getPlaceLocationByIdCached,
+  listCityIdsWithPlacesCached,
   listPlacesInBboxForFictionIds,
 } from "./place.queries"
 import type { Place } from "@/src/places/domain/place.entity"
@@ -65,6 +66,11 @@ export async function getPlacesInBboxAction(fictionIds: string[], bbox: MapBbox)
   const { west, south, east, north } = bbox
   if (![west, south, east, north].every((n) => Number.isFinite(n))) return []
   return listPlacesInBboxForFictionIds(fictionIds, bbox)
+}
+
+/** City IDs that have at least one place (map city picker: disable others). */
+export async function getCityIdsWithPlacesAction(): Promise<string[]> {
+  return listCityIdsWithPlacesCached()
 }
 
 export async function createPlaceAction(data: CreatePlaceData): Promise<CreatePlaceResult> {

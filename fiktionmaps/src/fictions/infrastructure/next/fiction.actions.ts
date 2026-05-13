@@ -21,6 +21,7 @@ import {
   getFictionByIdCached,
   getFictionBySlugCached,
   getFictionCitiesCached,
+  getFictionDetailRecommendations,
   getFictionLikeCountsByIds,
   getActiveFictionsCached,
   loadRecommendedFictionsDeps,
@@ -35,6 +36,7 @@ import type {
   GetFictionInterestsResult,
   SetFictionInterestsResult,
   GetRecommendedFictionsResult,
+  GetFictionDetailRecommendationsResult,
 } from "./fiction.actions.types"
 
 const CREATE_FICTION_CONTRIBUTION = {
@@ -69,6 +71,7 @@ export type {
   GetFictionInterestsResult,
   SetFictionInterestsResult,
   GetRecommendedFictionsResult,
+  GetFictionDetailRecommendationsResult,
 } from "./fiction.actions.types"
 
 export async function uploadFictionImageAction(
@@ -259,6 +262,28 @@ export async function getRecommendedFictionsAction(limit?: number): Promise<GetR
   try {
     const fictions = await getRecommendedFictionsUseCase(user.id, lim, loadRecommendedFictionsDeps())
     return { success: true, fictions }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed to load recommendations" }
+  }
+}
+
+/** Public read: same pipeline as fiction detail (city → interests → random). Loads places if not passed. */
+export async function getFictionDetailRecommendationsAction(
+  fictionId: string,
+  interestIds: string[]
+): Promise<GetFictionDetailRecommendationsResult> {
+  if (!uuidSchema.safeParse(fictionId).success) {
+    return { success: false, error: "Invalid fictionId" }
+  }
+  const parsed = interestIdsBodySchema.safeParse({ interestIds })
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+
+  try {
+    const { fictions, reason } = await getFictionDetailRecommendations({
+      fictionId,
+      interestIds: parsed.data.interestIds,
+    })
+    return { success: true, fictions, reason }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed to load recommendations" }
   }
