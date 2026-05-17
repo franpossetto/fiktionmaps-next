@@ -9,6 +9,10 @@ import type { Place } from "@/src/places/domain/place.entity"
 import type { ProfileScenePreview, Scene } from "@/src/scenes/domain/scene.entity"
 import type { CreateSceneData, UpdateSceneData } from "@/src/scenes/domain/scene.schemas"
 import type { SceneListFilters, ScenesRepositoryPort } from "@/src/scenes/domain/scene.repository"
+import type { z } from "zod"
+import { fictionRowStatusSchema } from "@/src/fictions/domain/fiction.schemas"
+
+type SceneRowStatus = z.infer<typeof fictionRowStatusSchema>
 
 type SceneRowWithPlace = {
   id: string
@@ -396,7 +400,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
     return attachThumbnailsToScenes(supabase, mapped)
   },
 
-  async create(data: CreateSceneData, createdBy?: string | null): Promise<Scene | null> {
+  async create(data: CreateSceneData, createdBy: string | null, status: SceneRowStatus): Promise<Scene | null> {
     const supabase = await createClient()
     const insert = {
       fiction_id: data.fictionId,
@@ -412,6 +416,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       sort_order: data.sortOrder ?? 0,
       active: data.active ?? true,
       created_by: createdBy ?? null,
+      status,
     }
 
     const { data: inserted, error } = await supabase.from("scenes").insert(insert).select("id").single()

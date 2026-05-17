@@ -2,6 +2,10 @@
 
 import { updateTag } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
+import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/ensure-user-is-moderator.usecase"
+import { profilesReaderSupabaseAdapter } from "@/src/contributions/infrastructure/supabase/profiles-reader.supabase"
+import { resolveEntityContributionInsertDefaults } from "@/src/contributions/application/resolve-entity-contribution-insert-defaults.usecase"
 import { zodErrorMessage } from "@/lib/validation/http"
 import { isUuidString, uuidSchema } from "@/lib/validation/primitives"
 import type { MapBbox } from "@/lib/validation/map-query"
@@ -65,7 +69,13 @@ export async function createSceneAction(body: unknown): Promise<CreateSceneResul
   if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
 
   try {
-    const scene = await createSceneUseCase(parsed.data, user.id, {
+    const isStaffModerator = await ensureUserIsModeratorUseCase(
+      user.id,
+      profilesReaderSupabaseAdapter,
+      MODERATOR_ROLES,
+    )
+    const { status } = resolveEntityContributionInsertDefaults(isStaffModerator, user.id)
+    const scene = await createSceneUseCase(parsed.data, { userId: user.id, status }, {
       scenesRepo: scenesSupabaseAdapter,
       getFictionType,
     })

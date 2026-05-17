@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { ASSET_IMAGES_BUCKET } from "@/lib/asset-images/variant-sizes"
 import type { MapBbox } from "@/lib/validation/map-query"
 import type { Place } from "@/src/places/domain/place.entity"
-import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
+import type { CreatePlaceRepoInput, UpdatePlaceData } from "@/src/places/domain/place.schemas"
 import type { PlacesRepositoryPort } from "@/src/places/domain/place.repository"
 
 function str(row: Record<string, unknown>, snake: string, camel: string): string {
@@ -388,7 +388,7 @@ export function createPlacesSupabaseAdapter(
       })
     },
 
-    async create(data: CreatePlaceData): Promise<{ placeId: string } | null> {
+    async create(data: CreatePlaceRepoInput): Promise<{ placeId: string } | null> {
       const supabase = await getSupabase()
 
       const locationName = data.locationName.trim()
@@ -422,7 +422,9 @@ export function createPlacesSupabaseAdapter(
           location_id: locationRow.id,
           name: placeName,
           description: data.description.trim(),
-          active: true,
+          active: data.status !== "pending",
+          status: data.status,
+          created_by: data.created_by,
         })
         .select("id")
         .single()

@@ -1,3 +1,4 @@
+import { resolveEntityContributionInsertDefaults } from "@/src/contributions/application/resolve-entity-contribution-insert-defaults.usecase"
 import type { z } from "zod"
 import type { fictionRowStatusSchema } from "@/src/fictions/domain/fiction.schemas"
 
@@ -13,8 +14,10 @@ export function resolveContributorFictionCreateDefaults(
   isStaffModerator: boolean,
   userId: string,
 ): ContributorFictionCreateDefaults {
-  if (isStaffModerator) {
-    return { active: true, status: "approved", created_by: userId }
+  const { status, created_by } = resolveEntityContributionInsertDefaults(isStaffModerator, userId)
+  return {
+    active: isStaffModerator,
+    status,
+    created_by,
   }
-  return { active: false, status: "pending", created_by: userId }
 }

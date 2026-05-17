@@ -1,6 +1,11 @@
 "use server"
 
 import { revalidatePath, updateTag } from "next/cache"
+import { createClient } from "@/lib/supabase/server"
+import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
+import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/ensure-user-is-moderator.usecase"
+import { profilesReaderSupabaseAdapter } from "@/src/contributions/infrastructure/supabase/profiles-reader.supabase"
+import { resolveEntityContributionInsertDefaults } from "@/src/contributions/application/resolve-entity-contribution-insert-defaults.usecase"
 import { uuidSchema } from "@/lib/validation/primitives"
 import type { MapBbox } from "@/lib/validation/map-query"
 import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
@@ -74,7 +79,21 @@ export async function getCityIdsWithPlacesAction(): Promise<string[]> {
 }
 
 export async function createPlaceAction(data: CreatePlaceData): Promise<CreatePlaceResult> {
-  const result = await createPlaceUseCase(data, placesRepo)
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: "Unauthorized" }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  const { status, created_by } = resolveEntityContributionInsertDefaults(isStaffModerator, user.id)
+
+  const result = await createPlaceUseCase({ ...data, status, created_by }, placesRepo)
   if (!result) return { success: false, error: "Failed to create place" }
   updateTag("places")
   const places = await getAllPlacesCached()

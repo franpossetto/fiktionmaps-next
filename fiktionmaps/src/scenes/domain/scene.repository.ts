@@ -1,8 +1,12 @@
+import type { z } from "zod"
 import type { MapBbox } from "@/lib/validation/map-query"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Place } from "@/src/places/domain/place.entity"
+import { fictionRowStatusSchema } from "@/src/fictions/domain/fiction.schemas"
 import type { ProfileScenePreview, Scene } from "./scene.entity"
 import type { CreateSceneData, UpdateSceneData } from "./scene.schemas"
+
+type SceneRowStatus = z.infer<typeof fictionRowStatusSchema>
 
 export interface SceneListFilters {
   fictionId?: string
@@ -19,7 +23,7 @@ export interface ScenesRepositoryPort {
   getById(id: string): Promise<Scene | null>
   list(filters: SceneListFilters): Promise<Scene[]>
   countByFictionIds(fictionIds: string[]): Promise<Record<string, number>>
-  create(data: CreateSceneData, createdBy?: string | null): Promise<Scene | null>
+  create(data: CreateSceneData, createdBy: string | null, status: SceneRowStatus): Promise<Scene | null>
   update(id: string, data: UpdateSceneData): Promise<Scene | null>
   delete(id: string): Promise<boolean>
 
