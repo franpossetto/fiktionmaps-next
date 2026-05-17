@@ -4,7 +4,15 @@ export type SearchPersonsResult =
   | { success: true; persons: Person[] }
   | { success: false; error: string }
 
+export type ListDirectorCandidatesResult =
+  | { success: true; persons: Person[] }
+  | { success: false; error: string }
+
 export type CreatePersonResult =
+  | { success: true; person: Person }
+  | { success: false; error: string }
+
+export type ResolveOrCreatePersonResult =
   | { success: true; person: Person }
   | { success: false; error: string }
 

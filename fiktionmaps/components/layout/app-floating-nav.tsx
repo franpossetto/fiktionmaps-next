@@ -4,12 +4,15 @@ import { Home, Map } from "lucide-react"
 import { useEffect } from "react"
 import { useTranslations } from "next-intl"
 import { Link, usePathname } from "@/i18n/navigation"
+import { ContributeFab } from "@/components/contribute/contribute-fab"
 
+/** left-4 + botón (44) + margen para controles del mapa (columna vertical) */
 const MAP_LEFT_CONTROLS_OFFSET_PX = 76
 
 export function AppFloatingNav() {
   const pathname = usePathname()
   const isMapView = pathname?.startsWith("/map")
+  const hideFloating = pathname != null && /(^|\/)contribute(\/|$)/.test(pathname)
   const tNav = useTranslations("Nav")
 
   useEffect(() => {
@@ -28,8 +31,11 @@ export function AppFloatingNav() {
     }
   }, [isMapView])
 
+  if (hideFloating) return null
+
   return (
-    <div className="pointer-events-none fixed bottom-4 left-4 z-[1200]">
+    <div className="pointer-events-none fixed bottom-4 left-4 z-[5000] flex flex-col items-center gap-2 sm:bottom-6 sm:left-6">
+      <ContributeFab />
       <Link
         href={isMapView ? "/fictions" : "/map"}
         aria-label={isMapView ? tNav("goToFictions") : tNav("openMap")}

@@ -80,6 +80,41 @@ export type Database = {
           },
         ]
       }
+      fiction_external_ids: {
+        Row: {
+          id: string
+          fiction_id: string
+          provider: string
+          external_id: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          fiction_id: string
+          provider: string
+          external_id: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          fiction_id?: string
+          provider?: string
+          external_id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiction_external_ids_fiction_id_fkey"
+            columns: ["fiction_id"]
+            isOneToOne: false
+            referencedRelation: "fictions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fictions: {
         Row: {
           id: string

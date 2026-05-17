@@ -13,3 +13,9 @@ export const CONTRIBUTION_FPP: Record<ContributionType, number> = {
 }
 
 export const MODERATOR_ROLES = ["moderator", "admin"] as const
+
+/** Applied to fiction / place / scene when a contribution is approved. */
+export const ENTITY_PATCH_ON_CONTRIBUTION_APPROVE = {
+  status: "approved" as const,
+  active: true,
+}

@@ -9,6 +9,40 @@ import { SearchInput } from "@/components/ui/search-input"
 import { getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 
+const TOP_NAV_HEADER_CLASS =
+  "sticky top-0 z-40 h-[60px] border-b border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90"
+
+const TOP_NAV_INNER_PAD = "mx-auto h-full w-full max-w-[1900px] px-4 sm:px-6 lg:px-10"
+
+/**
+ * Misma barra que `AppTopNavbar` pero sin buscador (flujos de contribución y otras pantallas donde no aplica).
+ */
+export function AppTopNavbarNoSearch() {
+  const tNav = useTranslations("Nav")
+
+  return (
+    <header className={TOP_NAV_HEADER_CLASS}>
+      <div className={`${TOP_NAV_INNER_PAD} flex items-center justify-between gap-4`}>
+        <div className="flex min-w-0 items-center gap-3">
+          <Link href="/map" className="inline-flex shrink-0 items-center rounded-md">
+            <Image
+              src="/fiktionmaps-logo.svg"
+              alt={tNav("logoAlt")}
+              width={119}
+              height={25}
+              priority
+              className="h-[22px] w-auto shrink-0 object-contain"
+            />
+          </Link>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <UserMenu />
+        </div>
+      </div>
+    </header>
+  )
+}
+
 export function AppTopNavbar() {
   const router = useRouter()
   const tNav = useTranslations("Nav")
@@ -54,8 +88,8 @@ export function AppTopNavbar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 h-[60px] border-b border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90">
-      <div className="mx-auto grid h-full w-full max-w-[1900px] grid-cols-[1fr_minmax(280px,520px)_1fr] items-center gap-4 px-4 sm:px-6 lg:px-10">
+    <header className={TOP_NAV_HEADER_CLASS}>
+      <div className={`${TOP_NAV_INNER_PAD} grid h-full grid-cols-[1fr_minmax(280px,520px)_1fr] items-center gap-4`}>
         <div className="flex min-w-0 items-center gap-3 justify-self-start">
           <Link href="/map" className="inline-flex shrink-0 items-center rounded-md">
             <Image

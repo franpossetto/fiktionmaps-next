@@ -2,7 +2,10 @@ import { cache } from "react"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { ContributionRow, Database } from "@/supabase/database.types"
 import { createClient } from "@/lib/supabase/server"
-import { CONTRIBUTION_FPP } from "@/src/contributions/domain/contribution.config"
+import {
+  CONTRIBUTION_FPP,
+  ENTITY_PATCH_ON_CONTRIBUTION_APPROVE,
+} from "@/src/contributions/domain/contribution.config"
 import type {
   Contribution,
   ContributionEntityType,
@@ -336,7 +339,7 @@ export function createContributionsSupabaseAdapter(
       const { error: entityErr } = await supabase
         .from(table)
         .update({
-          status: "approved",
+          ...ENTITY_PATCH_ON_CONTRIBUTION_APPROVE,
           updated_at: now,
         })
         .eq("id", entityId)

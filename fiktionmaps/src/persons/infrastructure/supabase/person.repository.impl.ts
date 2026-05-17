@@ -31,6 +31,32 @@ export function createPersonsSupabaseAdapter(
       return (data ?? []) as Person[]
     },
 
+    async listPersonsWithFictionRole(
+      role: string,
+      nameQuery: string | null,
+      limit: number,
+    ): Promise<Person[]> {
+      const supabase = await getSupabase()
+      const { data, error } = await supabase
+        .from("fiction_persons")
+        .select("person_id, persons ( id, name, bio, photo_url, birth_year, nationality, created_at, updated_at )")
+        .eq("role", role)
+        .limit(500)
+      if (error) throw new Error(error.message)
+      const q = nameQuery?.trim().toLowerCase() ?? ""
+      const byId = new Map<string, Person>()
+      for (const row of data ?? []) {
+        const raw = row.persons as Person | Person[] | null
+        const p = Array.isArray(raw) ? raw[0] : raw
+        if (!p?.id) continue
+        if (q && !p.name.toLowerCase().includes(q)) continue
+        byId.set(p.id, p as Person)
+      }
+      return Array.from(byId.values())
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .slice(0, limit)
+    },
+
     async getById(id: string): Promise<Person | null> {
       const supabase = await getSupabase()
       const { data, error } = await supabase
@@ -40,6 +66,20 @@ export function createPersonsSupabaseAdapter(
         .single()
       if (error || !data) return null
       return data as Person
+    },
+
+    async findByNormalizedName(name: string): Promise<Person | null> {
+      const normalized = name.trim().toLowerCase()
+      if (!normalized) return null
+      const supabase = await getSupabase()
+      const { data, error } = await supabase
+        .from("persons")
+        .select("*")
+        .ilike("name", name.trim())
+        .limit(20)
+      if (error) throw new Error(error.message)
+      const found = (data ?? []).find((row) => row.name.trim().toLowerCase() === normalized)
+      return found ? (found as Person) : null
     },
 
     async create(data: CreatePersonData): Promise<Person | null> {

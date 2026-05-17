@@ -13,6 +13,9 @@ const CAROUSEL_HEIGHT = 140
 const THUMB_SIZE = CAROUSEL_HEIGHT - 16 // minus py-2
 const THUMB_SIZE_PX = `${THUMB_SIZE}px`
 
+const CAROUSEL_OVERLAY_CLASS =
+  "absolute inset-0 z-[1000] flex items-end justify-center pointer-events-none p-4"
+
 interface ThumbnailCarouselProps {
   places: Place[]
   selectedLocationId?: string | null
@@ -108,7 +111,7 @@ export function ThumbnailCarousel({
 
   if (!isVisible) {
     return (
-      <div className="absolute bottom-4 left-1/2 z-[1000] flex -translate-x-1/2 items-end pointer-events-none md:left-4 md:translate-x-0">
+      <div className={CAROUSEL_OVERLAY_CLASS}>
         <button
           ref={expandButtonRef}
           type="button"
@@ -124,19 +127,20 @@ export function ThumbnailCarousel({
   }
 
   return (
-    <div className="absolute bottom-4 left-1/2 z-[1000] flex -translate-x-1/2 flex-col items-start gap-1 pointer-events-none md:left-4 md:translate-x-0">
-      <button
-        type="button"
-        onClick={handleClose}
-        className="pointer-events-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-chrome/95 text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.2)] backdrop-blur-sm transition-colors hover:bg-chrome"
-        aria-label={t("exitNavigationMode")}
-      >
-        <X className="h-4 w-4" />
-      </button>
-      <div
-        className="pointer-events-auto flex flex-col rounded-lg overflow-hidden border border-border bg-card shadow-lg"
-        style={{ height: CAROUSEL_HEIGHT, width: "min(700px, calc(100vw - 2rem))" }}
-      >
+    <div className={CAROUSEL_OVERLAY_CLASS}>
+      <div className="flex flex-col items-center gap-1">
+        <button
+          type="button"
+          onClick={handleClose}
+          className="pointer-events-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-chrome/95 text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.2)] backdrop-blur-sm transition-colors hover:bg-chrome"
+          aria-label={t("exitNavigationMode")}
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <div
+          className="pointer-events-auto flex flex-col rounded-lg overflow-hidden border border-border bg-card shadow-lg"
+          style={{ height: CAROUSEL_HEIGHT, width: "min(700px, calc(100vw - 2rem))" }}
+        >
         <div
           className="flex h-full items-center gap-1.5 px-2 py-2 bg-muted/50"
           onKeyDown={handleStripKeyDown}
@@ -214,6 +218,7 @@ export function ThumbnailCarousel({
           >
             <ChevronRight className="h-3 w-3" />
           </button>
+        </div>
         </div>
       </div>
     </div>

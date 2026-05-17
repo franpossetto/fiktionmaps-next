@@ -1,5 +1,5 @@
 export type CreateContributionResult =
-  | { success: true; contributionId: string }
+  | { success: true; contributionId: string; autoApproved: boolean }
   | { success: false; error: string }
 
 export type ApproveContributionResult =

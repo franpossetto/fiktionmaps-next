@@ -273,6 +273,7 @@ function MapPageInner() {
               </div>
 
               <div className="pointer-events-auto ml-auto flex items-center gap-2">
+                <Map3DToggleSlot />
                 <CitySelector
                   cities={cities}
                   selectedCity={selectedCity}
@@ -280,7 +281,6 @@ function MapPageInner() {
                   cityIdsWithPlaces={cityIdsWithPlaces}
                   cityWithoutPlacesHint={tMap("cityWithoutPlaces")}
                 />
-                <Map3DToggleSlot />
                 <div className="rounded-xl border border-border bg-background shadow-sm">
                   <UserMenu />
                 </div>

@@ -6,6 +6,7 @@ import { zodErrorMessage } from "@/lib/validation/http"
 import { approveContributionUseCase } from "@/src/contributions/application/approve-contribution.usecase"
 import { createContributionUseCase } from "@/src/contributions/application/create-contribution.usecase"
 import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/ensure-user-is-moderator.usecase"
+import { getContributionByIdUseCase } from "@/src/contributions/application/get-contribution-by-id.usecase"
 import { rejectContributionUseCase } from "@/src/contributions/application/reject-contribution.usecase"
 import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
 import type { ContributionEntityType } from "@/src/contributions/domain/contribution.entity"
@@ -63,9 +64,11 @@ export async function createContributionAction(data: CreateContributionData): Pr
   const parsed = createContributionSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
 
-  const role = await profilesReaderSupabaseAdapter.getRole(user.id)
-  const autoApprove =
-    role != null && MODERATOR_ROLES.includes(role as (typeof MODERATOR_ROLES)[number])
+  const autoApprove = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
 
   const result = await createContributionUseCase(
     { ...parsed.data, userId: user.id },
@@ -80,7 +83,7 @@ export async function createContributionAction(data: CreateContributionData): Pr
   if (result.autoApproved) {
     updateTag("profiles")
   }
-  return { success: true, contributionId: result.contributionId }
+  return { success: true, contributionId: result.contributionId, autoApproved: result.autoApproved }
 }
 
 export async function approveContributionAction(data: ApproveContributionData): Promise<ApproveContributionResult> {
@@ -105,7 +108,7 @@ export async function approveContributionAction(data: ApproveContributionData): 
   const parsed = approveContributionSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
 
-  const contributionBefore = await contributionsRepo.getById(parsed.data.id)
+  const contributionBefore = await getContributionByIdUseCase(parsed.data.id, contributionsRepo)
   if (!contributionBefore) return { success: false, error: "Contribution not found" }
 
   const ok = await approveContributionUseCase({ ...parsed.data, moderatorId: user.id }, contributionsRepo)
@@ -140,7 +143,7 @@ export async function rejectContributionAction(data: RejectContributionData): Pr
   const parsed = rejectContributionSchema.safeParse(data)
   if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
 
-  const contributionBefore = await contributionsRepo.getById(parsed.data.id)
+  const contributionBefore = await getContributionByIdUseCase(parsed.data.id, contributionsRepo)
   if (!contributionBefore) return { success: false, error: "Contribution not found" }
 
   const ok = await rejectContributionUseCase({ ...parsed.data, moderatorId: user.id }, contributionsRepo)

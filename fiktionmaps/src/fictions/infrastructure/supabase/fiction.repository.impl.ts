@@ -6,7 +6,10 @@ import type { Database } from "@/supabase/database.types"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { CreateFictionData, UpdateFictionData } from "@/src/fictions/domain/fiction.schemas"
 import { mapAssetImagesToFiction, type AssetImageRow } from "./fiction.mappers"
-import type { FictionsRepositoryPort } from "@/src/fictions/domain/fiction.repository"
+import type {
+  FictionsRepositoryPort,
+  FindActiveContributeDuplicateParams,
+} from "@/src/fictions/domain/fiction.repository"
 
 function extractStoragePath(url: string | null | undefined): string | null {
   const pathMatch = url?.match(/\/storage\/v1\/object\/public\/[^/]+\/(.+)$/)
@@ -156,6 +159,32 @@ export function createFictionsSupabaseAdapter(
       return mapAssetImagesToFiction(fictionData, (imagesData ?? []) as AssetImageRow[])
     },
 
+    async findActiveDuplicateForContribute(
+      params: FindActiveContributeDuplicateParams,
+    ): Promise<FictionWithMedia | null> {
+      const supabase = await getSupabase()
+
+      const title = params.title.trim()
+      if (!title) return null
+
+      const titleNorm = title.toLowerCase()
+      const { data: rows, error: titleErr } = await supabase
+        .from("fictions")
+        .select("*")
+        .eq("active", true)
+        .eq("year", params.year)
+        .eq("type", params.type)
+        .limit(500)
+
+      if (titleErr || !rows?.length) return null
+
+      const byTitle = rows.find(
+        (r) => typeof r.title === "string" && r.title.trim().toLowerCase() === titleNorm,
+      )
+      if (!byTitle) return null
+      return mapAssetImagesToFiction(byTitle, [])
+    },
+
     async findSlugsByPrefix(prefix: string, excludeId?: string): Promise<string[]> {
       const supabase = await getSupabase()
       let query = supabase
@@ -169,20 +198,19 @@ export function createFictionsSupabaseAdapter(
 
     async create(data: CreateFictionData): Promise<FictionWithMedia | null> {
       const supabase = await getSupabase()
-      const { data: row, error } = await supabase
-        .from("fictions")
-        .insert({
-          title: data.title,
-          type: data.type,
-          year: data.year,
-          genre: data.genre,
-          description: data.description,
-          active: data.active ?? true,
-          duration_sec: data.duration_sec ?? null,
-          slug: data.slug ?? null,
-        })
-        .select()
-        .single()
+      const insertRow = {
+        title: data.title,
+        type: data.type,
+        year: data.year,
+        genre: data.genre,
+        description: data.description,
+        active: data.active ?? true,
+        duration_sec: data.duration_sec ?? null,
+        slug: data.slug ?? null,
+        ...(data.status != null ? { status: data.status } : {}),
+        ...(data.created_by != null ? { created_by: data.created_by } : {}),
+      }
+      const { data: row, error } = await supabase.from("fictions").insert(insertRow).select().single()
       if (error || !row) return null
       return mapAssetImagesToFiction(row, [])
     },

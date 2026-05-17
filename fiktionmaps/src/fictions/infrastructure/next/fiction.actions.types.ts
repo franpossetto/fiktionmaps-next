@@ -1,8 +1,20 @@
 import type { Fiction, FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { FictionDetailRecommendationReason } from "@/src/fictions/application/get-fiction-detail-recommendations.usecase"
 
+export type FictionDuplicateSummaryForContribute = {
+  id: string
+  slug: string | null
+  title: string
+  year: number | null
+  type: Fiction["type"]
+}
+
+export type CheckFictionDuplicateForContributeResult =
+  | { success: true; duplicate: FictionDuplicateSummaryForContribute | null }
+  | { success: false; error: string }
+
 export type CreateFictionResult =
-  | { success: true; fiction: Fiction }
+  | { success: true; fiction: Fiction; contributionAutoApproved?: boolean }
   | { success: false; error: string }
 
 export type CreateFictionWithImagesResult =
@@ -30,6 +42,10 @@ export type GetFictionInterestsResult =
   | { success: false; error: string }
 
 export type SetFictionInterestsResult =
+  | { success: true }
+  | { success: false; error: string }
+
+export type LinkFictionPrimaryCreditResult =
   | { success: true }
   | { success: false; error: string }
 
