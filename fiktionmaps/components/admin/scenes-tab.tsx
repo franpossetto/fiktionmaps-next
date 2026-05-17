@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl"
 import { useRouter } from "@/i18n/navigation"
 import { Plus, Edit2, Trash2, ChevronRight, Clapperboard, CheckCircle2, Search, Loader2 } from "lucide-react"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import { createClient } from "@/lib/supabase/client"
 import { ASSET_VIDEOS_BUCKET } from "@/lib/asset-videos/asset-videos-bucket"
@@ -65,11 +65,11 @@ const emptyForm = (): SceneFormData => ({
 
 type WorkflowStep = "list" | "select-fiction" | "select-location" | "details"
 
-export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initialFictions?: FictionWithMedia[], initialPlaces?: Location[] }) {
+export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initialFictions?: FictionWithMedia[], initialPlaces?: Place[] }) {
   const t = useTranslations("Scenes")
   const router = useRouter()
   const [fictions, setFictions] = useState<FictionWithMedia[]>(initialFictions)
-  const [locations, setLocations] = useState<Location[]>(initialPlaces)
+  const [places] = useState<Place[]>(initialPlaces)
   const [scenes, setScenes] = useState<Scene[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -91,7 +91,6 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
   }, [])
 
   useEffect(() => {
-    // Server action uses same validation as former POST /api/scenes.
     loadScenes().finally(() => setLoading(false))
   }, [loadScenes])
 
@@ -113,14 +112,14 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
     if (!searchTerm.trim()) return true
     const q = searchTerm.toLowerCase()
     const fiction = fictions.find((f) => f.id === scene.fictionId)
-    const location = locations.find((l) => l.id === scene.placeId)
+    const place = places.find((p) => p.placeId === scene.placeId)
     return (
       scene.title.toLowerCase().includes(q) ||
       scene.description.toLowerCase().includes(q) ||
       scene.timestamp?.toLowerCase().includes(q) ||
       scene.episodeTitle?.toLowerCase().includes(q) ||
       fiction?.title.toLowerCase().includes(q) ||
-      location?.name.toLowerCase().includes(q)
+      (place && (place.name ?? place.location.name).toLowerCase().includes(q))
     )
   })
 
@@ -217,7 +216,7 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
     setWorkflowStep("select-location")
   }
 
-  const handleSelectLocation = (placeId: string) => {
+  const handleSelectPlace = (placeId: string) => {
     setFormData((prev) => ({ ...prev, placeId }))
     setWorkflowStep("details")
   }
@@ -290,7 +289,7 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredScenes.map((scene) => {
               const fiction = fictions.find((f) => f.id === scene.fictionId)
-              const location = locations.find((l) => l.id === scene.placeId)
+              const place = places.find((p) => p.placeId === scene.placeId)
               const timeLabel =
                 scene.timestamp ||
                 (scene.season != null && scene.episode != null
@@ -309,8 +308,10 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
                           <span className="text-xs font-medium uppercase px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                             {fiction?.title || "Fiction"}
                           </span>
-                          {location?.name && (
-                            <span className="text-xs text-muted-foreground">{location.name}</span>
+                          {(place?.name ?? place?.location.name) && (
+                            <span className="text-xs text-muted-foreground">
+                              {place?.name ?? place?.location.name}
+                            </span>
                           )}
                           {timeLabel && (
                             <span className="text-xs text-muted-foreground">{timeLabel}</span>
@@ -398,7 +399,7 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
 
   if (workflowStep === "select-location") {
     const selectedFiction = fictions.find((f) => f.id === formData.fictionId)
-    const availableLocations = locations.filter((l) => l.fictionId === formData.fictionId)
+    const availablePlaces = places.filter((p) => p.fictionId === formData.fictionId)
 
     return (
       <WizardShell
@@ -420,23 +421,25 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
           </div>
 
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {availableLocations.length === 0 ? (
+            {availablePlaces.length === 0 ? (
               <div className="p-4 rounded-lg border border-border/50 text-center">
                 <p className="text-sm text-muted-foreground">{t("noPlaces")}</p>
                 <p className="text-xs text-muted-foreground mt-1">{t("addPlacesFirst")}</p>
               </div>
             ) : (
-              availableLocations.map((location) => (
+              availablePlaces.map((p) => (
                 <button
-                  key={location.id}
+                  key={p.placeId}
                   type="button"
-                  onClick={() => handleSelectLocation(location.id)}
+                  onClick={() => handleSelectPlace(p.placeId)}
                   className="w-full text-left p-4 rounded-lg border border-border hover:border-foreground/50 hover:bg-card/50 transition-all group"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-semibold text-foreground">{location.name}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{location.description}</p>
+                      <p className="font-semibold text-foreground">
+                        {p.name ?? p.location.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">{p.description}</p>
                     </div>
                     <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
                   </div>
@@ -455,7 +458,7 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
 
   if (workflowStep === "details") {
     const selectedFiction = fictions.find((f) => f.id === formData.fictionId)
-    const selectedLocation = locations.find((l) => l.id === formData.placeId)
+    const selectedPlace = places.find((p) => p.placeId === formData.placeId)
     const isTv = selectedFiction?.type === "tv-series"
 
     return (
@@ -483,7 +486,9 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
               </div>
               <div className="flex items-center gap-2 p-3 rounded-lg bg-foreground/10 border border-foreground/30">
                 <CheckCircle2 className="h-4 w-4 text-foreground flex-shrink-0" />
-                <span className="text-xs font-medium text-foreground">Place: {selectedLocation?.name}</span>
+                <span className="text-xs font-medium text-foreground">
+                  Place: {selectedPlace?.name ?? selectedPlace?.location.name}
+                </span>
               </div>
             </div>
           </div>

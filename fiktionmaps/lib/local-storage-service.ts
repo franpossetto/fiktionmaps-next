@@ -12,11 +12,20 @@ const KEYS = {
   placeSelectorCollapsed: `${PREFIX}place-selector-collapsed`,
   selectedCityId: `${PREFIX}selected-city-id`,
   adminViewMode: `${PREFIX}admin-view-mode`,
+  recentFictions: `${PREFIX}recent-fictions`,
 } as const
 
 export type MapStyleValue = "day" | "dawn" | "dusk" | "night"
 export type ThemeValue = "dark" | "light"
 export type AdminViewMode = "cards" | "table"
+
+export type RecentFictionItem = {
+  readonly id: string
+  readonly slug: string | null
+  readonly viewedAt: number
+}
+
+const RECENT_FICTIONS_LIMIT = 8
 
 const DEFAULT_MAP_STYLE: MapStyleValue = "night"
 const DEFAULT_THEME: ThemeValue = "dark"
@@ -162,6 +171,55 @@ export const adminViewModeStorage = {
   },
 }
 
+function parseRecentFictions(raw: string | null): RecentFictionItem[] {
+  if (raw === null) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (item): item is RecentFictionItem =>
+        item !== null &&
+        typeof item === "object" &&
+        typeof (item as Record<string, unknown>).id === "string" &&
+        ((item as Record<string, unknown>).id as string).length > 0 &&
+        (
+          (item as Record<string, unknown>).slug === null ||
+          typeof (item as Record<string, unknown>).slug === "string"
+        ) &&
+        typeof (item as Record<string, unknown>).viewedAt === "number",
+    )
+  } catch {
+    return []
+  }
+}
+
+/** Recently visited fictions (client-only, persisted across sessions). */
+export const recentFictionsStorage = {
+  get(): readonly RecentFictionItem[] {
+    return parseRecentFictions(getItem(KEYS.recentFictions))
+  },
+  add({ id, slug }: { id: string; slug?: string | null }): void {
+    const current = parseRecentFictions(getItem(KEYS.recentFictions))
+    const deduped = current.filter((item) => item.id !== id)
+    const updated = [
+      { id, slug: slug ?? null, viewedAt: Date.now() },
+      ...deduped,
+    ].slice(0, RECENT_FICTIONS_LIMIT)
+    setItem(KEYS.recentFictions, JSON.stringify(updated))
+  },
+  clear(): void {
+    if (!isClient()) return
+    try {
+      localStorage.removeItem(KEYS.recentFictions)
+    } catch {
+      // ignore
+    }
+  },
+  getDefault(): readonly RecentFictionItem[] {
+    return []
+  },
+}
+
 /** Single entry point for all UI local storage. */
 export const localStorageService = {
   mapStyle: mapStyleStorage,
@@ -170,4 +228,5 @@ export const localStorageService = {
   placeSelectorCollapsed: placeSelectorCollapsedStorage,
   selectedCityId: selectedCityIdStorage,
   adminViewMode: adminViewModeStorage,
+  recentFictions: recentFictionsStorage,
 }

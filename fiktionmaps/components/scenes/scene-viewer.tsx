@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react"
 import { ChevronLeft, ChevronRight, Volume2, VolumeX, Play, Pause, Film } from "lucide-react"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
 import { CitySelector } from "@/components/map/city-selector"
 import { FictionSelector } from "@/components/map/fiction-selector"
@@ -31,7 +31,7 @@ export function SceneViewer({
   const [selectedCity, setSelectedCity] = useState<City | null>(initialSelectedCity)
   const [selectedFictionIds, setSelectedFictionIds] = useState<string[]>([])
   const [availableFictions, setAvailableFictions] = useState<Fiction[]>(initialAvailableFictions ?? [])
-  const [scenes, setScenes] = useState<Location[]>([])
+  const [scenes, setScenes] = useState<Place[]>([])
   const [scenesLoading, setScenesLoading] = useState(Boolean(initialSelectedCity))
   const [hintCities, setHintCities] = useState<Pick<City, "id" | "name" | "country">[]>([])
   const [hintVariant, setHintVariant] = useState<"scoped" | "global" | null>(null)
@@ -468,7 +468,7 @@ export function SceneViewer({
               </span>
             </div>
             <h2 className="text-xl font-bold text-white drop-shadow-md [text-shadow:_0_1px_3px_rgb(0_0_0_/_0.9)]">
-              {currentScene.name}
+              {currentScene.sceneTitle ?? currentScene.name ?? currentScene.location.name}
             </h2>
             <p className="max-w-lg text-sm text-white/85 line-clamp-1 drop-shadow-md [text-shadow:_0_1px_2px_rgb(0_0_0_/_0.85)]">
               {currentScene.sceneDescription}

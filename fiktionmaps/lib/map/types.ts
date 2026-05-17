@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import type { CollocatedSpiderfyTheme } from "./collocated-spiderfy-theme"
 
 export interface LatLng {
   lat: number
@@ -42,6 +43,8 @@ export interface MapContainerProps {
 
 export interface MarkerProps {
   position: LatLng
+  /** Defaults to `bottom` (pin tip on coords). Use `center` for previews where the marker block should sit in the viewport middle. */
+  anchor?: "center" | "top" | "bottom" | "left" | "right"
   onClick?: () => void
   zIndex?: number
   children?: ReactNode
@@ -74,16 +77,28 @@ export interface ClusterItem {
   imageUrl?: string
 }
 
+/** Optional collocated-pin spiderfy (same lat/lng). */
+export interface CollocatedSpiderfyOptions {
+  enabled?: boolean
+  /** Merged after CSS-variable resolution (see `resolveCollocatedSpiderfyTheme`). */
+  theme?: Partial<CollocatedSpiderfyTheme>
+}
+
 export interface ClusterLayerProps<T extends ClusterItem = ClusterItem> {
   items: T[]
   selectedItemId?: string | null
   onItemClick?: (item: T) => void
   renderItem: (
     item: T,
-    state: { isSelected: boolean; isHovered: boolean },
+    state: { isSelected: boolean; isHovered: boolean; stackSize?: number },
   ) => ReactNode
   maxZoom?: number
   radius?: number
+  /**
+   * When `true` or `{ enabled: true }`, overlapping unclustered points at the same coordinates
+   * collapse to one marker and fan out on click. Default: off when omitted.
+   */
+  collocatedSpiderfy?: boolean | CollocatedSpiderfyOptions
 }
 
 export interface GeocodingPrediction {

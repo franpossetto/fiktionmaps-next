@@ -5,10 +5,14 @@ import {
 import type { MapBbox } from "@/lib/validation/map-query"
 import { createAnonymousClient, createClient } from "@/lib/supabase/server"
 import type { City } from "@/src/cities/domain/city.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { ProfileScenePreview, Scene } from "@/src/scenes/domain/scene.entity"
 import type { CreateSceneData, UpdateSceneData } from "@/src/scenes/domain/scene.schemas"
 import type { SceneListFilters, ScenesRepositoryPort } from "@/src/scenes/domain/scene.repository"
+import type { z } from "zod"
+import { fictionRowStatusSchema } from "@/src/fictions/domain/fiction.schemas"
+
+type SceneRowStatus = z.infer<typeof fictionRowStatusSchema>
 
 type SceneRowWithPlace = {
   id: string
@@ -79,11 +83,52 @@ type AnonSupabase = ReturnType<typeof createAnonymousClient>
 type ImgRow = { entity_id: string; role: string; variant: string; url: string }
 
 function pickThumb(rows: ImgRow[]): string | null {
-  if (!rows.length) return null
-  const sm = rows.filter((r) => r.variant === "sm")
-  const pool = sm.length ? sm : rows
+  const valid = rows.filter((r) => typeof r.url === "string" && r.url.trim().length > 0)
+  if (!valid.length) return null
+  const sm = valid.filter((r) => r.variant === "sm")
+  const pool = sm.length ? sm : valid
   const byRole = (role: string) => pool.find((r) => r.role === role)
-  return byRole("hero")?.url ?? byRole("cover")?.url ?? byRole("avatar")?.url ?? pool[0]?.url ?? null
+  const picked =
+    byRole("hero")?.url ??
+    byRole("cover")?.url ??
+    byRole("avatar")?.url ??
+    pool[0]?.url ??
+    null
+  return picked?.trim() || null
+}
+
+async function attachThumbnailsToScenes(
+  supabase: SupabaseLike | AnonSupabase,
+  scenes: Scene[],
+): Promise<Scene[]> {
+  if (scenes.length === 0) return scenes
+  const sceneIds = scenes.map((s) => s.id)
+  const { data: imgs } = await supabase
+    .from("asset_images")
+    .select("entity_id, role, variant, url")
+    .eq("entity_type", "scene")
+    .in("entity_id", sceneIds)
+
+  const byScene = new Map<string, ImgRow[]>()
+  for (const row of imgs ?? []) {
+    const raw = row as Record<string, unknown>
+    const entityId =
+      typeof raw.entity_id === "string"
+        ? raw.entity_id
+        : typeof raw.entityId === "string"
+          ? raw.entityId
+          : ""
+    if (!entityId) continue
+    const r = row as ImgRow
+    const list = byScene.get(entityId) ?? []
+    list.push({ ...r, entity_id: entityId })
+    byScene.set(entityId, list)
+  }
+
+  return scenes.map((s) => ({
+    ...s,
+    thumbnail: pickThumb(byScene.get(s.id) ?? []) ?? s.thumbnail,
+  }))
 }
 
 async function removeVideoObjectIfAny(supabase: SupabaseLike, videoUrl: string | null) {
@@ -103,7 +148,9 @@ async function fetchSceneById(
     return null
   }
   if (!data) return null
-  return mapRow(data as SceneRowWithPlace)
+  const scene = mapRow(data as SceneRowWithPlace)
+  const enriched = await attachThumbnailsToScenes(supabase, [scene])
+  return enriched[0] ?? null
 }
 
 type LocFromJoin = {
@@ -115,22 +162,30 @@ type LocFromJoin = {
   city_id?: string
 }
 
-function locationFromSceneJoinRow(r: unknown): LocFromJoin | null {
+function placeGeoFromSceneJoinRow(r: unknown): {
+  placeId: string
+  placeName: string | null
+  loc: LocFromJoin | null
+} | null {
   const row = r as { places?: unknown }
   const pRaw = row.places
   const placeObj = Array.isArray(pRaw) ? pRaw[0] : pRaw
   if (!placeObj || typeof placeObj !== "object") return null
+  const pid = (placeObj as { id?: string }).id
+  if (!pid) return null
+  const rawName = (placeObj as { name?: string | null }).name
+  const placeName = rawName == null || rawName === "" ? null : String(rawName)
   const locRaw = "locations" in placeObj ? (placeObj as { locations?: unknown }).locations : undefined
   const locObj = Array.isArray(locRaw) ? locRaw[0] : locRaw
-  if (!locObj || typeof locObj !== "object") return null
-  return locObj as LocFromJoin
+  if (!locObj || typeof locObj !== "object") return { placeId: pid, placeName, loc: null }
+  return { placeId: pid, placeName, loc: locObj as LocFromJoin }
 }
 
 async function fetchScenesWithVideoForPlaceIds(
   supabase: AnonSupabase,
   fictionIds: string[],
   placeIds: string[],
-): Promise<Location[]> {
+): Promise<Place[]> {
   if (placeIds.length === 0 || fictionIds.length === 0) return []
 
   const { data: sceneRows, error: sceneError } = await supabase
@@ -146,6 +201,8 @@ async function fetchScenesWithVideoForPlaceIds(
         video_url,
         sort_order,
         places!inner (
+          id,
+          name,
           location_id,
           locations!inner (
             id,
@@ -198,22 +255,28 @@ async function fetchScenesWithVideoForPlaceIds(
       quote: string | null
       video_url: string
     }
-    const loc = locationFromSceneJoinRow(raw)
+    const geo = placeGeoFromSceneJoinRow(raw)
+    const loc = geo?.loc
     const poster = thumbBySceneId.get(r.id) ?? ""
     return {
       id: r.id,
-      name: r.title?.trim() || loc?.name || "Scene",
-      address: loc?.formatted_address ?? "",
-      lat: loc?.latitude ?? 0,
-      lng: loc?.longitude ?? 0,
-      cityId: loc?.city_id ?? "",
+      placeId: geo?.placeId ?? "",
+      name: geo?.placeName ?? null,
       fictionId: r.fiction_id ?? "",
+      location: {
+        name: loc?.name ?? "Unknown place",
+        address: loc?.formatted_address ?? "",
+        lat: loc?.latitude ?? 0,
+        lng: loc?.longitude ?? 0,
+        cityId: loc?.city_id ?? "",
+      },
       image: poster,
       videoUrl: String(r.video_url).trim(),
       description: r.description ?? "",
       sceneDescription: r.description ?? "",
       sceneQuote: r.quote ?? undefined,
       visitTip: undefined,
+      sceneTitle: r.title?.trim() || null,
     }
   })
 }
@@ -231,7 +294,8 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       console.error("[scenes repo] getAll:", error.message)
       return []
     }
-    return (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    const mapped = (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    return attachThumbnailsToScenes(supabase, mapped)
   },
 
   async getByLocationId(locationId: string): Promise<Scene[]> {
@@ -257,7 +321,8 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       console.error("[scenes repo] getByLocationId:", error.message)
       return []
     }
-    return (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    const mapped = (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    return attachThumbnailsToScenes(supabase, mapped)
   },
 
   async getByFictionId(fictionId: string): Promise<Scene[]> {
@@ -273,7 +338,8 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       console.error("[scenes repo] getByFictionId:", error.message)
       return []
     }
-    return (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    const mapped = (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    return attachThumbnailsToScenes(supabase, mapped)
   },
 
   async getByPlaceId(placeId: string): Promise<Scene[]> {
@@ -289,7 +355,8 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       console.error("[scenes repo] getByPlaceId:", error.message)
       return []
     }
-    return (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    const mapped = (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    return attachThumbnailsToScenes(supabase, mapped)
   },
 
   async getById(id: string): Promise<Scene | null> {
@@ -329,10 +396,11 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       console.error("[scenes repo] list:", error.message)
       return []
     }
-    return (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    const mapped = (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+    return attachThumbnailsToScenes(supabase, mapped)
   },
 
-  async create(data: CreateSceneData, createdBy?: string | null): Promise<Scene | null> {
+  async create(data: CreateSceneData, createdBy: string | null, status: SceneRowStatus): Promise<Scene | null> {
     const supabase = await createClient()
     const insert = {
       fiction_id: data.fictionId,
@@ -348,6 +416,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       sort_order: data.sortOrder ?? 0,
       active: data.active ?? true,
       created_by: createdBy ?? null,
+      status,
     }
 
     const { data: inserted, error } = await supabase.from("scenes").insert(insert).select("id").single()
@@ -542,7 +611,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
     return [...ids].sort()
   },
 
-  async listScenesWithVideoInBbox(params: { fictionIds: string[]; bbox: MapBbox }): Promise<Location[]> {
+  async listScenesWithVideoInBbox(params: { fictionIds: string[]; bbox: MapBbox }): Promise<Place[]> {
     const { fictionIds, bbox } = params
     if (fictionIds.length === 0) return []
 
@@ -584,7 +653,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
   async listScenesWithVideoInCity(params: {
     fictionIds: string[]
     cityId: string
-  }): Promise<Location[]> {
+  }): Promise<Place[]> {
     const { fictionIds, cityId } = params
     if (fictionIds.length === 0) return []
 
@@ -625,7 +694,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
       const supabase = await createClient()
       const { data: scenes, error } = await supabase
         .from("scenes")
-        .select("id, title, place_id, fiction_id, fictions ( title )")
+        .select("id, title, place_id, fiction_id, fictions ( title, slug )")
         .eq("active", true)
         .eq("created_by", userId)
         .order("created_at", { ascending: false })
@@ -654,6 +723,10 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
           fictions && typeof fictions === "object" && "title" in fictions
             ? String((fictions as { title?: string }).title ?? "")
             : ""
+        const fictionSlug =
+          fictions && typeof fictions === "object" && "slug" in fictions
+            ? ((fictions as { slug?: string | null }).slug ?? null)
+            : null
         const placeId = (s as { place_id?: string }).place_id
         const fictionId = (s as { fiction_id?: string }).fiction_id
         if (!placeId || !fictionId) return []
@@ -661,6 +734,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
           {
             id: s.id,
             fictionId,
+            fictionSlug,
             placeId,
             title: s.title,
             fictionTitle,

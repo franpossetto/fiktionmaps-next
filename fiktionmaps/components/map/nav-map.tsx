@@ -5,7 +5,7 @@ import { createPortal } from "react-dom"
 import { motion } from "framer-motion"
 import { useMap } from "react-map-gl/mapbox"
 import { MapContainer, MapMarker, useMapLoaded } from "@/lib/map"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import { Expand, Map, Minimize2, X } from "lucide-react"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -16,7 +16,6 @@ const MINIMAP_SLOT_ID = "map-minimap-slot"
 const SIZE_SMALL = { width: 200, height: 140 }
 const SIZE_EXPANDED = { width: 360, height: 280 }
 
-/** Calls map.resize() whenever the container size changes so the canvas tracks the transition smoothly */
 function NavMapResizeTrigger() {
   const mapRef = useMap()?.current
 
@@ -43,12 +42,11 @@ function NavMapResizeTrigger() {
   return null
 }
 
-/** Pins that animate in after the nav map has loaded */
 function NavMapPins({
-  locations,
+  places,
   viewportCenter,
 }: {
-  locations: Location[]
+  places: Place[]
   viewportCenter: { lat: number; lng: number }
 }) {
   const mapLoaded = useMapLoaded()
@@ -62,11 +60,11 @@ function NavMapPins({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
     >
-      {locations.map((loc, index) => (
-        <MapMarker key={loc.id} position={{ lat: loc.lat, lng: loc.lng }}>
+      {places.map((loc, index) => (
+        <MapMarker key={loc.id} position={{ lat: loc.location.lat, lng: loc.location.lng }}>
           <motion.div
             className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-sm"
-            title={loc.name}
+            title={loc.name ?? loc.location.name}
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{
@@ -107,11 +105,11 @@ export const NAV_MAP_SLOT_ID = MINIMAP_SLOT_ID
 interface NavMapProps {
   city: City
   viewportCenter: { lat: number; lng: number }
-  locations: Location[]
+  places: Place[]
   onMinimapClick: (position: { lat: number; lng: number }) => void
 }
 
-export function NavMap({ city, viewportCenter, locations, onMinimapClick }: NavMapProps) {
+export function NavMap({ city, viewportCenter, places, onMinimapClick }: NavMapProps) {
   const isMobile = useIsMobile()
   const [container, setContainer] = useState<HTMLElement | null>(null)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -195,7 +193,7 @@ export function NavMap({ city, viewportCenter, locations, onMinimapClick }: NavM
             onClick={handleMinimapClick}
           >
             <NavMapResizeTrigger />
-            <NavMapPins locations={locations} viewportCenter={viewportCenter} />
+            <NavMapPins places={places} viewportCenter={viewportCenter} />
           </MapContainer>
         </div>
       </div>

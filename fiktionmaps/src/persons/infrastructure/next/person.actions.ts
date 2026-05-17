@@ -7,13 +7,18 @@ import { createPersonSchema, fictionPersonEntrySchema } from "@/src/persons/doma
 import { supabaseRepositoryAdapter as personsRepo } from "@/src/persons/infrastructure/supabase/person.repository.impl"
 import { deletePerson } from "@/src/persons/application/delete-person.usecase"
 import { searchPersons } from "@/src/persons/application/search-persons.usecase"
+import { listCreditCandidatesForContribute } from "@/src/persons/application/list-credit-candidates-for-contribute.usecase"
+import { FICTION_PERSON_ROLES } from "@/src/persons/domain/person.entity"
 import { createPerson } from "@/src/persons/application/create-person.usecase"
+import { resolveOrCreatePerson } from "@/src/persons/application/resolve-or-create-person.usecase"
 import { getFictionPersons } from "@/src/persons/application/get-fiction-persons.usecase"
 import { setFictionPersons } from "@/src/persons/application/set-fiction-persons.usecase"
 import { z } from "zod"
 import type {
   SearchPersonsResult,
+  ListDirectorCandidatesResult,
   CreatePersonResult,
+  ResolveOrCreatePersonResult,
   DeletePersonResult,
   GetFictionPersonsResult,
   SetFictionPersonsResult,
@@ -21,7 +26,9 @@ import type {
 
 export type {
   SearchPersonsResult,
+  ListDirectorCandidatesResult,
   CreatePersonResult,
+  ResolveOrCreatePersonResult,
   DeletePersonResult,
   GetFictionPersonsResult,
   SetFictionPersonsResult,
@@ -55,6 +62,29 @@ export async function searchPersonsAction(query: string): Promise<SearchPersonsR
   }
 }
 
+export async function listDirectorCandidatesAction(nameQuery: string): Promise<ListDirectorCandidatesResult> {
+  return listCreditCandidatesAction("director", nameQuery)
+}
+
+export async function listCreditCandidatesAction(
+  role: (typeof FICTION_PERSON_ROLES)[number],
+  nameQuery: string,
+): Promise<ListDirectorCandidatesResult> {
+  const parsedRole = z.enum(FICTION_PERSON_ROLES).safeParse(role)
+  if (!parsedRole.success) return { success: false, error: "Invalid role" }
+  const parsed = z.string().safeParse(nameQuery ?? "")
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+  try {
+    const persons = await listCreditCandidatesForContribute(
+      { role: parsedRole.data, nameQuery: parsed.data },
+      personsRepo,
+    )
+    return { success: true, persons }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed to load catalog" }
+  }
+}
+
 export async function createPersonAction(
   data: { name: string; bio?: string; nationality?: string; birth_year?: number | null }
 ): Promise<CreatePersonResult> {
@@ -66,6 +96,18 @@ export async function createPersonAction(
     return { success: true, person }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Create failed" }
+  }
+}
+
+export async function resolveOrCreatePersonAction(name: string): Promise<ResolveOrCreatePersonResult> {
+  const parsed = z.string().trim().min(1).safeParse(name)
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+  try {
+    const person = await resolveOrCreatePerson(parsed.data, personsRepo)
+    if (!person) return { success: false, error: "Failed to resolve person" }
+    return { success: true, person }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed to resolve person" }
   }
 }
 

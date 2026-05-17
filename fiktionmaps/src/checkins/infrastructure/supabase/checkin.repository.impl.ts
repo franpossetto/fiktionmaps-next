@@ -11,14 +11,18 @@ type EnrichedPlaceCheckinRow = {
   checked_at: string
   places: {
     fiction_id: string | null
-    fictions: { id: string | null; title: string | null } | { id: string | null; title: string | null }[]
+    fictions:
+      | { id: string | null; title: string | null; slug: string | null }
+      | { id: string | null; title: string | null; slug: string | null }[]
     locations:
       | { name: string | null; formatted_address: string | null; city_id: string | null }
       | { name: string | null; formatted_address: string | null; city_id: string | null }[]
   }[]
     | {
         fiction_id: string | null
-        fictions: { id: string | null; title: string | null } | { id: string | null; title: string | null }[]
+        fictions:
+          | { id: string | null; title: string | null; slug: string | null }
+          | { id: string | null; title: string | null; slug: string | null }[]
         locations:
           | { name: string | null; formatted_address: string | null; city_id: string | null }
           | { name: string | null; formatted_address: string | null; city_id: string | null }[]
@@ -178,7 +182,7 @@ export const checkinsSupabaseAdapter: CheckinsRepositoryPort = {
           places!inner (
             id,
             fiction_id,
-            fictions!inner ( id, title ),
+            fictions!inner ( id, title, slug ),
             location_id,
             locations!inner ( name, formatted_address, city_id )
           )
@@ -257,6 +261,7 @@ export const checkinsSupabaseAdapter: CheckinsRepositoryPort = {
         placeAddress: location?.formatted_address ?? "",
         placeImage: placeImageById.get(row.place_id) ?? null,
         fictionId: place?.fiction_id ?? "",
+        fictionSlug: fiction?.slug ?? null,
         fictionTitle: fiction?.title ?? "",
         fictionCover: fid ? coverByFiction.get(fid) ?? null : null,
         cityId: cid ?? null,

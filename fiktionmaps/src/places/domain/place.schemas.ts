@@ -1,10 +1,12 @@
 import { z } from "zod"
 import { latitudeSchema, longitudeSchema, uuidSchema } from "@/lib/validation/primitives"
+import { fictionRowStatusSchema } from "@/src/fictions/domain/fiction.schemas"
 
 export const createPlaceSchema = z.object({
   fictionId: uuidSchema,
   cityId: uuidSchema,
-  name: z.string().trim().min(1),
+  locationName: z.string().trim().min(1),
+  placeName: z.string().trim().min(1),
   formattedAddress: z.string().trim(),
   latitude: z.coerce.number().pipe(latitudeSchema),
   longitude: z.coerce.number().pipe(longitudeSchema),
@@ -17,3 +19,9 @@ export const updatePlaceSchema = createPlaceSchema
 
 export type CreatePlaceData = z.infer<typeof createPlaceSchema>
 export type UpdatePlaceData = z.infer<typeof updatePlaceSchema>
+
+/** Set in server actions from session + moderator role; not from client parsing. */
+export type CreatePlaceRepoInput = CreatePlaceData & {
+  status: z.infer<typeof fictionRowStatusSchema>
+  created_by: string
+}

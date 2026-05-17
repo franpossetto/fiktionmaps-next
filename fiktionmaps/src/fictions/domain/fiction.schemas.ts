@@ -5,6 +5,9 @@ const slugField = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Only lowercase letters, numbers and hyphens")
   .nullable()
 
+/** Matches `public.contribution_status` on fictions / places / scenes. */
+export const fictionRowStatusSchema = z.enum(["pending", "approved", "rejected"])
+
 export const createFictionFormSchema = z.object({
   title: z.string().trim().min(1),
   type: z.enum(["movie", "book", "tv-series"]),
@@ -14,6 +17,8 @@ export const createFictionFormSchema = z.object({
   active: z.boolean(),
   duration_sec: z.number().nullable(),
   slug: slugField,
+  status: fictionRowStatusSchema.optional(),
+  created_by: z.string().uuid().optional(),
 })
 
 export const updateFictionFormSchema = z.object({
@@ -25,6 +30,7 @@ export const updateFictionFormSchema = z.object({
   active: z.boolean(),
   duration_sec: z.number().nullable(),
   slug: slugField,
+  author: z.string().trim().nullable().optional(),
 })
 
 export type CreateFictionData = z.infer<typeof createFictionFormSchema>

@@ -33,6 +33,8 @@ export type Database = {
           date_of_birth: string | null
           onboarding_completed: boolean
           role: string
+          fpp_total: number
+          level: number
           created_at: string
           updated_at: string
         }
@@ -47,6 +49,8 @@ export type Database = {
           date_of_birth?: string | null
           onboarding_completed?: boolean
           role?: string
+          fpp_total?: number
+          level?: number
           created_at?: string
           updated_at?: string
         }
@@ -61,6 +65,8 @@ export type Database = {
           date_of_birth?: string | null
           onboarding_completed?: boolean
           role?: string
+          fpp_total?: number
+          level?: number
           created_at?: string
           updated_at?: string
         }
@@ -70,6 +76,41 @@ export type Database = {
             columns: ["id"]
             isOneToOne: true
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiction_external_ids: {
+        Row: {
+          id: string
+          fiction_id: string
+          provider: string
+          external_id: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          fiction_id: string
+          provider: string
+          external_id: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          fiction_id?: string
+          provider?: string
+          external_id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiction_external_ids_fiction_id_fkey"
+            columns: ["fiction_id"]
+            isOneToOne: false
+            referencedRelation: "fictions"
             referencedColumns: ["id"]
           },
         ]
@@ -86,6 +127,8 @@ export type Database = {
           active: boolean
           slug: string | null
           duration_sec: number | null
+          status: "pending" | "approved" | "rejected"
+          created_by: string | null
           created_at: string
           updated_at: string
         }
@@ -100,6 +143,8 @@ export type Database = {
           active?: boolean
           slug?: string | null
           duration_sec?: number | null
+          status?: "pending" | "approved" | "rejected"
+          created_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -114,10 +159,20 @@ export type Database = {
           active?: boolean
           slug?: string | null
           duration_sec?: number | null
+          status?: "pending" | "approved" | "rejected"
+          created_by?: string | null
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fictions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cities: {
         Row: {
@@ -245,6 +300,9 @@ export type Database = {
           location_id: string | null
           description: string | null
           active: boolean
+          name: string | null
+          status: "pending" | "approved" | "rejected"
+          created_by: string | null
           created_at: string
           updated_at: string
         }
@@ -254,6 +312,9 @@ export type Database = {
           location_id?: string | null
           description?: string | null
           active?: boolean
+          name?: string | null
+          status?: "pending" | "approved" | "rejected"
+          created_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -263,6 +324,9 @@ export type Database = {
           location_id?: string | null
           description?: string | null
           active?: boolean
+          name?: string | null
+          status?: "pending" | "approved" | "rejected"
+          created_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -279,6 +343,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "places_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -298,6 +369,7 @@ export type Database = {
           video_url: string | null
           sort_order: number
           active: boolean
+          status: "pending" | "approved" | "rejected"
           created_by: string | null
           created_at: string
           updated_at: string
@@ -316,6 +388,7 @@ export type Database = {
           video_url?: string | null
           sort_order?: number
           active?: boolean
+          status?: "pending" | "approved" | "rejected"
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -334,6 +407,7 @@ export type Database = {
           video_url?: string | null
           sort_order?: number
           active?: boolean
+          status?: "pending" | "approved" | "rejected"
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -678,6 +752,90 @@ export type Database = {
           },
         ]
       }
+      contributions: {
+        Row: {
+          id: string
+          user_id: string
+          type:
+            | "create_fiction"
+            | "create_place"
+            | "add_scene"
+            | "add_photo"
+            | "enrich_entity"
+            | "correct_data"
+            | "mark_inaccessible"
+            | "add_tip"
+            | "checkin"
+          entity_type: "fiction" | "place" | "scene"
+          entity_id: string
+          status: "pending" | "approved" | "rejected"
+          moderator_id: string | null
+          moderator_note: string | null
+          fpp_awarded: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type:
+            | "create_fiction"
+            | "create_place"
+            | "add_scene"
+            | "add_photo"
+            | "enrich_entity"
+            | "correct_data"
+            | "mark_inaccessible"
+            | "add_tip"
+            | "checkin"
+          entity_type: "fiction" | "place" | "scene"
+          entity_id: string
+          status?: "pending" | "approved" | "rejected"
+          moderator_id?: string | null
+          moderator_note?: string | null
+          fpp_awarded?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?:
+            | "create_fiction"
+            | "create_place"
+            | "add_scene"
+            | "add_photo"
+            | "enrich_entity"
+            | "correct_data"
+            | "mark_inaccessible"
+            | "add_tip"
+            | "checkin"
+          entity_type?: "fiction" | "place" | "scene"
+          entity_id?: string
+          status?: "pending" | "approved" | "rejected"
+          moderator_id?: string | null
+          moderator_note?: string | null
+          fpp_awarded?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contributions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_moderator_id_fkey"
+            columns: ["moderator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       place_checkins: {
         Row: {
           id: string
@@ -740,7 +898,18 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      contribution_status: "pending" | "approved" | "rejected"
+      contribution_type:
+        | "create_fiction"
+        | "create_place"
+        | "add_scene"
+        | "add_photo"
+        | "enrich_entity"
+        | "correct_data"
+        | "mark_inaccessible"
+        | "add_tip"
+        | "checkin"
+      contribution_entity_type: "fiction" | "place" | "scene"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -893,6 +1062,10 @@ export type CityCheckinUpdate = TablesUpdate<"city_checkins">
 export type PlaceCheckinRow = Tables<"place_checkins">
 export type PlaceCheckinInsert = TablesInsert<"place_checkins">
 export type PlaceCheckinUpdate = TablesUpdate<"place_checkins">
+
+export type ContributionRow = Tables<"contributions">
+export type ContributionInsert = TablesInsert<"contributions">
+export type ContributionUpdate = TablesUpdate<"contributions">
 
 export type Enums<
   PublicEnumNameOrOptions extends

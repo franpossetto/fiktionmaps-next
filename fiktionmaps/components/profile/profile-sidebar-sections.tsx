@@ -114,6 +114,7 @@ export function PlacesSection({ checkins, cityMap }: PlacesSectionProps) {
       ? unique.map((c) => ({
           key: c.id,
           fictionId: c.fictionId,
+          fictionSlug: c.fictionSlug,
           placeId: c.placeId,
           imageUrl:
             c.placeImage?.trim() ||
@@ -139,7 +140,7 @@ export function PlacesSection({ checkins, cityMap }: PlacesSectionProps) {
           type="button"
           onClick={() =>
             router.push(
-              `/fiction/${encodeURIComponent(row.fictionId)}/place/${encodeURIComponent(row.placeId)}`,
+              `/fiction/${encodeURIComponent(row.fictionSlug ?? row.fictionId)}/place/${encodeURIComponent(row.placeId)}`,
             )
           }
           className="block w-full text-left transition-colors hover:bg-muted/30"
@@ -173,6 +174,7 @@ export function ScenesSection({ rows: previewRows }: { rows: ProfileScenePreview
   const rows = previewRows.map((d) => ({
     key: d.id,
     fictionId: d.fictionId,
+    fictionSlug: d.fictionSlug,
     imageUrl: d.imageUrl?.trim() || DEFAULT_FICTION_COVER,
     title: d.title,
     subtitle: d.fictionTitle,
@@ -190,7 +192,7 @@ export function ScenesSection({ rows: previewRows }: { rows: ProfileScenePreview
           type="button"
           onClick={() =>
             router.push(
-              `/fiction/${encodeURIComponent(row.fictionId)}/scene/${encodeURIComponent(row.key)}`,
+              `/fiction/${encodeURIComponent(row.fictionSlug ?? row.fictionId)}/scene/${encodeURIComponent(row.key)}`,
             )
           }
           className="block w-full text-left transition-colors hover:bg-muted/30"

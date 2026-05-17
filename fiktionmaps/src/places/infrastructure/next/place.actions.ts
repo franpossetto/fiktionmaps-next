@@ -1,6 +1,11 @@
 "use server"
 
 import { revalidatePath, updateTag } from "next/cache"
+import { createClient } from "@/lib/supabase/server"
+import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
+import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/ensure-user-is-moderator.usecase"
+import { profilesReaderSupabaseAdapter } from "@/src/contributions/infrastructure/supabase/profiles-reader.supabase"
+import { resolveEntityContributionInsertDefaults } from "@/src/contributions/application/resolve-entity-contribution-insert-defaults.usecase"
 import { uuidSchema } from "@/lib/validation/primitives"
 import type { MapBbox } from "@/lib/validation/map-query"
 import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
@@ -10,11 +15,12 @@ import { deletePlaceUseCase } from "@/src/places/application/delete-place.usecas
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
 import {
   getAllPlacesCached,
-  getFictionLocationsCached,
+  getFictionPlacesCached,
   getPlaceLocationByIdCached,
+  listCityIdsWithPlacesCached,
   listPlacesInBboxForFictionIds,
 } from "./place.queries"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
 import type { CreatePlaceResult, UpdatePlaceResult, DeletePlaceResult, UploadPlaceImageResult } from "./place.actions.types"
 
@@ -47,32 +53,51 @@ export async function uploadPlaceImageAction(
   return { success: true, avatarUrl: result.urls.sm }
 }
 
-export async function getAllPlacesAction(): Promise<Location[]> {
+export async function getAllPlacesAction(): Promise<Place[]> {
   return getAllPlacesCached()
 }
 
-export async function getPlaceLocationAction(placeId: string): Promise<Location | null> {
+export async function getPlaceLocationAction(placeId: string): Promise<Place | null> {
   if (!uuidSchema.safeParse(placeId).success) return null
   return getPlaceLocationByIdCached(placeId)
 }
 
-export async function getFictionLocationsAction(fictionId: string): Promise<Location[]> {
+export async function getFictionPlacesAction(fictionId: string): Promise<Place[]> {
   if (!uuidSchema.safeParse(fictionId).success) return []
-  return getFictionLocationsCached(fictionId)
+  return getFictionPlacesCached(fictionId)
 }
 
-export async function getPlacesInBboxAction(fictionIds: string[], bbox: MapBbox): Promise<Location[]> {
+export async function getPlacesInBboxAction(fictionIds: string[], bbox: MapBbox): Promise<Place[]> {
   const { west, south, east, north } = bbox
   if (![west, south, east, north].every((n) => Number.isFinite(n))) return []
   return listPlacesInBboxForFictionIds(fictionIds, bbox)
 }
 
+/** City IDs that have at least one place (map city picker: disable others). */
+export async function getCityIdsWithPlacesAction(): Promise<string[]> {
+  return listCityIdsWithPlacesCached()
+}
+
 export async function createPlaceAction(data: CreatePlaceData): Promise<CreatePlaceResult> {
-  const result = await createPlaceUseCase(data, placesRepo)
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: "Unauthorized" }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  const { status, created_by } = resolveEntityContributionInsertDefaults(isStaffModerator, user.id)
+
+  const result = await createPlaceUseCase({ ...data, status, created_by }, placesRepo)
   if (!result) return { success: false, error: "Failed to create place" }
   updateTag("places")
-  const locations = await getAllPlacesCached()
-  return { success: true, createdPlaceId: result.placeId, locations }
+  const places = await getAllPlacesCached()
+  return { success: true, createdPlaceId: result.placeId, places }
 }
 
 export async function updatePlaceAction(placeId: string, data: UpdatePlaceData): Promise<UpdatePlaceResult> {

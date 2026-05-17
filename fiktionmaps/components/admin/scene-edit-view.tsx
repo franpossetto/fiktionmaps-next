@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl"
 import { Link, useRouter } from "@/i18n/navigation"
 import { ArrowLeft, CheckCircle2, Loader2, RefreshCw } from "lucide-react"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import { createClient } from "@/lib/supabase/client"
 import { ASSET_VIDEOS_BUCKET } from "@/lib/asset-videos/asset-videos-bucket"
@@ -62,14 +62,14 @@ function sceneToForm(scene: Scene): SceneFormData {
 export interface SceneEditViewProps {
   initialScene: Scene
   fictions?: FictionWithMedia[]
-  places?: Location[]
+  places?: Place[]
 }
 
 export function SceneEditView({ initialScene, fictions: initialFictions = [], places: initialPlaces = [] }: SceneEditViewProps) {
   const t = useTranslations("Scenes")
   const router = useRouter()
   const [fictions, setFictions] = useState<FictionWithMedia[]>(initialFictions)
-  const [locations, setLocations] = useState<Location[]>(initialPlaces)
+  const [places] = useState<Place[]>(initialPlaces)
   const [formData, setFormData] = useState<SceneFormData>(() => sceneToForm(initialScene))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -91,9 +91,9 @@ export function SceneEditView({ initialScene, fictions: initialFictions = [], pl
     () => fictions.find((f) => f.id === formData.fictionId),
     [fictions, formData.fictionId],
   )
-  const selectedLocation = useMemo(
-    () => locations.find((l) => l.id === formData.placeId),
-    [locations, formData.placeId],
+  const selectedPlace = useMemo(
+    () => places.find((p) => p.placeId === formData.placeId),
+    [places, formData.placeId],
   )
   const isTv = selectedFiction?.type === "tv-series"
   const videoPreviewSrc = pendingVideoPreviewUrl ?? initialScene.videoUrl ?? null
@@ -193,7 +193,9 @@ export function SceneEditView({ initialScene, fictions: initialFictions = [], pl
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-foreground/30 bg-foreground/10 p-3">
               <CheckCircle2 className="h-4 w-4 shrink-0 text-foreground" />
-              <span className="text-xs font-medium text-foreground">Place: {selectedLocation?.name ?? "…"}</span>
+              <span className="text-xs font-medium text-foreground">
+                Place: {selectedPlace?.name ?? selectedPlace?.location.name ?? "…"}
+              </span>
             </div>
           </div>
         </div>
@@ -223,7 +225,9 @@ export function SceneEditView({ initialScene, fictions: initialFictions = [], pl
                   {formData.title.trim() || initialScene.title}
                 </h3>
                 <p className="truncate text-sm text-muted-foreground">{selectedFiction?.title ?? "…"}</p>
-                <p className="truncate text-sm text-muted-foreground">{selectedLocation?.name ?? "…"}</p>
+                <p className="truncate text-sm text-muted-foreground">
+                  {selectedPlace?.name ?? selectedPlace?.location.name ?? "…"}
+                </p>
                 {timecodeDisplay ? (
                   <p className="font-mono text-xs text-muted-foreground/90">{timecodeDisplay}</p>
                 ) : null}

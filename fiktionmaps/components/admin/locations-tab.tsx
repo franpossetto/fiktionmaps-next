@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Plus, Edit2, Trash2, Search, MapPin } from "lucide-react"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import { Button } from "@/components/ui/button"
 import { PlaceCreateView, type PlaceFormData } from "./place-create-view"
 import { uploadPlaceImageAction } from "@/src/places/infrastructure/next/place.actions"
@@ -18,31 +18,32 @@ import {
 type WorkflowStep = "list" | "create" | "edit"
 
 interface LocationsTabProps {
-  initialLocations?: Location[]
+  initialPlaces?: Place[]
   initialFictions?: Fiction[]
   initialCities?: City[]
 }
 
-export function LocationsTab({ initialLocations, initialFictions = [], initialCities = [] }: LocationsTabProps) {
+export function LocationsTab({ initialPlaces, initialFictions = [], initialCities = [] }: LocationsTabProps) {
   const [cities, setCities] = useState<City[]>(initialCities)
   const [fictions, setFictions] = useState<Fiction[]>(initialFictions)
-  const [locations, setLocations] = useState<Location[]>(initialLocations ?? [])
+  const [places, setPlaces] = useState<Place[]>(initialPlaces ?? [])
   const [workflowStep, setWorkflowStep] = useState<WorkflowStep>("list")
-  const [editingLocation, setEditingLocation] = useState<Location | null>(null)
+  const [editingLocation, setEditingLocation] = useState<Place | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [fictionFilter, setFictionFilter] = useState("all")
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [deletingPlaceId, setDeletingPlaceId] = useState<string | null>(null)
 
   useEffect(() => {
-    setLocations(initialLocations ?? [])
-  }, [initialLocations])
+    setPlaces(initialPlaces ?? [])
+  }, [initialPlaces])
 
   const defaultCity = cities[0]
   const initialPlaceFormData: PlaceFormData = {
     fictionId: "",
     address: "",
-    name: "",
+    locationName: "",
+    placeName: "",
     description: "",
     latitude: defaultCity?.lat ?? 48.8566,
     longitude: defaultCity?.lng ?? 2.3522,
@@ -57,7 +58,8 @@ export function LocationsTab({ initialLocations, initialFictions = [], initialCi
     const result = await updatePlaceAction(placeId, {
       fictionId: data.fictionId,
       cityId: data.cityId,
-      name: data.name,
+      locationName: data.locationName,
+      placeName: data.placeName,
       formattedAddress: data.formattedAddress || data.address,
       latitude: data.latitude,
       longitude: data.longitude,
@@ -75,7 +77,7 @@ export function LocationsTab({ initialLocations, initialFictions = [], initialCi
       await uploadPlaceImageAction(placeId, formData)
     }
     const list = await getAllPlacesAction()
-    setLocations(list)
+    setPlaces(list)
     setWorkflowStep("list")
     setEditingLocation(null)
   }
@@ -85,7 +87,8 @@ export function LocationsTab({ initialLocations, initialFictions = [], initialCi
     const result = await createPlaceAction({
       fictionId: data.fictionId,
       cityId: data.cityId,
-      name: data.name,
+      locationName: data.locationName,
+      placeName: data.placeName,
       formattedAddress: data.formattedAddress || data.address,
       latitude: data.latitude,
       longitude: data.longitude,
@@ -106,7 +109,7 @@ export function LocationsTab({ initialLocations, initialFictions = [], initialCi
       }
     }
     // Refetch list so new place shows with image (or placeholder)
-    setLocations(await getAllPlacesAction())
+    setPlaces(await getAllPlacesAction())
     setWorkflowStep("list")
   }
 
@@ -122,18 +125,19 @@ export function LocationsTab({ initialLocations, initialFictions = [], initialCi
       setSubmitError(result.error)
       return
     }
-    setLocations(await getAllPlacesAction())
+    setPlaces(await getAllPlacesAction())
   }
 
-  const filteredLocations = locations.filter((loc) => {
+  const filteredPlaces = places.filter((loc) => {
     const matchesFiction = fictionFilter === "all" || loc.fictionId === fictionFilter
     if (!matchesFiction) return false
     if (!searchTerm.trim()) return true
     const q = searchTerm.toLowerCase()
     return (
-      loc.name.toLowerCase().includes(q) ||
+      (loc.name && loc.name.toLowerCase().includes(q)) ||
+      loc.location.name.toLowerCase().includes(q) ||
       (loc.description && loc.description.toLowerCase().includes(q)) ||
-      (loc.address && loc.address.toLowerCase().includes(q))
+      (loc.location.address && loc.location.address.toLowerCase().includes(q))
     )
   })
 
@@ -153,15 +157,16 @@ export function LocationsTab({ initialLocations, initialFictions = [], initialCi
   if (workflowStep === "edit" && editingLocation) {
     const editInitialFormData: PlaceFormData = {
       fictionId: editingLocation.fictionId,
-      cityId: editingLocation.cityId,
-      name: editingLocation.name,
-      address: editingLocation.address ?? "",
-      formattedAddress: editingLocation.address ?? "",
+      cityId: editingLocation.location.cityId,
+      locationName: editingLocation.location.name ?? "",
+      placeName: editingLocation.name ?? editingLocation.location.name ?? "",
+      address: editingLocation.location.address ?? "",
+      formattedAddress: editingLocation.location.address ?? "",
       description: editingLocation.description ?? "",
-      latitude: editingLocation.lat,
-      longitude: editingLocation.lng,
-      locationType: editingLocation.locationType ?? "",
-      isLandmark: editingLocation.isLandmark ?? false,
+      latitude: editingLocation.location.lat,
+      longitude: editingLocation.location.lng,
+      locationType: editingLocation.location.locationType ?? "",
+      isLandmark: editingLocation.location.isLandmark ?? false,
     }
     return (
       <PlaceCreateView
@@ -192,7 +197,7 @@ export function LocationsTab({ initialLocations, initialFictions = [], initialCi
           <div>
             <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
               <MapPin className="h-5 w-5" />
-              Places ({filteredLocations.length})
+              Places ({filteredPlaces.length})
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
               Add places to your stories. Pick an address on the map and create the place in one step.
@@ -230,10 +235,10 @@ export function LocationsTab({ initialLocations, initialFictions = [], initialCi
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredLocations.map((loc) => {
+        {filteredPlaces.map((loc) => {
           const fiction = fictions.find((f) => f.id === loc.fictionId)
-          const city = cities.find((c) => c.id === loc.cityId)
-          const cityLabel = city ? `${city.name}, ${city.country}` : loc.cityId
+          const city = cities.find((c) => c.id === loc.location.cityId)
+          const cityLabel = city ? `${city.name}, ${city.country}` : loc.location.cityId
           return (
             <div
               key={loc.id}
@@ -242,7 +247,9 @@ export function LocationsTab({ initialLocations, initialFictions = [], initialCi
               <div className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-foreground truncate text-base">{loc.name}</h3>
+                    <h3 className="font-semibold text-foreground truncate text-base">
+                      {loc.name ?? loc.location.name}
+                    </h3>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-xs font-medium uppercase px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                         {fiction?.title || "Fiction"}
@@ -252,7 +259,9 @@ export function LocationsTab({ initialLocations, initialFictions = [], initialCi
                   </div>
                 </div>
 
-                <p className="text-xs text-muted-foreground line-clamp-2">{loc.address || loc.description}</p>
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {loc.location.address || loc.description}
+                </p>
 
                 <div className="flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity gap-2">
                   <button

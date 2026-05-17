@@ -4,9 +4,25 @@
 
 ## Backlog
 
+- [ ] [SEO] Google Search Console: confirm `https://fiktions.com/sitemap.xml` reaches `Success` status after reprocessing (without legacy errors from the previous domain).
+
+- [ ] [SEO] URL Inspection core: validate and request indexing for `/en/map`, `/es/map`, `/en/fictions`, `/es/fictions`, `/en/scenes`, `/es/scenes`.
+
+- [ ] [SEO] URL Inspection fictions: continue with priority slugs (today `amelie` EN/ES was already requested) and rely on sitemap for discovery of the rest.
+
+- [ ] [SEO] Review the `Page indexing` report in Search Console and log main causes (including redirects, excluded, discovered/crawled not indexed) with suggested actions.
+
+- [ ] [SEO] Review `Performance` in Search Console (weekly baseline: queries, pages, CTR, average position) and track `amelie` EN/ES evolution.
+
+- [ ] [SEO] Review `Enhancements` / rich results and validate structured data on fiction pages.
+
+- [ ] [SEO] Convert findings into a prioritized `P0/P1/P2` backlog with owner and ETA.
+
 - [ ] **People model for fictions**: replace `author` TEXT column with a normalized `persons` table + `fiction_persons` junction table (fields: `fiction_id`, `person_id`, `role`). Roles: `author`, `director`, `actor`, `screenwriter`, `producer`, etc. One person can have multiple roles across multiple fictions (e.g. Clint Eastwood as actor + director). Phases: (1) DB migration + backfill existing `author` text, (2) domain/infra layer update (entity, repo, actions), (3) UI update (person search/select in create + edit forms).
 
 - [ ] Edit Place: replacing the existing image does not work.
+
+- [ ] **Place likes (persisted)**: Fiction likes are backed by `fiction_likes`, use cases, and server actions. Place hearts in `fiction-detail.tsx` (`likedPlaces` / `togglePlaceLike`) and `PlaceDetailLikeCluster` in `fiction-place-detail-view.tsx` are client-only (no DB). Add a `place_likes`-style table + RLS, domain/repo/application/`infrastructure/next` wiring (same architectural rules as `fiction-likes`), SSR counts and per-user liked state, then replace the placeholder UI.
 
 - [ ] **Separate place display name from real location name**: add `places.name` (fiction/display name) while keeping `locations.name` as the real-world name. Include DB migration with backfill (`places.name <- locations.name`), update Supabase types/repositories/actions, stop overwriting `locations.name` from place edit flow, and update admin/map UI to use `places.name` as primary label (optionally show real name as secondary).
 
@@ -19,6 +35,11 @@
 - [ ] Scenes module full optimization: build a dedicated scene-watch payload use case + optimized repository query (scenes + places/locations in one read), add viewer prefetch/observability (TTFF, buffering, bytes), and prepare optional automatic upload optimization pipeline for short clips (15s max) as a future phase.
 
 ## In progress
+
+- [ ] [map] Optimize `getByBboxAndFictionIds` to avoid serial `locations -> places` queries (single joined bbox query), then measure map first-pins latency again.
+- [ ] [map] General map behavior: keep `/map` default initial state as `city + all fictions`, and optimize first-pins load / entry latency.
+- [ ] [map] Explore Map entry behavior: from `fictions/[slug]`, pass `city + fiction` in URL as contextual preselection (user can switch back to all fictions during navigation).
+- [ ] [map] Temporary scope decision: `Visit` opens Google Maps (external link) and we defer in-map place deep-link/zoom/sidebar while prioritizing other work.
 
 ## Done (recent)
 

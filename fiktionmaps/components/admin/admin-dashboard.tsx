@@ -11,7 +11,7 @@ import { ScenesTab } from "./scenes-tab"
 import { PersonsTab } from "./persons-tab"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 import type { City } from "@/src/cities/domain/city.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import type { Person } from "@/src/persons/domain/person.entity"
 import { useAdminViewModeStorage } from "@/lib/local-storage-service-hooks"
 
@@ -66,13 +66,13 @@ const sections: SectionItem[] = [
 interface AdminDashboardProps {
   initialFictions?: Fiction[]
   initialCities?: City[]
-  initialLocations?: Location[]
+  initialPlaces?: Place[]
   initialPersons?: Person[]
   onOpenFiction?: (fictionId: string) => void
   onOpenCity?: (cityId: string) => void
 }
 
-export function AdminDashboard({ initialFictions, initialCities, initialLocations, initialPersons, onOpenFiction, onOpenCity }: AdminDashboardProps) {
+export function AdminDashboard({ initialFictions, initialCities, initialPlaces, initialPersons, onOpenFiction, onOpenCity }: AdminDashboardProps) {
   const searchParams = useSearchParams()
   const [activeSection, setActiveSection] = useState<AdminSection>(() => {
     const tab = searchParams.get("tab")
@@ -90,16 +90,6 @@ export function AdminDashboard({ initialFictions, initialCities, initialLocation
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-gradient-to-b from-background to-background/50">
-      {/* Header — sticky within the centered column (same canvas rhythm as profile) */}
-      <div className="sticky top-0 z-40 border-b border-border bg-card/50 py-6 backdrop-blur-sm">
-        <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-          Content Management
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Edit and manage fictions, cities, locations, and scenes
-        </p>
-      </div>
-
       {/* Tabs bar */}
       <div className="border-b border-border bg-card/30">
         <div className="flex items-center justify-between gap-4">
@@ -182,8 +172,8 @@ export function AdminDashboard({ initialFictions, initialCities, initialLocation
               viewMode={viewMode}
             />
           )}
-          {activeSection === "locations" && <LocationsTab initialLocations={initialLocations} initialFictions={initialFictions} initialCities={initialCities} />}
-          {activeSection === "scenes" && <ScenesTab initialFictions={initialFictions} initialPlaces={initialLocations} />}
+          {activeSection === "locations" && <LocationsTab initialPlaces={initialPlaces} initialFictions={initialFictions} initialCities={initialCities} />}
+          {activeSection === "scenes" && <ScenesTab initialFictions={initialFictions} initialPlaces={initialPlaces} />}
           {activeSection === "persons" && <PersonsTab initialPersons={initialPersons} viewMode={viewMode} />}
         </div>
       </div>

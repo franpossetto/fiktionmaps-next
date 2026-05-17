@@ -1,9 +1,9 @@
 import type { Metadata } from "next"
+import { getTranslations } from "next-intl/server"
 import { getAllFictionsCached } from "@/src/fictions/infrastructure/next/fiction.queries"
-import { getSceneCountsByFictionIdsCached } from "@/src/scenes/infrastructure/next/scene.queries"
 import { getFictionLikeCountsCached } from "@/src/fiction-likes/infrastructure/next/fiction-likes.queries"
 import { getPlaceCountsByFictionIdsCached } from "@/src/places/infrastructure/next/place.queries"
-import { FictionLanding } from "@/components/fictions/fiction-landing"
+import { FictionCatalog } from "@/components/fictions/fiction-catalog"
 import { getSiteUrl } from "@/lib/site"
 
 type Props = {
@@ -14,10 +14,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params
   const siteUrl = getSiteUrl()
   const canonical = `${siteUrl}/${locale}/fictions`
+  const tMeta = await getTranslations({ locale, namespace: "Metadata" })
+  const title = tMeta("fictionsListTitle")
+  const description = tMeta("fictionsListDescription")
   return {
-    title: "Explore Movies & Books by Location",
-    description:
-      "Browse active fiction titles and discover where stories happened in real life through maps, scenes, and places.",
+    title,
+    description,
     alternates: {
       canonical,
       languages: {
@@ -26,17 +28,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
     },
     openGraph: {
-      title: "Explore Movies & Books by Location",
-      description:
-        "Browse active fiction titles and discover where stories happened in real life through maps, scenes, and places.",
+      title,
+      description,
       url: canonical,
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
-      title: "Explore Movies & Books by Location",
-      description:
-        "Browse active fiction titles and discover where stories happened in real life through maps, scenes, and places.",
+      title,
+      description,
     },
   }
 }
@@ -46,17 +46,15 @@ export default async function FictionsPage() {
   const fictions = all.filter((f) => f.active)
   const allIds = fictions.map((f) => f.id)
 
-  const [sceneCounts, likeCounts, placeCounts] = await Promise.all([
-    getSceneCountsByFictionIdsCached(allIds),
+  const [likeCounts, placeCounts] = await Promise.all([
     getFictionLikeCountsCached(allIds),
     getPlaceCountsByFictionIdsCached(allIds),
   ])
 
   return (
-    <div className="h-full">
-      <FictionLanding
+    <div className="h-full overflow-y-auto bg-background">
+      <FictionCatalog
         initialFictions={fictions}
-        initialSceneCounts={sceneCounts}
         initialLikeCounts={likeCounts}
         initialPlaceCounts={placeCounts}
       />

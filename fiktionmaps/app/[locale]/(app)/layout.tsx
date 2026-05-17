@@ -1,29 +1,38 @@
 "use client"
 
-import { AppSidebar } from "@/components/layout/app-sidebar"
-import { AppBottomNav } from "@/components/layout/app-bottom-nav"
+import { AppFloatingNav } from "@/components/layout/app-floating-nav"
+import { AppTopNavbar, AppTopNavbarNoSearch } from "@/components/layout/app-top-navbar"
 import { MapEngineProvider } from "@/lib/map"
 import { mapboxEngine } from "@/lib/map/mapbox"
 import { GeoProvider } from "@/components/checkins/geo-provider"
 import { CityCheckinSheet } from "@/components/checkins/city-checkin-sheet"
+import { usePathname } from "@/i18n/navigation"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  const isMapView = pathname?.startsWith("/map")
+  const isContributeFlow = pathname != null && /(^|\/)contribute(\/|$)/.test(pathname)
+
   return (
     <MapEngineProvider engine={mapboxEngine}>
       <GeoProvider>
-        <div className="flex h-screen w-screen overflow-hidden flex-col md:flex-row">
-          <div className="hidden md:flex md:w-[60px] md:min-w-[60px] md:shrink-0 md:flex-col">
-            <AppSidebar />
-          </div>
-
-          <main className="relative flex-1 min-w-0 overflow-hidden mb-[70px] md:mb-0">
-            {children}
+        <div className="flex h-screen w-screen overflow-hidden">
+          <main className="relative flex-1 min-w-0 overflow-hidden">
+            {isMapView ? (
+              children
+            ) : (
+              <div className="flex h-full flex-col">
+                {isContributeFlow ? <AppTopNavbarNoSearch /> : <AppTopNavbar />}
+                <div className="min-h-0 flex-1">{children}</div>
+              </div>
+            )}
           </main>
-
-          <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-chrome border-t border-chrome-border z-[999]">
-            <AppBottomNav />
-          </nav>
         </div>
+        {/**
+         * Fuera del contenedor con overflow-hidden para que `position: fixed` no quede recortado
+         * en algunos navegadores junto con el map / wizards.
+         */}
+        <AppFloatingNav />
         <CityCheckinSheet />
       </GeoProvider>
     </MapEngineProvider>

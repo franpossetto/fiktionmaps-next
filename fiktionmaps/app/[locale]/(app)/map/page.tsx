@@ -2,28 +2,28 @@
 
 import { Suspense, useState, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { motion } from "framer-motion"
+import { useTranslations } from "next-intl"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import { MapView, Map3DToggleSlot, MapMinimapSlot } from "@/components/map/map-view"
 import { MapProvider } from "@/lib/map"
 import { CitySelector } from "@/components/map/city-selector"
 import { FictionSelector } from "@/components/map/fiction-selector"
 import { LocationDetail } from "@/components/map/location-detail"
 import { ThumbnailCarousel } from "@/components/map/thumbnail-carousel"
+import { UserMenu } from "@/components/layout/user-menu"
 import { usePlaceSelectorCollapsedStorage } from "@/lib/local-storage-service-hooks"
 import { useRouter } from "@/i18n/navigation"
 import {
   getAllCitiesAction,
   getCityFictionsAction,
 } from "@/src/cities/infrastructure/next/city.actions"
-import { getPlaceLocationAction, getPlacesInBboxAction } from "@/src/places/infrastructure/next/place.actions"
+import { getPlaceLocationAction, getPlacesInBboxAction, getCityIdsWithPlacesAction } from "@/src/places/infrastructure/next/place.actions"
 import { isUuidString } from "@/lib/validation/primitives"
 
 type Bbox = { west: number; south: number; east: number; north: number }
 
-/** Returns a bbox (west, south, east, north) for a ~radiusKm square around lat/lng. */
 function bboxAround(lat: number, lng: number, radiusKm: number): Bbox {
   const kmPerDegLat = 111.32
   const deltaLat = radiusKm / kmPerDegLat
@@ -36,7 +36,6 @@ function bboxAround(lat: number, lng: number, radiusKm: number): Bbox {
   }
 }
 
-/** Union of two bboxes so the result contains both areas. */
 function bboxUnion(a: Bbox, b: Bbox): Bbox {
   return {
     west: Math.min(a.west, b.west),
@@ -51,34 +50,57 @@ const MIN_LOAD_RADIUS_KM = 50
 function MapPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const tMap = useTranslations("Map")
   const initialFictionId = searchParams.get("fiction")
   const initialCityId = searchParams.get("city")
   const placeParam = searchParams.get("place")
+  const shouldOpenSidebarFromQuery =
+    searchParams.get("openSidebar") === "true" || searchParams.get("openSidebar") === "1"
   const [placeSelectorCollapsed, setPlaceSelectorCollapsed] = usePlaceSelectorCollapsedStorage()
 
   const [cities, setCities] = useState<City[]>([])
   const [selectedCity, setSelectedCity] = useState<City | null>(null)
   const [availableFictions, setAvailableFictions] = useState<FictionWithMedia[]>([])
   const [selectedFictionIds, setSelectedFictionIds] = useState<string[]>([])
-  const [filteredLocations, setFilteredLocations] = useState<Location[]>([])
-  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null)
-  const [focusedLocationId, setFocusedLocationId] = useState<string | null>(null)
+  const [filteredPlaces, setFilteredPlaces] = useState<Place[]>([])
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null)
+  const [focusedPlaceId, setFocusedPlaceId] = useState<string | null>(null)
   const [is3D, setIs3D] = useState(false)
-  const [mapLoaded, setMapLoaded] = useState(false)
   const [bounds, setBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
   const [citiesLoading, setCitiesLoading] = useState(true)
+  const [cityIdsWithPlaces, setCityIdsWithPlaces] = useState<string[]>([])
+  const [hasAppliedInitialPlaceOpen, setHasAppliedInitialPlaceOpen] = useState(false)
 
-  // Load cities, then open city/fictions (optionally from ?city= & ?fiction= when opening from a fiction page)
   useEffect(() => {
     setCitiesLoading(true)
-    getAllCitiesAction()
-      .then((citiesList: City[]) => {
+    let cancelled = false
+    Promise.all([getAllCitiesAction(), getCityIdsWithPlacesAction()])
+      .then(([citiesList, withPlacesIds]: [City[], string[]]) => {
+        if (cancelled) return
         setCities(citiesList)
-        if (citiesList.length === 0) return
+        setCityIdsWithPlaces(withPlacesIds)
+        if (citiesList.length === 0) {
+          setCitiesLoading(false)
+          return
+        }
+        const withPlacesSet = new Set(withPlacesIds)
+        const fromUrl = initialCityId
+          ? citiesList.find((c) => c.id === initialCityId)
+          : undefined
         const city =
-          (initialCityId && citiesList.find((c) => c.id === initialCityId)) || citiesList[0]
+          fromUrl ??
+          citiesList.find((c) => withPlacesSet.has(c.id)) ??
+          citiesList[0]
         setSelectedCity(city)
+        setCitiesLoading(false)
+
+        const canPrefillInitialFiction = Boolean(initialFictionId && isUuidString(initialFictionId))
+        if (canPrefillInitialFiction) {
+          setSelectedFictionIds([initialFictionId!])
+        }
+
         return getCityFictionsAction(city.id).then((fics: FictionWithMedia[]) => {
+          if (cancelled) return
           setAvailableFictions(fics)
           if (initialFictionId && fics.some((f) => f.id === initialFictionId)) {
             setSelectedFictionIds([initialFictionId])
@@ -87,22 +109,48 @@ function MapPageInner() {
           }
         })
       })
-      .catch(() => {})
-      .finally(() => setCitiesLoading(false))
-    // Intentionally only on mount; query is read once for initial state.
+      .catch(() => {
+        if (!cancelled) setCitiesLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Deep link ?place=: sync focus and ensure the pin is in the list (bbox query can omit it or SSR had no searchParams).
   useEffect(() => {
     if (placeParam && isUuidString(placeParam)) {
-      setFocusedLocationId(placeParam)
+      setFocusedPlaceId(placeParam)
     }
   }, [placeParam])
 
   useEffect(() => {
+    if (!shouldOpenSidebarFromQuery || hasAppliedInitialPlaceOpen) return
+    const deepPlaceId = placeParam && isUuidString(placeParam) ? placeParam : null
+    if (!deepPlaceId) {
+      setHasAppliedInitialPlaceOpen(true)
+      return
+    }
+    if (selectedPlace?.id === deepPlaceId) {
+      setHasAppliedInitialPlaceOpen(true)
+      return
+    }
+    const targetPlace = filteredPlaces.find((p) => p.id === deepPlaceId)
+    if (!targetPlace) return
+    setFocusedPlaceId(deepPlaceId)
+    setSelectedPlace(targetPlace)
+    setHasAppliedInitialPlaceOpen(true)
+  }, [
+    shouldOpenSidebarFromQuery,
+    hasAppliedInitialPlaceOpen,
+    placeParam,
+    filteredPlaces,
+    selectedPlace?.id,
+  ])
+
+  useEffect(() => {
     if (!selectedCity || selectedFictionIds.length === 0) {
-      setFilteredLocations([])
+      setFilteredPlaces([])
       return
     }
     const minBbox = bboxAround(selectedCity.lat, selectedCity.lng, MIN_LOAD_RADIUS_KM)
@@ -118,7 +166,7 @@ function MapPageInner() {
           if (cancelled) return
           if (loc) list = [...list, loc]
         }
-        if (!cancelled) setFilteredLocations(list)
+        if (!cancelled) setFilteredPlaces(list)
       })
       .catch(() => {})
     return () => {
@@ -128,8 +176,8 @@ function MapPageInner() {
 
   const handleCityChange = useCallback(async (city: City) => {
     setSelectedCity(city)
-    setSelectedLocation(null)
-    setFocusedLocationId(null)
+    setSelectedPlace(null)
+    setFocusedPlaceId(null)
     const fics = await getCityFictionsAction(city.id)
     setAvailableFictions(fics)
     setSelectedFictionIds(fics.map((f) => f.id))
@@ -139,31 +187,31 @@ function MapPageInner() {
     setSelectedFictionIds((prev) =>
       prev.includes(fictionId) ? prev.filter((id) => id !== fictionId) : [...prev, fictionId],
     )
-    setSelectedLocation(null)
-    setFocusedLocationId(null)
+    setSelectedPlace(null)
+    setFocusedPlaceId(null)
   }
 
-  const handleLocationClick = useCallback((location: Location) => {
-    setSelectedLocation(location)
-    setFocusedLocationId(location.id)
+  const handleLocationClick = useCallback((place: Place) => {
+    setSelectedPlace(place)
+    setFocusedPlaceId(place.id)
   }, [])
 
-  /** Navigate map to place (from carousel) without opening sidebar. */
-  const handleNavigateToPlace = useCallback((location: Location) => {
-    setFocusedLocationId(location.id)
+  const handleNavigateToPlace = useCallback((place: Place) => {
+    setFocusedPlaceId(place.id)
   }, [])
 
   const handleExplorePlace = useCallback(
-    (location: Location) => {
-      setSelectedLocation(null)
+    (place: Place) => {
+      setSelectedPlace(null)
+      const targetFiction = availableFictions.find((fiction) => fiction.id === place.fictionId)
       router.push(
-        `/fiction/${encodeURIComponent(location.fictionId)}/place/${encodeURIComponent(location.id)}`,
+        `/fictions/${encodeURIComponent(targetFiction?.slug ?? place.fictionId)}`,
       )
     },
-    [router],
+    [router, availableFictions],
   )
 
-  const isNavigationModeActive = !placeSelectorCollapsed && filteredLocations.length > 0
+  const isNavigationModeActive = !placeSelectorCollapsed && filteredPlaces.length > 0
 
   useEffect(() => {
     if (!isNavigationModeActive) return
@@ -178,17 +226,17 @@ function MapPageInner() {
 
       if (e.key === "Enter" || e.key === " ") {
         if (isInputLike) return
-        if (focusedLocationId && !selectedLocation) {
-          const loc = filteredLocations.find((l) => l.id === focusedLocationId)
-          if (loc) {
+        if (focusedPlaceId && !selectedPlace) {
+          const p = filteredPlaces.find((x) => x.id === focusedPlaceId)
+          if (p) {
             e.preventDefault()
-            setSelectedLocation(loc)
+            setSelectedPlace(p)
           }
         }
       } else if (e.key === "Escape") {
         e.preventDefault()
-        if (selectedLocation) {
-          setSelectedLocation(null)
+        if (selectedPlace) {
+          setSelectedPlace(null)
         } else {
           setPlaceSelectorCollapsed(true)
         }
@@ -198,9 +246,9 @@ function MapPageInner() {
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [
     isNavigationModeActive,
-    focusedLocationId,
-    selectedLocation,
-    filteredLocations,
+    focusedPlaceId,
+    selectedPlace,
+    filteredPlaces,
     setPlaceSelectorCollapsed,
   ])
 
@@ -208,93 +256,90 @@ function MapPageInner() {
     <MapProvider>
       {citiesLoading || !selectedCity ? (
         <div className="flex min-h-full items-center justify-center bg-background">
-          <p className="text-muted-foreground">Loading map…</p>
+          <p className="text-muted-foreground">{tMap("loadingMap")}</p>
         </div>
       ) : (
-      <div className="absolute inset-0 min-h-0 flex flex-col">
-      <motion.div
-        className="absolute left-4 top-4 z-[1000] flex items-center gap-2"
-        initial={{ opacity: 0, y: -12 }}
-        animate={
-          mapLoaded
-            ? { opacity: 1, y: 0 }
-            : { opacity: 0, y: -12 }
-        }
-        transition={{ duration: 0.35, ease: "easeOut" }}
-      >
-        <FictionSelector
-          availableFictions={availableFictions}
-          selectedFictionIds={selectedFictionIds}
-          onToggleFiction={handleToggleFiction}
-        />
-      </motion.div>
+        <div className="absolute inset-0 min-h-0 flex flex-col">
+          <header className="pointer-events-none absolute inset-x-0 top-0 z-[1000]">
+            <div className="relative flex w-full items-start px-4 py-4 sm:px-6 lg:px-8">
+              <div
+                className="pointer-events-auto flex items-center gap-2"
+              >
+                <FictionSelector
+                  availableFictions={availableFictions}
+                  selectedFictionIds={selectedFictionIds}
+                  onToggleFiction={handleToggleFiction}
+                />
+              </div>
 
-      <motion.div
-        className="absolute right-4 top-4 z-[1000] flex items-center gap-2"
-        initial={{ opacity: 0, y: -12 }}
-        animate={
-          mapLoaded
-            ? { opacity: 1, y: 0 }
-            : { opacity: 0, y: -12 }
-        }
-        transition={{ duration: 0.35, ease: "easeOut", delay: 0.08 }}
-      >
-        <Map3DToggleSlot />
-        <CitySelector
-          cities={cities}
-          selectedCity={selectedCity}
-          onCityChange={handleCityChange}
-        />
-      </motion.div>
+              <div className="pointer-events-auto ml-auto flex items-center gap-2">
+                <Map3DToggleSlot />
+                <CitySelector
+                  cities={cities}
+                  selectedCity={selectedCity}
+                  onCityChange={handleCityChange}
+                  cityIdsWithPlaces={cityIdsWithPlaces}
+                  cityWithoutPlacesHint={tMap("cityWithoutPlaces")}
+                />
+                <div className="rounded-xl border border-border bg-background shadow-sm">
+                  <UserMenu />
+                </div>
+              </div>
+            </div>
+          </header>
 
-      <div className="relative flex-1 min-h-0 w-full">
-        <MapView
-          city={selectedCity}
-          locations={filteredLocations}
-          onLocationClick={handleLocationClick}
-          selectedLocationId={selectedLocation?.id}
-          focusLocationId={focusedLocationId}
-          is3D={is3D}
-          onToggle3D={setIs3D}
-          onMapLoaded={() => setMapLoaded(true)}
-          onBoundsChange={setBounds}
-        />
-      </div>
+          <div className="relative flex-1 min-h-0 w-full">
+            <MapView
+              city={selectedCity}
+              places={filteredPlaces}
+              onLocationClick={handleLocationClick}
+              selectedLocationId={selectedPlace?.id}
+              focusLocationId={focusedPlaceId}
+              is3D={is3D}
+              onToggle3D={setIs3D}
+              onBoundsChange={setBounds}
+            />
+          </div>
 
-      <MapMinimapSlot />
+          <MapMinimapSlot />
 
-      <ThumbnailCarousel
-        locations={filteredLocations}
-        selectedLocationId={focusedLocationId ?? selectedLocation?.id}
-        onLocationClick={handleNavigateToPlace}
-        placeSelectorCollapsed={placeSelectorCollapsed}
-        setPlaceSelectorCollapsed={setPlaceSelectorCollapsed}
-      />
+          <ThumbnailCarousel
+            places={filteredPlaces}
+            selectedLocationId={focusedPlaceId ?? selectedPlace?.id}
+            onLocationClick={handleNavigateToPlace}
+            placeSelectorCollapsed={placeSelectorCollapsed}
+            setPlaceSelectorCollapsed={setPlaceSelectorCollapsed}
+          />
 
-      {selectedLocation && (
-        <LocationDetail
-          location={selectedLocation}
-          fiction={availableFictions.find((f) => f.id === selectedLocation.fictionId)}
-          onClose={() => setSelectedLocation(null)}
-          onViewPlace={handleExplorePlace}
-        />
-      )}
-
-      </div>
+          {selectedPlace && (
+            <LocationDetail
+              place={selectedPlace}
+              fiction={availableFictions.find((f) => f.id === selectedPlace.fictionId)}
+              relatedPlaces={filteredPlaces.filter((p) => p.id !== selectedPlace.id)}
+              relatedFictions={availableFictions.filter((f) => f.id !== selectedPlace.fictionId)}
+              onClose={() => setSelectedPlace(null)}
+              onSelectRelatedPlace={handleLocationClick}
+              onViewPlace={handleExplorePlace}
+            />
+          )}
+        </div>
       )}
     </MapProvider>
   )
 }
 
+function MapPageFallback() {
+  const tMap = useTranslations("Map")
+  return (
+    <div className="flex min-h-full items-center justify-center bg-background">
+      <p className="text-muted-foreground">{tMap("loadingMap")}</p>
+    </div>
+  )
+}
+
 export default function MapPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-full items-center justify-center bg-background">
-          <p className="text-muted-foreground">Loading map…</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<MapPageFallback />}>
       <MapPageInner />
     </Suspense>
   )

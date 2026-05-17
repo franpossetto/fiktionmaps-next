@@ -8,15 +8,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { AuthModal } from "@/components/auth/auth-modal"
-import { LogOut, User, Settings } from "lucide-react"
+import { LogOut, User, Settings, Shield, BookOpen, Map } from "lucide-react"
 import { Link } from "@/i18n/navigation"
 
 export function UserMenu() {
   const t = useTranslations("Nav")
-  const { user, logout } = useAuth()
+  const { user, isAdmin, logout } = useAuth()
   const [authOpen, setAuthOpen] = useState(false)
 
   if (!user) {
@@ -65,6 +66,18 @@ export function UserMenu() {
           {user.email}
         </DropdownMenuItem>
         <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
+          <Link href="/fictions">
+            <BookOpen className="mr-2 h-4 w-4" />
+            {t("fictions")}
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
+          <Link href="/map">
+            <Map className="mr-2 h-4 w-4" />
+            {t("exploreMap")}
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
           <Link href="/profile">
             <User className="mr-2 h-4 w-4" />
             {t("profile")}
@@ -76,6 +89,18 @@ export function UserMenu() {
             {t("settings")}
           </Link>
         </DropdownMenuItem>
+        {isAdmin && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
+              <Link href="/admin">
+                <Shield className="mr-2 h-4 w-4" />
+                {t("admin")}
+              </Link>
+            </DropdownMenuItem>
+          </>
+        )}
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout} className="text-foreground focus:bg-accent focus:text-accent-foreground">
           <LogOut className="mr-2 h-4 w-4" />
           {t("signOut")}

@@ -17,9 +17,22 @@ interface CitySelectorProps {
   cities?: City[]
   selectedCity: City
   onCityChange: (city: City) => void
+  /**
+   * When set, only these city IDs can be chosen (e.g. cities with at least one place on the map).
+   * The current `selectedCity` stays visible even if missing here (e.g. deep link).
+   */
+  cityIdsWithPlaces?: string[]
+  /** Accessible label for rows without places (title / aria). */
+  cityWithoutPlacesHint?: string
 }
 
-export function CitySelector({ cities: citiesProp, selectedCity, onCityChange }: CitySelectorProps) {
+export function CitySelector({
+  cities: citiesProp,
+  selectedCity,
+  onCityChange,
+  cityIdsWithPlaces,
+  cityWithoutPlacesHint,
+}: CitySelectorProps) {
   const [cities, setCities] = useState<City[]>(citiesProp ?? [])
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
@@ -41,6 +54,11 @@ export function CitySelector({ cities: citiesProp, selectedCity, onCityChange }:
       (c) => c.name.toLowerCase().includes(q) || c.country.toLowerCase().includes(q),
     )
   }, [search, cities])
+
+  const withPlacesSet = useMemo(
+    () => (cityIdsWithPlaces != null ? new Set(cityIdsWithPlaces) : null),
+    [cityIdsWithPlaces],
+  )
 
   return (
     <Dialog
@@ -80,18 +98,26 @@ export function CitySelector({ cities: citiesProp, selectedCity, onCityChange }:
           ) : (
             filtered.map((city) => {
               const isActive = selectedCity.id === city.id
+              const hasPlaces = withPlacesSet == null || withPlacesSet.has(city.id)
+              const rowDisabled = !hasPlaces && !isActive
               return (
                 <button
                   key={city.id}
+                  type="button"
+                  title={rowDisabled ? cityWithoutPlacesHint : undefined}
+                  disabled={rowDisabled}
                   onClick={() => {
-                    onCityChange(city)
+                    if (rowDisabled) return
+                    if (hasPlaces) onCityChange(city)
                     setOpen(false)
                     setSearch("")
                   }}
                   className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors ${
-                    isActive
-                      ? "bg-primary/10 text-foreground"
-                      : "text-foreground hover:bg-secondary"
+                    rowDisabled
+                      ? "cursor-not-allowed opacity-45"
+                      : isActive
+                        ? "bg-primary/10 text-foreground"
+                        : "text-foreground hover:bg-secondary"
                   }`}
                 >
                   <div

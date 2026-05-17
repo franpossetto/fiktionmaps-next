@@ -2,6 +2,10 @@
 
 import { updateTag } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
+import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/ensure-user-is-moderator.usecase"
+import { profilesReaderSupabaseAdapter } from "@/src/contributions/infrastructure/supabase/profiles-reader.supabase"
+import { resolveEntityContributionInsertDefaults } from "@/src/contributions/application/resolve-entity-contribution-insert-defaults.usecase"
 import { zodErrorMessage } from "@/lib/validation/http"
 import { isUuidString, uuidSchema } from "@/lib/validation/primitives"
 import type { MapBbox } from "@/lib/validation/map-query"
@@ -12,7 +16,7 @@ import { createSceneBodySchema, patchSceneBodySchema } from "@/src/scenes/domain
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
-import type { Location } from "@/src/locations/domain/location.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 import { listScenesUseCase } from "@/src/scenes/application/list-scenes.usecase"
 import { getSceneByIdUseCase } from "@/src/scenes/application/get-scene-by-id.usecase"
 import { createSceneUseCase } from "@/src/scenes/application/create-scene.usecase"
@@ -65,7 +69,13 @@ export async function createSceneAction(body: unknown): Promise<CreateSceneResul
   if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
 
   try {
-    const scene = await createSceneUseCase(parsed.data, user.id, {
+    const isStaffModerator = await ensureUserIsModeratorUseCase(
+      user.id,
+      profilesReaderSupabaseAdapter,
+      MODERATOR_ROLES,
+    )
+    const { status } = resolveEntityContributionInsertDefaults(isStaffModerator, user.id)
+    const scene = await createSceneUseCase(parsed.data, { userId: user.id, status }, {
       scenesRepo: scenesSupabaseAdapter,
       getFictionType,
     })
@@ -124,7 +134,7 @@ export async function getCityFictionsWithScenesForViewerAction(cityId: string): 
 export async function listScenesForViewerAction(
   fictionIds: string[],
   opts: { cityId: string } | { bbox: MapBbox },
-): Promise<Location[]> {
+): Promise<Place[]> {
   const ids = fictionIds.filter(isUuidString)
   if (ids.length === 0) return []
 

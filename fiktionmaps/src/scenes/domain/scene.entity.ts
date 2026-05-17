@@ -25,7 +25,7 @@ export interface Scene {
 export type ProfileScenePreview = {
   id: string
   fictionId: string
-  /** `places.id` — same as `Location.id` on the map. */
+  fictionSlug?: string | null
   placeId: string
   title: string
   fictionTitle: string
