@@ -23,3 +23,8 @@ export interface FictionWithMedia extends Fiction {
   coverImageLarge?: string | null
   bannerImage?: string | null
 }
+
+/** Staff read model: includes linked catalog ids (`fiction_external_ids`). */
+export interface FictionWithMediaAndCatalogIds extends FictionWithMedia {
+  catalogExternalIds: Partial<Record<string, string>>
+}

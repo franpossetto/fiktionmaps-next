@@ -11,6 +11,7 @@ import {
   getCurrentUserProfileAction,
   completeOnboardingAction,
 } from "@/src/users/infrastructure/next/user.actions"
+import { isStaffUserRole } from "@/src/users/domain/user.roles"
 
 export interface User {
   id: string
@@ -30,6 +31,8 @@ export interface UserPreferences {
 interface AuthContextType {
   user: User | null
   isAdmin: boolean
+  /** Admin or moderator — can access staff `/contributions` (distinct from full dashboard admin). */
+  isStaffModerator: boolean
   isLoading: boolean
   isAuthReady: boolean
   needsOnboarding: boolean
@@ -63,6 +66,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isStaffModerator, setIsStaffModerator] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isAuthReady, setIsAuthReady] = useState(false)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
@@ -80,11 +84,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setNeedsOnboarding(profileResult.data ? !profileResult.data.onboardingCompleted : true)
         const admin = profileResult.data?.role === "admin"
         setIsAdmin(admin)
+        const staff = profileResult.data ? isStaffUserRole(profileResult.data.role) : false
+        setIsStaffModerator(staff)
         if (process.env.NODE_ENV === "development") {
           console.info("[auth] profile role → isAdmin", profileResult.data?.role, admin)
         }
       } else {
         setIsAdmin(false)
+        setIsStaffModerator(false)
       }
       setIsAuthReady(true)
     }
@@ -105,6 +112,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setNeedsOnboarding(profileResult.data ? !profileResult.data.onboardingCompleted : true)
         const admin = profileResult.data?.role === "admin"
         setIsAdmin(admin)
+        const staff = profileResult.data ? isStaffUserRole(profileResult.data.role) : false
+        setIsStaffModerator(staff)
         if (process.env.NODE_ENV === "development") {
           console.info("[auth] profile role → isAdmin", profileResult.data?.role, admin)
         }
@@ -123,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(authUserToUser(result.data, name.trim() || undefined))
         setNeedsOnboarding(true)
         setIsAdmin(false)
+        setIsStaffModerator(false)
       }
     } finally {
       setIsLoading(false)
@@ -133,6 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signOutAction()
     setUser(null)
     setIsAdmin(false)
+    setIsStaffModerator(false)
     setNeedsOnboarding(false)
     setPreferences(null)
     window.location.href = "/login"
@@ -159,6 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         isAdmin,
+        isStaffModerator,
         isLoading,
         isAuthReady,
         needsOnboarding,

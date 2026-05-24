@@ -3,11 +3,12 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import type { Database, Tables } from "@/supabase/database.types"
 import type { Profile } from "@/src/users/domain/user.entity"
-import type { UpdateProfileData, UserRole } from "@/src/users/domain/user.dtos"
 import type { UsersRepositoryPort } from "@/src/users/domain/user.repository"
+import type { UpdateProfileData } from "@/src/users/domain/user.dtos"
+import { parseProfileRole, type UserRole } from "@/src/users/domain/user.dtos"
 
 function mapProfileRow(row: Tables<"profiles">): Profile {
-  const role: UserRole = row.role === "admin" ? "admin" : "user"
+  const role: UserRole = parseProfileRole(row.role)
   return {
     id: row.id,
     username: row.username,
@@ -18,6 +19,7 @@ function mapProfileRow(row: Tables<"profiles">): Profile {
     date_of_birth: row.date_of_birth,
     onboarding_completed: row.onboarding_completed,
     role,
+    fpp_total: row.fpp_total ?? 0,
     created_at: row.created_at,
     updated_at: row.updated_at,
   }

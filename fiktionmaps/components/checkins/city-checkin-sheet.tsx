@@ -6,7 +6,6 @@ import { useTranslations } from "next-intl"
 import { motion, AnimatePresence } from "framer-motion"
 import { MAPBOX_ACCESS_TOKEN } from "@/lib/map/mapbox/styles"
 import { useGeo } from "./geo-provider"
-import { checkinCityAction } from "@/src/checkins/infrastructure/next/checkin.actions"
 
 function staticMapUrl(lat: number, lng: number): string {
   if (!MAPBOX_ACCESS_TOKEN) return ""
@@ -17,7 +16,11 @@ const AUTO_DISMISS_MS = 12_000
 
 export function CityCheckinSheet() {
   const t = useTranslations("Checkins")
-  const { pendingCityCheckin, dismissCityCheckin, lat, lng } = useGeo()
+  const {
+    pendingCityCheckin,
+    dismissCityCheckin,
+    confirmCityCheckin,
+  } = useGeo()
   const [loading, setLoading] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -35,10 +38,9 @@ export function CityCheckinSheet() {
     if (timerRef.current) clearTimeout(timerRef.current)
     setLoading(true)
     try {
-      await checkinCityAction(pendingCityCheckin.id, lat, lng, "auto")
+      await confirmCityCheckin()
     } finally {
       setLoading(false)
-      dismissCityCheckin()
     }
   }
 

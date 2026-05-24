@@ -15,8 +15,10 @@ import { deletePlaceUseCase } from "@/src/places/application/delete-place.usecas
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
 import {
   getAllPlacesCached,
+  getCityPlacesCached,
   getFictionPlacesCached,
   getPlaceLocationByIdCached,
+  getPlaceLocationByIdDetailCached,
   listCityIdsWithPlacesCached,
   listPlacesInBboxForFictionIds,
 } from "./place.queries"
@@ -62,9 +64,20 @@ export async function getPlaceLocationAction(placeId: string): Promise<Place | n
   return getPlaceLocationByIdCached(placeId)
 }
 
+/** Full place row with large avatar (same as fiction place detail page). */
+export async function getPlaceLocationDetailAction(placeId: string): Promise<Place | null> {
+  if (!uuidSchema.safeParse(placeId).success) return null
+  return getPlaceLocationByIdDetailCached(placeId)
+}
+
 export async function getFictionPlacesAction(fictionId: string): Promise<Place[]> {
   if (!uuidSchema.safeParse(fictionId).success) return []
   return getFictionPlacesCached(fictionId)
+}
+
+export async function getCityPlacesAction(cityId: string): Promise<Place[]> {
+  if (!uuidSchema.safeParse(cityId).success) return []
+  return getCityPlacesCached(cityId)
 }
 
 export async function getPlacesInBboxAction(fictionIds: string[], bbox: MapBbox): Promise<Place[]> {

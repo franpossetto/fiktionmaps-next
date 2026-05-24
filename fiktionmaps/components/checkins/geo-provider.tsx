@@ -13,6 +13,10 @@ import { MAPBOX_ACCESS_TOKEN } from "@/lib/map/mapbox/styles"
 import { haversineDistance } from "@/lib/geo/haversine"
 import { useAuth } from "@/context/auth-context"
 import { findOrCreateCityAction } from "@/src/cities/infrastructure/next/city.actions"
+import {
+  checkinCityAction,
+  getLastCityCheckinAction,
+} from "@/src/checkins/infrastructure/next/checkin.actions"
 
 interface DetectedCity {
   /** UUID from the cities DB table. */
@@ -31,6 +35,7 @@ interface GeoContextValue {
   detectedCity: DetectedCity | null
   pendingCityCheckin: DetectedCity | null
   dismissCityCheckin: () => void
+  confirmCityCheckin: () => Promise<void>
 }
 
 const GeoContext = createContext<GeoContextValue>({
@@ -41,6 +46,7 @@ const GeoContext = createContext<GeoContextValue>({
   detectedCity: null,
   pendingCityCheckin: null,
   dismissCityCheckin: () => {},
+  confirmCityCheckin: async () => {},
 })
 
 export function useGeo() {
@@ -117,12 +123,59 @@ export function GeoProvider({ children }: { children: ReactNode }) {
   const [detectedCity, setDetectedCity] = useState<DetectedCity | null>(null)
   const [pendingCityCheckin, setPendingCityCheckin] =
     useState<DetectedCity | null>(null)
-  const lastCityIdRef = useRef<string | null>(null)
+  // Hydrated from DB; gates the prompt so we never show it when the
+  // user's most recent city check-in already matches the detected city.
+  const lastCheckinCityIdRef = useRef<string | null>(null)
   const watchIdRef = useRef<number | null>(null)
+  // Mirrors the latest pending check-in so the confirm callback stays stable
+  // and the long-lived geolocation closure can read fresh coords too.
+  const pendingRef = useRef<DetectedCity | null>(null)
+  const latRef = useRef<number | null>(null)
+  const lngRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    pendingRef.current = pendingCityCheckin
+  }, [pendingCityCheckin])
+
+  useEffect(() => {
+    latRef.current = lat
+    lngRef.current = lng
+  }, [lat, lng])
 
   const dismissCityCheckin = useCallback(() => {
     setPendingCityCheckin(null)
   }, [])
+
+  const confirmCityCheckin = useCallback(async () => {
+    const pending = pendingRef.current
+    if (!pending) return
+    const res = await checkinCityAction(
+      pending.id,
+      latRef.current,
+      lngRef.current,
+      "auto",
+    )
+    if (res.data) {
+      lastCheckinCityIdRef.current = res.data.cityId
+    }
+    setPendingCityCheckin(null)
+  }, [])
+
+  useEffect(() => {
+    if (!user) {
+      lastCheckinCityIdRef.current = null
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      const res = await getLastCityCheckinAction()
+      if (cancelled) return
+      lastCheckinCityIdRef.current = res.data?.cityId ?? null
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user])
 
   useEffect(() => {
     if (!user || typeof navigator === "undefined" || !navigator.geolocation) {
@@ -157,8 +210,7 @@ export function GeoProvider({ children }: { children: ReactNode }) {
 
         setDetectedCity(resolved)
 
-        if (lastCityIdRef.current !== resolved.id) {
-          lastCityIdRef.current = resolved.id
+        if (lastCheckinCityIdRef.current !== resolved.id) {
           setPendingCityCheckin(resolved)
         }
       },
@@ -188,6 +240,7 @@ export function GeoProvider({ children }: { children: ReactNode }) {
         detectedCity,
         pendingCityCheckin,
         dismissCityCheckin,
+        confirmCityCheckin,
       }}
     >
       {children}

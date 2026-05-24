@@ -1,8 +1,9 @@
 "use client"
 
-import { Suspense, useState, useCallback, useEffect } from "react"
+import { Suspense, useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import { useTranslations } from "next-intl"
+import { Loader2 } from "lucide-react"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { Place } from "@/src/places/domain/place.entity"
@@ -11,41 +12,63 @@ import { MapProvider } from "@/lib/map"
 import { CitySelector } from "@/components/map/city-selector"
 import { FictionSelector } from "@/components/map/fiction-selector"
 import { LocationDetail } from "@/components/map/location-detail"
-import { ThumbnailCarousel } from "@/components/map/thumbnail-carousel"
+// import { ThumbnailCarousel } from "@/components/map/thumbnail-carousel"
 import { UserMenu } from "@/components/layout/user-menu"
-import { usePlaceSelectorCollapsedStorage } from "@/lib/local-storage-service-hooks"
+// import { usePlaceSelectorCollapsedStorage } from "@/lib/local-storage-service-hooks"
 import { useRouter } from "@/i18n/navigation"
 import {
   getAllCitiesAction,
   getCityFictionsAction,
 } from "@/src/cities/infrastructure/next/city.actions"
-import { getPlaceLocationAction, getPlacesInBboxAction, getCityIdsWithPlacesAction } from "@/src/places/infrastructure/next/place.actions"
+import {
+  getPlacesInBboxAction,
+  getPlaceLocationAction,
+  getCityIdsWithPlacesAction,
+  getCityPlacesAction,
+} from "@/src/places/infrastructure/next/place.actions"
 import { isUuidString } from "@/lib/validation/primitives"
 
-type Bbox = { west: number; south: number; east: number; north: number }
-
-function bboxAround(lat: number, lng: number, radiusKm: number): Bbox {
-  const kmPerDegLat = 111.32
-  const deltaLat = radiusKm / kmPerDegLat
-  const deltaLng = radiusKm / (kmPerDegLat * Math.cos((lat * Math.PI) / 180))
-  return {
-    west: lng - deltaLng,
-    south: lat - deltaLat,
-    east: lng + deltaLng,
-    north: lat + deltaLat,
-  }
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs)
+    return () => clearTimeout(id)
+  }, [value, delayMs])
+  return debounced
 }
 
-function bboxUnion(a: Bbox, b: Bbox): Bbox {
-  return {
-    west: Math.min(a.west, b.west),
-    south: Math.min(a.south, b.south),
-    east: Math.max(a.east, b.east),
-    north: Math.max(a.north, b.north),
+const BOUNDS_DEBOUNCE_MS = 300
+
+function resolveSelectedFictionIds(
+  fics: FictionWithMedia[],
+  preferredFictionId: string | null,
+): string[] {
+  if (
+    preferredFictionId &&
+    isUuidString(preferredFictionId) &&
+    fics.some((f) => f.id === preferredFictionId)
+  ) {
+    return [preferredFictionId]
   }
+  return fics.map((f) => f.id)
 }
 
-const MIN_LOAD_RADIUS_KM = 50
+function filterPlacesByFictionIds(places: Place[], fictionIds: string[]): Place[] {
+  if (fictionIds.length === 0) return []
+  const allowed = new Set(fictionIds)
+  return places.filter((p) => allowed.has(p.fictionId))
+}
+
+function MapLoadingScreen({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-full items-center justify-center bg-background">
+      <div className="flex items-center gap-2">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden />
+        <p className="text-muted-foreground">{message}</p>
+      </div>
+    </div>
+  )
+}
 
 function MapPageInner() {
   const router = useRouter()
@@ -56,58 +79,72 @@ function MapPageInner() {
   const placeParam = searchParams.get("place")
   const shouldOpenSidebarFromQuery =
     searchParams.get("openSidebar") === "true" || searchParams.get("openSidebar") === "1"
-  const [placeSelectorCollapsed, setPlaceSelectorCollapsed] = usePlaceSelectorCollapsedStorage()
+  // const [placeSelectorCollapsed, setPlaceSelectorCollapsed] = usePlaceSelectorCollapsedStorage()
 
   const [cities, setCities] = useState<City[]>([])
   const [selectedCity, setSelectedCity] = useState<City | null>(null)
   const [availableFictions, setAvailableFictions] = useState<FictionWithMedia[]>([])
   const [selectedFictionIds, setSelectedFictionIds] = useState<string[]>([])
-  const [filteredPlaces, setFilteredPlaces] = useState<Place[]>([])
+  const [viewportPlaces, setViewportPlaces] = useState<Place[]>([])
+  const cityPlacesRef = useRef<Place[]>([])
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null)
   const [focusedPlaceId, setFocusedPlaceId] = useState<string | null>(null)
+  const [detailPanelWidth, setDetailPanelWidth] = useState(0)
   const [is3D, setIs3D] = useState(false)
   const [bounds, setBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
   const [citiesLoading, setCitiesLoading] = useState(true)
   const [cityIdsWithPlaces, setCityIdsWithPlaces] = useState<string[]>([])
   const [hasAppliedInitialPlaceOpen, setHasAppliedInitialPlaceOpen] = useState(false)
+  const debouncedBounds = useDebouncedValue(bounds, BOUNDS_DEBOUNCE_MS)
+
+  const selectedFictionIdsKey = useMemo(
+    () => selectedFictionIds.slice().sort().join(","),
+    [selectedFictionIds],
+  )
+
+  const isBootstrapping = citiesLoading || !selectedCity
+
+  const loadingMessage = tMap("loadingMap")
+
+  // City picker hints only — must not block first paint (full-table scan).
+  useEffect(() => {
+    let cancelled = false
+    getCityIdsWithPlacesAction()
+      .then((ids) => {
+        if (!cancelled) setCityIdsWithPlaces(ids)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // If the default city has no places, switch once hints arrive (does not block first paint).
+  useEffect(() => {
+    if (!selectedCity || cityIdsWithPlaces.length === 0 || cities.length === 0) return
+    if (cityIdsWithPlaces.includes(selectedCity.id)) return
+    const withPlaces = cities.find((c) => cityIdsWithPlaces.includes(c.id))
+    if (withPlaces) setSelectedCity(withPlaces)
+  }, [cityIdsWithPlaces, cities, selectedCity])
 
   useEffect(() => {
     setCitiesLoading(true)
     let cancelled = false
-    Promise.all([getAllCitiesAction(), getCityIdsWithPlacesAction()])
-      .then(([citiesList, withPlacesIds]: [City[], string[]]) => {
+    getAllCitiesAction()
+      .then((citiesList: City[]) => {
         if (cancelled) return
         setCities(citiesList)
-        setCityIdsWithPlaces(withPlacesIds)
         if (citiesList.length === 0) {
           setCitiesLoading(false)
           return
         }
-        const withPlacesSet = new Set(withPlacesIds)
         const fromUrl = initialCityId
           ? citiesList.find((c) => c.id === initialCityId)
           : undefined
-        const city =
-          fromUrl ??
-          citiesList.find((c) => withPlacesSet.has(c.id)) ??
-          citiesList[0]
+        const city = fromUrl ?? citiesList[0]
+
         setSelectedCity(city)
         setCitiesLoading(false)
-
-        const canPrefillInitialFiction = Boolean(initialFictionId && isUuidString(initialFictionId))
-        if (canPrefillInitialFiction) {
-          setSelectedFictionIds([initialFictionId!])
-        }
-
-        return getCityFictionsAction(city.id).then((fics: FictionWithMedia[]) => {
-          if (cancelled) return
-          setAvailableFictions(fics)
-          if (initialFictionId && fics.some((f) => f.id === initialFictionId)) {
-            setSelectedFictionIds([initialFictionId])
-          } else {
-            setSelectedFictionIds(fics.map((f) => f.id))
-          }
-        })
       })
       .catch(() => {
         if (!cancelled) setCitiesLoading(false)
@@ -117,6 +154,83 @@ function MapPageInner() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!selectedCity) {
+      setAvailableFictions([])
+      setViewportPlaces([])
+      cityPlacesRef.current = []
+      return
+    }
+    let cancelled = false
+    const preferredFictionId =
+      initialFictionId && isUuidString(initialFictionId) ? initialFictionId : null
+
+    setBounds(null)
+    setViewportPlaces([])
+    cityPlacesRef.current = []
+
+    Promise.all([
+      getCityFictionsAction(selectedCity.id),
+      getCityPlacesAction(selectedCity.id),
+    ])
+      .then(([fics, places]) => {
+        if (cancelled) return
+        setAvailableFictions(fics)
+        const fictionIds = resolveSelectedFictionIds(fics, preferredFictionId)
+        setSelectedFictionIds(fictionIds)
+        cityPlacesRef.current = places
+        setViewportPlaces(filterPlacesByFictionIds(places, fictionIds))
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAvailableFictions([])
+          setViewportPlaces([])
+          cityPlacesRef.current = []
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedCity?.id, initialFictionId])
+
+  // Fiction filter at city zoom — no extra round-trip.
+  useEffect(() => {
+    if (!selectedCity || debouncedBounds) return
+    setViewportPlaces(filterPlacesByFictionIds(cityPlacesRef.current, selectedFictionIds))
+  }, [selectedCity?.id, selectedFictionIdsKey, debouncedBounds])
+
+  // Viewport bbox fetch only after the user pans/zooms (not on first paint).
+  useEffect(() => {
+    if (!selectedCity || !debouncedBounds) return
+    if (selectedFictionIds.length === 0) {
+      setViewportPlaces([])
+      return
+    }
+
+    const deepPlaceId = placeParam && isUuidString(placeParam) ? placeParam : null
+    let cancelled = false
+
+    getPlacesInBboxAction(selectedFictionIds, debouncedBounds)
+      .then(async (data) => {
+        if (cancelled) return
+        let list = data ?? []
+        if (deepPlaceId && !list.some((place) => place.id === deepPlaceId)) {
+          const loc = await getPlaceLocationAction(deepPlaceId)
+          if (cancelled) return
+          if (loc) list = [...list, loc]
+        }
+        setViewportPlaces(list)
+      })
+      .catch(() => {
+        if (!cancelled) setViewportPlaces([])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedCity?.id, selectedFictionIdsKey, debouncedBounds, placeParam])
 
   useEffect(() => {
     if (placeParam && isUuidString(placeParam)) {
@@ -135,7 +249,7 @@ function MapPageInner() {
       setHasAppliedInitialPlaceOpen(true)
       return
     }
-    const targetPlace = filteredPlaces.find((p) => p.id === deepPlaceId)
+    const targetPlace = viewportPlaces.find((p) => p.id === deepPlaceId)
     if (!targetPlace) return
     setFocusedPlaceId(deepPlaceId)
     setSelectedPlace(targetPlace)
@@ -144,43 +258,16 @@ function MapPageInner() {
     shouldOpenSidebarFromQuery,
     hasAppliedInitialPlaceOpen,
     placeParam,
-    filteredPlaces,
+    viewportPlaces,
     selectedPlace?.id,
   ])
 
-  useEffect(() => {
-    if (!selectedCity || selectedFictionIds.length === 0) {
-      setFilteredPlaces([])
-      return
-    }
-    const minBbox = bboxAround(selectedCity.lat, selectedCity.lng, MIN_LOAD_RADIUS_KM)
-    const bbox = bounds ? bboxUnion(bounds, minBbox) : minBbox
-    const deepPlaceId = placeParam && isUuidString(placeParam) ? placeParam : null
-    let cancelled = false
-    getPlacesInBboxAction(selectedFictionIds, bbox)
-      .then(async (data) => {
-        if (cancelled) return
-        let list = data ?? []
-        if (deepPlaceId && !list.some((l) => l.id === deepPlaceId)) {
-          const loc = await getPlaceLocationAction(deepPlaceId)
-          if (cancelled) return
-          if (loc) list = [...list, loc]
-        }
-        if (!cancelled) setFilteredPlaces(list)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [selectedCity?.id, selectedCity?.lat, selectedCity?.lng, selectedFictionIds, bounds, placeParam])
-
-  const handleCityChange = useCallback(async (city: City) => {
+  const handleCityChange = useCallback((city: City) => {
+    setBounds(null)
     setSelectedCity(city)
     setSelectedPlace(null)
     setFocusedPlaceId(null)
-    const fics = await getCityFictionsAction(city.id)
-    setAvailableFictions(fics)
-    setSelectedFictionIds(fics.map((f) => f.id))
+    setViewportPlaces([])
   }, [])
 
   const handleToggleFiction = (fictionId: string) => {
@@ -196,9 +283,9 @@ function MapPageInner() {
     setFocusedPlaceId(place.id)
   }, [])
 
-  const handleNavigateToPlace = useCallback((place: Place) => {
-    setFocusedPlaceId(place.id)
-  }, [])
+  // const handleNavigateToPlace = useCallback((place: Place) => {
+  //   setFocusedPlaceId(place.id)
+  // }, [])
 
   const handleExplorePlace = useCallback(
     (place: Place) => {
@@ -211,53 +298,52 @@ function MapPageInner() {
     [router, availableFictions],
   )
 
-  const isNavigationModeActive = !placeSelectorCollapsed && filteredPlaces.length > 0
-
-  useEffect(() => {
-    if (!isNavigationModeActive) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target
-      const isHTMLElement = target instanceof HTMLElement
-      const isInputLike =
-        isHTMLElement &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.getAttribute("contenteditable") === "true")
-
-      if (e.key === "Enter" || e.key === " ") {
-        if (isInputLike) return
-        if (focusedPlaceId && !selectedPlace) {
-          const p = filteredPlaces.find((x) => x.id === focusedPlaceId)
-          if (p) {
-            e.preventDefault()
-            setSelectedPlace(p)
-          }
-        }
-      } else if (e.key === "Escape") {
-        e.preventDefault()
-        if (selectedPlace) {
-          setSelectedPlace(null)
-        } else {
-          setPlaceSelectorCollapsed(true)
-        }
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [
-    isNavigationModeActive,
-    focusedPlaceId,
-    selectedPlace,
-    filteredPlaces,
-    setPlaceSelectorCollapsed,
-  ])
+  // Modo navegación (carrusel inferior): oculto por ahora — reactivar con ThumbnailCarousel + estado arriba.
+  // const isNavigationModeActive = !placeSelectorCollapsed && filteredPlaces.length > 0
+  //
+  // useEffect(() => {
+  //   if (!isNavigationModeActive) return
+  //   const handleKeyDown = (e: KeyboardEvent) => {
+  //     const target = e.target
+  //     const isHTMLElement = target instanceof HTMLElement
+  //     const isInputLike =
+  //       isHTMLElement &&
+  //       (target.tagName === "INPUT" ||
+  //         target.tagName === "TEXTAREA" ||
+  //         target.getAttribute("contenteditable") === "true")
+  //
+  //     if (e.key === "Enter" || e.key === " ") {
+  //       if (isInputLike) return
+  //       if (focusedPlaceId && !selectedPlace) {
+  //         const p = filteredPlaces.find((x) => x.id === focusedPlaceId)
+  //         if (p) {
+  //           e.preventDefault()
+  //           setSelectedPlace(p)
+  //         }
+  //       }
+  //     } else if (e.key === "Escape") {
+  //       e.preventDefault()
+  //       if (selectedPlace) {
+  //         setSelectedPlace(null)
+  //       } else {
+  //         setPlaceSelectorCollapsed(true)
+  //       }
+  //     }
+  //   }
+  //   window.addEventListener("keydown", handleKeyDown)
+  //   return () => window.removeEventListener("keydown", handleKeyDown)
+  // }, [
+  //   isNavigationModeActive,
+  //   focusedPlaceId,
+  //   selectedPlace,
+  //   filteredPlaces,
+  //   setPlaceSelectorCollapsed,
+  // ])
 
   return (
     <MapProvider>
-      {citiesLoading || !selectedCity ? (
-        <div className="flex min-h-full items-center justify-center bg-background">
-          <p className="text-muted-foreground">{tMap("loadingMap")}</p>
-        </div>
+      {isBootstrapping ? (
+        <MapLoadingScreen message={loadingMessage} />
       ) : (
         <div className="absolute inset-0 min-h-0 flex flex-col">
           <header className="pointer-events-none absolute inset-x-0 top-0 z-[1000]">
@@ -291,10 +377,11 @@ function MapPageInner() {
           <div className="relative flex-1 min-h-0 w-full">
             <MapView
               city={selectedCity}
-              places={filteredPlaces}
+              places={viewportPlaces}
               onLocationClick={handleLocationClick}
               selectedLocationId={selectedPlace?.id}
               focusLocationId={focusedPlaceId}
+              focusPaddingRight={detailPanelWidth}
               is3D={is3D}
               onToggle3D={setIs3D}
               onBoundsChange={setBounds}
@@ -303,6 +390,7 @@ function MapPageInner() {
 
           <MapMinimapSlot />
 
+          {/*
           <ThumbnailCarousel
             places={filteredPlaces}
             selectedLocationId={focusedPlaceId ?? selectedPlace?.id}
@@ -310,14 +398,19 @@ function MapPageInner() {
             placeSelectorCollapsed={placeSelectorCollapsed}
             setPlaceSelectorCollapsed={setPlaceSelectorCollapsed}
           />
+          */}
 
           {selectedPlace && (
             <LocationDetail
               place={selectedPlace}
               fiction={availableFictions.find((f) => f.id === selectedPlace.fictionId)}
-              relatedPlaces={filteredPlaces.filter((p) => p.id !== selectedPlace.id)}
+              relatedPlaces={viewportPlaces.filter((p) => p.id !== selectedPlace.id)}
               relatedFictions={availableFictions.filter((f) => f.id !== selectedPlace.fictionId)}
-              onClose={() => setSelectedPlace(null)}
+              onClose={() => {
+                setSelectedPlace(null)
+                setDetailPanelWidth(0)
+              }}
+              onPanelWidthChange={setDetailPanelWidth}
               onSelectRelatedPlace={handleLocationClick}
               onViewPlace={handleExplorePlace}
             />
@@ -330,11 +423,7 @@ function MapPageInner() {
 
 function MapPageFallback() {
   const tMap = useTranslations("Map")
-  return (
-    <div className="flex min-h-full items-center justify-center bg-background">
-      <p className="text-muted-foreground">{tMap("loadingMap")}</p>
-    </div>
-  )
+  return <MapLoadingScreen message={tMap("loadingMap")} />
 }
 
 export default function MapPage() {

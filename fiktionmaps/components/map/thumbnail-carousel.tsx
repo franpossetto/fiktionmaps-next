@@ -9,8 +9,9 @@ import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { usePlaceSelectorCollapsedStorage } from "@/lib/local-storage-service-hooks"
 
-const CAROUSEL_HEIGHT = 140
-const THUMB_SIZE = CAROUSEL_HEIGHT - 16 // minus py-2
+const CAROUSEL_HEIGHT = 118
+const STRIP_VERTICAL_PADDING_PX = 12 // py-1.5 × 2
+const THUMB_SIZE = CAROUSEL_HEIGHT - STRIP_VERTICAL_PADDING_PX
 const THUMB_SIZE_PX = `${THUMB_SIZE}px`
 
 const CAROUSEL_OVERLAY_CLASS =
@@ -132,28 +133,28 @@ export function ThumbnailCarousel({
         <button
           type="button"
           onClick={handleClose}
-          className="pointer-events-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-chrome/95 text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.2)] backdrop-blur-sm transition-colors hover:bg-chrome"
+          className="pointer-events-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-chrome/95 text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.2)] backdrop-blur-sm transition-colors hover:bg-chrome"
           aria-label={t("exitNavigationMode")}
         >
-          <X className="h-4 w-4" />
+          <X className="h-3.5 w-3.5" />
         </button>
         <div
           className="pointer-events-auto flex flex-col rounded-lg overflow-hidden border border-border bg-card shadow-lg"
-          style={{ height: CAROUSEL_HEIGHT, width: "min(700px, calc(100vw - 2rem))" }}
+          style={{ height: CAROUSEL_HEIGHT, width: "min(580px, calc(100vw - 2rem))" }}
         >
         <div
-          className="flex h-full items-center gap-1.5 px-2 py-2 bg-muted/50"
+          className="flex h-full items-center gap-1 px-1.5 py-1.5 bg-muted/50"
           onKeyDown={handleStripKeyDown}
           role="group"
           aria-label={t("navigationMode")}
         >
           <button
             onClick={goToPrevPlace}
-            className="flex w-8 shrink-0 items-center justify-center rounded border border-border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="flex w-7 shrink-0 items-center justify-center rounded border border-border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             style={{ height: THUMB_SIZE }}
             aria-label={t("previousPlace")}
           >
-            <ChevronLeft className="h-3 w-3" />
+            <ChevronLeft className="h-3 w-3" aria-hidden />
           </button>
 
           <div
@@ -212,11 +213,11 @@ export function ThumbnailCarousel({
 
           <button
             onClick={goToNextPlace}
-            className="flex w-8 shrink-0 items-center justify-center rounded border border-border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="flex w-7 shrink-0 items-center justify-center rounded border border-border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             style={{ height: THUMB_SIZE }}
             aria-label={t("nextPlace")}
           >
-            <ChevronRight className="h-3 w-3" />
+            <ChevronRight className="h-3 w-3" aria-hidden />
           </button>
         </div>
         </div>

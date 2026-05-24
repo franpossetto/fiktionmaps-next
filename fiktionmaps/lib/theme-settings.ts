@@ -10,10 +10,22 @@ export type TimeOfDay = "day" | "afternoon" | "evening" | "night"
 
 export type ThemeMode = "manual" | "realtime"
 
+/** 2D map pin shape: square = legacy v1, round = current v2. */
+export type Map2dMarkerShape = "square" | "round"
+
+/** When to show the place name chip on map pins (2D and 3D). */
+export type MapMarkerLabelMode = "always" | "hover"
+
+/** Hover enlargement: normal = subtle; strong = 2× the previous strong growth. */
+export type MapMarkerHoverScaleMode = "normal" | "strong"
+
 export interface ThemeSettings {
   mode: ThemeMode
   base: ThemeBase
   styleVariant: StyleVariant
+  marker2dShape: Map2dMarkerShape
+  markerLabelMode: MapMarkerLabelMode
+  markerHoverScale: MapMarkerHoverScaleMode
 }
 
 export const THEME_STORAGE_KEY = "fiktions-theme-settings"
@@ -22,6 +34,21 @@ export const defaultThemeSettings: ThemeSettings = {
   mode: "manual",
   base: "dark",
   styleVariant: "1",
+  marker2dShape: "round",
+  markerLabelMode: "hover",
+  markerHoverScale: "normal",
+}
+
+export function parseMap2dMarkerShape(raw: unknown): Map2dMarkerShape {
+  return raw === "square" ? "square" : "round"
+}
+
+export function parseMapMarkerLabelMode(raw: unknown): MapMarkerLabelMode {
+  return raw === "always" ? "always" : "hover"
+}
+
+export function parseMapMarkerHoverScaleMode(raw: unknown): MapMarkerHoverScaleMode {
+  return raw === "strong" ? "strong" : "normal"
 }
 
 /** Class applied to <html> for manual themes */

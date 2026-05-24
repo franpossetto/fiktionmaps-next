@@ -45,6 +45,19 @@ export function createFictionExternalIdsSupabaseAdapter(
       })
       if (insError) throw new Error(insError.message)
     },
+
+    async listForFiction(fictionId) {
+      const supabase = await getSupabase()
+      const { data, error } = await supabase
+        .from("fiction_external_ids")
+        .select("provider, external_id")
+        .eq("fiction_id", fictionId)
+      if (error || !data?.length) return []
+      return data.map((row) => ({
+        provider: row.provider,
+        externalId: row.external_id,
+      }))
+    },
   }
 }
 

@@ -28,6 +28,15 @@ export interface FictionContributorProfile {
   avatarUrl: string | null
 }
 
+/** Staff feed row: a create_fiction contribution on a fiction entity plus submitter profile. */
+export interface FictionContributionFeedItem extends Contribution {
+  contributor: FictionContributorProfile
+  /** Draft fiction title when the row is readable under RLS (staff). */
+  fictionTitle: string | null
+  /** Cover thumbnail URL (`asset_images` cover sm) when present. */
+  fictionCoverUrl: string | null
+}
+
 /** Same as FictionContributorProfile plus first approved contribution timestamp for this entity (deduped per user). */
 export interface ContributorProfileWithDate extends FictionContributorProfile {
   contributedAt: string
@@ -36,4 +45,26 @@ export interface ContributorProfileWithDate extends FictionContributorProfile {
 /** Profile with accumulated FPP total for global top-contributors ranking. */
 export interface TopContributorProfile extends FictionContributorProfile {
   fppTotal: number
+}
+
+/** Staff: submitter activity + lifetime FPP on profile (contributions detail). */
+export interface ContributorModerationContext {
+  totalContributions: number
+  otherContributionsCount: number
+  fppTotal: number
+}
+
+/** Staff fiction create feed tab — matches UI `ContributionsFeedTab`. */
+export type StaffFictionContributionsFeedStatusTab = "all" | "pending" | "approved"
+
+export type StaffFictionContributionsFeedPageInput = {
+  userIdFilter?: string
+  statusTab: StaffFictionContributionsFeedStatusTab
+  limit: number
+  offset: number
+}
+
+export type StaffFictionContributionsFeedPageResult = {
+  items: FictionContributionFeedItem[]
+  totalCount: number
 }

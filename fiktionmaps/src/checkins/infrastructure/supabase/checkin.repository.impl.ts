@@ -155,6 +155,19 @@ export const checkinsSupabaseAdapter: CheckinsRepositoryPort = {
     return (count ?? 0) > 0
   },
 
+  async getLastCityCheckin(userId: string): Promise<CityCheckin | null> {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("city_checkins")
+      .select("*")
+      .eq("user_id", userId)
+      .order("checked_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error || !data) return null
+    return toCityCheckin(data)
+  },
+
   async getPlaceLocation(placeId: string): Promise<{ lat: number; lng: number; cityId: string } | null> {
     const supabase = await createClient()
     const { data, error } = await supabase

@@ -14,8 +14,14 @@ import {
   type StyleVariant,
   type ThemeMode,
   type TimeOfDay,
+  type Map2dMarkerShape,
+  type MapMarkerLabelMode,
+  type MapMarkerHoverScaleMode,
   THEME_STORAGE_KEY,
   defaultThemeSettings,
+  parseMap2dMarkerShape,
+  parseMapMarkerLabelMode,
+  parseMapMarkerHoverScaleMode,
   getManualThemeClass,
   getRealtimeThemeClass,
   getTimeOfDayNow,
@@ -52,6 +58,9 @@ function loadSettings(): ThemeSettings {
       mode: parsed.mode ?? defaultThemeSettings.mode,
       base: parsed.base ?? defaultThemeSettings.base,
       styleVariant: parsed.styleVariant ?? defaultThemeSettings.styleVariant,
+      marker2dShape: parseMap2dMarkerShape(parsed.marker2dShape),
+      markerLabelMode: parseMapMarkerLabelMode(parsed.markerLabelMode),
+      markerHoverScale: parseMapMarkerHoverScaleMode(parsed.markerHoverScale),
     }
   } catch {
     return defaultThemeSettings
@@ -227,4 +236,25 @@ export function useMapStyle(): MapStyleKey {
   const ctx = useContext(ThemeSettingsContext)
   if (!ctx) return "night"
   return ctx.effectiveMapStyle
+}
+
+/** 2D place/cluster pin shape from saved settings (square = v1, round = v2). */
+export function useMapMarker2dShape(): Map2dMarkerShape {
+  const ctx = useContext(ThemeSettingsContext)
+  if (!ctx) return defaultThemeSettings.marker2dShape
+  return ctx.settings.marker2dShape
+}
+
+/** When place names appear on map pins (always vs hover/select). */
+export function useMapMarkerLabelMode(): MapMarkerLabelMode {
+  const ctx = useContext(ThemeSettingsContext)
+  if (!ctx) return defaultThemeSettings.markerLabelMode
+  return ctx.settings.markerLabelMode
+}
+
+/** Hover enlargement strength on map pins. */
+export function useMapMarkerHoverScaleMode(): MapMarkerHoverScaleMode {
+  const ctx = useContext(ThemeSettingsContext)
+  if (!ctx) return defaultThemeSettings.markerHoverScale
+  return ctx.settings.markerHoverScale
 }

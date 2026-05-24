@@ -81,5 +81,15 @@ export async function listPlacesInBboxForFictionIds(
 ): Promise<Place[]> {
   const fictionIds = rawFictionIds.filter(isUuidString)
   if (fictionIds.length === 0) return []
-  return getPlacesInBboxUseCase(fictionIds, bbox, anonRepo)
+
+  const fictionKey = fictionIds.slice().sort().join(",")
+  const bboxKey = [bbox.west, bbox.south, bbox.east, bbox.north]
+    .map((n) => n.toFixed(4))
+    .join(",")
+
+  return unstable_cache(
+    () => getPlacesInBboxUseCase(fictionIds, bbox, anonRepo),
+    CacheKeys.place(`bbox:${fictionKey}:${bboxKey}`),
+    { ...CacheConfig.short, tags: ["places"] },
+  )()
 }

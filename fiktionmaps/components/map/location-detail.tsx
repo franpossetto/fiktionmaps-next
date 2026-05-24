@@ -10,10 +10,11 @@ import type { Scene } from "@/src/scenes/domain/scene.entity"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { DEFAULT_FICTION_ACCENT } from "@/lib/constants/placeholders"
+import { DEFAULT_FICTION_ACCENT, DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import Image from "next/image"
 import { SceneClipPanelCard } from "./scene-clip-panel-card"
 import { getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
+import { getPlaceLocationDetailAction } from "@/src/places/infrastructure/next/place.actions"
 import { listScenesAction } from "@/src/scenes/infrastructure/next/scene.actions"
 
 interface LocationDetailProps {
@@ -22,6 +23,8 @@ interface LocationDetailProps {
   relatedPlaces?: Place[]
   relatedFictions?: FictionWithMedia[]
   onClose: () => void
+  /** Reports panel width so the map can center the pin in the remaining viewport (md+). */
+  onPanelWidthChange?: (width: number) => void
   onSelectRelatedPlace?: (place: Place) => void
   onViewPlace?: (place: Place) => void
   onView3D?: () => void
@@ -33,6 +36,7 @@ export function LocationDetail({
   relatedPlaces = [],
   relatedFictions = [],
   onClose,
+  onPanelWidthChange,
   onSelectRelatedPlace,
   onViewPlace,
   onView3D: _onView3D,
@@ -43,7 +47,29 @@ export function LocationDetail({
     fictionProp ?? undefined
   )
   const [placeScenes, setPlaceScenes] = useState<Scene[]>([])
+  const [placeDetail, setPlaceDetail] = useState<Place | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    const el = panelRef.current
+    if (!el || !onPanelWidthChange) return
+
+    const report = () => {
+      const fullBleed = window.matchMedia("(max-width: 767px)").matches
+      onPanelWidthChange(fullBleed ? 0 : el.offsetWidth)
+    }
+
+    report()
+    const ro = new ResizeObserver(report)
+    ro.observe(el)
+    window.addEventListener("resize", report)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener("resize", report)
+      onPanelWidthChange(0)
+    }
+  }, [onPanelWidthChange])
 
   useEffect(() => {
     let cancelled = false
@@ -67,6 +93,21 @@ export function LocationDetail({
 
   useEffect(() => {
     let cancelled = false
+    setPlaceDetail(null)
+    getPlaceLocationDetailAction(place.id)
+      .then((detail) => {
+        if (!cancelled) setPlaceDetail(detail)
+      })
+      .catch(() => {
+        if (!cancelled) setPlaceDetail(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [place.id])
+
+  useEffect(() => {
+    let cancelled = false
     listScenesAction({ placeId: place.id, active: "true" })
       .then((s) => {
         if (!cancelled) setPlaceScenes(s)
@@ -79,7 +120,10 @@ export function LocationDetail({
     }
   }, [place.id])
 
-  const sceneCount = placeScenes.length
+  const displayName = place.name ?? place.location.name
+  const heroSrc =
+    placeDetail?.image?.trim() || place.image?.trim() || DEFAULT_FICTION_COVER
+  const placeDescription = placeDetail?.description?.trim() || place.description?.trim()
   const fictionMeta = [fiction?.year, fiction?.genre, fiction?.author].filter(Boolean).join(" · ")
   const fictionCoverSrc =
     fiction?.coverImage?.trim() || fiction?.coverImageLarge?.trim() || "/placeholder.svg"
@@ -90,67 +134,76 @@ export function LocationDetail({
   }, [place.id])
 
   return (
-    <>
-      <div
-        className="absolute inset-0 z-[1990] bg-black/45 md:bg-black/25"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <aside
-        className="absolute inset-y-0 right-0 z-[2000] flex w-full flex-col border-l border-border/70 bg-background sm:w-[440px]"
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("locationDetailDialogTitle", {
-          name: place.name ?? place.location.name,
-        })}
-      >
-        <div className="relative h-56 shrink-0">
-          <Image
-            src={place.image || "/placeholder.svg"}
-            alt={place.name ?? place.location.name}
-            fill
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
-          <button
-            ref={closeButtonRef}
-            onClick={onClose}
-            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-background/90 text-foreground backdrop-blur-sm transition-colors hover:bg-background"
-            aria-label={t("closeLocationDetail")}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
+    <aside
+      ref={panelRef}
+      className="pointer-events-auto absolute inset-y-0 right-0 z-[2000] flex w-full flex-col border-l border-border/70 bg-background shadow-xl md:w-[min(100%,480px)] lg:w-[min(100%,540px)] xl:w-[min(100%,580px)]"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("locationDetailDialogTitle", {
+        name: displayName,
+      })}
+    >
         <ScrollArea className="min-h-0 flex-1">
-          <article className="space-y-7 p-5">
-            <header className="space-y-4 border-b border-border/60 pb-6">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                {fiction?.type && (
-                  <Badge variant="secondary" className="text-xs">
-                    {fiction.type === "tv-series"
-                      ? tFictions("typeTvSeries")
-                      : fiction.type === "book"
-                        ? tFictions("typeBook")
-                        : tFictions("typeMovie")}
-                  </Badge>
-                )}
-                {fiction?.genre && (
-                  <Badge variant="outline" className="text-xs">
-                    {fiction.genre}
-                  </Badge>
-                )}
-                {fiction?.year && <span>{fiction.year}</span>}
+          <article className="space-y-7 px-5 py-5 sm:px-6 sm:py-6">
+            <header className="space-y-5 border-b border-border/60 pb-6">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  {fiction?.type && (
+                    <Badge variant="secondary" className="text-xs">
+                      {fiction.type === "tv-series"
+                        ? tFictions("typeTvSeries")
+                        : fiction.type === "book"
+                          ? tFictions("typeBook")
+                          : tFictions("typeMovie")}
+                    </Badge>
+                  )}
+                  {fiction?.genre && (
+                    <Badge variant="outline" className="text-xs">
+                      {fiction.genre}
+                    </Badge>
+                  )}
+                  {fiction?.year && <span>{fiction.year}</span>}
+                </div>
+                <button
+                  ref={closeButtonRef}
+                  onClick={onClose}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border/70 bg-background text-foreground transition-colors hover:bg-muted"
+                  aria-label={t("closeLocationDetail")}
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
               <div className="space-y-2">
-                <h2 className="text-xl font-bold leading-tight tracking-tight text-foreground text-balance sm:text-[1.35rem]">
-                  {place.name ?? place.location.name}
+                <h2 className="text-xl font-bold leading-[1.15] tracking-tight text-foreground text-balance sm:text-2xl">
+                  {fiction
+                    ? tFictions("placeDetailCatchyHeading", {
+                        placeName: displayName,
+                        fictionName: fiction.title,
+                      })
+                    : displayName}
                 </h2>
                 <div className="flex items-start gap-1.5 text-muted-foreground">
                   <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   <span className="text-xs leading-relaxed">{place.location.address}</span>
                 </div>
               </div>
+
+              <div className="relative aspect-[21/9] overflow-hidden rounded-xl border border-border/60">
+                <Image
+                  src={heroSrc}
+                  alt={displayName}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 580px"
+                  priority
+                />
+              </div>
+
+              {placeDescription ? (
+                <p className="text-sm leading-relaxed text-muted-foreground sm:text-base sm:leading-8">
+                  {placeDescription}
+                </p>
+              ) : null}
 
               {fiction && (
                 <div className="space-y-3 rounded-xl border border-border/60 bg-card/30 p-3">
@@ -349,7 +402,6 @@ export function LocationDetail({
 
           </article>
         </ScrollArea>
-      </aside>
-    </>
+    </aside>
   )
 }

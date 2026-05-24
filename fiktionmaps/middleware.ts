@@ -18,7 +18,7 @@ const ENFORCE_CANONICAL_HOST = process.env.VERCEL_ENV
   ? process.env.VERCEL_ENV === "production"
   : process.env.NODE_ENV === "production"
 
-const PROTECTED_PATHS = ["/profile", "/settings", "/admin", "/contribute"]
+const PROTECTED_PATHS = ["/profile", "/settings", "/admin", "/contributions", "/contribute"]
 
 function isProtected(pathname: string): boolean {
   return PROTECTED_PATHS.some(
@@ -84,13 +84,12 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const pathWithoutLocale = pathnameWithoutLocale(pathname)
 
-  const pathWithoutLocale2 = pathnameWithoutLocale(pathname)
-if (pathWithoutLocale2 === "/" || pathWithoutLocale2 === "") {
-  const locale = getLocaleFromPathname(pathname)
-  const mapUrl = request.nextUrl.clone()
-  mapUrl.pathname = `/${locale}/map`
-  return NextResponse.redirect(mapUrl)
-}
+  if (pathWithoutLocale === "/" || pathWithoutLocale === "") {
+    const locale = getLocaleFromPathname(pathname)
+    const mapUrl = request.nextUrl.clone()
+    mapUrl.pathname = `/${locale}/map`
+    return NextResponse.redirect(mapUrl)
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY

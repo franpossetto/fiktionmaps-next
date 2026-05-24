@@ -12,12 +12,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { AuthModal } from "@/components/auth/auth-modal"
-import { LogOut, User, Settings, Shield, BookOpen, Map } from "lucide-react"
+import { LogOut, User, Settings, Shield, BookOpen, Map, Inbox } from "lucide-react"
 import { Link } from "@/i18n/navigation"
 
 export function UserMenu() {
   const t = useTranslations("Nav")
-  const { user, isAdmin, logout } = useAuth()
+  const { user, isAdmin, isStaffModerator, logout } = useAuth()
   const [authOpen, setAuthOpen] = useState(false)
 
   if (!user) {
@@ -89,16 +89,22 @@ export function UserMenu() {
             {t("settings")}
           </Link>
         </DropdownMenuItem>
+        {(isStaffModerator || isAdmin) && <DropdownMenuSeparator />}
+        {isStaffModerator && (
+          <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
+            <Link href="/contributions">
+              <Inbox className="mr-2 h-4 w-4" />
+              {t("contributions")}
+            </Link>
+          </DropdownMenuItem>
+        )}
         {isAdmin && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
-              <Link href="/admin">
-                <Shield className="mr-2 h-4 w-4" />
-                {t("admin")}
-              </Link>
-            </DropdownMenuItem>
-          </>
+          <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
+            <Link href="/admin">
+              <Shield className="mr-2 h-4 w-4" />
+              {t("admin")}
+            </Link>
+          </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout} className="text-foreground focus:bg-accent focus:text-accent-foreground">

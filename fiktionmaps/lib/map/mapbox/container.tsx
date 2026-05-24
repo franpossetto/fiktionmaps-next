@@ -32,6 +32,7 @@ export function MapboxContainer({
   onMapReady,
   onZoomChange,
   controls,
+  showLoadingOverlay = true,
 }: MapContainerProps) {
   const [mapLoaded, setMapLoaded] = useState(false)
   const mapRef = useRef<MapboxMap | null>(null)
@@ -151,7 +152,7 @@ export function MapboxContainer({
         </MapLoadedProvider>
       </ReactMapGL>
       <AnimatePresence>
-        {!mapLoaded && (
+        {showLoadingOverlay && !mapLoaded && (
           <motion.div
             className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 backdrop-blur-[2px]"
             initial={{ opacity: 1 }}

@@ -2,6 +2,8 @@
 
 ## Inbox
 
+- [ ] [map] Review map sidebar: reorder its sections and summarize the content so it does not duplicate what is already shown on the fiction/place page.
+
 ## Backlog
 
 - [ ] [SEO] Google Search Console: confirm `https://fiktions.com/sitemap.xml` reaches `Success` status after reprocessing (without legacy errors from the previous domain).

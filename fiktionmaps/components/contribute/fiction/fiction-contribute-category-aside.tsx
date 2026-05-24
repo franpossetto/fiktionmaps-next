@@ -7,7 +7,7 @@ export function FictionContributeCategoryAside() {
   const t = useTranslations("Contribute.categoryAside")
 
   return (
-    <div className="mx-auto w-full max-w-[260px] space-y-3">
+    <div className="mx-auto w-full max-w-full space-y-3">
       <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("heading")}</h2>
       <div className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
         <p>{t("body1")}</p>

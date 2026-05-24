@@ -210,7 +210,7 @@ export function FictionContributeCriteriaAside({
   const asideError = coverAsideError ?? bannerAsideError ?? null
 
   return (
-    <div className="mx-auto w-full max-w-[280px] space-y-3">
+    <div className="mx-auto w-full max-w-full space-y-3">
       <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         {t("criteria.heading")}
       </h2>
