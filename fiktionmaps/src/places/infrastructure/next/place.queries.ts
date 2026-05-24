@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache"
-import { createAnonymousClient } from "@/lib/supabase/server"
+import { createAnonymousClient, createClient } from "@/lib/supabase/server"
+import { getIsUserStaff } from "@/src/users/infrastructure/next/user.queries"
 import { isUuidString } from "@/lib/validation/primitives"
 import type { MapBbox } from "@/lib/validation/map-query"
 import { createPlacesSupabaseAdapter } from "@/src/places/infrastructure/supabase/place.repository.impl"
@@ -49,6 +50,20 @@ export function getPlaceLocationByIdDetailCached(placeId: string) {
     CacheKeys.place(`${placeId}:detail-lg:v2`),
     { ...CacheConfig.medium, tags: ["places", `place-${placeId}`] }
   )()
+}
+
+/** Respects staff RLS (e.g. pending places). Caller should only use on staff-only pages. */
+export async function getPlaceLocationByIdForStaffSession(placeId: string): Promise<Place | null> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+  if (error || !user) return null
+  const staff = await getIsUserStaff(user.id)
+  if (!staff) return null
+  const repo = createPlacesSupabaseAdapter(async () => supabase)
+  return getPlaceByIdUseCase(placeId, repo, "lg")
 }
 
 export function getFictionPlacesCached(fictionId: string) {

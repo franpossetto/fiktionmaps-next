@@ -8,6 +8,8 @@ import { getContributorsFirstContributionByEntityUseCase } from "@/src/contribut
 import { getPendingContributionsUseCase } from "@/src/contributions/application/get-pending-contributions.usecase"
 import { getStaffFictionContributionDetailUseCase } from "@/src/contributions/application/get-staff-fiction-contribution-detail.usecase"
 import { getStaffFictionContributionsFeedPageUseCase } from "@/src/contributions/application/get-staff-fiction-contributions-feed-page.usecase"
+import { getStaffCreateContributionsFeedPageUseCase } from "@/src/contributions/application/get-staff-create-contributions-feed-page.usecase"
+import { getStaffPlaceContributionDetailUseCase } from "@/src/contributions/application/get-staff-place-contribution-detail.usecase"
 import { getContributorModerationContextUseCase } from "@/src/contributions/application/get-contributor-moderation-context.usecase"
 import { getTopContributorsUseCase } from "@/src/contributions/application/get-top-contributors.usecase"
 import {
@@ -20,6 +22,9 @@ import type {
   ContributorProfileWithDate,
   FictionContributionFeedItem,
   FictionContributorProfile,
+  PlaceContributionFeedItem,
+  StaffContributionsFeedKind,
+  StaffCreateContributionsFeedPageResult,
   StaffFictionContributionsFeedPageResult,
   StaffFictionContributionsFeedStatusTab,
   TopContributorProfile,
@@ -93,7 +98,39 @@ export async function getPendingContributionsForStaffSession(): Promise<Contribu
   return getPendingContributionsUseCase(repo)
 }
 
-/** create_fiction staff queue: pending + approved (paginated); staff session only. */
+/** create_fiction / create_place staff queue (paginated); staff session only. */
+export async function getCreateContributionsFeedPageForStaffSession(options: {
+  page: number
+  statusTab: StaffFictionContributionsFeedStatusTab
+  submitterUserId: string
+  kind: StaffContributionsFeedKind
+}): Promise<StaffCreateContributionsFeedPageResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+  if (error || !user) return { items: [], totalCount: 0 }
+  const staff = await getIsUserStaff(user.id)
+  if (!staff) return { items: [], totalCount: 0 }
+
+  const pageSize = STAFF_FICTION_CONTRIBUTIONS_FEED_PAGE_SIZE
+  const safePage = Number.isFinite(options.page) && options.page >= 1 ? Math.floor(options.page) : 1
+  const offset = (safePage - 1) * pageSize
+  const repo = createContributionsSupabaseAdapter(async () => supabase)
+  return getStaffCreateContributionsFeedPageUseCase(
+    {
+      kind: options.kind,
+      userIdFilter: options.submitterUserId.trim() || undefined,
+      statusTab: options.statusTab,
+      limit: pageSize,
+      offset,
+    },
+    repo,
+  )
+}
+
+/** @deprecated Prefer getCreateContributionsFeedPageForStaffSession with kind "fiction". */
 export async function getFictionContributionsFeedPageForStaffSession(options: {
   page: number
   statusTab: StaffFictionContributionsFeedStatusTab
@@ -136,6 +173,21 @@ export async function getFictionContributionDetailForStaffSession(
   if (!staff) return null
   const repo = createContributionsSupabaseAdapter(async () => supabase)
   return getStaffFictionContributionDetailUseCase(id, repo)
+}
+
+export async function getPlaceContributionDetailForStaffSession(
+  id: string,
+): Promise<PlaceContributionFeedItem | null> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+  if (error || !user) return null
+  const staff = await getIsUserStaff(user.id)
+  if (!staff) return null
+  const repo = createContributionsSupabaseAdapter(async () => supabase)
+  return getStaffPlaceContributionDetailUseCase(id, repo)
 }
 
 /** Submitter activity + lifetime FPP (profiles.fpp_total); staff session only. */

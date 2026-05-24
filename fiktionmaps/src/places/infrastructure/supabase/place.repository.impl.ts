@@ -7,6 +7,10 @@ import type { MapBbox } from "@/lib/validation/map-query"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { CreatePlaceRepoInput, UpdatePlaceData } from "@/src/places/domain/place.schemas"
 import type { PlacesRepositoryPort } from "@/src/places/domain/place.repository"
+import {
+  type StreetViewReference,
+  LOCATION_VIEW_REFERENCE_PROVIDER,
+} from "@/src/locations/domain/location-view-reference.schemas"
 
 function str(row: Record<string, unknown>, snake: string, camel: string): string {
   const v = row[snake] ?? row[camel]
@@ -24,6 +28,93 @@ function optStr(row: Record<string, unknown>, snake: string, camel: string): str
   if (v == null || v === "") return null
   return typeof v === "string" ? v : null
 }
+
+function optNum(row: Record<string, unknown>, snake: string, camel: string): number | null {
+  const v = row[snake] ?? row[camel]
+  if (v == null || v === "") return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+function mapStreetViewReferenceFromViewReferenceRow(
+  row: Record<string, unknown>,
+): StreetViewReference | null {
+  const latitude = optNum(row, "camera_latitude", "cameraLatitude")
+  const longitude = optNum(row, "camera_longitude", "cameraLongitude")
+  const heading = optNum(row, "heading", "heading")
+  const pitch = optNum(row, "pitch", "pitch")
+  const fov = optNum(row, "fov", "fov")
+  if (latitude == null || longitude == null || heading == null || pitch == null || fov == null) {
+    return null
+  }
+  const panoId = optStr(row, "external_pano_id", "externalPanoId")
+  return {
+    latitude,
+    longitude,
+    heading,
+    pitch,
+    fov,
+    panoId,
+  }
+}
+
+function parseStreetViewReferenceFromLocationEmbed(
+  loc: Record<string, unknown>,
+): StreetViewReference | null {
+  const raw = loc.location_view_references
+  const row = Array.isArray(raw) ? raw[0] : raw
+  if (!row || typeof row !== "object" || Array.isArray(row)) return null
+  return mapStreetViewReferenceFromViewReferenceRow(row as Record<string, unknown>)
+}
+
+function viewReferenceToInsertRow(
+  locationId: string,
+  ref: StreetViewReference,
+): Database["public"]["Tables"]["location_view_references"]["Insert"] {
+  return {
+    location_id: locationId,
+    provider: LOCATION_VIEW_REFERENCE_PROVIDER.googleStreetView,
+    camera_latitude: ref.latitude,
+    camera_longitude: ref.longitude,
+    heading: ref.heading,
+    pitch: ref.pitch,
+    fov: ref.fov,
+    external_pano_id: ref.panoId?.trim() || null,
+  }
+}
+
+async function upsertLocationViewReference(
+  supabase: SupabaseClient<Database>,
+  locationId: string,
+  ref: StreetViewReference,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("location_view_references")
+    .upsert(viewReferenceToInsertRow(locationId, ref), { onConflict: "location_id" })
+  if (error) {
+    console.error("[places repo] upsert location_view_references failed:", error.message)
+    return false
+  }
+  return true
+}
+
+async function deleteLocationViewReference(
+  supabase: SupabaseClient<Database>,
+  locationId: string,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("location_view_references")
+    .delete()
+    .eq("location_id", locationId)
+  if (error) {
+    console.error("[places repo] delete location_view_references failed:", error.message)
+    return false
+  }
+  return true
+}
+
+const LOCATION_EMBED_SELECT =
+  "id, name, formatted_address, latitude, longitude, city_id, is_landmark, type, location_view_references(provider, camera_latitude, camera_longitude, heading, pitch, fov, external_pano_id)"
 
 /** Embed column may appear as `location`, `locations`, object or single-element array. */
 function parseLocationEmbedFromPlaceRow(row: Record<string, unknown>): Record<string, unknown> | null {
@@ -58,6 +149,7 @@ function mapPlaceRowsToPlaces(
     const cityId = loc ? str(loc, "city_id", "cityId") : ""
     const locationType = loc ? optStr(loc, "type", "type") : null
     const isLandmark = loc ? Boolean(loc.is_landmark ?? loc.isLandmark) : false
+    const streetViewReference = loc ? parseStreetViewReferenceFromLocationEmbed(loc) : null
 
     return {
       id: placeId,
@@ -72,6 +164,7 @@ function mapPlaceRowsToPlaces(
         cityId,
         locationType,
         isLandmark,
+        streetViewReference,
       },
       image: avatarByPlaceId.get(placeId) ?? "/placeholder.svg",
       videoUrl: "",
@@ -92,7 +185,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error: placesError } = await supabase
         .from("places")
         .select(
-          "id, fiction_id, description, active, location_id, name, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark, type)"
+          `id, fiction_id, description, active, location_id, name, locations(${LOCATION_EMBED_SELECT})`
         )
         .order("created_at", { ascending: false })
         .range(0, 9999)
@@ -159,7 +252,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error } = await supabase
         .from("places")
         .select(
-          "id, fiction_id, description, active, location_id, name, locations(id, name, formatted_address, latitude, longitude, city_id, is_landmark, type)"
+          `id, fiction_id, description, active, location_id, name, locations(${LOCATION_EMBED_SELECT})`
         )
         .eq("fiction_id", fictionId)
         .order("created_at", { ascending: false })
@@ -192,7 +285,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error } = await supabase
         .from("places")
         .select(
-          "id, fiction_id, description, active, location_id, name, locations!inner(id, name, formatted_address, latitude, longitude, city_id, is_landmark, type)"
+          `id, fiction_id, description, active, location_id, name, locations!inner(${LOCATION_EMBED_SELECT})`
         )
         .eq("locations.city_id", cityId)
         .order("created_at", { ascending: false })
@@ -270,7 +363,7 @@ export function createPlacesSupabaseAdapter(
         .select(
           `id, fiction_id, description, active, name,
            location:locations!inner (
-             id, name, formatted_address, latitude, longitude, city_id, is_landmark, type
+             ${LOCATION_EMBED_SELECT}
            )`
         )
         .eq("id", placeId)
@@ -313,6 +406,7 @@ export function createPlacesSupabaseAdapter(
           cityId: loc ? str(loc, "city_id", "cityId") : "",
           locationType: loc ? optStr(loc, "type", "type") : null,
           isLandmark: loc ? Boolean(loc.is_landmark ?? loc.isLandmark) : false,
+          streetViewReference: loc ? parseStreetViewReferenceFromLocationEmbed(loc) : null,
         },
         image: imageUrl ?? "/placeholder.svg",
         videoUrl: "",
@@ -331,7 +425,7 @@ export function createPlacesSupabaseAdapter(
         .select(
           `id, fiction_id, description, active, name,
            location:locations!inner (
-             id, name, formatted_address, latitude, longitude, city_id, is_landmark, type
+             ${LOCATION_EMBED_SELECT}
            )`
         )
         .in("fiction_id", fictionIds)
@@ -377,6 +471,7 @@ export function createPlacesSupabaseAdapter(
             cityId: loc ? str(loc, "city_id", "cityId") : "",
             locationType: loc ? optStr(loc, "type", "type") : null,
             isLandmark: loc ? Boolean(loc.is_landmark ?? loc.isLandmark) : false,
+            streetViewReference: loc ? parseStreetViewReferenceFromLocationEmbed(loc) : null,
           },
           image: avatarByPlaceId.get(pid) ?? "/placeholder.svg",
           videoUrl: "",
@@ -415,11 +510,22 @@ export function createPlacesSupabaseAdapter(
         return null
       }
 
+      const locationId = locationRow.id as string
+
+      if (data.streetViewReference) {
+        const viewOk = await upsertLocationViewReference(
+          supabase,
+          locationId,
+          data.streetViewReference,
+        )
+        if (!viewOk) return null
+      }
+
       const { data: placeRow, error: placeError } = await supabase
         .from("places")
         .insert({
           fiction_id: data.fictionId,
-          location_id: locationRow.id,
+          location_id: locationId,
           name: placeName,
           description: data.description.trim(),
           active: data.status !== "pending",
@@ -469,6 +575,20 @@ export function createPlacesSupabaseAdapter(
         .eq("id", locationId)
 
       if (locationError) return false
+
+      if (data.streetViewReference !== undefined) {
+        if (data.streetViewReference) {
+          const viewOk = await upsertLocationViewReference(
+            supabase,
+            locationId,
+            data.streetViewReference,
+          )
+          if (!viewOk) return false
+        } else {
+          const viewOk = await deleteLocationViewReference(supabase, locationId)
+          if (!viewOk) return false
+        }
+      }
 
       const { error: placeError } = await supabase
         .from("places")

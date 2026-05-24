@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { latitudeSchema, longitudeSchema, uuidSchema } from "@/lib/validation/primitives"
 import { fictionRowStatusSchema } from "@/src/fictions/domain/fiction.schemas"
+import { streetViewReferenceSchema } from "@/src/locations/domain/location-view-reference.schemas"
 
 export const createPlaceSchema = z.object({
   fictionId: uuidSchema,
@@ -13,6 +14,7 @@ export const createPlaceSchema = z.object({
   description: z.string().trim().min(1),
   isLandmark: z.boolean().optional(),
   locationType: z.string().nullable().optional(),
+  streetViewReference: streetViewReferenceSchema.nullable().optional(),
 })
 
 export const updatePlaceSchema = createPlaceSchema

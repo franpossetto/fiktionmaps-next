@@ -1,19 +1,23 @@
 import { getTranslations } from "next-intl/server"
 import Image from "next/image"
 import { Link } from "@/i18n/navigation"
-import type { FictionContributionFeedItem } from "@/src/contributions/domain/contribution.entity"
+import {
+  isPlaceContributionFeedItem,
+  type StaffCreateContributionFeedItem,
+  type StaffContributionsFeedKind,
+} from "@/src/contributions/domain/contribution.entity"
 import { contributionTypeMessageKey } from "@/components/contributions/contribution-type-label"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import type { ContributionsFeedTab } from "@/components/contributions/contributions-feed-tab-bar"
 
-function contributorHandleLabel(c: FictionContributionFeedItem["contributor"]): string {
+function contributorHandleLabel(c: StaffCreateContributionFeedItem["contributor"]): string {
   if (c.username?.trim()) return `@${c.username.trim()}`
   return `·${c.id.slice(0, 8)}`
 }
 
-function statusBadgeClass(status: FictionContributionFeedItem["status"]): string {
+function statusBadgeClass(status: StaffCreateContributionFeedItem["status"]): string {
   switch (status) {
     case "pending":
       return "bg-amber-100 text-amber-950 ring-1 ring-amber-200/90 dark:bg-amber-950/55 dark:text-amber-100 dark:ring-amber-700/50"
@@ -24,63 +28,70 @@ function statusBadgeClass(status: FictionContributionFeedItem["status"]): string
   }
 }
 
+function emptyMessageKeys(
+  feedKind: StaffContributionsFeedKind,
+  submitterFiltered: boolean,
+  statusTab: ContributionsFeedTab,
+): { title: string; body: string } {
+  const isPlace = feedKind === "place"
+  if (submitterFiltered && statusTab === "pending") {
+    return {
+      title: isPlace ? "feedEmptyFilteredPendingPlaceTitle" : "feedEmptyFilteredPendingTitle",
+      body: isPlace ? "feedEmptyFilteredPendingPlace" : "feedEmptyFilteredPending",
+    }
+  }
+  if (submitterFiltered && statusTab === "approved") {
+    return {
+      title: isPlace ? "feedEmptyFilteredApprovedPlaceTitle" : "feedEmptyFilteredApprovedTitle",
+      body: isPlace ? "feedEmptyFilteredApprovedPlace" : "feedEmptyFilteredApproved",
+    }
+  }
+  if (submitterFiltered) {
+    return {
+      title: isPlace ? "feedEmptyFilteredPlaceTitle" : "feedEmptyFilteredTitle",
+      body: isPlace ? "feedEmptyFilteredPlace" : "feedEmptyFiltered",
+    }
+  }
+  if (statusTab === "pending") {
+    return {
+      title: isPlace ? "feedEmptyTabPendingPlaceTitle" : "feedEmptyTabPendingTitle",
+      body: isPlace ? "feedEmptyTabPendingPlace" : "feedEmptyTabPending",
+    }
+  }
+  if (statusTab === "approved") {
+    return {
+      title: isPlace ? "feedEmptyTabApprovedPlaceTitle" : "feedEmptyTabApprovedTitle",
+      body: isPlace ? "feedEmptyTabApprovedPlace" : "feedEmptyTabApproved",
+    }
+  }
+  return {
+    title: isPlace ? "feedEmptyPlaceTitle" : feedKind === "all" ? "feedEmptyAllTitle" : "feedEmptyTitle",
+    body: isPlace ? "feedEmptyPlace" : feedKind === "all" ? "feedEmptyAll" : "feedEmpty",
+  }
+}
+
 export async function ContributionsFeedList({
   items,
   emptyContext,
 }: {
-  items: FictionContributionFeedItem[]
-  emptyContext?: { submitterFiltered: boolean; statusTab: ContributionsFeedTab }
+  items: StaffCreateContributionFeedItem[]
+  emptyContext?: {
+    submitterFiltered: boolean
+    statusTab: ContributionsFeedTab
+    feedKind: StaffContributionsFeedKind
+  }
 }) {
   const t = await getTranslations("Contributions")
 
   if (items.length === 0) {
     const submitterFiltered = emptyContext?.submitterFiltered ?? false
     const statusTab = emptyContext?.statusTab ?? "all"
-
-    if (submitterFiltered && statusTab === "pending") {
-      return (
-        <div className="border-t border-border/60 py-8 text-center">
-          <p className="text-sm font-medium text-foreground">{t("feedEmptyFilteredPendingTitle")}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{t("feedEmptyFilteredPending")}</p>
-        </div>
-      )
-    }
-    if (submitterFiltered && statusTab === "approved") {
-      return (
-        <div className="border-t border-border/60 py-8 text-center">
-          <p className="text-sm font-medium text-foreground">{t("feedEmptyFilteredApprovedTitle")}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{t("feedEmptyFilteredApproved")}</p>
-        </div>
-      )
-    }
-    if (submitterFiltered) {
-      return (
-        <div className="border-t border-border/60 py-8 text-center">
-          <p className="text-sm font-medium text-foreground">{t("feedEmptyFilteredTitle")}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{t("feedEmptyFiltered")}</p>
-        </div>
-      )
-    }
-    if (statusTab === "pending") {
-      return (
-        <div className="border-t border-border/60 py-8 text-center">
-          <p className="text-sm font-medium text-foreground">{t("feedEmptyTabPendingTitle")}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{t("feedEmptyTabPending")}</p>
-        </div>
-      )
-    }
-    if (statusTab === "approved") {
-      return (
-        <div className="border-t border-border/60 py-8 text-center">
-          <p className="text-sm font-medium text-foreground">{t("feedEmptyTabApprovedTitle")}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{t("feedEmptyTabApproved")}</p>
-        </div>
-      )
-    }
+    const feedKind = emptyContext?.feedKind ?? "fiction"
+    const { title, body } = emptyMessageKeys(feedKind, submitterFiltered, statusTab)
     return (
       <div className="border-t border-border/60 py-8 text-center">
-        <p className="text-sm font-medium text-foreground">{t("feedEmptyTitle")}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{t("feedEmpty")}</p>
+        <p className="text-sm font-medium text-foreground">{t(title)}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t(body)}</p>
       </div>
     )
   }
@@ -88,23 +99,32 @@ export async function ContributionsFeedList({
   return (
     <ul className="pt-1">
       {items.map((item, idx) => {
-        const title = item.fictionTitle?.trim() ? item.fictionTitle.trim() : t("feedCard_untitledFiction")
-        const coverSrc = item.fictionCoverUrl?.trim() ? item.fictionCoverUrl.trim() : DEFAULT_FICTION_COVER
+        const isPlace = isPlaceContributionFeedItem(item)
+        const title = isPlace
+          ? item.placeName?.trim() || t("feedCard_untitledPlace")
+          : item.fictionTitle?.trim() || t("feedCard_untitledFiction")
+        const coverSrc = isPlace
+          ? item.placeAvatarUrl?.trim() || DEFAULT_FICTION_COVER
+          : item.fictionCoverUrl?.trim() || DEFAULT_FICTION_COVER
+        const subtitle = isPlace && item.fictionTitle?.trim() ? item.fictionTitle.trim() : null
+
         return (
-          <li
-            key={item.id}
-            className={cn("border-t border-border/60", idx === 0 && "border-t-0")}
-          >
+          <li key={item.id} className={cn("border-t border-border/60", idx === 0 && "border-t-0")}>
             <Link
               href={`/contributions/${item.id}`}
               className={cn(
-                "group flex cursor-pointer gap-3 py-3.5 transition-colors -mx-2 px-2 sm:-mx-3 sm:px-3 rounded-lg",
+                "group -mx-2 flex cursor-pointer gap-3 rounded-lg px-2 py-3.5 transition-colors sm:-mx-3 sm:px-3",
                 item.status === "pending"
                   ? "bg-amber-50/95 hover:bg-amber-100/95 dark:bg-amber-950/22 dark:hover:bg-amber-950/35"
                   : "hover:bg-muted/[0.35]",
               )}
             >
-              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-border bg-muted sm:h-16 sm:w-16">
+              <div
+                className={cn(
+                  "relative h-14 w-14 shrink-0 overflow-hidden border border-border bg-muted sm:h-16 sm:w-16",
+                  isPlace ? "rounded-lg" : "rounded-full",
+                )}
+              >
                 <Image
                   src={coverSrc}
                   alt={title}
@@ -132,6 +152,8 @@ export async function ContributionsFeedList({
                 <h2 className="text-base font-bold leading-snug tracking-tight text-foreground transition-colors group-hover:text-primary sm:text-lg">
                   {title}
                 </h2>
+
+                {subtitle ? <p className="text-xs text-muted-foreground">{subtitle}</p> : null}
 
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
                   <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">

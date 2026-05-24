@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
+import { ContributePublicPreviewAside } from "@/components/contribute/contribute-public-preview-aside"
 import { FictionContributeFppRewardCard } from "@/components/contribute/fiction/fiction-contribute-fpp-reward-card"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 
@@ -170,23 +171,16 @@ export function FictionContributeCriteriaAside({
   bannerAsideError = null,
 }: FictionContributeCriteriaAsideProps) {
   const t = useTranslations("Contribute")
-  const tf = useTranslations("Contribute.fiction")
+  const tc = useTranslations("Contribute.criteria")
 
   if (step === 7) {
-    const tc = (k: string) => t(`criteria.${k}`)
     return (
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[min(280px,100%)] flex-col self-stretch pb-6">
-        <div className="min-h-0 shrink-0">
-          <h2 className="text-base font-semibold leading-snug text-foreground sm:text-[1.0625rem]">
-            {tf("publicPreviewTitle")}
-          </h2>
-          <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">{tf("publicPreviewDescription")}</p>
-          <p className="mt-4 text-xs leading-relaxed text-muted-foreground/90">{tc("reviewPending")}</p>
-        </div>
-        <div className="mt-auto shrink-0 pt-5">
-          <FictionContributeFppRewardCard />
-        </div>
-      </div>
+      <ContributePublicPreviewAside
+        title={tc("publicPreviewTitle")}
+        description={tc("publicPreviewDescriptionFiction")}
+        reviewPendingNote={tc("reviewPending")}
+        rewardCard={<FictionContributeFppRewardCard />}
+      />
     )
   }
 

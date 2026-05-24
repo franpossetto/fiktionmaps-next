@@ -13,6 +13,10 @@ import type {
   ContributorProfileWithDate,
   FictionContributionFeedItem,
   FictionContributorProfile,
+  PlaceContributionFeedItem,
+  StaffContributionsFeedKind,
+  StaffCreateContributionFeedItem,
+  StaffCreateContributionsFeedPageResult,
   StaffFictionContributionsFeedPageResult,
   StaffFictionContributionsFeedStatusTab,
   TopContributorProfile,
@@ -47,7 +51,10 @@ type ProfileEmbed = {
   avatar_url: string | null
 }
 
-function mapFeedItem(row: ContributionRow, profiles: ProfileEmbed | ProfileEmbed[] | null): FictionContributionFeedItem | null {
+function mapFictionFeedItem(
+  row: ContributionRow,
+  profiles: ProfileEmbed | ProfileEmbed[] | null,
+): FictionContributionFeedItem | null {
   const raw = profiles
   const prof = Array.isArray(raw) ? raw[0] : raw
   if (!prof?.id) return null
@@ -62,6 +69,93 @@ function mapFeedItem(row: ContributionRow, profiles: ProfileEmbed | ProfileEmbed
     fictionTitle: null,
     fictionCoverUrl: null,
   }
+}
+
+function mapPlaceFeedItem(
+  row: ContributionRow,
+  profiles: ProfileEmbed | ProfileEmbed[] | null,
+): PlaceContributionFeedItem | null {
+  const raw = profiles
+  const prof = Array.isArray(raw) ? raw[0] : raw
+  if (!prof?.id) return null
+  return {
+    ...mapRow(row),
+    contributor: {
+      id: prof.id,
+      username: prof.username,
+      fullName: prof.full_name,
+      avatarUrl: prof.avatar_url,
+    },
+    placeName: null,
+    placeAvatarUrl: null,
+    fictionTitle: null,
+    fictionId: null,
+  }
+}
+
+type PlaceMeta = { name: string | null; fictionId: string }
+
+async function placeMetaByIds(
+  supabase: SupabaseClient<Database>,
+  placeIds: string[],
+): Promise<Map<string, PlaceMeta>> {
+  const unique = [...new Set(placeIds)].filter(Boolean)
+  if (unique.length === 0) return new Map()
+  const { data, error } = await supabase.from("places").select("id, name, fiction_id").in("id", unique)
+  if (error) {
+    console.error("[contributions repo] placeMetaByIds:", error.message)
+    return new Map()
+  }
+  const m = new Map<string, PlaceMeta>()
+  for (const row of data ?? []) {
+    m.set(row.id, { name: row.name, fictionId: row.fiction_id })
+  }
+  return m
+}
+
+async function placeAvatarThumbByIds(
+  supabase: SupabaseClient<Database>,
+  placeIds: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(placeIds)].filter(Boolean)
+  if (unique.length === 0) return new Map()
+  const map = new Map<string, string>()
+
+  const { data: smRows, error: smErr } = await supabase
+    .from("asset_images")
+    .select("entity_id, url")
+    .eq("entity_type", "place")
+    .eq("role", "avatar")
+    .eq("variant", "sm")
+    .in("entity_id", unique)
+
+  if (smErr) {
+    console.error("[contributions repo] placeAvatarThumbByIds sm:", smErr.message)
+  } else {
+    for (const row of smRows ?? []) {
+      if (!map.has(row.entity_id)) map.set(row.entity_id, row.url)
+    }
+  }
+
+  const missing = unique.filter((id) => !map.has(id))
+  if (missing.length === 0) return map
+
+  const { data: lgRows, error: lgErr } = await supabase
+    .from("asset_images")
+    .select("entity_id, url")
+    .eq("entity_type", "place")
+    .eq("role", "avatar")
+    .eq("variant", "lg")
+    .in("entity_id", missing)
+
+  if (lgErr) {
+    console.error("[contributions repo] placeAvatarThumbByIds lg:", lgErr.message)
+    return map
+  }
+  for (const row of lgRows ?? []) {
+    if (!map.has(row.entity_id)) map.set(row.entity_id, row.url)
+  }
+  return map
 }
 
 async function fictionTitlesByIds(supabase: SupabaseClient<Database>, fictionIds: string[]): Promise<Map<string, string>> {
@@ -183,7 +277,7 @@ export function createContributionsSupabaseAdapter(
       type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
       const items: FictionContributionFeedItem[] = []
       for (const row of (data ?? []) as Row[]) {
-        const item = mapFeedItem(row, row.profiles)
+        const item = mapFictionFeedItem(row, row.profiles)
         if (item) items.push(item)
       }
       const [titles, covers] = await Promise.all([
@@ -197,6 +291,114 @@ export function createContributionsSupabaseAdapter(
       }))
 
       return { items: withMedia, totalCount: count ?? 0 }
+    },
+  )
+
+  const listCreateContributionsStaffReviewFeedPageCached = cache(
+    async (
+      kind: StaffContributionsFeedKind,
+      userIdFilter: string | undefined,
+      statusTab: StaffFictionContributionsFeedStatusTab,
+      limit: number,
+      offset: number,
+    ): Promise<StaffCreateContributionsFeedPageResult> => {
+      const supabase = await getSupabase()
+      let q = supabase
+        .from("contributions")
+        .select(
+          `
+          *,
+          profiles!contributions_user_id_fkey (
+            id,
+            username,
+            full_name,
+            avatar_url
+          )
+        `,
+          { count: "exact" },
+        )
+
+      if (kind === "fiction") {
+        q = q.eq("entity_type", "fiction").eq("type", "create_fiction")
+      } else if (kind === "place") {
+        q = q.eq("entity_type", "place").eq("type", "create_place")
+      } else {
+        q = q.in("type", ["create_fiction", "create_place"])
+      }
+
+      if (userIdFilter) q = q.eq("user_id", userIdFilter)
+
+      if (statusTab === "all") {
+        q = q.in("status", ["pending", "approved"])
+        q = q.order("status", { ascending: false }).order("created_at", { ascending: false })
+      } else {
+        q = q.eq("status", statusTab).order("created_at", { ascending: false })
+      }
+
+      const safeLimit = Math.max(1, limit)
+      const from = Math.max(0, offset)
+      const to = from + safeLimit - 1
+
+      const { data, error, count } = await q.range(from, to)
+
+      if (error) {
+        console.error("[contributions repo] listCreateContributionsStaffReviewFeedPage:", error.message)
+        return { items: [], totalCount: 0 }
+      }
+
+      type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
+      const fictionItems: FictionContributionFeedItem[] = []
+      const placeItems: PlaceContributionFeedItem[] = []
+
+      for (const row of (data ?? []) as Row[]) {
+        if (row.entity_type === "place" && row.type === "create_place") {
+          const item = mapPlaceFeedItem(row, row.profiles)
+          if (item) placeItems.push(item)
+        } else if (row.entity_type === "fiction" && row.type === "create_fiction") {
+          const item = mapFictionFeedItem(row, row.profiles)
+          if (item) fictionItems.push(item)
+        }
+      }
+
+      const [fictionTitles, fictionCovers, placeMeta, placeAvatars] = await Promise.all([
+        fictionTitlesByIds(supabase, fictionItems.map((i) => i.entityId)),
+        fictionCoverThumbByIds(supabase, fictionItems.map((i) => i.entityId)),
+        placeMetaByIds(supabase, placeItems.map((i) => i.entityId)),
+        placeAvatarThumbByIds(supabase, placeItems.map((i) => i.entityId)),
+      ])
+
+      const fictionIdsForPlaces = [...new Set(placeItems.map((i) => placeMeta.get(i.entityId)?.fictionId).filter(Boolean) as string[])]
+      const parentFictionTitles = await fictionTitlesByIds(supabase, fictionIdsForPlaces)
+
+      const enrichedFiction = fictionItems.map((i) => ({
+        ...i,
+        fictionTitle: fictionTitles.get(i.entityId) ?? null,
+        fictionCoverUrl: fictionCovers.get(i.entityId) ?? null,
+      }))
+
+      const enrichedPlace = placeItems.map((i) => {
+        const meta = placeMeta.get(i.entityId)
+        const fid = meta?.fictionId ?? null
+        return {
+          ...i,
+          placeName: meta?.name ?? null,
+          placeAvatarUrl: placeAvatars.get(i.entityId) ?? null,
+          fictionId: fid,
+          fictionTitle: fid ? (parentFictionTitles.get(fid) ?? null) : null,
+        }
+      })
+
+      const itemById = new Map<string, StaffCreateContributionFeedItem>()
+      for (const item of enrichedFiction) itemById.set(item.id, item)
+      for (const item of enrichedPlace) itemById.set(item.id, item)
+
+      const ordered: StaffCreateContributionFeedItem[] = []
+      for (const row of (data ?? []) as Row[]) {
+        const item = itemById.get(row.id)
+        if (item) ordered.push(item)
+      }
+
+      return { items: ordered, totalCount: count ?? 0 }
     },
   )
 
@@ -424,6 +626,17 @@ export function createContributionsSupabaseAdapter(
       )
     },
 
+    listCreateContributionsStaffReviewFeedPage(input) {
+      const uid = input.userIdFilter?.trim()
+      return listCreateContributionsStaffReviewFeedPageCached(
+        input.kind,
+        uid || undefined,
+        input.statusTab,
+        input.limit,
+        input.offset,
+      )
+    },
+
     getFictionCreateContributionWithContributorById: cache(
       async (id: string): Promise<FictionContributionFeedItem | null> => {
         const supabase = await getSupabase()
@@ -452,7 +665,7 @@ export function createContributionsSupabaseAdapter(
         type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
         const row = data as Row
         if (row.type !== "create_fiction" || row.entity_type !== "fiction") return null
-        const base = mapFeedItem(row, row.profiles)
+        const base = mapFictionFeedItem(row, row.profiles)
         if (!base) return null
         const [titles, covers] = await Promise.all([
           fictionTitlesByIds(supabase, [base.entityId]),
@@ -462,6 +675,53 @@ export function createContributionsSupabaseAdapter(
           ...base,
           fictionTitle: titles.get(base.entityId) ?? null,
           fictionCoverUrl: covers.get(base.entityId) ?? null,
+        }
+      },
+    ),
+
+    getPlaceCreateContributionWithContributorById: cache(
+      async (id: string): Promise<PlaceContributionFeedItem | null> => {
+        const supabase = await getSupabase()
+        const { data, error } = await supabase
+          .from("contributions")
+          .select(
+            `
+          *,
+          profiles!contributions_user_id_fkey (
+            id,
+            username,
+            full_name,
+            avatar_url
+          )
+        `,
+          )
+          .eq("id", id)
+          .maybeSingle()
+
+        if (error) {
+          console.error("[contributions repo] getPlaceCreateContributionWithContributorById:", error.message)
+          return null
+        }
+        if (!data) return null
+
+        type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
+        const row = data as Row
+        if (row.type !== "create_place" || row.entity_type !== "place") return null
+        const base = mapPlaceFeedItem(row, row.profiles)
+        if (!base) return null
+        const [meta, avatars] = await Promise.all([
+          placeMetaByIds(supabase, [base.entityId]),
+          placeAvatarThumbByIds(supabase, [base.entityId]),
+        ])
+        const placeMetaRow = meta.get(base.entityId)
+        const fid = placeMetaRow?.fictionId ?? null
+        const fictionTitles = fid ? await fictionTitlesByIds(supabase, [fid]) : new Map<string, string>()
+        return {
+          ...base,
+          placeName: placeMetaRow?.name ?? null,
+          placeAvatarUrl: avatars.get(base.entityId) ?? null,
+          fictionId: fid,
+          fictionTitle: fid ? (fictionTitles.get(fid) ?? null) : null,
         }
       },
     ),

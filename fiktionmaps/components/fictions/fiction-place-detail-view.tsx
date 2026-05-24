@@ -88,6 +88,8 @@ export interface FictionPlaceDetailViewProps {
   scenes: Scene[]
   exploreMapHref: string
   placeContributors: ContributorProfileWithDate[]
+  /** Contribute wizard: same layout, no navigation away from the flow. */
+  previewMode?: boolean
 }
 
 export function FictionPlaceDetailView({
@@ -98,6 +100,7 @@ export function FictionPlaceDetailView({
   scenes,
   exploreMapHref,
   placeContributors,
+  previewMode = false,
 }: FictionPlaceDetailViewProps) {
   const t = useTranslations("Fictions")
   const tMeta = useTranslations("Metadata")
@@ -113,6 +116,7 @@ export function FictionPlaceDetailView({
     }
   const displayName = location.name?.trim() || geo.name || "Sin nombre"
   const heroSrc = location.image?.trim() ? location.image.trim() : DEFAULT_FICTION_COVER
+  const heroUnoptimized = heroSrc.startsWith("blob:")
   const coordsOk = hasValidPlaceCoordinates(geo.lat, geo.lng)
   const addressLine =
     geo.address?.trim() ||
@@ -122,24 +126,45 @@ export function FictionPlaceDetailView({
   const showDirectionsSection = coordsOk || Boolean(addressLine)
 
   return (
-    <main className="px-6 py-8 sm:px-8 lg:px-10">
+    <main
+      className={
+        previewMode
+          ? "px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10"
+          : "px-6 py-8 sm:px-8 lg:px-10"
+      }
+    >
       <div className="mx-auto w-full max-w-[920px]">
         <div className="mb-6 flex items-center justify-between gap-3">
           <PageBreadcrumb
             ariaLabel={tMeta("breadcrumbNavAriaLabel")}
             className="min-w-0 flex-1 pr-2"
-            items={[
-              { label: tMeta("breadcrumbFictions"), href: "/fictions" },
-              { label: fiction.title, href: `/fictions/${fictionPathSlug}` },
-              { label: displayName },
-            ]}
+            items={
+              previewMode
+                ? [
+                    { label: tMeta("breadcrumbFictions") },
+                    { label: fiction.title },
+                    { label: displayName },
+                  ]
+                : [
+                    { label: tMeta("breadcrumbFictions"), href: "/fictions" },
+                    { label: fiction.title, href: `/fictions/${fictionPathSlug}` },
+                    { label: displayName },
+                  ]
+            }
           />
-          <Button asChild size="sm" variant="cta">
-            <Link href={exploreMapHref}>
+          {previewMode ? (
+            <Button type="button" size="sm" variant="cta" disabled className="pointer-events-none opacity-80">
               <Compass className="h-4 w-4" />
               <span>{t("exploreMap")}</span>
-            </Link>
-          </Button>
+            </Button>
+          ) : (
+            <Button asChild size="sm" variant="cta">
+              <Link href={exploreMapHref}>
+                <Compass className="h-4 w-4" />
+                <span>{t("exploreMap")}</span>
+              </Link>
+            </Button>
+          )}
         </div>
 
         <article className="space-y-6">
@@ -173,6 +198,7 @@ export function FictionPlaceDetailView({
                   fill
                   className="object-cover"
                   sizes="(max-width: 1024px) 100vw, 40vw"
+                  unoptimized={heroUnoptimized}
                 />
               </div>
               {location.description ? (
@@ -202,12 +228,25 @@ export function FictionPlaceDetailView({
                     {t("placeDetailDirectionsHeading")}
                   </h2>
                 </div>
-                <Button asChild size="sm" variant="outline" className="h-9 shrink-0 border-border bg-background px-3 text-sm shadow-none">
-                  <Link href={exploreMapHref}>
+                {previewMode ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled
+                    className="pointer-events-none h-9 shrink-0 border-border bg-background px-3 text-sm opacity-80 shadow-none"
+                  >
                     <Compass className="h-4 w-4" />
                     <span>{t("placeDetailGoToMap")}</span>
-                  </Link>
-                </Button>
+                  </Button>
+                ) : (
+                  <Button asChild size="sm" variant="outline" className="h-9 shrink-0 border-border bg-background px-3 text-sm shadow-none">
+                    <Link href={exploreMapHref}>
+                      <Compass className="h-4 w-4" />
+                      <span>{t("placeDetailGoToMap")}</span>
+                    </Link>
+                  </Button>
+                )}
               </div>
               {coordsOk ? (
                 <FictionPlaceDirectionsMap

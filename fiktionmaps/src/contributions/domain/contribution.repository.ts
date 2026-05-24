@@ -4,6 +4,9 @@ import type {
   ContributorProfileWithDate,
   FictionContributionFeedItem,
   FictionContributorProfile,
+  PlaceContributionFeedItem,
+  StaffCreateContributionsFeedPageInput,
+  StaffCreateContributionsFeedPageResult,
   StaffFictionContributionsFeedPageInput,
   StaffFictionContributionsFeedPageResult,
   TopContributorProfile,
@@ -41,7 +44,11 @@ export interface ContributionsRepositoryPort {
   listFictionCreateContributionsStaffReviewFeedPage(
     input: StaffFictionContributionsFeedPageInput,
   ): Promise<StaffFictionContributionsFeedPageResult>
+  listCreateContributionsStaffReviewFeedPage(
+    input: StaffCreateContributionsFeedPageInput,
+  ): Promise<StaffCreateContributionsFeedPageResult>
   getFictionCreateContributionWithContributorById(id: string): Promise<FictionContributionFeedItem | null>
+  getPlaceCreateContributionWithContributorById(id: string): Promise<PlaceContributionFeedItem | null>
   approve(input: ApproveContributionInput): Promise<boolean>
   reject(input: RejectContributionInput): Promise<boolean>
   listTopContributors(limit: number): Promise<TopContributorProfile[]>

@@ -2,14 +2,15 @@ import type { Metadata } from "next"
 import { getTranslations } from "next-intl/server"
 import { Link, redirect } from "@/i18n/navigation"
 import { FictionContributeLayout } from "@/components/contribute/fiction/fiction-contribute-layout"
-import { buildContributionsFeedHref } from "@/components/contributions/contributions-feed-href"
+import { buildContributionsFeedHref, parseContributionsFeedKind } from "@/components/contributions/contributions-feed-href"
+import { ContributionsFeedKindTabBar } from "@/components/contributions/contributions-feed-kind-tab-bar"
 import { ContributionsFeedList } from "@/components/contributions/contributions-feed-list"
 import { ContributionsFeedPagination } from "@/components/contributions/contributions-feed-pagination"
 import { ContributionsFeedTabBar, type ContributionsFeedTab } from "@/components/contributions/contributions-feed-tab-bar"
 import { ContributionsRightRail } from "@/components/contributions/contributions-right-rail"
 import { STAFF_FICTION_CONTRIBUTIONS_FEED_PAGE_SIZE } from "@/src/contributions/domain/contribution.config"
 import {
-  getFictionContributionsFeedPageForStaffSession,
+  getCreateContributionsFeedPageForStaffSession,
   getTopContributorsCached,
 } from "@/src/contributions/infrastructure/next/contribution.queries"
 
@@ -33,19 +34,21 @@ function parsePage(raw: string | undefined): number {
 export default async function ContributionsStaffPage({
   searchParams,
 }: {
-  searchParams: Promise<{ submitter?: string; status?: string; page?: string }>
+  searchParams: Promise<{ submitter?: string; status?: string; page?: string; kind?: string }>
 }) {
-  const { submitter: submitterParam, status: statusParam, page: pageParam } = await searchParams
+  const { submitter: submitterParam, status: statusParam, page: pageParam, kind: kindParam } = await searchParams
   const submitter = submitterParam?.trim() ?? ""
   const statusTab = parseStatusTab(statusParam)
+  const feedKind = parseContributionsFeedKind(kindParam)
   const requestedPage = parsePage(pageParam)
 
   const t = await getTranslations("Contributions")
   const [{ items, totalCount }, topContributors] = await Promise.all([
-    getFictionContributionsFeedPageForStaffSession({
+    getCreateContributionsFeedPageForStaffSession({
       page: requestedPage,
       statusTab,
       submitterUserId: submitter,
+      kind: feedKind,
     }),
     getTopContributorsCached(14),
   ])
@@ -55,7 +58,14 @@ export default async function ContributionsStaffPage({
   const canonicalPage = Math.min(requestedPage, totalPages)
 
   if (requestedPage !== canonicalPage) {
-    redirect(buildContributionsFeedHref(statusTab, submitter, canonicalPage > 1 ? canonicalPage : undefined))
+    redirect({
+      href: buildContributionsFeedHref(
+        statusTab,
+        submitter,
+        canonicalPage > 1 ? canonicalPage : undefined,
+        feedKind,
+      ),
+    })
   }
 
   return (
@@ -72,9 +82,19 @@ export default async function ContributionsStaffPage({
             </Link>
           </div>
         ) : null}
+        <ContributionsFeedKindTabBar
+          activeKind={feedKind}
+          statusTab={statusTab}
+          submitter={submitter}
+          navAriaLabel={t("feedKindNavAria")}
+          labelFiction={t("feedKind_fiction")}
+          labelPlace={t("feedKind_place")}
+          labelAll={t("feedKind_all")}
+        />
         <ContributionsFeedTabBar
           active={statusTab}
           submitter={submitter}
+          kind={feedKind}
           navAriaLabel={t("feedTabsNavAria")}
           labelAll={t("feedTab_all")}
           labelPending={t("feedTab_pending")}
@@ -82,7 +102,7 @@ export default async function ContributionsStaffPage({
         />
         <ContributionsFeedList
           items={items}
-          emptyContext={{ submitterFiltered: Boolean(submitter), statusTab }}
+          emptyContext={{ submitterFiltered: Boolean(submitter), statusTab, feedKind }}
         />
         <ContributionsFeedPagination
           currentPage={canonicalPage}
@@ -90,6 +110,7 @@ export default async function ContributionsStaffPage({
           pageSize={pageSize}
           statusTab={statusTab}
           submitter={submitter}
+          kind={feedKind}
         />
       </div>
     </FictionContributeLayout>

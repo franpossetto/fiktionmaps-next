@@ -24,9 +24,52 @@ import {
 } from "./place.queries"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
-import type { CreatePlaceResult, UpdatePlaceResult, DeletePlaceResult, UploadPlaceImageResult } from "./place.actions.types"
+import { createContributionAction } from "@/src/contributions/infrastructure/next/contribution.actions"
+import { parsePlaceContributeFormData } from "@/src/places/domain/place-contribute.schemas"
+import type {
+  CreatePlaceResult,
+  CreateContributorPlaceResult,
+  UpdatePlaceResult,
+  DeletePlaceResult,
+  UploadPlaceImageResult,
+} from "./place.actions.types"
 
-export type { CreatePlaceResult, UpdatePlaceResult, DeletePlaceResult, UploadPlaceImageResult } from "./place.actions.types"
+export type {
+  CreatePlaceResult,
+  CreateContributorPlaceResult,
+  UpdatePlaceResult,
+  DeletePlaceResult,
+  UploadPlaceImageResult,
+} from "./place.actions.types"
+
+const CREATE_PLACE_CONTRIBUTION = {
+  type: "create_place" as const,
+  entityType: "place" as const,
+}
+
+async function recordCreatePlaceContribution(
+  placeId: string,
+  logContext: string,
+): Promise<boolean | undefined> {
+  const payload = { ...CREATE_PLACE_CONTRIBUTION, entityId: placeId }
+  try {
+    const res = await createContributionAction(payload)
+    if (!res.success) {
+      console.error(`[${logContext}] createContributionAction failed`, {
+        ...payload,
+        error: res.error,
+      })
+      return undefined
+    }
+    return res.autoApproved
+  } catch (err) {
+    console.error(`[${logContext}] createContributionAction threw`, {
+      ...payload,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return undefined
+  }
+}
 
 export async function uploadPlaceImageAction(
   placeId: string,
@@ -125,4 +168,83 @@ export async function deletePlaceAction(placeId: string): Promise<DeletePlaceRes
   if (!ok) return { success: false, error: "Place not found or delete failed" }
   updateTag("places")
   return { success: true }
+}
+
+/** Contributor flow: server sets place status and created_by from session (client cannot override). */
+export async function createContributorPlaceWithImageAction(
+  formData: FormData,
+): Promise<CreateContributorPlaceResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const parsed = parsePlaceContributeFormData(formData)
+  if (!parsed.success) return { success: false, error: parsed.error }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  const { status, created_by } = resolveEntityContributionInsertDefaults(isStaffModerator, user.id)
+
+  const result = await createPlaceUseCase(
+    {
+      fictionId: parsed.data.fictionId,
+      cityId: parsed.data.cityId,
+      locationName: parsed.data.locationName,
+      placeName: parsed.data.placeName,
+      formattedAddress: parsed.data.formattedAddress,
+      latitude: parsed.data.latitude,
+      longitude: parsed.data.longitude,
+      description: parsed.data.description,
+      isLandmark: parsed.data.isLandmark,
+      locationType: parsed.data.locationType ?? null,
+      streetViewReference: parsed.data.streetViewReference ?? null,
+      status,
+      created_by,
+    },
+    placesRepo,
+  )
+  if (!result) return { success: false, error: "Failed to create place" }
+
+  const contributionAutoApproved = await recordCreatePlaceContribution(
+    result.placeId,
+    "createContributorPlaceWithImageAction",
+  )
+
+  if (parsed.imageFile) {
+    const validationError = validateImageFile(parsed.imageFile)
+    if (!validationError) {
+      await uploadEntityImage({
+        entityType: "place",
+        entityId: result.placeId,
+        role: "avatar",
+        variants: ["sm", "lg"],
+        file: parsed.imageFile,
+        replace: true,
+      })
+    }
+  }
+
+  revalidatePath("/admin")
+  revalidatePath("/contributions")
+  updateTag("places")
+  updateTag(`place-${result.placeId}`)
+  updateTag("contributions")
+
+  const out: CreateContributorPlaceResult = {
+    success: true,
+    placeId: result.placeId,
+    fictionId: parsed.data.fictionId,
+  }
+  if (typeof contributionAutoApproved === "boolean") {
+    return { ...out, contributionAutoApproved }
+  }
+  return out
 }

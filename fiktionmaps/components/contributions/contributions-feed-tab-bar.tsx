@@ -9,13 +9,12 @@ import {
 
 export type { ContributionsFeedTab }
 
-function buildContributionsHref(tab: ContributionsFeedTab, submitter: string): string {
-  return buildContributionsFeedHref(tab, submitter)
-}
+import type { StaffContributionsFeedKind } from "@/src/contributions/domain/contribution.entity"
 
 export interface ContributionsFeedTabBarProps {
   active: ContributionsFeedTab
   submitter: string
+  kind?: StaffContributionsFeedKind
   navAriaLabel: string
   labelAll: string
   labelPending: string
@@ -25,6 +24,7 @@ export interface ContributionsFeedTabBarProps {
 export function ContributionsFeedTabBar({
   active,
   submitter,
+  kind = "fiction",
   navAriaLabel,
   labelAll,
   labelPending,
@@ -40,7 +40,7 @@ export function ContributionsFeedTabBar({
     <nav className="mb-6 border-b border-border" aria-label={navAriaLabel}>
       <div className="flex flex-wrap gap-x-5 gap-y-1 sm:gap-x-8">
         {tabs.map(({ value, label }) => {
-          const href = buildContributionsHref(value, submitter)
+          const href = buildContributionsFeedHref(value, submitter, undefined, kind)
           const isActive = active === value
           return (
             <Link

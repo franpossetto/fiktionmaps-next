@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Link } from "@/i18n/navigation"
 import { buildContributionsFeedHref, type ContributionsFeedTab } from "@/components/contributions/contributions-feed-href"
+import type { StaffContributionsFeedKind } from "@/src/contributions/domain/contribution.entity"
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -11,8 +12,9 @@ export async function ContributionsFeedPagination(props: {
   pageSize: number
   statusTab: ContributionsFeedTab
   submitter: string
+  kind?: StaffContributionsFeedKind
 }) {
-  const { currentPage, totalCount, pageSize, statusTab, submitter } = props
+  const { currentPage, totalCount, pageSize, statusTab, submitter, kind = "fiction" } = props
   const t = await getTranslations("Contributions")
 
   if (totalCount <= pageSize) return null
@@ -23,8 +25,8 @@ export async function ContributionsFeedPagination(props: {
   const prevPage = safePage > 1 ? safePage - 1 : null
   const nextPage = safePage < totalPages ? safePage + 1 : null
 
-  const prevHref = prevPage != null ? buildContributionsFeedHref(statusTab, submitter, prevPage) : undefined
-  const nextHref = nextPage != null ? buildContributionsFeedHref(statusTab, submitter, nextPage) : undefined
+  const prevHref = prevPage != null ? buildContributionsFeedHref(statusTab, submitter, prevPage, kind) : undefined
+  const nextHref = nextPage != null ? buildContributionsFeedHref(statusTab, submitter, nextPage, kind) : undefined
 
   return (
     <nav
