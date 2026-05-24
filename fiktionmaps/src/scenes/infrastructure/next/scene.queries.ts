@@ -62,3 +62,8 @@ export function getSceneCountsByFictionIdsCached(fictionIds: string[]): Promise<
 export async function getScenesForPlace(placeId: string): Promise<Scene[]> {
   return listScenesUseCase({ placeId, active: true }, repo)
 }
+
+/** Active scenes for a fiction (public detail / watch page). */
+export async function getScenesForFiction(fictionId: string): Promise<Scene[]> {
+  return listScenesUseCase({ fictionId, active: true }, repo)
+}

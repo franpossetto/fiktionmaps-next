@@ -19,6 +19,7 @@ import type { ContributorProfileWithDate } from "@/src/contributions/domain/cont
 import { ScenePreviewThumb } from "@/components/scenes/scene-preview-thumb"
 import { PlaceContributorsByline } from "@/components/fictions/place-contributors-byline"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
+import { publicFictionScenePath } from "@/lib/fictions/public-fiction-paths"
 
 const FictionPlaceDirectionsMap = dynamic(
   () =>
@@ -81,7 +82,7 @@ function PlaceDetailLikeCluster() {
 
 export interface FictionPlaceDetailViewProps {
   fiction: FictionWithMedia
-  /** Segment for `/fictions/...` and `/fiction/...` paths (slug preferred). */
+  /** Slug segment for `/fictions/...` paths. */
   fictionPathSlug: string
   location: Place
   city: City | undefined
@@ -301,7 +302,7 @@ export function FictionPlaceDetailView({
                   return (
                     <li key={scene.id} className="px-4 py-4 sm:px-5 sm:py-5">
                       <Link
-                        href={`/fiction/${fictionPathSlug}/scene/${encodeURIComponent(scene.id)}`}
+                        href={publicFictionScenePath(fictionPathSlug, scene.id)}
                         className="flex min-w-0 flex-1 cursor-pointer items-center gap-4 rounded-lg outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       >
                         <p className="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground">

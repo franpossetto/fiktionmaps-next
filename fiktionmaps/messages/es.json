@@ -385,6 +385,7 @@
     "moreClipsOnPlacePage": "+{count} más en la página del lugar",
     "visitorTip": "Tip para visitantes",
     "exploreThisPlace": "Explorar este lugar",
+    "seeFullPlaceArticle": "Ver artículo completo",
     "viewMore": "Ver más",
     "scenesFilmedCount": "{count, plural, one {# escena rodada aquí} other {# escenas rodadas aquí}}",
     "featuredIn": "Aparece en",
@@ -937,7 +938,9 @@
     "fictionDetailDescriptionBook": "Descubre las ubicaciones reales de {title}, explóralas en el mapa y planifica tu visita con consejos prácticos de viaje.",
     "fictionNotFound": "Ficción no encontrada",
     "placeNotFound": "Lugar no encontrado",
+    "sceneNotFound": "Escena no encontrada",
     "placeDetailTitle": "{placeName} · {fictionTitle}",
+    "sceneDetailTitle": "{sceneTitle} · {fictionTitle}",
     "breadcrumbHome": "Inicio",
     "breadcrumbFictions": "Ficciones",
     "breadcrumbNavAriaLabel": "Migas de pan"

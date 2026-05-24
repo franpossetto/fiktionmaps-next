@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DEFAULT_FICTION_ACCENT, DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
+import { publicFictionPlacePath } from "@/lib/fictions/public-fiction-paths"
 import Image from "next/image"
 import { SceneClipPanelCard } from "./scene-clip-panel-card"
 import { getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
@@ -128,6 +129,8 @@ export function LocationDetail({
   const fictionCoverSrc =
     fiction?.coverImage?.trim() || fiction?.coverImageLarge?.trim() || "/placeholder.svg"
   const hasSceneNarrative = Boolean(place.sceneDescription?.trim() || place.sceneQuote?.trim())
+  const fictionSlug = fiction?.slug ?? fiction?.id ?? place.fictionId
+  const placePageHref = fictionSlug ? publicFictionPlacePath(fictionSlug, place.id) : null
 
   useEffect(() => {
     closeButtonRef.current?.focus()
@@ -402,6 +405,17 @@ export function LocationDetail({
 
           </article>
         </ScrollArea>
+
+        {placePageHref ? (
+          <footer className="shrink-0 border-t border-border/60 px-5 py-4 sm:px-6">
+            <Button asChild variant="secondary" size="sm" className="h-9 w-full">
+              <Link href={placePageHref} className="justify-between">
+                <span>{t("seeFullPlaceArticle")}</span>
+                <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              </Link>
+            </Button>
+          </footer>
+        ) : null}
     </aside>
   )
 }

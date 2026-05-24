@@ -385,6 +385,7 @@
     "moreClipsOnPlacePage": "+{count} more on the place page",
     "visitorTip": "Visitor tip",
     "exploreThisPlace": "Explore this place",
+    "seeFullPlaceArticle": "See full article",
     "viewMore": "See more",
     "scenesFilmedCount": "{count, plural, one {# scene filmed here} other {# scenes filmed here}}",
     "featuredIn": "Featured in",
@@ -937,7 +938,9 @@
     "fictionDetailDescriptionBook": "Discover {title} real-world locations, explore them on the map, and plan your visit with practical travel tips.",
     "fictionNotFound": "Fiction not found",
     "placeNotFound": "Place not found",
+    "sceneNotFound": "Scene not found",
     "placeDetailTitle": "{placeName} · {fictionTitle}",
+    "sceneDetailTitle": "{sceneTitle} · {fictionTitle}",
     "breadcrumbHome": "Home",
     "breadcrumbFictions": "Fictions",
     "breadcrumbNavAriaLabel": "Breadcrumb"
