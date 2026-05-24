@@ -27,7 +27,6 @@ interface LocationDetailProps {
   /** Reports panel width so the map can center the pin in the remaining viewport (md+). */
   onPanelWidthChange?: (width: number) => void
   onSelectRelatedPlace?: (place: Place) => void
-  onViewPlace?: (place: Place) => void
   onView3D?: () => void
 }
 
@@ -39,7 +38,6 @@ export function LocationDetail({
   onClose,
   onPanelWidthChange,
   onSelectRelatedPlace,
-  onViewPlace,
   onView3D: _onView3D,
 }: LocationDetailProps) {
   const t = useTranslations("Map")
@@ -305,18 +303,6 @@ export function LocationDetail({
                     </li>
                   ))}
                 </ul>
-                {onViewPlace && (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-9 w-full justify-between"
-                    onClick={() => onViewPlace(place)}
-                  >
-                    <span>{t("viewMore")}</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Button>
-                )}
               </section>
             )}
 

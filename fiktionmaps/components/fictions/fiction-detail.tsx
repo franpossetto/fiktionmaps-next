@@ -312,16 +312,16 @@ export function FictionDetail({
                 {locationRows.map(({ index, location, city }) => {
                   const googleMapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${location.location.lat},${location.location.lng}`)}`
                   return (
-                    <li key={location.id} className="px-4 py-4 sm:px-5 sm:py-5">
+                    <li key={location.id} className="px-3 py-3 sm:px-5 sm:py-5">
                       <div className="flex items-center gap-4">
                         <Link
                           href={`/fictions/${pathSlug}/places/${location.id}`}
-                          className="flex min-w-0 flex-1 cursor-pointer items-center gap-4 rounded-lg outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:gap-4"
                         >
-                          <p className="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground">
+                          <p className="hidden w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground sm:block">
                             {index}
                           </p>
-                          <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted/30 sm:h-18 sm:w-24">
+                          <div className="relative h-14 w-18 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted/30 sm:h-18 sm:w-24">
                             <Image
                               src={location.image || "/placeholder.svg"}
                               alt={location.name ?? location.location.name}
@@ -341,7 +341,7 @@ export function FictionDetail({
                             <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{location.location.address}</p>
                           </div>
                         </Link>
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="hidden shrink-0 items-center gap-2 sm:flex">
                           <Button asChild size="sm" variant="outline" className="h-9 border-border bg-background px-3 text-sm shadow-none">
                             <a href={googleMapsHref} target="_blank" rel="noopener noreferrer">
                               {t("mapsShort")}

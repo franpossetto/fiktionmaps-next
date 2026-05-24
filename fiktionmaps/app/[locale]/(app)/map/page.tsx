@@ -15,7 +15,6 @@ import { LocationDetail } from "@/components/map/location-detail"
 // import { ThumbnailCarousel } from "@/components/map/thumbnail-carousel"
 import { UserMenu } from "@/components/layout/user-menu"
 // import { usePlaceSelectorCollapsedStorage } from "@/lib/local-storage-service-hooks"
-import { useRouter } from "@/i18n/navigation"
 import {
   getAllCitiesAction,
   getCityFictionsAction,
@@ -71,7 +70,6 @@ function MapLoadingScreen({ message }: { message: string }) {
 }
 
 function MapPageInner() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const tMap = useTranslations("Map")
   const initialFictionId = searchParams.get("fiction")
@@ -86,6 +84,8 @@ function MapPageInner() {
   const [availableFictions, setAvailableFictions] = useState<FictionWithMedia[]>([])
   const [selectedFictionIds, setSelectedFictionIds] = useState<string[]>([])
   const [viewportPlaces, setViewportPlaces] = useState<Place[]>([])
+  /** Full city place list — stable source for sidebar “next places”, independent of map bbox. */
+  const [cityPlaces, setCityPlaces] = useState<Place[]>([])
   const cityPlacesRef = useRef<Place[]>([])
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null)
   const [focusedPlaceId, setFocusedPlaceId] = useState<string | null>(null)
@@ -101,6 +101,13 @@ function MapPageInner() {
     () => selectedFictionIds.slice().sort().join(","),
     [selectedFictionIds],
   )
+
+  const sidebarRelatedPlaces = useMemo(() => {
+    if (!selectedPlace) return []
+    return filterPlacesByFictionIds(cityPlaces, selectedFictionIds).filter(
+      (p) => p.id !== selectedPlace.id,
+    )
+  }, [cityPlaces, selectedFictionIds, selectedPlace?.id])
 
   const isBootstrapping = citiesLoading || !selectedCity
 
@@ -159,6 +166,7 @@ function MapPageInner() {
     if (!selectedCity) {
       setAvailableFictions([])
       setViewportPlaces([])
+      setCityPlaces([])
       cityPlacesRef.current = []
       return
     }
@@ -168,6 +176,7 @@ function MapPageInner() {
 
     setBounds(null)
     setViewportPlaces([])
+    setCityPlaces([])
     cityPlacesRef.current = []
 
     Promise.all([
@@ -180,12 +189,14 @@ function MapPageInner() {
         const fictionIds = resolveSelectedFictionIds(fics, preferredFictionId)
         setSelectedFictionIds(fictionIds)
         cityPlacesRef.current = places
+        setCityPlaces(places)
         setViewportPlaces(filterPlacesByFictionIds(places, fictionIds))
       })
       .catch(() => {
         if (!cancelled) {
           setAvailableFictions([])
           setViewportPlaces([])
+          setCityPlaces([])
           cityPlacesRef.current = []
         }
       })
@@ -268,6 +279,7 @@ function MapPageInner() {
     setSelectedPlace(null)
     setFocusedPlaceId(null)
     setViewportPlaces([])
+    setCityPlaces([])
   }, [])
 
   const handleToggleFiction = (fictionId: string) => {
@@ -286,17 +298,6 @@ function MapPageInner() {
   // const handleNavigateToPlace = useCallback((place: Place) => {
   //   setFocusedPlaceId(place.id)
   // }, [])
-
-  const handleExplorePlace = useCallback(
-    (place: Place) => {
-      setSelectedPlace(null)
-      const targetFiction = availableFictions.find((fiction) => fiction.id === place.fictionId)
-      router.push(
-        `/fictions/${encodeURIComponent(targetFiction?.slug ?? place.fictionId)}`,
-      )
-    },
-    [router, availableFictions],
-  )
 
   // Modo navegación (carrusel inferior): oculto por ahora — reactivar con ThumbnailCarousel + estado arriba.
   // const isNavigationModeActive = !placeSelectorCollapsed && filteredPlaces.length > 0
@@ -404,7 +405,7 @@ function MapPageInner() {
             <LocationDetail
               place={selectedPlace}
               fiction={availableFictions.find((f) => f.id === selectedPlace.fictionId)}
-              relatedPlaces={viewportPlaces.filter((p) => p.id !== selectedPlace.id)}
+              relatedPlaces={sidebarRelatedPlaces}
               relatedFictions={availableFictions.filter((f) => f.id !== selectedPlace.fictionId)}
               onClose={() => {
                 setSelectedPlace(null)
@@ -412,7 +413,6 @@ function MapPageInner() {
               }}
               onPanelWidthChange={setDetailPanelWidth}
               onSelectRelatedPlace={handleLocationClick}
-              onViewPlace={handleExplorePlace}
             />
           )}
         </div>

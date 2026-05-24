@@ -14,6 +14,7 @@ import {
 import { AuthModal } from "@/components/auth/auth-modal"
 import { LogOut, User, Settings, Shield, BookOpen, Map, Inbox } from "lucide-react"
 import { Link } from "@/i18n/navigation"
+import { LocaleMenuSub } from "@/components/layout/locale-switcher"
 
 export function UserMenu() {
   const t = useTranslations("Nav")
@@ -23,13 +24,31 @@ export function UserMenu() {
   if (!user) {
     return (
       <>
-        <button
-          onClick={() => setAuthOpen(true)}
-          className="flex h-10 w-10 items-center justify-center rounded-xl text-chrome-muted transition-all duration-200 hover:bg-chrome-hover hover:text-foreground mx-auto"
-          aria-label={t("signIn")}
-        >
-          <User className="h-[18px] w-[18px]" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-chrome-muted transition-all duration-200 hover:bg-chrome-hover hover:text-foreground mx-auto"
+              aria-label={t("userMenu")}
+            >
+              <User className="h-[18px] w-[18px]" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            side="right"
+            align="end"
+            className="z-[1100] min-w-[240px] w-auto max-w-[min(320px,90vw)] bg-background text-foreground border border-border shadow-xl"
+          >
+            <DropdownMenuItem
+              onClick={() => setAuthOpen(true)}
+              className="text-foreground focus:bg-accent focus:text-accent-foreground"
+            >
+              <User className="mr-2 h-4 w-4" />
+              {t("signIn")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <LocaleMenuSub />
+          </DropdownMenuContent>
+        </DropdownMenu>
         <AuthModal open={authOpen} onOpenChange={setAuthOpen} />
       </>
     )
@@ -106,6 +125,8 @@ export function UserMenu() {
             </Link>
           </DropdownMenuItem>
         )}
+        <DropdownMenuSeparator />
+        <LocaleMenuSub />
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout} className="text-foreground focus:bg-accent focus:text-accent-foreground">
           <LogOut className="mr-2 h-4 w-4" />

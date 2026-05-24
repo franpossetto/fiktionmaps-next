@@ -189,13 +189,13 @@ export function FictionContributePublicPreview({
                       const index = idx + 1
                       const { city, place, address } = splitDemoPlaceLine(tPreview(rowKey))
                       return (
-                        <li key={rowKey} className="px-4 py-4 sm:px-5 sm:py-5">
+                        <li key={rowKey} className="px-3 py-3 sm:px-5 sm:py-5">
                           <div className="flex items-center gap-4">
-                            <div className="flex min-w-0 flex-1 items-center gap-4">
-                              <p className="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground">
+                            <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
+                              <p className="hidden w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground sm:block">
                                 {index}
                               </p>
-                              <div className="relative flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/60 bg-muted/40 sm:h-18 sm:w-24">
+                              <div className="relative flex h-14 w-18 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/60 bg-muted/40 sm:h-18 sm:w-24">
                                 <ImageIcon className="h-7 w-7 text-muted-foreground/45" aria-hidden />
                               </div>
                               <div className="min-w-0 flex-1">
@@ -209,7 +209,7 @@ export function FictionContributePublicPreview({
                                 <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{address}</p>
                               </div>
                             </div>
-                            <div className="flex shrink-0 items-center gap-2">
+                            <div className="hidden shrink-0 items-center gap-2 sm:flex">
                               <span className="inline-flex h-9 items-center rounded-md border border-dashed border-border/80 bg-muted/20 px-3 text-xs text-muted-foreground">
                                 {t("mapsShort")}
                               </span>
