@@ -1,13 +1,24 @@
-/** Same wide hero as `FictionPlaceDetailView` (`aspect-[21/9]`). */
+/** Preferred hero on the place page (`aspect-[21/9]`). */
 export const PLACE_HERO_ASPECT_WIDTH_OVER_HEIGHT = 21 / 9
 
+/** Also accepted: typical video / YouTube frames (16:9). */
+export const PLACE_HERO_ASPECT_YOUTUBE_WIDTH_OVER_HEIGHT = 16 / 9
+
+const PLACE_HERO_ASPECT_TARGETS = [
+  PLACE_HERO_ASPECT_WIDTH_OVER_HEIGHT,
+  PLACE_HERO_ASPECT_YOUTUBE_WIDTH_OVER_HEIGHT,
+] as const
+
 export const PLACE_HERO_ASPECT_RATIO_TOLERANCE = 0.1
+
+function isNearAspectTarget(actual: number, target: number): boolean {
+  return Math.abs(actual - target) / target <= PLACE_HERO_ASPECT_RATIO_TOLERANCE
+}
 
 export function isPlaceHeroAspectRatioOk(width: number, height: number): boolean {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return false
   const actual = width / height
-  const target = PLACE_HERO_ASPECT_WIDTH_OVER_HEIGHT
-  return Math.abs(actual - target) / target <= PLACE_HERO_ASPECT_RATIO_TOLERANCE
+  return PLACE_HERO_ASPECT_TARGETS.some((target) => isNearAspectTarget(actual, target))
 }
 
 export const PLACE_HERO_READABLE_MIN_SHORT_EDGE_PX = 360

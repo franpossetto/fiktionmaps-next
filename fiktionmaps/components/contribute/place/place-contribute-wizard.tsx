@@ -36,11 +36,12 @@ import {
 import { PlaceContributePhotoField } from "@/components/contribute/place/place-contribute-photo-field"
 import {
   LOCATION_TYPE_OPTIONS,
-  PlaceAddressSearchWithTabs,
+  DEFAULT_MAPBOX_SEARCH_TYPES,
+  PlaceAddressSearchWithFilters,
   PlaceLocationMap,
   flyMapToLocation,
   resolveCityId,
-  type PlaceAddressMode,
+  type MapboxSearchType,
 } from "@/components/places/place-location-picker"
 import { PlaceContributeCriteriaAside } from "@/components/contribute/place/place-contribute-criteria-aside"
 import { PlaceContributeReferencePhotoAside } from "@/components/contribute/place/place-contribute-reference-photo-aside"
@@ -125,7 +126,7 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [addressLocked, setAddressLocked] = useState(false)
-  const [searchMode, setSearchMode] = useState<PlaceAddressMode>("street")
+  const [searchTypes, setSearchTypes] = useState<MapboxSearchType[]>(DEFAULT_MAPBOX_SEARCH_TYPES)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmCityId, setConfirmCityId] = useState("")
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -451,17 +452,21 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
               <div className="space-y-4">
                 <ContributeFieldWrapper label={t("stepLocation")} required error={errors.address}>
                   {addressLocked ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                       <input
                         type="text"
                         readOnly
                         value={draft.formattedAddress || draft.address}
-                        className={cn(INPUT_ROW, "cursor-not-allowed bg-muted/50")}
+                        className={cn(
+                          INPUT_ROW,
+                          "min-w-0 w-auto shrink flex-1 truncate cursor-not-allowed bg-muted/50",
+                        )}
                       />
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
+                        className="shrink-0"
                         onClick={() => {
                           setAddressLocked(false)
                           setDraft((p) => ({
@@ -478,14 +483,20 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
                       </Button>
                     </div>
                   ) : (
-                    <PlaceAddressSearchWithTabs
+                    <PlaceAddressSearchWithFilters
                       value={draft.address}
                       onChange={(v) => setDraft((p) => ({ ...p, address: v }))}
                       onSelect={handleAddressSelect}
-                      searchMode={searchMode}
-                      onSearchModeChange={setSearchMode}
-                      placeTabLabel={t("addressTabPlace")}
-                      streetTabLabel={t("addressTabStreet")}
+                      searchTypes={searchTypes}
+                      onSearchTypesChange={setSearchTypes}
+                      placeholder={t("addressSearchPlaceholder")}
+                      intersectionHint={t("addressIntersectionHint")}
+                      filterLabel={t("addressSearchTypeFilter")}
+                      typeLabels={{
+                        poi: t("addressSearchTypePoi"),
+                        address: t("addressSearchTypeAddress"),
+                        street: t("addressSearchTypeStreet"),
+                      }}
                     />
                   )}
                 </ContributeFieldWrapper>
@@ -632,9 +643,9 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
             <label className="block text-sm font-medium">{t("confirmCityLabel")}</label>
             <Select value={confirmCityId || undefined} onValueChange={setConfirmCityId}>
               <SelectTrigger className="h-10 w-full">
-                <SelectValue />
+                <SelectValue placeholder={t("confirmCityLabel")} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[10000]">
                 {initialCities.map((city) => (
                   <SelectItem key={city.id} value={city.id}>
                     {city.name}, {city.country}

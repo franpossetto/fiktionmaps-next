@@ -1,19 +1,54 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Search, X, MapPin } from "lucide-react"
+import { Search, SlidersHorizontal, X, MapPin } from "lucide-react"
 import { MapProvider, MapContainer, MapMarker } from "@/lib/map"
 import type { MapControlHandle } from "@/lib/map/types"
 import { MAPBOX_ACCESS_TOKEN } from "@/lib/map/mapbox/styles"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { City } from "@/src/cities/domain/city.entity"
 
 const SEARCH_BOX_URL = "https://api.mapbox.com/search/searchbox/v1"
+const GEOCODING_URL = "https://api.mapbox.com/geocoding/v5/mapbox.places"
 export const PLACE_LOCATION_DEFAULT_CENTER = { lat: 48.8566, lng: 2.3522 }
 export const PLACE_LOCATION_DEFAULT_ZOOM = 10
 export const PLACE_LOCATION_MIN_ZOOM = 0
 export const PLACE_LOCATION_MAX_ZOOM = 22
 export const PLACE_LOCATION_FLY_DURATION = 1200
+
+export type MapboxSearchType = "poi" | "address" | "street"
+
+export const DEFAULT_MAPBOX_SEARCH_TYPES: MapboxSearchType[] = ["address", "street", "poi"]
+
+export const MAPBOX_SEARCH_TYPE_OPTIONS: {
+  value: MapboxSearchType
+  label: string
+  description: string
+}[] = [
+  {
+    value: "address",
+    label: "Addresses",
+    description: "Numbered street addresses",
+  },
+  {
+    value: "street",
+    label: "Streets & intersections",
+    description: "Street names and corners (e.g. LaSalle St and Adams St)",
+  },
+  {
+    value: "poi",
+    label: "Places (POI)",
+    description: "Landmarks, businesses, and points of interest",
+  },
+]
 
 interface SearchBoxContextEntry {
   name?: string
@@ -44,6 +79,73 @@ interface SearchBoxRetrieveFeature {
   }
 }
 
+interface GeocodingFeature {
+  id: string
+  place_name: string
+  center: [number, number]
+  place_type?: string[]
+  text: string
+  context?: Array<{ id: string; text: string }>
+  properties?: { accuracy?: string }
+}
+
+function looksLikeIntersectionQuery(input: string): boolean {
+  return /\s(&|and)\s/i.test(input)
+}
+
+function formatSearchBoxSuggestionAddress(suggestion: SearchBoxSuggestion): string {
+  return suggestion.place_formatted
+    ? `${suggestion.name}, ${suggestion.place_formatted}`
+    : suggestion.name
+}
+
+/** Search Box retrieve snaps street intersections to a nearby numbered address; use Geocoding v5 instead. */
+async function geocodeStreetIntersectionSuggestion(
+  suggestion: SearchBoxSuggestion,
+): Promise<PlaceAddressSelectResult | null> {
+  if (!MAPBOX_ACCESS_TOKEN) return null
+  const query = formatSearchBoxSuggestionAddress(suggestion)
+  const geoParams = new URLSearchParams({
+    access_token: MAPBOX_ACCESS_TOKEN,
+    types: "address",
+    limit: "1",
+    language: "en",
+  })
+  const res = await fetch(`${GEOCODING_URL}/${encodeURIComponent(query)}.json?${geoParams}`)
+  if (!res.ok) return null
+  const data = await res.json()
+  const feature = data.features?.[0] as GeocodingFeature | undefined
+  if (!feature) return null
+  const [lng, lat] = feature.center
+  const placeName =
+    feature.properties?.accuracy === "intersection"
+      ? feature.place_name
+      : formatSearchBoxSuggestionAddress(suggestion)
+  return {
+    lat,
+    lng,
+    place_name: placeName,
+    text: suggestion.name,
+    context: feature.context ?? searchBoxContextToV5(suggestion.context),
+  }
+}
+
+function rankPredictions(predictions: AddressPrediction[], input: string): AddressPrediction[] {
+  const intersectionQuery = looksLikeIntersectionQuery(input)
+  if (!intersectionQuery) return predictions
+  const score = (p: AddressPrediction): number => {
+    const type = predictionFeatureType(p)
+    if (type === "street") return 0
+    if (type === "address") return 1
+    return 2
+  }
+  return [...predictions].sort((a, b) => score(a) - score(b))
+}
+
+type AddressPrediction =
+  | { source: "searchbox"; suggestion: SearchBoxSuggestion }
+  | { source: "geocoding"; feature: GeocodingFeature }
+
 function searchBoxContextToV5(
   context?: SearchBoxContext,
 ): Array<{ id: string; text: string }> {
@@ -55,6 +157,35 @@ function searchBoxContextToV5(
   if (context?.region?.name) out.push({ id: "region.x", text: context.region.name })
   if (context?.place?.name) out.push({ id: "place.x", text: context.place.name })
   return out
+}
+
+function predictionKey(prediction: AddressPrediction): string {
+  return prediction.source === "searchbox"
+    ? prediction.suggestion.mapbox_id
+    : prediction.feature.id
+}
+
+function predictionTitle(prediction: AddressPrediction): string {
+  return prediction.source === "searchbox"
+    ? prediction.suggestion.name
+    : prediction.feature.text || prediction.feature.place_name.split(",")[0]?.trim() || ""
+}
+
+function predictionSubtitle(prediction: AddressPrediction): string | undefined {
+  if (prediction.source === "searchbox") return prediction.suggestion.place_formatted
+  const parts = prediction.feature.place_name.split(",").slice(1).map((p) => p.trim())
+  return parts.length > 0 ? parts.join(", ") : undefined
+}
+
+function predictionFeatureType(prediction: AddressPrediction): string {
+  if (prediction.source === "searchbox") return prediction.suggestion.feature_type
+  return prediction.feature.place_type?.[0] ?? "address"
+}
+
+function featureTypeLabel(type: string, labels?: Partial<Record<MapboxSearchType, string>>): string {
+  if (type === "poi") return labels?.poi ?? "Place"
+  if (type === "street") return labels?.street ?? "Intersection"
+  return labels?.address ?? "Address"
 }
 
 export const LOCATION_TYPE_OPTIONS = [
@@ -75,6 +206,7 @@ export const LOCATION_TYPE_OPTIONS = [
   { value: "other", label: "Other" },
 ] as const
 
+/** @deprecated Use MapboxSearchType[] instead */
 export type PlaceAddressMode = "place" | "street"
 
 export type PlaceAddressSelectResult = {
@@ -83,16 +215,6 @@ export type PlaceAddressSelectResult = {
   place_name: string
   text: string
   context?: Array<{ id: string; text: string }>
-}
-
-const ADDRESS_MODE_PLACEHOLDER: Record<PlaceAddressMode, string> = {
-  place: "Search a place (e.g. Eiffel Tower, Platform 9¾)",
-  street: "Search a street address (e.g. 9 de Julio 1058)",
-}
-
-const ADDRESS_MODE_MAPBOX_TYPES: Record<PlaceAddressMode, string> = {
-  place: "poi",
-  street: "address",
 }
 
 function newSessionToken(): string {
@@ -122,59 +244,140 @@ export function resolveCityId(
   return cities[0]?.id ?? ""
 }
 
+function MapboxSearchTypeFilter({
+  searchTypes,
+  onSearchTypesChange,
+  typeLabels,
+  filterLabel = "Result types",
+}: {
+  searchTypes: MapboxSearchType[]
+  onSearchTypesChange: (types: MapboxSearchType[]) => void
+  typeLabels?: Partial<Record<MapboxSearchType, string>>
+  filterLabel?: string
+}) {
+  const toggleType = useCallback(
+    (type: MapboxSearchType, checked: boolean) => {
+      if (checked) {
+        onSearchTypesChange([...searchTypes, type])
+        return
+      }
+      if (searchTypes.length <= 1) return
+      onSearchTypesChange(searchTypes.filter((t) => t !== type))
+    },
+    [searchTypes, onSearchTypesChange],
+  )
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9 shrink-0 gap-1.5 px-2.5"
+          aria-label={filterLabel}
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          <span className="text-xs tabular-nums">
+            {searchTypes.length}/{MAPBOX_SEARCH_TYPE_OPTIONS.length}
+          </span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuLabel>{filterLabel}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {MAPBOX_SEARCH_TYPE_OPTIONS.map((opt) => (
+          <DropdownMenuCheckboxItem
+            key={opt.value}
+            checked={searchTypes.includes(opt.value)}
+            onCheckedChange={(checked) => toggleType(opt.value, checked === true)}
+            onSelect={(e) => e.preventDefault()}
+          >
+            <span>{typeLabels?.[opt.value] ?? opt.label}</span>
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 export function PlaceAddressSearch({
   value,
   onChange,
   onSelect,
   onError,
-  mode,
-  placePlaceholder,
-  streetPlaceholder,
+  searchTypes,
+  placeholder = "Search address, intersection, or place…",
+  intersectionHint,
+  typeLabels,
+  filterLabel,
 }: {
   value: string
   onChange: (v: string) => void
   onSelect: (result: PlaceAddressSelectResult) => void
   onError?: (msg: string) => void
-  mode: PlaceAddressMode
-  placePlaceholder?: string
-  streetPlaceholder?: string
+  searchTypes: MapboxSearchType[]
+  placeholder?: string
+  intersectionHint?: string
+  typeLabels?: Partial<Record<MapboxSearchType, string>>
+  filterLabel?: string
 }) {
   const [loading, setLoading] = useState(false)
-  const [predictions, setPredictions] = useState<SearchBoxSuggestion[]>([])
+  const [predictions, setPredictions] = useState<AddressPrediction[]>([])
   const sessionTokenRef = useRef<string>("")
   if (!sessionTokenRef.current) {
     sessionTokenRef.current = newSessionToken()
   }
 
-  const placeholder =
-    mode === "place"
-      ? (placePlaceholder ?? ADDRESS_MODE_PLACEHOLDER.place)
-      : (streetPlaceholder ?? ADDRESS_MODE_PLACEHOLDER.street)
-
   const search = useCallback(
     async (input: string) => {
-      if (!MAPBOX_ACCESS_TOKEN || input.trim().length < 2) {
+      if (!MAPBOX_ACCESS_TOKEN || input.trim().length < 2 || searchTypes.length === 0) {
         setPredictions([])
         return
       }
       try {
+        const typesParam = searchTypes.join(",")
         const params = new URLSearchParams({
           access_token: MAPBOX_ACCESS_TOKEN,
           session_token: sessionTokenRef.current,
           q: input,
-          types: ADDRESS_MODE_MAPBOX_TYPES[mode],
-          limit: "5",
+          types: typesParam,
+          limit: "8",
           language: "en",
         })
         const res = await fetch(`${SEARCH_BOX_URL}/suggest?${params}`)
-        if (!res.ok) return
-        const data = await res.json()
-        setPredictions((data.suggestions ?? []) as SearchBoxSuggestion[])
+        const next: AddressPrediction[] = []
+        if (res.ok) {
+          const data = await res.json()
+          for (const suggestion of (data.suggestions ?? []) as SearchBoxSuggestion[]) {
+            next.push({ source: "searchbox", suggestion })
+          }
+        }
+
+        const wantsStreetOrAddress = searchTypes.includes("address") || searchTypes.includes("street")
+        if (next.length === 0 && wantsStreetOrAddress) {
+          const geoParams = new URLSearchParams({
+            access_token: MAPBOX_ACCESS_TOKEN,
+            autocomplete: "true",
+            types: "address",
+            limit: "5",
+            language: "en",
+          })
+          const geoRes = await fetch(`${GEOCODING_URL}/${encodeURIComponent(input)}.json?${geoParams}`)
+          if (geoRes.ok) {
+            const geoData = await geoRes.json()
+            for (const feature of (geoData.features ?? []) as GeocodingFeature[]) {
+              next.push({ source: "geocoding", feature })
+            }
+          }
+        }
+
+        setPredictions(rankPredictions(next, input))
       } catch {
         setPredictions([])
       }
     },
-    [mode],
+    [searchTypes],
   )
 
   useEffect(() => {
@@ -186,15 +389,23 @@ export function PlaceAddressSearch({
     return () => clearTimeout(t)
   }, [value, search])
 
-  useEffect(() => {
-    setPredictions([])
-  }, [mode])
-
-  const handleSelect = useCallback(
+  const handleSelectSearchBox = useCallback(
     async (suggestion: SearchBoxSuggestion) => {
       if (!MAPBOX_ACCESS_TOKEN) return
       setLoading(true)
       try {
+        if (suggestion.feature_type === "street") {
+          const intersection = await geocodeStreetIntersectionSuggestion(suggestion)
+          if (intersection) {
+            onSelect(intersection)
+            onChange(intersection.place_name)
+            setPredictions([])
+            sessionTokenRef.current = newSessionToken()
+            onError?.("")
+            return
+          }
+        }
+
         const params = new URLSearchParams({
           access_token: MAPBOX_ACCESS_TOKEN,
           session_token: sessionTokenRef.current,
@@ -207,7 +418,7 @@ export function PlaceAddressSearch({
           return
         }
         const data = await res.json()
-        const feat = (data.features?.[0]) as SearchBoxRetrieveFeature | undefined
+        const feat = data.features?.[0] as SearchBoxRetrieveFeature | undefined
         if (!feat) {
           onError?.("Could not retrieve location.")
           return
@@ -238,56 +449,152 @@ export function PlaceAddressSearch({
     [onSelect, onChange, onError],
   )
 
+  const handleSelectGeocoding = useCallback(
+    (feature: GeocodingFeature) => {
+      const [lng, lat] = feature.center
+      onSelect({
+        lat,
+        lng,
+        place_name: feature.place_name,
+        text: feature.text || feature.place_name.split(",")[0]?.trim() || "",
+        context: feature.context,
+      })
+      onChange(feature.place_name)
+      setPredictions([])
+      onError?.("")
+    },
+    [onSelect, onChange, onError],
+  )
+
+  const handleSelect = useCallback(
+    (prediction: AddressPrediction) => {
+      if (prediction.source === "searchbox") {
+        void handleSelectSearchBox(prediction.suggestion)
+        return
+      }
+      handleSelectGeocoding(prediction.feature)
+    },
+    [handleSelectSearchBox, handleSelectGeocoding],
+  )
+
   return (
-    <div className="relative w-full">
-      <div className="relative flex items-center">
-        <Search className="pointer-events-none absolute left-3 h-4 w-4 text-muted-foreground" />
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          autoComplete="off"
-          className="h-9 w-full rounded-lg border border-border bg-background py-2 pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-        {value ? (
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onChange("")}
-            className="absolute right-3 text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
+    <div className="space-y-1.5">
+      <div className="relative w-full">
+        <div className="relative flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              autoComplete="off"
+              className="h-9 w-full rounded-lg border border-border bg-background py-2 pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            {value ? (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => onChange("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+        </div>
+        {loading && predictions.length === 0 ? (
+          <div className="absolute left-0 right-0 top-full rounded-b-lg border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+            Searching…
+          </div>
+        ) : null}
+        {predictions.length > 0 ? (
+          <div className="absolute left-0 right-0 top-full z-50 mt-0.5 overflow-hidden rounded-lg border border-border bg-background shadow-lg">
+            {predictions.map((prediction) => {
+              const featureType = predictionFeatureType(prediction)
+              return (
+                <button
+                  key={predictionKey(prediction)}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => handleSelect(prediction)}
+                  className="w-full border-b border-border px-4 py-3 text-left text-sm text-foreground transition-colors last:border-b-0 hover:bg-muted"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 truncate font-medium">{predictionTitle(prediction)}</div>
+                    <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {featureTypeLabel(featureType, typeLabels)}
+                    </span>
+                  </div>
+                  {predictionSubtitle(prediction) ? (
+                    <div className="truncate text-xs text-muted-foreground">
+                      {predictionSubtitle(prediction)}
+                    </div>
+                  ) : null}
+                </button>
+              )
+            })}
+          </div>
         ) : null}
       </div>
-      {loading && predictions.length === 0 ? (
-        <div className="absolute left-0 right-0 top-full rounded-b-lg border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-          Searching…
-        </div>
-      ) : null}
-      {predictions.length > 0 ? (
-        <div className="absolute left-0 right-0 top-full z-50 mt-0.5 overflow-hidden rounded-lg border border-border bg-background shadow-lg">
-          {predictions.map((suggestion) => (
-            <button
-              key={suggestion.mapbox_id}
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleSelect(suggestion)}
-              className="w-full border-b border-border px-4 py-3 text-left text-sm text-foreground transition-colors last:border-b-0 hover:bg-muted"
-            >
-              <div className="truncate font-medium">{suggestion.name}</div>
-              {suggestion.place_formatted ? (
-                <div className="truncate text-xs text-muted-foreground">{suggestion.place_formatted}</div>
-              ) : null}
-            </button>
-          ))}
-        </div>
+      {intersectionHint ? (
+        <p className="text-xs text-muted-foreground">{intersectionHint}</p>
       ) : null}
     </div>
   )
 }
 
+export function PlaceAddressSearchWithFilters({
+  value,
+  onChange,
+  onSelect,
+  onError,
+  searchTypes,
+  onSearchTypesChange,
+  placeholder,
+  intersectionHint,
+  typeLabels,
+  filterLabel,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onSelect: (result: PlaceAddressSelectResult) => void
+  onError?: (msg: string) => void
+  searchTypes: MapboxSearchType[]
+  onSearchTypesChange: (types: MapboxSearchType[]) => void
+  placeholder?: string
+  intersectionHint?: string
+  typeLabels?: Partial<Record<MapboxSearchType, string>>
+  filterLabel?: string
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <PlaceAddressSearch
+            value={value}
+            onChange={onChange}
+            onSelect={onSelect}
+            onError={onError}
+            searchTypes={searchTypes}
+            placeholder={placeholder}
+            intersectionHint={intersectionHint}
+            typeLabels={typeLabels}
+            filterLabel={filterLabel}
+          />
+        </div>
+        <MapboxSearchTypeFilter
+          searchTypes={searchTypes}
+          onSearchTypesChange={onSearchTypesChange}
+          typeLabels={typeLabels}
+          filterLabel={filterLabel}
+        />
+      </div>
+    </div>
+  )
+}
+
+/** @deprecated Use PlaceAddressSearchWithFilters */
 export function PlaceAddressSearchWithTabs({
   value,
   onChange,
@@ -311,24 +618,38 @@ export function PlaceAddressSearchWithTabs({
   placePlaceholder?: string
   streetPlaceholder?: string
 }) {
+  const searchTypes: MapboxSearchType[] =
+    searchMode === "place" ? ["poi"] : ["address", "street"]
+  const handleTypesChange = useCallback(
+    (types: MapboxSearchType[]) => {
+      if (types.length === 1 && types[0] === "poi") {
+        onSearchModeChange("place")
+        return
+      }
+      onSearchModeChange("street")
+    },
+    [onSearchModeChange],
+  )
+
   return (
-    <div className="space-y-2">
-      <Tabs value={searchMode} onValueChange={(v) => onSearchModeChange(v as PlaceAddressMode)}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="place">{placeTabLabel}</TabsTrigger>
-          <TabsTrigger value="street">{streetTabLabel}</TabsTrigger>
-        </TabsList>
-      </Tabs>
-      <PlaceAddressSearch
-        value={value}
-        onChange={onChange}
-        onSelect={onSelect}
-        onError={onError}
-        mode={searchMode}
-        placePlaceholder={placePlaceholder}
-        streetPlaceholder={streetPlaceholder}
-      />
-    </div>
+    <PlaceAddressSearchWithFilters
+      value={value}
+      onChange={onChange}
+      onSelect={onSelect}
+      onError={onError}
+      searchTypes={searchTypes}
+      onSearchTypesChange={handleTypesChange}
+      placeholder={
+        searchMode === "place"
+          ? (placePlaceholder ?? "Search a place (e.g. Eiffel Tower, Platform 9¾)")
+          : (streetPlaceholder ?? "Search a street address (e.g. 9 de Julio 1058)")
+      }
+      typeLabels={{
+        poi: placeTabLabel,
+        address: streetTabLabel,
+        street: "Intersection",
+      }}
+    />
   )
 }
 

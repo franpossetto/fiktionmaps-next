@@ -23,11 +23,12 @@ import { LocationImageCropper } from "./location-image-cropper"
 import {
   LOCATION_TYPE_OPTIONS,
   PLACE_LOCATION_DEFAULT_CENTER,
-  PlaceAddressSearchWithTabs,
+  DEFAULT_MAPBOX_SEARCH_TYPES,
+  PlaceAddressSearchWithFilters,
   PlaceLocationMap,
   flyMapToLocation,
   resolveCityId,
-  type PlaceAddressMode,
+  type MapboxSearchType,
 } from "@/components/places/place-location-picker"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
@@ -68,7 +69,7 @@ export function PlaceCreateView({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [acceptedUrl, setAcceptedUrl] = useState<string | null>(null)
   const [addressLocked, setAddressLocked] = useState(!!placeId)
-  const [searchMode, setSearchMode] = useState<PlaceAddressMode>("street")
+  const [searchTypes, setSearchTypes] = useState<MapboxSearchType[]>(DEFAULT_MAPBOX_SEARCH_TYPES)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmCityId, setConfirmCityId] = useState("")
   const mapControlRef = useRef<MapControlHandle | null>(null)
@@ -239,12 +240,14 @@ export function PlaceCreateView({
                   </Button>
                 </div>
               ) : (
-                <PlaceAddressSearchWithTabs
+                <PlaceAddressSearchWithFilters
                   value={formData.address}
                   onChange={(v) => setFormData((p) => ({ ...p, address: v }))}
                   onSelect={handleAddressSelect}
-                  searchMode={searchMode}
-                  onSearchModeChange={setSearchMode}
+                  searchTypes={searchTypes}
+                  onSearchTypesChange={setSearchTypes}
+                  placeholder="Search address, intersection, or place…"
+                  intersectionHint="For intersections use both street names, e.g. LaSalle St and Adams St, Chicago."
                 />
               )}
             </FormField>
