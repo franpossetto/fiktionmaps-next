@@ -13,16 +13,34 @@ import { LocaleSwitcher } from "@/components/layout/locale-switcher"
 
 type AuthView = "login" | "signup" | "forgot-password"
 
-function FiktionLogo({ size = 140, alt }: { size?: number; alt: string }) {
+/** Inputs legibles sobre #111827 — evita bloques casi negros del token `bg-input`. */
+const authFieldClass =
+  "h-11 rounded-xl border border-white/[0.13] bg-[#283548] px-3.5 text-[15px] leading-none text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] placeholder:text-zinc-500 transition-[border-color,box-shadow] focus-visible:border-sky-400/50 focus-visible:ring-2 focus-visible:ring-sky-400/25 focus-visible:ring-offset-0 md:text-[15px] disabled:opacity-55"
+
+const authPrimaryButtonClass =
+  "h-11 w-full rounded-xl bg-zinc-100 font-bold text-sm tracking-wide text-[#111827] shadow-md transition-colors hover:bg-white disabled:opacity-50"
+
+const authSecondaryButtonClass =
+  "h-11 w-full rounded-xl border border-white/15 bg-white/5 font-semibold text-zinc-100 shadow-sm backdrop-blur-sm transition-colors hover:bg-white/10"
+
+/** Wordmark 2400×1081; `displayWidth` sets rendered width (aspect preserved). */
+function FiktionLogo({
+  displayWidth,
+  alt,
+}: {
+  displayWidth: number
+  alt: string
+}) {
   return (
     <Image
-      src="/logo-icon.png"
+      src="/fiktion-maps-logo.png"
       alt={alt}
-      width={size}
-      height={size}
+      width={2400}
+      height={1081}
       loading="eager"
-      style={{ width: "auto", height: size }}
-      className="drop-shadow-2xl"
+      priority
+      className="h-auto max-w-full drop-shadow-2xl"
+      style={{ width: displayWidth, maxWidth: "100%" }}
     />
   )
 }
@@ -42,7 +60,7 @@ function Field({
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between">
-        <label className="text-sm font-medium text-foreground">{label}</label>
+        <label className="text-sm font-medium text-zinc-300">{label}</label>
         {rightSlot}
       </div>
       {children}
@@ -106,30 +124,23 @@ export function AuthPage() {
 
   /* ---- layout ---- */
   return (
-    <div className="relative flex min-h-screen w-full bg-background">
+    <div className="dark relative flex min-h-screen w-full bg-[#111827]">
       {/* Left panel – logo + tagline (hidden on small screens) */}
-      <div className="hidden md:flex flex-1 flex-col items-center justify-center gap-8 border-r border-border">
-        <FiktionLogo size={160} alt={t("logoAlt")} />
-        <div className="text-center px-8">
-          <h1 className="text-6xl font-black tracking-tight leading-none text-foreground">
-            {t("brandName")}
-            <sup className="ml-1 align-super text-sm font-normal opacity-50">™</sup>
-          </h1>
-          <p className="mt-4 text-xs font-medium tracking-widest uppercase text-muted-foreground">
+      <div className="hidden md:flex flex-1 flex-col items-center justify-center gap-10 border-r border-white/10 px-6">
+        <FiktionLogo displayWidth={520} alt={t("logoAlt")} />
+        <div className="px-8 text-center">
+          <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">
             {t("tagline")}
           </p>
         </div>
       </div>
 
       {/* Right panel – form, always centered */}
-      <div className="flex w-full flex-col items-center justify-center px-6 py-16 md:w-[460px] md:flex-none">
+      <div className="flex w-full flex-col items-center justify-center px-6 py-16 md:w-[480px] md:flex-none">
 
-        {/* Mobile logo */}
-        <div className="mb-8 flex flex-col items-center gap-3 md:hidden">
-          <FiktionLogo size={72} alt={t("logoAlt")} />
-          <span className="text-2xl font-black text-foreground">
-            {t("brandName")}<sup className="text-xs font-normal opacity-50">™</sup>
-          </span>
+        {/* Mobile logo (wordmark includes name + ™) */}
+        <div className="mb-10 flex w-full justify-center px-2 md:hidden">
+          <FiktionLogo displayWidth={320} alt={t("logoAlt")} />
         </div>
 
         {/* Forgot password view */}
@@ -137,13 +148,13 @@ export function AuthPage() {
           <div className="w-full max-w-[360px]">
             <button
               onClick={() => { setView("login"); resetForm() }}
-              className="mb-8 flex items-center gap-1.5 text-sm text-muted-foreground transition-opacity hover:opacity-70"
+              className="mb-8 flex items-center gap-1.5 text-sm text-zinc-400 transition-colors hover:text-zinc-200"
             >
               <ArrowLeft className="h-4 w-4" />
               {t("backToLogin")}
             </button>
-            <h2 className="mb-1 text-xl font-bold text-foreground">{t("resetPassword")}</h2>
-            <p className="mb-6 text-sm text-muted-foreground">
+            <h2 className="mb-1 text-xl font-bold text-zinc-100">{t("resetPassword")}</h2>
+            <p className="mb-6 text-sm text-zinc-400">
               {t("resetPasswordDescription")}
             </p>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -155,15 +166,15 @@ export function AuthPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
                   required
-                  className="h-11 border-input bg-input text-foreground placeholder:text-muted-foreground focus-visible:ring-ring"
+                  className={authFieldClass}
                 />
               </Field>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              {success && <p className="text-sm text-primary">{success}</p>}
+              {error && <p className="text-sm text-red-400">{error}</p>}
+              {success && <p className="text-sm text-sky-300">{success}</p>}
               <Button
                 type="submit"
                 disabled={isLoading || !email}
-                className="h-11 w-full font-semibold border border-border bg-secondary text-foreground hover:bg-secondary/80"
+                className={authSecondaryButtonClass}
               >
                 {isLoading ? tCommon("sending") : t("sendResetLink")}
               </Button>
@@ -183,7 +194,7 @@ export function AuthPage() {
                     onChange={(e) => setName(e.target.value)}
                     disabled={isLoading}
                     required
-                    className="h-11 border-input bg-input text-foreground placeholder:text-muted-foreground focus-visible:ring-ring"
+                    className={authFieldClass}
                   />
                 </Field>
               )}
@@ -196,7 +207,7 @@ export function AuthPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
                   required
-                  className="h-11 border-input bg-input text-foreground placeholder:text-muted-foreground focus-visible:ring-ring"
+                  className={authFieldClass}
                 />
               </Field>
 
@@ -207,7 +218,7 @@ export function AuthPage() {
                     <button
                       type="button"
                       onClick={() => { setView("forgot-password"); resetForm() }}
-                      className="text-xs font-semibold text-primary transition-opacity hover:opacity-80"
+                      className="text-xs font-semibold text-sky-400 transition-opacity hover:text-sky-300"
                     >
                       {t("forgotPassword")}
                     </button>
@@ -221,27 +232,27 @@ export function AuthPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading}
                   required
-                  className="h-11 border-input bg-input text-foreground placeholder:text-muted-foreground focus-visible:ring-ring"
+                  className={authFieldClass}
                 />
               </Field>
 
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && <p className="text-sm text-red-400">{error}</p>}
 
               <Button
                 type="submit"
                 disabled={isLoading || !email || !password || (view === "signup" && !name)}
-                className="h-11 w-full font-bold text-sm tracking-wide"
+                className={authPrimaryButtonClass}
               >
                 {isLoading ? t("loadingButton") : view === "login" ? t("login") : t("createAccount")}
               </Button>
             </form>
 
-            <p className="mt-6 text-center text-sm text-muted-foreground">
+            <p className="mt-6 text-center text-sm text-zinc-400">
               {view === "login" ? t("dontHaveAccount") : t("alreadyHaveAccount")}
               <button
                 type="button"
                 onClick={() => { setView(view === "login" ? "signup" : "login"); resetForm() }}
-                className="font-semibold text-primary transition-opacity hover:opacity-80"
+                className="font-semibold text-sky-400 transition-colors hover:text-sky-300"
               >
                 {view === "login" ? t("createOne") : t("signIn")}
               </button>
@@ -257,7 +268,7 @@ export function AuthPage() {
       <div className="absolute inset-x-0 bottom-6 flex justify-center">
         <Link
           href="/map"
-          className="group flex h-8 w-24 items-center justify-center text-muted-foreground transition-transform duration-200 active:scale-95"
+          className="group flex h-8 w-24 items-center justify-center text-zinc-500 transition-colors hover:text-zinc-300 active:scale-95"
           aria-label={tCommon("browseMap")}
           title={tCommon("browseMap")}
         >

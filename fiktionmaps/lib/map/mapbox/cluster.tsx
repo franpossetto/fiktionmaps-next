@@ -4,16 +4,21 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Layer, Marker, Source, useMap } from "react-map-gl/mapbox"
 import Supercluster from "supercluster"
 import type { ClusterItem, ClusterLayerProps, LatLng } from "../types"
+import { ClusterMarker2d } from "../pin-markers"
 import { resolveCollocatedSpiderfyTheme } from "../collocated-spiderfy-theme"
 import type { CollocatedSpiderfyTheme } from "../collocated-spiderfy-theme"
 import {
+  computeSpiderLegCurveCoordinates,
   computeSpiderLngLats,
   getCollocatedClusterStack,
   groupCollocatedPointFeatures,
+  trimSpiderLegCurve,
   useCollocatedSpiderfy,
   type CollocatedPointGroup,
 } from "../use-collocated-spiderfy"
+import { SpiderfyAnimatedMarker } from "./spiderfy-animated-marker"
 import type { Map as MapboxMap } from "mapbox-gl"
+import { motion } from "framer-motion"
 
 type PointFeature<T> = GeoJSON.Feature<GeoJSON.Point, T>
 type ClusterFeature = Supercluster.ClusterFeature<Supercluster.AnyProps>
@@ -51,11 +56,17 @@ function spiderLegSourceId(stackKey: string): string {
   return `collocated-spider-legs-${encodeURIComponent(stackKey).replace(/%/g, "_")}`
 }
 
+function clusterHoverId(clusterId: number): string {
+  return `cluster:${clusterId}`
+}
+
 export function MapboxClusterLayer<T extends ClusterItem>({
   items,
   selectedItemId,
   onItemClick,
   renderItem,
+  marker2dShape = "round",
+  markerHoverScale = "normal",
   maxZoom = 20,
   radius = 70,
   collocatedSpiderfy,
@@ -93,6 +104,7 @@ export function MapboxClusterLayer<T extends ClusterItem>({
   const [hoveredStackKey, setHoveredStackKey] = useState<string | null>(null)
   const [styleLoaded, setStyleLoaded] = useState(false)
   const [spiderLayoutTick, setSpiderLayoutTick] = useState(0)
+  const [spiderReveal, setSpiderReveal] = useState(0)
 
   const supercluster = useMemo(() => {
     const sc = new Supercluster<T>({ maxZoom, radius })
@@ -280,6 +292,25 @@ export function MapboxClusterLayer<T extends ClusterItem>({
     }
   }, [spiderfyEnabled, expandedStackKey, mapRef])
 
+  useEffect(() => {
+    if (!expandedStackKey) {
+      setSpiderReveal(0)
+      return
+    }
+    let frame = 0
+    let start: number | null = null
+    const durationMs = 520
+    const tick = (now: number) => {
+      if (start === null) start = now
+      const t = Math.min(1, (now - start) / durationMs)
+      const eased = 1 - (1 - t) ** 3
+      setSpiderReveal(eased)
+      if (t < 1) frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [expandedStackKey])
+
   const spiderLegGeoJson = useMemo(() => {
     void spiderLayoutTick
     if (!spiderfyEnabled || !expandedStackData || !mapRef || !styleLoaded) return null
@@ -292,22 +323,30 @@ export function MapboxClusterLayer<T extends ClusterItem>({
     const center: LatLng = { lat: expandedStackData.lat, lng: expandedStackData.lng }
     const leafCount = Math.min(expandedStackData.items.length, resolvedTheme.maxLeaves)
     const leafLngLats = computeSpiderLngLats(map, center, leafCount, resolvedTheme)
-    const features: GeoJSON.Feature<GeoJSON.LineString>[] = leafLngLats.map((leaf) => ({
-      type: "Feature",
-      geometry: {
-        type: "LineString",
-        coordinates: [
-          [center.lng, center.lat],
-          [leaf.lng, leaf.lat],
-        ],
-      },
-      properties: {},
-    }))
+    const features: GeoJSON.Feature<GeoJSON.LineString>[] = leafLngLats.map((leaf) => {
+      const curve = computeSpiderLegCurveCoordinates(map, center, leaf)
+      return {
+        type: "Feature",
+        geometry: {
+          type: "LineString",
+          coordinates: trimSpiderLegCurve(curve, spiderReveal),
+        },
+        properties: {},
+      }
+    })
     return {
       type: "FeatureCollection" as const,
       features,
     }
-  }, [spiderfyEnabled, expandedStackData, mapRef, resolvedTheme, styleLoaded, spiderLayoutTick])
+  }, [
+    spiderfyEnabled,
+    expandedStackData,
+    mapRef,
+    resolvedTheme,
+    styleLoaded,
+    spiderLayoutTick,
+    spiderReveal,
+  ])
 
   const clusterOnlyExpanded =
     spiderfyEnabled &&
@@ -340,41 +379,48 @@ export function MapboxClusterLayer<T extends ClusterItem>({
           toggleStack(data.key)
         }}
       >
-        <div className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 border-border bg-background/95 text-xs font-bold shadow-md">
+        <motion.div
+          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border-2 border-border bg-background/95 text-xs font-bold shadow-md"
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 420, damping: 24 }}
+        >
           ×
-        </div>
+        </motion.div>
       </Marker>
     )
 
-    const leaves = visibleItems.map((item, index) => {
-      const pos = leafLngLats[index] ?? center
-      const isSelected = selectedItemId === item.id
-      const isHovered = hoveredId === item.id
-      return (
-        <Marker
-          key={`stack-leaf-${data.key}-${item.id}`}
-          longitude={pos.lng}
-          latitude={pos.lat}
-          anchor="bottom"
-          style={{ zIndex: 5 }}
-          onClick={
-            onItemClick
-              ? (e) => {
-                  e.originalEvent.stopPropagation()
-                  onItemClick(item)
+    const leaves =
+      map && styleLoaded
+        ? visibleItems.map((item, index) => {
+            const pos = leafLngLats[index] ?? center
+            const isSelected = selectedItemId === item.id
+            const isHovered = hoveredId === item.id
+            return (
+              <SpiderfyAnimatedMarker
+                key={`stack-leaf-${data.key}-${item.id}`}
+                map={map}
+                center={center}
+                position={pos}
+                index={index}
+                stackKey={data.key}
+                markerKey={`stack-leaf-${data.key}-${item.id}`}
+                onClick={
+                  onItemClick
+                    ? (e) => {
+                        e.originalEvent.stopPropagation()
+                        onItemClick(item)
+                      }
+                    : undefined
                 }
-              : undefined
-          }
-        >
-          <div
-            onMouseEnter={() => setHoveredId(item.id)}
-            onMouseLeave={() => setHoveredId(null)}
-          >
-            {renderItem(item, { isSelected, isHovered })}
-          </div>
-        </Marker>
-      )
-    })
+                onMouseEnter={() => setHoveredId(item.id)}
+                onMouseLeave={() => setHoveredId(null)}
+              >
+                {renderItem(item, { isSelected, isHovered })}
+              </SpiderfyAnimatedMarker>
+            )
+          })
+        : []
 
     return (
       <span key={`stack-expanded-${data.key}`} style={{ display: "contents" }}>
@@ -395,8 +441,7 @@ export function MapboxClusterLayer<T extends ClusterItem>({
     } catch {
       // Cluster ID can be stale if supercluster was recreated (e.g. items changed)
     }
-    const dotSize = count >= 10 ? 20 : 18
-    const dotFontSize = count >= 10 ? 10 : 11
+    const isHovered = hoveredId === clusterHoverId(clusterId)
 
     const collocated =
       spiderfyEnabled ? getCollocatedClusterStack(supercluster, clusterId) : null
@@ -432,31 +477,18 @@ export function MapboxClusterLayer<T extends ClusterItem>({
           }
         }}
       >
-        <div className="flex cursor-pointer flex-col items-center">
-          <div className="relative overflow-visible">
-            <div
-              className="h-14 w-14 overflow-hidden rounded-lg border-2 border-border transition-all duration-200"
-              style={{ filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.5))" }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imageUrl} alt="" className="h-full w-full object-cover" />
-            </div>
-            <div
-              className="absolute flex items-center justify-center rounded-full bg-[#e8365d] font-bold text-white shadow-[0_2px_6px_rgba(0,0,0,0.4)] border-2 border-[#0b0f14]"
-              style={{
-                top: -Math.round(dotSize * 0.45),
-                right: -Math.round(dotSize * 0.45),
-                width: dotSize,
-                height: dotSize,
-                fontSize: dotFontSize,
-                lineHeight: 1,
-                zIndex: 10,
-              }}
-            >
-              {count}
-            </div>
-          </div>
-          <div className="h-0 w-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-border" />
+        <div
+          className="flex cursor-pointer flex-col items-center"
+          onMouseEnter={() => setHoveredId(clusterHoverId(clusterId))}
+          onMouseLeave={() => setHoveredId(null)}
+        >
+          <ClusterMarker2d
+            shape={marker2dShape}
+            imageUrl={imageUrl}
+            count={count}
+            isHovered={isHovered}
+            hoverScaleMode={markerHoverScale}
+          />
         </div>
       </Marker>
     )
@@ -566,7 +598,7 @@ export function MapboxClusterLayer<T extends ClusterItem>({
           type="line"
           paint={{
             "line-color": resolvedTheme.legColor,
-            "line-opacity": 0.9,
+            "line-opacity": Math.max(0.12, 0.9 * spiderReveal),
             "line-width": resolvedTheme.legWidthPx,
           }}
           layout={{

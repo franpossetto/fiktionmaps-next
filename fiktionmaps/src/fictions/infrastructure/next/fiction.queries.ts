@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache"
-import { createAnonymousClient } from "@/lib/supabase/server"
+import { createAnonymousClient, createClient } from "@/lib/supabase/server"
 import { createFictionsSupabaseAdapter } from "@/src/fictions/infrastructure/supabase/fiction.repository.impl"
 import { createFictionInterestsSupabaseAdapter } from "@/src/fiction-interests/infrastructure/supabase/fiction-interests.repository.impl"
 import { createFictionLikesSupabaseAdapter } from "@/src/fiction-likes/infrastructure/supabase/fiction-likes.repository.impl"
@@ -9,6 +9,8 @@ import { createPlacesSupabaseAdapter } from "@/src/places/infrastructure/supabas
 import { getAllFictionsUseCase } from "@/src/fictions/application/get-all-fictions.usecase"
 import { getActiveFictionsUseCase } from "@/src/fictions/application/get-active-fictions.usecase"
 import { getFictionByIdUseCase } from "@/src/fictions/application/get-fiction-by-id.usecase"
+import { getFictionWithCatalogExternalIdsForStaffUseCase } from "@/src/fictions/application/get-fiction-with-catalog-external-ids-for-staff.usecase"
+import { createFictionExternalIdsSupabaseAdapter } from "@/src/fiction-external-ids/infrastructure/supabase/fiction-external-ids.repository.impl"
 import { getFictionBySlugUseCase } from "@/src/fictions/application/get-fiction-by-slug.usecase"
 import { getFictionsByIdsUseCase } from "@/src/fictions/application/get-fictions-by-ids.usecase"
 import { getFictionCitiesUseCase } from "@/src/fictions/application/get-fiction-cities.usecase"
@@ -19,9 +21,10 @@ import {
 import { getFictionLikeCountsUseCase } from "@/src/fiction-likes/application/get-fiction-like-counts.usecase"
 import { getFictionInterestsUseCase } from "@/src/fiction-interests/application/get-fiction-interests.usecase"
 import { isUuidString } from "@/lib/validation/primitives"
-import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import type { FictionWithMedia, FictionWithMediaAndCatalogIds } from "@/src/fictions/domain/fiction.entity"
 import { CacheKeys } from "@/src/shared/infrastructure/next/cache.keys"
 import { CacheConfig } from "@/src/shared/infrastructure/next/cache.config"
+import { getIsUserStaff } from "@/src/users/infrastructure/next/user.queries"
 
 const anon = () => Promise.resolve(createAnonymousClient())
 const fictionsRepo = createFictionsSupabaseAdapter(anon)
@@ -52,6 +55,21 @@ export function getFictionByIdCached(id: string) {
     CacheKeys.fiction(id),
     { ...CacheConfig.long, tags: ["fictions", `fiction-${id}`] }
   )()
+}
+
+/** Respects staff RLS (e.g. pending fictions). Caller should only use on staff-only pages. */
+export async function getFictionByIdForStaffSession(id: string): Promise<FictionWithMediaAndCatalogIds | null> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+  if (error || !user) return null
+  const staff = await getIsUserStaff(user.id)
+  if (!staff) return null
+  const fictionsRepo = createFictionsSupabaseAdapter(async () => supabase)
+  const externalIdsRepo = createFictionExternalIdsSupabaseAdapter(async () => supabase)
+  return getFictionWithCatalogExternalIdsForStaffUseCase(id, fictionsRepo, externalIdsRepo)
 }
 
 export function getFictionBySlugCached(slug: string) {

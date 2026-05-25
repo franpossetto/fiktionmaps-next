@@ -20,6 +20,7 @@ export interface CheckinsRepositoryPort {
     origin: "gps" | "manual",
   ): Promise<PlaceCheckin | null>
   hasCheckedInCity(userId: string, cityId: string): Promise<boolean>
+  getLastCityCheckin(userId: string): Promise<CityCheckin | null>
   getPlaceLocation(placeId: string): Promise<{ lat: number; lng: number; cityId: string } | null>
   getEnrichedPlaceCheckinsForUser(userId: string): Promise<EnrichedPlaceCheckin[]>
 }

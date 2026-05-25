@@ -8,6 +8,7 @@ import { useRouter } from "@/i18n/navigation"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { EnrichedPlaceCheckin } from "@/src/checkins/domain/checkin.entity"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
+import { publicFictionPlacePath, publicFictionScenePath } from "@/lib/fictions/public-fiction-paths"
 import type { ProfileArticlePreview, ProfileScenePreview } from "@/src/scenes/infrastructure/next/profile-scene-previews.actions"
 
 /** Profile section headers show "See all" only when total records exceed this count. */
@@ -116,6 +117,7 @@ export function PlacesSection({ checkins, cityMap }: PlacesSectionProps) {
           fictionId: c.fictionId,
           fictionSlug: c.fictionSlug,
           placeId: c.placeId,
+          placeSlug: c.placeSlug,
           imageUrl:
             c.placeImage?.trim() ||
             c.fictionCover?.trim() ||
@@ -140,7 +142,7 @@ export function PlacesSection({ checkins, cityMap }: PlacesSectionProps) {
           type="button"
           onClick={() =>
             router.push(
-              `/fiction/${encodeURIComponent(row.fictionSlug ?? row.fictionId)}/place/${encodeURIComponent(row.placeId)}`,
+              publicFictionPlacePath(row.fictionSlug, row.placeSlug),
             )
           }
           className="block w-full text-left transition-colors hover:bg-muted/30"
@@ -192,7 +194,7 @@ export function ScenesSection({ rows: previewRows }: { rows: ProfileScenePreview
           type="button"
           onClick={() =>
             router.push(
-              `/fiction/${encodeURIComponent(row.fictionSlug ?? row.fictionId)}/scene/${encodeURIComponent(row.key)}`,
+              publicFictionScenePath(row.fictionSlug ?? row.fictionId, row.key),
             )
           }
           className="block w-full text-left transition-colors hover:bg-muted/30"

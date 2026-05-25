@@ -24,12 +24,12 @@ export interface PlaceCheckin {
 export interface EnrichedPlaceCheckin {
   id: string
   placeId: string
+  placeSlug: string
   placeName: string
   placeAddress: string
   placeImage: string | null
   fictionId: string
-  /** Canonical URL segment when present; otherwise callers may fall back to `fictionId`. */
-  fictionSlug?: string | null
+  fictionSlug: string
   fictionTitle: string
   fictionCover: string | null
   cityId: string | null

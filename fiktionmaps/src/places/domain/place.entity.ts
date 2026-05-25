@@ -3,7 +3,8 @@ import type { Location } from "@/src/locations/domain/location.entity"
 export interface Place {
   id: string
   placeId: string
-  name: string | null
+  name: string
+  slug: string
   fictionId: string
   location: Location
   image: string

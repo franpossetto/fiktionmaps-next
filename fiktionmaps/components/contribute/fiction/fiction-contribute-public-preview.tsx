@@ -10,11 +10,8 @@ import { AppDetailRailsShell } from "@/components/layout/app-detail-rails-shell"
 import { Badge } from "@/components/ui/badge"
 import { FictionInterestTags, type FictionInterestTagItem } from "@/components/fictions/fiction-interest-tags"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
-import {
-  FICTION_SLUG_DETAIL_SIDEBAR_RIGHT_GAP_PX,
-  FICTION_SLUG_DETAIL_SIDEBAR_WIDTH_PX,
-} from "@/components/fictions/fiction-slug-detail-shell"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
+import { FictionContributePreviewSidebar } from "@/components/contribute/fiction/fiction-contribute-preview-sidebar"
 
 const DEMO_ROW_KEYS = [
   "publicPreviewDemoRow1",
@@ -52,70 +49,6 @@ export interface FictionContributePublicPreviewProps {
   /** Optional short blurb under the title in the left rail (e.g. excerpt). */
   summaryText?: string | null
   className?: string
-}
-
-function FictionContributePreviewSidebar(props: {
-  title: string
-  type: Fiction["type"]
-  year: number
-  genre: string
-  creditLine?: string | null
-  coverSrc: string | null
-  summaryText?: string | null
-}) {
-  const t = useTranslations("Fictions")
-  const { title, year, genre, creditLine, coverSrc, summaryText, type } = props
-  const typeLabel =
-    type === "tv-series" ? t("typeTvSeries") : type === "book" ? t("typeBook") : t("typeMovie")
-
-  const cover = coverSrc?.trim() || DEFAULT_FICTION_COVER
-
-  return (
-    <div
-      className={cn("hidden py-10 lg:flex", "justify-end")}
-      style={{ paddingRight: `${FICTION_SLUG_DETAIL_SIDEBAR_RIGHT_GAP_PX}px` }}
-    >
-      <div className="space-y-3.5" style={{ width: `${FICTION_SLUG_DETAIL_SIDEBAR_WIDTH_PX}px` }}>
-        <div className="relative ml-auto aspect-[2/3] w-full overflow-hidden rounded-lg border border-border/60 bg-muted/30">
-          <Image
-            src={cover}
-            alt={title}
-            fill
-            className="object-cover"
-            sizes={`${FICTION_SLUG_DETAIL_SIDEBAR_WIDTH_PX}px`}
-            unoptimized={cover.startsWith("blob:")}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <h2 className="max-w-full break-words font-serif text-[1.35rem] font-semibold leading-tight text-foreground xl:text-[1.5rem]">
-            {title || "—"}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {year || "—"}
-            {genre ? ` · ${genre}` : ""}
-            {creditLine?.trim() ? ` · ${creditLine.trim()}` : ""}
-          </p>
-        </div>
-
-        {summaryText?.trim() ? (
-          <p className="line-clamp-4 text-[12px] leading-5 text-muted-foreground">{summaryText.trim()}</p>
-        ) : null}
-
-        <div className="border-t border-border/60 pt-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-foreground">{t("sidebarDetails")}</p>
-          <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-            <dt className="text-muted-foreground">{t("sidebarType")}</dt>
-            <dd className="font-medium text-foreground">{typeLabel}</dd>
-            <dt className="text-muted-foreground">{t("sidebarYear")}</dt>
-            <dd className="font-medium text-foreground">{year || "—"}</dd>
-            <dt className="text-muted-foreground">{t("sidebarGenre")}</dt>
-            <dd className="font-medium text-foreground">{genre || "—"}</dd>
-          </dl>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 export function FictionContributePublicPreview({
@@ -256,13 +189,13 @@ export function FictionContributePublicPreview({
                       const index = idx + 1
                       const { city, place, address } = splitDemoPlaceLine(tPreview(rowKey))
                       return (
-                        <li key={rowKey} className="px-4 py-4 sm:px-5 sm:py-5">
+                        <li key={rowKey} className="px-3 py-3 sm:px-5 sm:py-5">
                           <div className="flex items-center gap-4">
-                            <div className="flex min-w-0 flex-1 items-center gap-4">
-                              <p className="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground">
+                            <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
+                              <p className="hidden w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground sm:block">
                                 {index}
                               </p>
-                              <div className="relative flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/60 bg-muted/40 sm:h-18 sm:w-24">
+                              <div className="relative flex h-14 w-18 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/60 bg-muted/40 sm:h-18 sm:w-24">
                                 <ImageIcon className="h-7 w-7 text-muted-foreground/45" aria-hidden />
                               </div>
                               <div className="min-w-0 flex-1">
@@ -276,7 +209,7 @@ export function FictionContributePublicPreview({
                                 <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{address}</p>
                               </div>
                             </div>
-                            <div className="flex shrink-0 items-center gap-2">
+                            <div className="hidden shrink-0 items-center gap-2 sm:flex">
                               <span className="inline-flex h-9 items-center rounded-md border border-dashed border-border/80 bg-muted/20 px-3 text-xs text-muted-foreground">
                                 {t("mapsShort")}
                               </span>

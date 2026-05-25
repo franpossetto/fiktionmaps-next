@@ -8,6 +8,7 @@ import { useRouter } from "@/i18n/navigation"
 import { Button } from "@/components/ui/button"
 import { MAPBOX_ACCESS_TOKEN } from "@/lib/map/mapbox/styles"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
+import { publicFictionPlacePath } from "@/lib/fictions/public-fiction-paths"
 import {
   getUserCityCheckinsAction,
   getUserPlaceCheckinsEnrichedAction,
@@ -197,7 +198,7 @@ export function CheckinsList({
                   type="button"
                   onClick={() =>
                     router.push(
-                      `/fiction/${encodeURIComponent(c.fictionSlug ?? c.fictionId)}/place/${encodeURIComponent(c.placeId)}`,
+                      publicFictionPlacePath(c.fictionSlug, c.placeSlug),
                     )
                   }
                   className="block w-full text-left transition-colors hover:bg-muted/30"

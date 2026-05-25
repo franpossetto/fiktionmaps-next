@@ -6,6 +6,7 @@ import { checkinsSupabaseAdapter } from "@/src/checkins/infrastructure/supabase/
 import { checkinCityUseCase } from "@/src/checkins/application/checkin-city.usecase"
 import { checkinPlaceUseCase } from "@/src/checkins/application/checkin-place.usecase"
 import { listMyCityCheckinsUseCase } from "@/src/checkins/application/list-my-city-checkins.usecase"
+import { getLastCityCheckinUseCase } from "@/src/checkins/application/get-last-city-checkin.usecase"
 import type { CityCheckin, EnrichedPlaceCheckin, PlaceCheckin } from "@/src/checkins/domain/checkin.entity"
 import type { CheckinResult } from "./checkin.actions.types"
 import { loadEnrichedPlaceCheckinsForCurrentUser } from "./checkin.queries"
@@ -43,6 +44,23 @@ async function fetchUserCityCheckinsAction(): Promise<CheckinResult<CityCheckin[
 
 /** Request-scoped dedupe for profile checkins reads. */
 export const getUserCityCheckinsAction = cache(fetchUserCityCheckinsAction)
+
+async function fetchLastCityCheckinAction(): Promise<CheckinResult<CityCheckin | null>> {
+  const userId = await getSessionUserId()
+  if (!userId) return { data: null, error: "Unauthorized" }
+  try {
+    const last = await getLastCityCheckinUseCase(userId, checkinsSupabaseAdapter)
+    return { data: last, error: null }
+  } catch (e) {
+    return {
+      data: null,
+      error: e instanceof Error ? e.message : "Failed to load last city checkin",
+    }
+  }
+}
+
+/** Used by GeoProvider to gate the "Are you in {city}?" prompt against the user's last city checkin. */
+export const getLastCityCheckinAction = cache(fetchLastCityCheckinAction)
 
 async function fetchUserPlaceCheckinsEnrichedAction(): Promise<CheckinResult<EnrichedPlaceCheckin[]>> {
   try {

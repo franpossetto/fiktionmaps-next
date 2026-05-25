@@ -10,7 +10,6 @@ import {
   type ReactNode,
 } from "react"
 import { createPortal } from "react-dom"
-import Image from "next/image"
 import { motion } from "framer-motion"
 import { useMap } from "react-map-gl/mapbox"
 import {
@@ -21,6 +20,12 @@ import {
   MAP_SPIDERFY_CSS_VARS,
 } from "@/lib/map"
 import type { ClusterItem } from "@/lib/map"
+import { PlaceMarker2d, PlaceMarker3d } from "@/lib/map/pin-markers"
+import {
+  useMapMarker2dShape,
+  useMapMarkerHoverScaleMode,
+  useMapMarkerLabelMode,
+} from "@/lib/theme-settings-context"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import { Map3DToggle } from "./map-3d-toggle"
@@ -34,6 +39,8 @@ interface MapViewProps {
   onLocationClick: (location: Place) => void
   selectedLocationId?: string | null
   focusLocationId?: string | null
+  /** Right inset (px) so the focused pin sits in the horizontal center of the map area not covered by a side panel. */
+  focusPaddingRight?: number
   is3D?: boolean
   onToggle3D?: (is3D: boolean) => void
   onMapLoaded?: () => void
@@ -44,26 +51,38 @@ function MapFocusController({
   cityId,
   places,
   focusLocationId,
+  focusPaddingRight = 0,
 }: {
   cityId: string
   places: Place[]
   focusLocationId: string | null | undefined
+  focusPaddingRight?: number
 }) {
   const control = useMapControl()
   const prevFocusRef = useRef<string | null | undefined>(null)
+  const prevPaddingRef = useRef(0)
 
   useEffect(() => {
     prevFocusRef.current = null
+    prevPaddingRef.current = 0
   }, [cityId])
 
   useEffect(() => {
     if (!focusLocationId || !control) return
     const loc = places.find((l) => l.id === focusLocationId)
     if (!loc) return
-    if (prevFocusRef.current === focusLocationId) return
+    if (
+      prevFocusRef.current === focusLocationId &&
+      prevPaddingRef.current === focusPaddingRight
+    ) {
+      return
+    }
 
     const { lat, lng } = loc.location
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+
+    const padding =
+      focusPaddingRight > 0 ? { right: focusPaddingRight } : undefined
 
     let cancelled = false
     let timeoutId: ReturnType<typeof setTimeout> | undefined
@@ -73,9 +92,11 @@ function MapFocusController({
         center: { lat, lng },
         zoom: FOCUS_ZOOM,
         duration: 1000,
+        padding,
       })
       if (ok) {
         prevFocusRef.current = focusLocationId
+        prevPaddingRef.current = focusPaddingRight
         return
       }
       if (attempt < 8) {
@@ -87,7 +108,7 @@ function MapFocusController({
       cancelled = true
       if (timeoutId !== undefined) clearTimeout(timeoutId)
     }
-  }, [focusLocationId, places, control])
+  }, [focusLocationId, focusPaddingRight, places, control])
 
   return null
 }
@@ -115,6 +136,19 @@ function MapLoadReporter({ onLoaded }: { onLoaded?: () => void }) {
   return null
 }
 
+function boundsRoughlyEqual(
+  a: { west: number; south: number; east: number; north: number },
+  b: { west: number; south: number; east: number; north: number },
+  epsilon = 1e-5,
+): boolean {
+  return (
+    Math.abs(a.west - b.west) < epsilon &&
+    Math.abs(a.south - b.south) < epsilon &&
+    Math.abs(a.east - b.east) < epsilon &&
+    Math.abs(a.north - b.north) < epsilon
+  )
+}
+
 function MapBoundsReporter({
   onBoundsChange,
 }: {
@@ -122,9 +156,14 @@ function MapBoundsReporter({
 }) {
   const maps = useMap()
   const mapRef = maps?.current
+  const onBoundsChangeRef = useRef(onBoundsChange)
+  const lastBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(
+    null,
+  )
+  onBoundsChangeRef.current = onBoundsChange
 
   useEffect(() => {
-    if (!mapRef || !onBoundsChange) return
+    if (!mapRef) return
     let map: mapboxgl.Map
     try {
       map = mapRef.getMap()
@@ -133,15 +172,20 @@ function MapBoundsReporter({
     }
 
     const report = () => {
+      const emit = onBoundsChangeRef.current
+      if (!emit) return
       try {
         const b = map.getBounds()
         if (!b) return
-        onBoundsChange({
+        const next = {
           west: b.getWest(),
           south: b.getSouth(),
           east: b.getEast(),
           north: b.getNorth(),
-        })
+        }
+        if (lastBoundsRef.current && boundsRoughlyEqual(lastBoundsRef.current, next)) return
+        lastBoundsRef.current = next
+        emit(next)
       } catch {
         // map not ready
       }
@@ -154,7 +198,7 @@ function MapBoundsReporter({
       map.off("load", report)
       map.off("moveend", report)
     }
-  }, [mapRef, onBoundsChange])
+  }, [mapRef])
 
   return null
 }
@@ -162,6 +206,9 @@ function MapBoundsReporter({
 function MapViewPins({
   cityId,
   is3D,
+  marker2dShape,
+  markerLabelMode,
+  markerHoverScale,
   clusterItems,
   selectedLocationId,
   onLocationClick,
@@ -169,6 +216,9 @@ function MapViewPins({
 }: {
   cityId: string
   is3D: boolean
+  marker2dShape: "square" | "round"
+  markerLabelMode: "always" | "hover"
+  markerHoverScale: "normal" | "strong"
   clusterItems: MapPinClusterItem[]
   selectedLocationId: string | null | undefined
   onLocationClick: (location: Place) => void
@@ -191,215 +241,41 @@ function MapViewPins({
     <motion.div
       className="absolute inset-0 pointer-events-none [&>*]:pointer-events-auto"
       style={spiderfyVars}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
     >
       <MapClusterLayer<MapPinClusterItem>
-        key={`pins-${cityId}-${is3D ? "3d" : "2d"}`}
+        key={`pins-${cityId}-${is3D ? "3d" : "2d"}-${marker2dShape}-${markerLabelMode}-${markerHoverScale}`}
         items={clusterItems}
         selectedItemId={selectedLocationId}
         onItemClick={(item) => onLocationClick(item.place)}
         renderItem={renderMarker}
+        marker2dShape={is3D ? undefined : marker2dShape}
+        markerHoverScale={markerHoverScale}
         collocatedSpiderfy={{ enabled: true }}
       />
     </motion.div>
   )
 }
 
-const pinDropSpring = {
-  type: "spring" as const,
-  stiffness: 400,
-  damping: 18,
-}
-const pinHoverScale = 1.08
-const pinTapScale = 0.96
-
-function renderLocationMarker2D(
+function renderMapPin(
+  marker2dShape: "square" | "round",
+  markerLabelMode: "always" | "hover",
+  markerHoverScale: "normal" | "strong",
+  is3D: boolean,
   item: MapPinClusterItem,
   state: { isSelected: boolean; isHovered: boolean; stackSize?: number },
 ) {
-  const { isSelected, isHovered, stackSize } = state
-  const showStackBadge = stackSize != null && stackSize > 1
-  return (
-    <motion.div
-      className="group flex flex-col items-center"
-      initial={{ scale: 0, opacity: 0, y: -24 }}
-      animate={{
-        scale: 1,
-        opacity: 1,
-        y: 0,
-        transition: pinDropSpring,
-      }}
-      whileHover={{ scale: pinHoverScale }}
-      whileTap={{ scale: pinTapScale }}
-      transition={pinDropSpring}
-    >
-      <div
-        className={`relative overflow-hidden rounded-lg transition-all duration-200 cursor-pointer ${
-          isSelected
-            ? "h-16 w-16 border-[3px] border-primary shadow-[0_0_0_3px_hsl(36_90%_55%/0.3)] scale-105"
-            : isHovered
-              ? "h-[60px] w-[60px] border-2 border-primary/70 scale-105"
-              : "h-14 w-14 border-2 border-border"
-        }`}
-        style={{ filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.5))" }}
-      >
-        <Image
-          src={item.place.image}
-          alt={item.place.name ?? item.place.location.name}
-          fill
-          className="object-cover"
-          sizes="64px"
-        />
-        {showStackBadge && (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-background bg-[#e8365d] px-1 text-[10px] font-bold text-white shadow-md">
-            {stackSize}
-          </span>
-        )}
-      </div>
-      <div
-        className={`h-0 w-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent transition-colors ${
-          isSelected
-            ? "border-t-primary"
-            : isHovered
-              ? "border-t-primary/70"
-              : "border-t-border"
-        }`}
-      />
-      {(isSelected || isHovered) && (
-        <motion.div
-          className="mt-0.5 max-w-[140px] truncate rounded-md bg-overlay/95 px-2 py-0.5 text-center text-[10px] font-semibold text-foreground backdrop-blur-sm shadow-lg"
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          {item.place.name ?? item.place.location.name}
-        </motion.div>
-      )}
-    </motion.div>
-  )
-}
-
-function renderLocationMarker3D(
-  item: MapPinClusterItem,
-  state: { isSelected: boolean; isHovered: boolean; stackSize?: number },
-) {
-  const { isSelected, isHovered, stackSize } = state
-  const showStackBadge = stackSize != null && stackSize > 1
-  const active = isSelected || isHovered
-  const ringColor = isSelected ? "hsl(36, 90%, 55%)" : isHovered ? "hsl(36, 90%, 55%, 0.6)" : "hsl(220, 25%, 35%)"
-
-  return (
-    <motion.div
-      className="flex flex-col items-center cursor-pointer"
-      style={{ filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.7))" }}
-      initial={{ scale: 0, opacity: 0, y: -20 }}
-      animate={{
-        scale: 1,
-        opacity: 1,
-        y: 0,
-        transition: pinDropSpring,
-      }}
-      whileHover={{ scale: pinHoverScale }}
-      whileTap={{ scale: pinTapScale }}
-      transition={pinDropSpring}
-    >
-      {active && (
-        <motion.div
-          className="mb-1 max-w-[140px] truncate rounded-md bg-overlay/95 px-2 py-0.5 text-center text-[10px] font-semibold text-foreground backdrop-blur-sm shadow-lg"
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          {item.place.name ?? item.place.location.name}
-        </motion.div>
-      )}
-      {/* Outer ring + image bubble */}
-      <div
-        className="relative flex items-center justify-center"
-        style={{
-          width: isSelected ? 58 : 50,
-          height: isSelected ? 58 : 50,
-          transition: "all 200ms ease",
-        }}
-      >
-        {/* Glow ring */}
-        <div
-          className={`absolute inset-0 rounded-full ${active ? "pin3d-spin" : ""}`}
-          style={{
-            background: `conic-gradient(from 0deg, ${ringColor}, transparent, ${ringColor})`,
-            opacity: active ? 1 : 0.6,
-          }}
-        />
-        {/* Inner circle with image */}
-        <div
-          className="relative overflow-hidden rounded-full"
-          style={{
-            width: isSelected ? 50 : 42,
-            height: isSelected ? 50 : 42,
-            border: `2px solid ${ringColor}`,
-            transition: "all 200ms ease",
-          }}
-        >
-          <Image
-            src={item.place.image}
-            alt={item.place.name ?? item.place.location.name}
-            fill
-            className="object-cover"
-            sizes="56px"
-          />
-          {showStackBadge && (
-            <span className="absolute -right-0.5 -top-0.5 z-[2] flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0b0f14] bg-[#e8365d] px-1 text-[10px] font-bold text-white shadow-md">
-              {stackSize}
-            </span>
-          )}
-          {/* Glass overlay */}
-          <div
-            className="absolute inset-0 rounded-full"
-            style={{
-              background: "linear-gradient(160deg, rgba(255,255,255,0.15) 0%, transparent 50%)",
-            }}
-          />
-        </div>
-      </div>
-      {/* Stem */}
-      <div
-        style={{
-          width: 2,
-          height: isSelected ? 28 : 22,
-          background: `linear-gradient(to bottom, ${ringColor}, transparent)`,
-          transition: "all 200ms ease",
-        }}
-      />
-      {/* Ground marker */}
-      <div className="relative flex items-center justify-center">
-        <div
-          className="rounded-full"
-          style={{
-            width: active ? 10 : 6,
-            height: active ? 10 : 6,
-            background: ringColor,
-            boxShadow: active
-              ? `0 0 8px 4px ${ringColor}`
-              : `0 0 4px 2px ${ringColor}`,
-            transition: "all 200ms ease",
-          }}
-        />
-        {active && (
-          <div
-            className="absolute rounded-full pin3d-ping"
-            style={{
-              width: 24,
-              height: 24,
-              border: `1px solid ${ringColor}`,
-              opacity: 0.3,
-            }}
-          />
-        )}
-      </div>
-    </motion.div>
-  )
+  const label = item.place.name
+  const props = {
+    imageSrc: item.place.image,
+    label,
+    labelMode: markerLabelMode,
+    hoverScaleMode: markerHoverScale,
+    isSelected: state.isSelected,
+    isHovered: state.isHovered,
+    stackSize: state.stackSize,
+  }
+  if (is3D) return <PlaceMarker3d {...props} />
+  return <PlaceMarker2d shape={marker2dShape} {...props} />
 }
 
 export function MapView({
@@ -408,13 +284,21 @@ export function MapView({
   onLocationClick,
   selectedLocationId,
   focusLocationId,
+  focusPaddingRight = 0,
   is3D = false,
   onToggle3D,
   onMapLoaded,
   onBoundsChange,
 }: MapViewProps) {
   const clusterItems = useMemo(() => toClusterItems(places), [places])
-  const renderMarker = is3D ? renderLocationMarker3D : renderLocationMarker2D
+  const marker2dShape = useMapMarker2dShape()
+  const markerLabelMode = useMapMarkerLabelMode()
+  const markerHoverScale = useMapMarkerHoverScaleMode()
+  const renderMarker = useCallback(
+    (item: MapPinClusterItem, state: { isSelected: boolean; isHovered: boolean; stackSize?: number }) =>
+      renderMapPin(marker2dShape, markerLabelMode, markerHoverScale, is3D, item, state),
+    [marker2dShape, markerLabelMode, markerHoverScale, is3D],
+  )
 
   const effectiveZoom = is3D ? 18 : 14
 
@@ -437,7 +321,8 @@ export function MapView({
       defaultZoom={effectiveZoom}
       minZoom={ZOOM_2D_MIN}
       maxZoom={ZOOM_2D_MAX}
-      controls={{ zoom: true, fullscreen: false }}
+      controls={{ fullscreen: false }}
+      showLoadingOverlay={false}
       className="h-full w-full"
       onCenterChange={onCenterChange}
     >
@@ -447,10 +332,14 @@ export function MapView({
         cityId={city.id}
         places={places}
         focusLocationId={focusLocationId}
+        focusPaddingRight={focusPaddingRight}
       />
       <MapViewPins
         cityId={city.id}
         is3D={is3D}
+        marker2dShape={marker2dShape}
+        markerLabelMode={markerLabelMode}
+        markerHoverScale={markerHoverScale}
         clusterItems={clusterItems}
         selectedLocationId={selectedLocationId ?? focusLocationId}
         onLocationClick={onLocationClick}
@@ -507,6 +396,7 @@ function SyncPitchTo3D({ onToggle3D }: { onToggle3D: (is3D: boolean) => void }) 
   const maps = useMap()
   const mapRef = maps?.current
   const onToggle3DRef = useRef(onToggle3D)
+  const lastIs3DRef = useRef<boolean | null>(null)
   onToggle3DRef.current = onToggle3D
 
   useEffect(() => {
@@ -522,6 +412,8 @@ function SyncPitchTo3D({ onToggle3D }: { onToggle3D: (is3D: boolean) => void }) 
       try {
         const pitch = map.getPitch()
         const is3D = pitch > PITCH_3D_THRESHOLD
+        if (lastIs3DRef.current === is3D) return
+        lastIs3DRef.current = is3D
         onToggle3DRef.current(is3D)
       } catch {
         // map not ready

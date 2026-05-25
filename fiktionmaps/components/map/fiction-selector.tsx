@@ -18,14 +18,22 @@ interface FictionSelectorProps {
   availableFictions: FictionWithMedia[]
   selectedFictionIds: string[]
   onToggleFiction: (fictionId: string) => void
+  /** Controlled open state (e.g. map bar requests pick when none selected). */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export function FictionSelector({
   availableFictions,
   selectedFictionIds,
   onToggleFiction,
+  open: openControlled,
+  onOpenChange,
 }: FictionSelectorProps) {
-  const [open, setOpen] = useState(false)
+  const [openInternal, setOpenInternal] = useState(false)
+  const isControlled = openControlled !== undefined && onOpenChange !== undefined
+  const open = isControlled ? openControlled : openInternal
+  const setOpen = isControlled ? onOpenChange : setOpenInternal
   const [search, setSearch] = useState("")
   const count = selectedFictionIds.length
 

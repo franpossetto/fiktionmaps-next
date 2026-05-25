@@ -10,6 +10,8 @@ type EnrichedPlaceCheckinRow = {
   distance_m: number | null
   checked_at: string
   places: {
+    name: string | null
+    slug: string | null
     fiction_id: string | null
     fictions:
       | { id: string | null; title: string | null; slug: string | null }
@@ -19,6 +21,8 @@ type EnrichedPlaceCheckinRow = {
       | { name: string | null; formatted_address: string | null; city_id: string | null }[]
   }[]
     | {
+        name: string | null
+        slug: string | null
         fiction_id: string | null
         fictions:
           | { id: string | null; title: string | null; slug: string | null }
@@ -155,6 +159,19 @@ export const checkinsSupabaseAdapter: CheckinsRepositoryPort = {
     return (count ?? 0) > 0
   },
 
+  async getLastCityCheckin(userId: string): Promise<CityCheckin | null> {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("city_checkins")
+      .select("*")
+      .eq("user_id", userId)
+      .order("checked_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error || !data) return null
+    return toCityCheckin(data)
+  },
+
   async getPlaceLocation(placeId: string): Promise<{ lat: number; lng: number; cityId: string } | null> {
     const supabase = await createClient()
     const { data, error } = await supabase
@@ -181,6 +198,8 @@ export const checkinsSupabaseAdapter: CheckinsRepositoryPort = {
           checked_at,
           places!inner (
             id,
+            name,
+            slug,
             fiction_id,
             fictions!inner ( id, title, slug ),
             location_id,
@@ -257,11 +276,12 @@ export const checkinsSupabaseAdapter: CheckinsRepositoryPort = {
       return {
         id: row.id,
         placeId: row.place_id,
-        placeName: location?.name ?? "Unknown place",
+        placeName: place?.name ?? "Unknown place",
+        placeSlug: place?.slug ?? row.place_id,
         placeAddress: location?.formatted_address ?? "",
         placeImage: placeImageById.get(row.place_id) ?? null,
         fictionId: place?.fiction_id ?? "",
-        fictionSlug: fiction?.slug ?? null,
+        fictionSlug: fiction?.slug ?? "",
         fictionTitle: fiction?.title ?? "",
         fictionCover: fid ? coverByFiction.get(fid) ?? null : null,
         cityId: cid ?? null,

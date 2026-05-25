@@ -15,16 +15,64 @@ import { deletePlaceUseCase } from "@/src/places/application/delete-place.usecas
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
 import {
   getAllPlacesCached,
+  getCityPlacesCached,
   getFictionPlacesCached,
   getPlaceLocationByIdCached,
+  getPlaceLocationByIdDetailCached,
   listCityIdsWithPlacesCached,
+  listMapSearchCatalogCached,
   listPlacesInBboxForFictionIds,
 } from "./place.queries"
+import type { MapSearchCatalog } from "@/src/places/domain/map-search-catalog.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
-import type { CreatePlaceResult, UpdatePlaceResult, DeletePlaceResult, UploadPlaceImageResult } from "./place.actions.types"
+import { getFictionByIdCached } from "@/src/fictions/infrastructure/next/fiction.queries"
+import { createContributionAction } from "@/src/contributions/infrastructure/next/contribution.actions"
+import { parsePlaceContributeFormData } from "@/src/places/domain/place-contribute.schemas"
+import type {
+  CreatePlaceResult,
+  CreateContributorPlaceResult,
+  UpdatePlaceResult,
+  DeletePlaceResult,
+  UploadPlaceImageResult,
+} from "./place.actions.types"
 
-export type { CreatePlaceResult, UpdatePlaceResult, DeletePlaceResult, UploadPlaceImageResult } from "./place.actions.types"
+export type {
+  CreatePlaceResult,
+  CreateContributorPlaceResult,
+  UpdatePlaceResult,
+  DeletePlaceResult,
+  UploadPlaceImageResult,
+} from "./place.actions.types"
+
+const CREATE_PLACE_CONTRIBUTION = {
+  type: "create_place" as const,
+  entityType: "place" as const,
+}
+
+async function recordCreatePlaceContribution(
+  placeId: string,
+  logContext: string,
+): Promise<boolean | undefined> {
+  const payload = { ...CREATE_PLACE_CONTRIBUTION, entityId: placeId }
+  try {
+    const res = await createContributionAction(payload)
+    if (!res.success) {
+      console.error(`[${logContext}] createContributionAction failed`, {
+        ...payload,
+        error: res.error,
+      })
+      return undefined
+    }
+    return res.autoApproved
+  } catch (err) {
+    console.error(`[${logContext}] createContributionAction threw`, {
+      ...payload,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return undefined
+  }
+}
 
 export async function uploadPlaceImageAction(
   placeId: string,
@@ -62,9 +110,20 @@ export async function getPlaceLocationAction(placeId: string): Promise<Place | n
   return getPlaceLocationByIdCached(placeId)
 }
 
+/** Full place row with large avatar (same as fiction place detail page). */
+export async function getPlaceLocationDetailAction(placeId: string): Promise<Place | null> {
+  if (!uuidSchema.safeParse(placeId).success) return null
+  return getPlaceLocationByIdDetailCached(placeId)
+}
+
 export async function getFictionPlacesAction(fictionId: string): Promise<Place[]> {
   if (!uuidSchema.safeParse(fictionId).success) return []
   return getFictionPlacesCached(fictionId)
+}
+
+export async function getCityPlacesAction(cityId: string): Promise<Place[]> {
+  if (!uuidSchema.safeParse(cityId).success) return []
+  return getCityPlacesCached(cityId)
 }
 
 export async function getPlacesInBboxAction(fictionIds: string[], bbox: MapBbox): Promise<Place[]> {
@@ -76,6 +135,11 @@ export async function getPlacesInBboxAction(fictionIds: string[], bbox: MapBbox)
 /** City IDs that have at least one place (map city picker: disable others). */
 export async function getCityIdsWithPlacesAction(): Promise<string[]> {
   return listCityIdsWithPlacesCached()
+}
+
+/** Fiction × city pairs and cities with places (map unified search). */
+export async function getMapSearchCatalogAction(): Promise<MapSearchCatalog> {
+  return listMapSearchCatalogCached()
 }
 
 export async function createPlaceAction(data: CreatePlaceData): Promise<CreatePlaceResult> {
@@ -112,4 +176,92 @@ export async function deletePlaceAction(placeId: string): Promise<DeletePlaceRes
   if (!ok) return { success: false, error: "Place not found or delete failed" }
   updateTag("places")
   return { success: true }
+}
+
+/** Contributor flow: server sets place status and created_by from session (client cannot override). */
+export async function createContributorPlaceWithImageAction(
+  formData: FormData,
+): Promise<CreateContributorPlaceResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const parsed = parsePlaceContributeFormData(formData)
+  if (!parsed.success) return { success: false, error: parsed.error }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  const { status, created_by } = resolveEntityContributionInsertDefaults(isStaffModerator, user.id)
+
+  const locationName =
+    parsed.data.locationName.trim() ||
+    parsed.data.formattedAddress.trim().split(",")[0]?.trim() ||
+    "Location"
+
+  const result = await createPlaceUseCase(
+    {
+      fictionId: parsed.data.fictionId,
+      cityId: parsed.data.cityId,
+      locationName,
+      placeName: parsed.data.placeName,
+      formattedAddress: parsed.data.formattedAddress,
+      latitude: parsed.data.latitude,
+      longitude: parsed.data.longitude,
+      description: parsed.data.description,
+      isLandmark: parsed.data.isLandmark,
+      locationType: parsed.data.locationType ?? null,
+      streetViewReference: parsed.data.streetViewReference ?? null,
+      status,
+      created_by,
+    },
+    placesRepo,
+  )
+  if (!result) return { success: false, error: "Failed to create place" }
+
+  const contributionAutoApproved = await recordCreatePlaceContribution(
+    result.placeId,
+    "createContributorPlaceWithImageAction",
+  )
+
+  if (parsed.imageFile) {
+    const validationError = validateImageFile(parsed.imageFile)
+    if (!validationError) {
+      await uploadEntityImage({
+        entityType: "place",
+        entityId: result.placeId,
+        role: "avatar",
+        variants: ["sm", "lg"],
+        file: parsed.imageFile,
+        replace: true,
+      })
+    }
+  }
+
+  revalidatePath("/admin")
+  revalidatePath("/contributions")
+  updateTag("places")
+  updateTag(`place-${result.placeId}`)
+  updateTag("contributions")
+
+  const fiction = await getFictionByIdCached(parsed.data.fictionId)
+
+  const out: CreateContributorPlaceResult = {
+    success: true,
+    placeId: result.placeId,
+    placeSlug: result.slug,
+    fictionId: parsed.data.fictionId,
+    fictionSlug: fiction?.slug ?? "",
+  }
+  if (typeof contributionAutoApproved === "boolean") {
+    return { ...out, contributionAutoApproved }
+  }
+  return out
 }

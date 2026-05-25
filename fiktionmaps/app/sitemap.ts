@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next"
 import { getActiveFictionsCached } from "@/src/fictions/infrastructure/next/fiction.queries"
+import { listActivePlacesForSitemapCached } from "@/src/places/infrastructure/next/place.queries"
 import { getSiteUrl } from "@/lib/site"
 
 const BASE_URL = getSiteUrl()
@@ -26,11 +27,12 @@ const staticPages: MetadataRoute.Sitemap = locales.flatMap((locale) =>
 )
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const fictions = await getActiveFictionsCached()
+  const [fictions, placeEntries] = await Promise.all([
+    getActiveFictionsCached(),
+    listActivePlacesForSitemapCached(),
+  ])
 
-  const fictionPages: MetadataRoute.Sitemap = fictions
-    .filter((fiction) => fiction.slug)
-    .flatMap((fiction) =>
+  const fictionPages: MetadataRoute.Sitemap = fictions.flatMap((fiction) =>
       locales.map((locale) => ({
         url: `${BASE_URL}/${locale}/fictions/${fiction.slug}`,
         lastModified: new Date(fiction.updated_at),
@@ -45,5 +47,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       })),
     )
 
-  return [...staticPages, ...fictionPages]
+  const placePages: MetadataRoute.Sitemap = placeEntries.flatMap((entry) =>
+    locales.map((locale) => ({
+      url: `${BASE_URL}/${locale}/fictions/${entry.fictionSlug}/places/${entry.placeSlug}`,
+      lastModified: new Date(entry.updatedAt),
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+      alternates: {
+        languages: {
+          en: `${BASE_URL}/en/fictions/${entry.fictionSlug}/places/${entry.placeSlug}`,
+          es: `${BASE_URL}/es/fictions/${entry.fictionSlug}/places/${entry.placeSlug}`,
+        },
+      },
+    })),
+  )
+
+  return [...staticPages, ...fictionPages, ...placePages]
 }

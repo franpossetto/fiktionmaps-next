@@ -125,7 +125,7 @@ export type Database = {
           genre: string
           description: string
           active: boolean
-          slug: string | null
+          slug: string
           duration_sec: number | null
           status: "pending" | "approved" | "rejected"
           created_by: string | null
@@ -141,7 +141,7 @@ export type Database = {
           genre: string
           description: string
           active?: boolean
-          slug?: string | null
+          slug: string
           duration_sec?: number | null
           status?: "pending" | "approved" | "rejected"
           created_by?: string | null
@@ -157,7 +157,7 @@ export type Database = {
           genre?: string
           description?: string
           active?: boolean
-          slug?: string | null
+          slug?: string
           duration_sec?: number | null
           status?: "pending" | "approved" | "rejected"
           created_by?: string | null
@@ -293,6 +293,56 @@ export type Database = {
           },
         ]
       }
+      location_view_references: {
+        Row: {
+          id: string
+          location_id: string
+          provider: string
+          camera_latitude: number
+          camera_longitude: number
+          heading: number
+          pitch: number
+          fov: number
+          external_pano_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          location_id: string
+          provider?: string
+          camera_latitude: number
+          camera_longitude: number
+          heading: number
+          pitch: number
+          fov: number
+          external_pano_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          location_id?: string
+          provider?: string
+          camera_latitude?: number
+          camera_longitude?: number
+          heading?: number
+          pitch?: number
+          fov?: number
+          external_pano_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_view_references_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: true
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       places: {
         Row: {
           id: string
@@ -300,7 +350,8 @@ export type Database = {
           location_id: string | null
           description: string | null
           active: boolean
-          name: string | null
+          name: string
+          slug: string
           status: "pending" | "approved" | "rejected"
           created_by: string | null
           created_at: string
@@ -312,7 +363,8 @@ export type Database = {
           location_id?: string | null
           description?: string | null
           active?: boolean
-          name?: string | null
+          name: string
+          slug: string
           status?: "pending" | "approved" | "rejected"
           created_by?: string | null
           created_at?: string
@@ -324,7 +376,8 @@ export type Database = {
           location_id?: string | null
           description?: string | null
           active?: boolean
-          name?: string | null
+          name?: string
+          slug?: string
           status?: "pending" | "approved" | "rejected"
           created_by?: string | null
           created_at?: string

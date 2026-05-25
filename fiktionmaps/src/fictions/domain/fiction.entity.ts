@@ -10,7 +10,7 @@ export interface Fiction {
   active: boolean
   /** Profile id of the user who created this fiction (omitted or null on legacy rows). */
   created_by?: string | null
-  slug: string | null
+  slug: string
   /** Full work runtime in seconds (audiovisual). Omitted or null if unknown. */
   duration_sec?: number | null
   created_at: string
@@ -22,4 +22,9 @@ export interface FictionWithMedia extends Fiction {
   coverImage?: string | null
   coverImageLarge?: string | null
   bannerImage?: string | null
+}
+
+/** Staff read model: includes linked catalog ids (`fiction_external_ids`). */
+export interface FictionWithMediaAndCatalogIds extends FictionWithMedia {
+  catalogExternalIds: Partial<Record<string, string>>
 }

@@ -64,7 +64,7 @@ function NavMapPins({
         <MapMarker key={loc.id} position={{ lat: loc.location.lat, lng: loc.location.lng }}>
           <motion.div
             className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-sm"
-            title={loc.name ?? loc.location.name}
+            title={loc.name}
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{
@@ -188,7 +188,7 @@ export function NavMap({ city, viewportCenter, places, onMinimapClick }: NavMapP
             minZoom={10}
             maxZoom={14}
             interactive={true}
-            controls={{ zoom: false, fullscreen: false }}
+            controls={{ fullscreen: false }}
             className="h-full w-full"
             onClick={handleMinimapClick}
           >

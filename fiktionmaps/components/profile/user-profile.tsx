@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import { ArrowRight, Plus } from "lucide-react"
 import { Link } from "@/i18n/navigation"
 import { useAuth } from "@/context/auth-context"
 import { useTranslations } from "next-intl"
@@ -251,6 +252,21 @@ function UserProfileBody({
                 navigator.share({ title: "FiktionMaps", text: `Check out ${displayName}'s profile` })
             }}
           />
+        </div>
+
+        <div className="border-b border-border/40 px-5 pb-6">
+          <Link
+            href="/profile/contribute"
+            className="inline-flex w-full max-w-md items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/15 px-4 py-3 text-sm font-medium text-foreground transition-colors hover:border-foreground/25 hover:bg-muted/30 sm:w-auto"
+          >
+            <span className="inline-flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-background">
+                <Plus className="h-4 w-4 shrink-0" aria-hidden />
+              </span>
+              {t("contributeCta")}
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+          </Link>
         </div>
 
         <HomesProvider initialHomes={initialHomes} initialCities={initialCities}>

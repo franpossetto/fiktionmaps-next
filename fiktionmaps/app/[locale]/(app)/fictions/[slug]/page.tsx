@@ -1,9 +1,7 @@
 import type { Metadata } from "next"
-import { notFound, redirect } from "next/navigation"
-import { RedirectType } from "next/dist/client/components/redirect"
+import { notFound } from "next/navigation"
 import { getTranslations } from "next-intl/server"
 import {
-  getFictionByIdCached,
   getFictionBySlugCached,
   getFictionCitiesCached,
   getFictionDetailRecommendations,
@@ -17,7 +15,6 @@ import {
 } from "@/src/places/infrastructure/next/place.queries"
 import { getFictionContributorsCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { getCurrentUserHasLikedFiction } from "@/src/users/infrastructure/next/user.queries"
-import { isUuidString } from "@/lib/validation/primitives"
 import { getSiteUrl } from "@/lib/site"
 import { FictionDetail } from "@/components/fictions/fiction-detail"
 import { FictionDetailRightRail } from "@/components/fictions/fiction-detail-right-rail"
@@ -44,23 +41,16 @@ function serializeJsonLd(value: unknown): string {
     .replace(/\u2029/g, "\\u2029")
 }
 
-async function resolveFiction(slug: string, locale: string) {
-  // Legacy UUID URLs: redirect permanently to slug URL
-  if (isUuidString(slug)) {
-    const fiction = await getFictionByIdCached(slug)
-    if (!fiction || !fiction.active) return null
-    if (fiction.slug) {
-      redirect(`/${locale}/fictions/${fiction.slug}`, RedirectType.replace)
-    }
-    return fiction
-  }
-  return getFictionBySlugCached(slug)
+async function resolveFiction(slug: string) {
+  const fiction = await getFictionBySlugCached(slug.trim())
+  if (!fiction?.active) return null
+  return fiction
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug, locale } = await params
   const siteUrl = getSiteUrl()
-  const fiction = await resolveFiction(slug, locale)
+  const fiction = await resolveFiction(slug)
   const tMeta = await getTranslations({ locale, namespace: "Metadata" })
   if (!fiction || !fiction.active) {
     return {
@@ -80,8 +70,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     : tMeta("fictionDetailDescriptionFilm", { title: fiction.title })
   const description = fiction.description?.slice(0, 160) || fallbackDescription
   const image = fiction.coverImage?.trim() || fiction.bannerImage?.trim()
-  const effectiveSlug = fiction.slug?.trim() || slug
-  const canonicalPath = `/${locale}/fictions/${effectiveSlug}`
+  const canonicalSlug = fiction.slug.trim()
+  const canonicalPath = `/${locale}/fictions/${canonicalSlug}`
   const canonicalUrl = `${siteUrl}${canonicalPath}`
   return {
     title,
@@ -89,8 +79,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: {
       canonical: canonicalUrl,
       languages: {
-        en: `${siteUrl}/en/fictions/${effectiveSlug}`,
-        es: `${siteUrl}/es/fictions/${effectiveSlug}`,
+        en: `${siteUrl}/en/fictions/${canonicalSlug}`,
+        es: `${siteUrl}/es/fictions/${canonicalSlug}`,
       },
     },
     robots: {
@@ -117,11 +107,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function FictionSlugPage({ params }: Props) {
   const { slug, locale } = await params
   const siteUrl = getSiteUrl()
-  const fiction = await resolveFiction(slug, locale)
+  const fiction = await resolveFiction(slug)
   if (!fiction || !fiction.active) {
     notFound()
   }
-  const canonicalSlug = fiction.slug?.trim() || slug
+  const canonicalSlug = fiction.slug.trim()
   const canonicalUrl = `${siteUrl}/${locale}/fictions/${canonicalSlug}`
   const tMeta = await getTranslations({ locale, namespace: "Metadata" })
 

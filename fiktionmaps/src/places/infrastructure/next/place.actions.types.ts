@@ -4,6 +4,17 @@ export type CreatePlaceResult =
   | { success: true; createdPlaceId: string; places: Place[] }
   | { success: false; error: string }
 
+export type CreateContributorPlaceResult =
+  | {
+      success: true
+      placeId: string
+      placeSlug: string
+      fictionId: string
+      fictionSlug: string
+      contributionAutoApproved?: boolean
+    }
+  | { success: false; error: string }
+
 export type UpdatePlaceResult =
   | { success: true }
   | { success: false; error: string }

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import type { Map2dMarkerShape, MapMarkerHoverScaleMode } from "@/lib/theme-settings"
 import type { CollocatedSpiderfyTheme } from "./collocated-spiderfy-theme"
 
 export interface LatLng {
@@ -6,10 +7,24 @@ export interface LatLng {
   lng: number
 }
 
+export interface MapFlyToPadding {
+  top?: number
+  right?: number
+  bottom?: number
+  left?: number
+}
+
+export interface MapFlyToOptions {
+  center: LatLng
+  zoom?: number
+  duration?: number
+  padding?: MapFlyToPadding
+}
+
 export interface MapControlHandle {
   panTo(position: LatLng): void
   setZoom(zoom: number): void
-  flyTo(options: { center: LatLng; zoom?: number; duration?: number }): boolean
+  flyTo(options: MapFlyToOptions): boolean
   getCenter?(): LatLng
   setCenter?(pos: LatLng): void
 }
@@ -35,8 +50,9 @@ export interface MapContainerProps {
   onMapReady?: (control: MapControlHandle) => void
   /** Called when the map zoom changes (e.g. via scroll). Rounded to integer. */
   onZoomChange?: (zoom: number) => void
+  /** When false, skips the Mapbox tile loading overlay (e.g. main map uses its own bootstrap). Default true. */
+  showLoadingOverlay?: boolean
   controls?: {
-    zoom?: boolean
     fullscreen?: boolean
   }
 }
@@ -64,7 +80,7 @@ export interface MapControl {
   getZoom(): number | undefined
   fitBounds(points: LatLng[], padding?: number): void
   /** Animate map to center and optional zoom. Returns false if the map was not ready. */
-  flyTo(options: { center: LatLng; zoom?: number; duration?: number }): boolean
+  flyTo(options: MapFlyToOptions): boolean
   setTilt?(tilt: number): void
   getTilt?(): number | undefined
   setHeading?(heading: number): void
@@ -92,6 +108,9 @@ export interface ClusterLayerProps<T extends ClusterItem = ClusterItem> {
     item: T,
     state: { isSelected: boolean; isHovered: boolean; stackSize?: number },
   ) => ReactNode
+  /** 2D pin shape for cluster chrome (square = v1, round = v2). Ignored when renderItem supplies full pin. */
+  marker2dShape?: Map2dMarkerShape
+  markerHoverScale?: MapMarkerHoverScaleMode
   maxZoom?: number
   radius?: number
   /**

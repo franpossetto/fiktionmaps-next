@@ -1,4 +1,8 @@
 import type { ContributionType } from "./contribution.entity"
+import { STAFF_ROLES } from "@/src/users/domain/user.roles"
+
+/** Staff `/contributions` fiction create feed: items per page (Supabase `.range`). */
+export const STAFF_FICTION_CONTRIBUTIONS_FEED_PAGE_SIZE = 10
 
 export const CONTRIBUTION_FPP: Record<ContributionType, number> = {
   create_fiction: 5,
@@ -12,7 +16,8 @@ export const CONTRIBUTION_FPP: Record<ContributionType, number> = {
   checkin: 8,
 }
 
-export const MODERATOR_ROLES = ["moderator", "admin"] as const
+/** Same canonical set as `STAFF_ROLES` (`@/src/users/domain/user.roles`). */
+export const MODERATOR_ROLES = STAFF_ROLES
 
 /** Applied to fiction / place / scene when a contribution is approved. */
 export const ENTITY_PATCH_ON_CONTRIBUTION_APPROVE = {

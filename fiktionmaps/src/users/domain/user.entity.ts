@@ -10,6 +10,7 @@ export interface Profile {
   date_of_birth: string | null
   onboarding_completed: boolean
   role: UserRole
+  fpp_total: number
   created_at: string
   updated_at: string
 }

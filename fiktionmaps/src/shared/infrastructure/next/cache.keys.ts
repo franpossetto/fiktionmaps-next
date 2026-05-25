@@ -9,7 +9,6 @@ export const CacheKeys = {
     entityType,
     entityId,
   ],
-  contributionPending: () => ["contribution", "pending"],
   fictionContributors: (fictionId: string) => ["contribution", "fiction-contributors", fictionId],
   placeContributorsDetail: (placeId: string) => ["contribution", "place-contributors-detail", placeId],
   topContributors: (limit: number) => ["top-contributors", String(limit)],

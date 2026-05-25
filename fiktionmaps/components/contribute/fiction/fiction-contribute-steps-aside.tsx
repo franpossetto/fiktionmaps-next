@@ -59,7 +59,7 @@ export function FictionContributeStepsAside({
 
   return (
     <nav
-      className={cn("ml-auto w-full min-w-0 max-w-[280px] space-y-3", className)}
+      className={cn("ml-auto w-full min-w-0 max-w-full space-y-3", className)}
       aria-label={tf("stepsAsideAria")}
     >
       <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { useMap } from "react-map-gl/mapbox"
-import type { MapControl, LatLng } from "../types"
+import type { MapControl, LatLng, MapFlyToOptions } from "../types"
 import type { LngLatBoundsLike } from "mapbox-gl"
 import { useMapLoaded } from "../map-loaded-context"
 
@@ -31,14 +31,15 @@ export function useMapboxMapControl(id?: string): MapControl | null {
       getZoom() {
         try { return map.getZoom() } catch { return undefined }
       },
-      flyTo(options: { center: LatLng; zoom?: number; duration?: number }) {
+      flyTo(options: MapFlyToOptions) {
         try {
-          const { center, zoom, duration = 1200 } = options
+          const { center, zoom, duration = 1200, padding } = options
           map.flyTo({
             center: [center.lng, center.lat],
             zoom: zoom ?? map.getZoom(),
             duration,
             essential: true,
+            ...(padding ? { padding } : {}),
           })
           return true
         } catch {

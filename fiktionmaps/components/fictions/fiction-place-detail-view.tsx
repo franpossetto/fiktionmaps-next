@@ -19,6 +19,7 @@ import type { ContributorProfileWithDate } from "@/src/contributions/domain/cont
 import { ScenePreviewThumb } from "@/components/scenes/scene-preview-thumb"
 import { PlaceContributorsByline } from "@/components/fictions/place-contributors-byline"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
+import { publicFictionScenePath } from "@/lib/fictions/public-fiction-paths"
 
 const FictionPlaceDirectionsMap = dynamic(
   () =>
@@ -81,28 +82,31 @@ function PlaceDetailLikeCluster() {
 
 export interface FictionPlaceDetailViewProps {
   fiction: FictionWithMedia
-  /** Segment for `/fictions/...` and `/fiction/...` paths (slug preferred). */
+  /** Slug segment for `/fictions/...` paths. */
   fictionPathSlug: string
-  location: Place
+  place: Place
   city: City | undefined
   scenes: Scene[]
   exploreMapHref: string
   placeContributors: ContributorProfileWithDate[]
+  /** Contribute wizard: same layout, no navigation away from the flow. */
+  previewMode?: boolean
 }
 
 export function FictionPlaceDetailView({
   fiction,
   fictionPathSlug,
-  location,
+  place,
   city,
   scenes,
   exploreMapHref,
   placeContributors,
+  previewMode = false,
 }: FictionPlaceDetailViewProps) {
   const t = useTranslations("Fictions")
   const tMeta = useTranslations("Metadata")
   const geo: Location =
-    location.location ?? {
+    place.location ?? {
       name: "",
       address: "",
       lat: 0,
@@ -111,8 +115,9 @@ export function FictionPlaceDetailView({
       locationType: null,
       isLandmark: undefined,
     }
-  const displayName = location.name?.trim() || geo.name || "Sin nombre"
-  const heroSrc = location.image?.trim() ? location.image.trim() : DEFAULT_FICTION_COVER
+  const displayName = place.name.trim() || tMeta("unnamedPlace")
+  const heroSrc = place.image?.trim() ? place.image.trim() : DEFAULT_FICTION_COVER
+  const heroUnoptimized = heroSrc.startsWith("blob:")
   const coordsOk = hasValidPlaceCoordinates(geo.lat, geo.lng)
   const addressLine =
     geo.address?.trim() ||
@@ -122,24 +127,45 @@ export function FictionPlaceDetailView({
   const showDirectionsSection = coordsOk || Boolean(addressLine)
 
   return (
-    <main className="px-6 py-8 sm:px-8 lg:px-10">
+    <main
+      className={
+        previewMode
+          ? "px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10"
+          : "px-6 py-8 sm:px-8 lg:px-10"
+      }
+    >
       <div className="mx-auto w-full max-w-[920px]">
         <div className="mb-6 flex items-center justify-between gap-3">
           <PageBreadcrumb
             ariaLabel={tMeta("breadcrumbNavAriaLabel")}
             className="min-w-0 flex-1 pr-2"
-            items={[
-              { label: tMeta("breadcrumbFictions"), href: "/fictions" },
-              { label: fiction.title, href: `/fictions/${fictionPathSlug}` },
-              { label: displayName },
-            ]}
+            items={
+              previewMode
+                ? [
+                    { label: tMeta("breadcrumbFictions") },
+                    { label: fiction.title },
+                    { label: displayName },
+                  ]
+                : [
+                    { label: tMeta("breadcrumbFictions"), href: "/fictions" },
+                    { label: fiction.title, href: `/fictions/${fictionPathSlug}` },
+                    { label: displayName },
+                  ]
+            }
           />
-          <Button asChild size="sm" variant="cta">
-            <Link href={exploreMapHref}>
+          {previewMode ? (
+            <Button type="button" size="sm" variant="cta" disabled className="pointer-events-none opacity-80">
               <Compass className="h-4 w-4" />
               <span>{t("exploreMap")}</span>
-            </Link>
-          </Button>
+            </Button>
+          ) : (
+            <Button asChild size="sm" variant="cta">
+              <Link href={exploreMapHref}>
+                <Compass className="h-4 w-4" />
+                <span>{t("exploreMap")}</span>
+              </Link>
+            </Button>
+          )}
         </div>
 
         <article className="space-y-6">
@@ -173,10 +199,11 @@ export function FictionPlaceDetailView({
                   fill
                   className="object-cover"
                   sizes="(max-width: 1024px) 100vw, 40vw"
+                  unoptimized={heroUnoptimized}
                 />
               </div>
-              {location.description ? (
-                <p className="max-w-[75ch] text-base leading-8 text-muted-foreground">{location.description}</p>
+              {place.description ? (
+                <p className="max-w-[75ch] text-base leading-8 text-muted-foreground">{place.description}</p>
               ) : null}
             </header>
 
@@ -202,16 +229,29 @@ export function FictionPlaceDetailView({
                     {t("placeDetailDirectionsHeading")}
                   </h2>
                 </div>
-                <Button asChild size="sm" variant="outline" className="h-9 shrink-0 border-border bg-background px-3 text-sm shadow-none">
-                  <Link href={exploreMapHref}>
+                {previewMode ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled
+                    className="pointer-events-none h-9 shrink-0 border-border bg-background px-3 text-sm opacity-80 shadow-none"
+                  >
                     <Compass className="h-4 w-4" />
                     <span>{t("placeDetailGoToMap")}</span>
-                  </Link>
-                </Button>
+                  </Button>
+                ) : (
+                  <Button asChild size="sm" variant="outline" className="h-9 shrink-0 border-border bg-background px-3 text-sm shadow-none">
+                    <Link href={exploreMapHref}>
+                      <Compass className="h-4 w-4" />
+                      <span>{t("placeDetailGoToMap")}</span>
+                    </Link>
+                  </Button>
+                )}
               </div>
               {coordsOk ? (
                 <FictionPlaceDirectionsMap
-                  mapInstanceId={`fiction-place-directions-${location.id}`}
+                  mapInstanceId={`fiction-place-directions-${place.id}`}
                   center={{ lat: geo.lat, lng: geo.lng }}
                   placeName={displayName}
                   imageSrc={heroSrc}
@@ -262,7 +302,7 @@ export function FictionPlaceDetailView({
                   return (
                     <li key={scene.id} className="px-4 py-4 sm:px-5 sm:py-5">
                       <Link
-                        href={`/fiction/${fictionPathSlug}/scene/${encodeURIComponent(scene.id)}`}
+                        href={publicFictionScenePath(fictionPathSlug, scene.id)}
                         className="flex min-w-0 flex-1 cursor-pointer items-center gap-4 rounded-lg outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       >
                         <p className="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground">

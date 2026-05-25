@@ -78,6 +78,7 @@ export async function createContributionAction(data: CreateContributionData): Pr
   if (!result) return { success: false, error: "Failed to create contribution" }
 
   revalidatePath("/admin")
+  revalidatePath("/contributions")
   updateTag("contributions")
   revalidateContributionEntityTags(parsed.data.entityType, parsed.data.entityId)
   if (result.autoApproved) {
@@ -115,6 +116,7 @@ export async function approveContributionAction(data: ApproveContributionData): 
   if (!ok) return { success: false, error: "Approve failed or contribution is not pending" }
 
   revalidatePath("/admin")
+  revalidatePath("/contributions")
   updateTag("contributions")
   updateTag("profiles")
   revalidateContributionEntityTags(contributionBefore.entityType, contributionBefore.entityId)
@@ -150,6 +152,7 @@ export async function rejectContributionAction(data: RejectContributionData): Pr
   if (!ok) return { success: false, error: "Reject failed or contribution is not pending" }
 
   revalidatePath("/admin")
+  revalidatePath("/contributions")
   updateTag("contributions")
   updateTag("profiles")
   revalidateContributionEntityTags(contributionBefore.entityType, contributionBefore.entityId)

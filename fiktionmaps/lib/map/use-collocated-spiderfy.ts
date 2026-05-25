@@ -50,6 +50,17 @@ export function groupCollocatedPointFeatures<T>(features: PointFeature<T>[]): Co
   return out
 }
 
+/** Screen-space fan: 2 pins open left/right; more pins spread in a wide arc above the hub. */
+export function computeSpiderAngles(count: number): number[] {
+  if (count <= 0) return []
+  if (count === 1) return [-Math.PI / 2]
+  if (count === 2) return [Math.PI, 0]
+  const arcSpan = Math.min(Math.PI * 1.3, Math.PI / 4 + (Math.PI / 5) * (count - 1))
+  const start = -Math.PI / 2 - arcSpan / 2
+  const step = arcSpan / (count - 1)
+  return Array.from({ length: count }, (_, i) => start + step * i)
+}
+
 /** Radial layout in screen space so legs stay visually correct on pan/zoom. */
 export function computeSpiderLngLats(
   map: MapboxMap,
@@ -61,15 +72,65 @@ export function computeSpiderLngLats(
   if (n <= 0) return []
   const origin = map.project([center.lng, center.lat])
   const ringPx = theme.radiusPx + theme.hubClearancePx
-  const positions: LatLng[] = []
-  for (let i = 0; i < n; i += 1) {
-    const angle = (2 * Math.PI * i) / n - Math.PI / 2
+  const angles = computeSpiderAngles(n)
+  return angles.map((angle) => {
     const x = origin.x + ringPx * Math.cos(angle)
     const y = origin.y + ringPx * Math.sin(angle)
     const ll = map.unproject([x, y])
-    positions.push({ lat: ll.lat, lng: ll.lng })
+    return { lat: ll.lat, lng: ll.lng }
+  })
+}
+
+const SPIDER_LEG_CURVE_SEGMENTS = 24
+
+/**
+ * Quadratic curve in screen space. Control point is offset perpendicular to the chord
+ * (a collinear CP would produce a straight segment).
+ */
+export function computeSpiderLegCurveCoordinates(
+  map: MapboxMap,
+  center: LatLng,
+  leaf: LatLng,
+  bowPx?: number,
+): [number, number][] {
+  const o = map.project([center.lng, center.lat])
+  const l = map.project([leaf.lng, leaf.lat])
+  const dx = l.x - o.x
+  const dy = l.y - o.y
+  const len = Math.hypot(dx, dy) || 1
+  const bow = bowPx ?? Math.min(42, len * 0.38)
+  const midX = (o.x + l.x) / 2
+  const midY = (o.y + l.y) / 2
+  const perpX = -dy / len
+  const perpY = dx / len
+  let cpX = midX + perpX * bow
+  let cpY = midY + perpY * bow
+  // Fan opens upward: bow legs toward visual top (smaller screen Y).
+  if (cpY > midY) {
+    cpX = midX - perpX * bow
+    cpY = midY - perpY * bow
   }
-  return positions
+  const coords: [number, number][] = []
+  for (let i = 0; i <= SPIDER_LEG_CURVE_SEGMENTS; i += 1) {
+    const t = i / SPIDER_LEG_CURVE_SEGMENTS
+    const u = 1 - t
+    const x = u * u * o.x + 2 * u * t * cpX + t * t * l.x
+    const y = u * u * o.y + 2 * u * t * cpY + t * t * l.y
+    const ll = map.unproject([x, y])
+    coords.push([ll.lng, ll.lat])
+  }
+  return coords
+}
+
+/** Truncate curve coordinates for leg draw-in (progress 0–1). */
+export function trimSpiderLegCurve(
+  coordinates: [number, number][],
+  progress: number,
+): [number, number][] {
+  const t = Math.min(1, Math.max(0, progress))
+  if (t <= 0) return [coordinates[0]!]
+  const target = Math.max(1, Math.ceil((coordinates.length - 1) * t))
+  return coordinates.slice(0, target + 1)
 }
 
 /**

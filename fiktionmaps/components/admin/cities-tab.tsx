@@ -232,7 +232,6 @@ export function CitiesTab({ initialCities, onOpenCity, viewMode = "cards" }: Cit
                         defaultZoom={parseInt(formData.zoom, 10)}
                         className="h-full w-full"
                         interactive={false}
-                        controls={{ zoom: false }}
                       />
                     </MapProvider>
                   </div>

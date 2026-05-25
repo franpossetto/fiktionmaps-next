@@ -161,7 +161,7 @@ export function SceneWatchView({
                     <div className="min-w-0">
                       <p className="line-clamp-2 text-xs font-semibold text-foreground">{scene.title}</p>
                       <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">
-                        {sceneLocation?.name ?? sceneLocation?.location?.name ?? "Unknown location"}
+                        {sceneLocation?.name ?? "Unknown location"}
                       </p>
                       {scene.timestamp && (
                         <p className="mt-1 text-[11px] text-muted-foreground">{scene.timestamp}</p>
