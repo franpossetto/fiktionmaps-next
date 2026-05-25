@@ -41,6 +41,12 @@
     "openMap": "Abrir mapa",
     "exploreMap": "Explorar mapa",
     "searchFictions": "Buscar ficciones...",
+    "searchInFiction": "Buscar en {name}",
+    "searchInPlace": "Buscar en {name}",
+    "clearSearchScope": "Quitar ámbito de búsqueda",
+    "searchResultPlace": "Lugar",
+    "searchResultScene": "Escena",
+    "noMatchingInScope": "Sin resultados en este ámbito",
     "noMatchingFictions": "No hay ficciones coincidentes",
     "logoAlt": "fiktionmaps"
   },

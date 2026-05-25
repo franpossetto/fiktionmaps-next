@@ -33,6 +33,10 @@ import { resolveContributorFictionCreateDefaults } from "@/src/fictions/applicat
 import { getFictionInterestsUseCase } from "@/src/fiction-interests/application/get-fiction-interests.usecase"
 import { setFictionInterestsUseCase } from "@/src/fiction-interests/application/set-fiction-interests.usecase"
 import { getRecommendedFictionsUseCase } from "@/src/fictions/application/get-recommended-fictions.usecase"
+import { resolveNavSearchScopeUseCase } from "@/src/fictions/application/resolve-nav-search-scope.usecase"
+import { parseFictionAppRoute } from "@/lib/navigation/parse-fiction-app-route"
+import type { NavSearchScope } from "@/src/fictions/domain/nav-search-scope"
+import { resolvePlaceForFictionPathCached } from "@/src/places/infrastructure/next/place.queries"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
 import {
   getFictionByIdCached,
@@ -462,6 +466,17 @@ export async function resolvePublicFictionFromSlugAction(
 
 /** @deprecated Use resolvePublicFictionFromSlugAction */
 export const resolvePublicFictionFromSlugOrIdAction = resolvePublicFictionFromSlugAction
+
+/** Top nav: global search vs chip scoped to current fiction / place page. */
+export async function getNavSearchScopeAction(pathname: string): Promise<NavSearchScope> {
+  const route = parseFictionAppRoute(pathname)
+  if (!route) return { kind: "global" }
+  return resolveNavSearchScopeUseCase(route, {
+    getFictionBySlug: (slug) => getFictionBySlugCached(slug),
+    resolvePlaceForFictionPath: (fictionId, segment) =>
+      resolvePlaceForFictionPathCached(fictionId, segment),
+  })
+}
 
 export async function getFictionCitiesAction(fictionId: string): Promise<City[]> {
   if (!uuidSchema.safeParse(fictionId).success) return []

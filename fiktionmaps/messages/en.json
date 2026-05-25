@@ -41,6 +41,12 @@
     "openMap": "Open map",
     "exploreMap": "Explore map",
     "searchFictions": "Search fictions...",
+    "searchInFiction": "Search in {name}",
+    "searchInPlace": "Search in {name}",
+    "clearSearchScope": "Clear search scope",
+    "searchResultPlace": "Place",
+    "searchResultScene": "Scene",
+    "noMatchingInScope": "No results in this scope",
     "noMatchingFictions": "No matching fictions",
     "logoAlt": "fiktionmaps"
   },
