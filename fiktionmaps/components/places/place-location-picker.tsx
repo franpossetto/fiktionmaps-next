@@ -699,7 +699,6 @@ export function PlaceLocationMap({
           setMapReady(true)
           onMapReady?.(ctrl)
         }}
-        controls={{ zoom: true }}
       >
         {mapReady && hasPin ? (
           <MapMarker position={{ lat: latitude, lng: longitude }}>

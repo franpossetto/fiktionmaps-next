@@ -188,7 +188,7 @@ export function NavMap({ city, viewportCenter, places, onMinimapClick }: NavMapP
             minZoom={10}
             maxZoom={14}
             interactive={true}
-            controls={{ zoom: false, fullscreen: false }}
+            controls={{ fullscreen: false }}
             className="h-full w-full"
             onClick={handleMinimapClick}
           >

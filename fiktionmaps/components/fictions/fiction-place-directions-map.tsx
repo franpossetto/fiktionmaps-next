@@ -30,7 +30,7 @@ export function FictionPlaceDirectionsMap({
         minZoom={11}
         maxZoom={18}
         interactive={false}
-        controls={{ zoom: false, fullscreen: false }}
+        controls={{ fullscreen: false }}
         className="h-full w-full"
       >
         <MapMarker position={center} anchor="center">

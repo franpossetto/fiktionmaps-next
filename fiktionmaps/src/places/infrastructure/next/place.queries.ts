@@ -13,6 +13,10 @@ import { getFictionPlacesUseCase } from "@/src/places/application/get-fiction-pl
 import { getCityPlacesUseCase } from "@/src/places/application/get-city-places.usecase"
 import { getPlacesInBboxUseCase } from "@/src/places/application/get-places-in-bbox.usecase"
 import { listCityIdsWithPlacesUseCase } from "@/src/places/application/list-city-ids-with-places.usecase"
+import { listMapSearchCatalogUseCase } from "@/src/places/application/list-map-search-catalog.usecase"
+import { getActiveFictionsCached } from "@/src/fictions/infrastructure/next/fiction.queries"
+import { getAllCitiesCached } from "@/src/cities/infrastructure/next/city.queries"
+import type { MapSearchCatalog } from "@/src/places/domain/map-search-catalog.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import { CacheKeys } from "@/src/shared/infrastructure/next/cache.keys"
 import { CacheConfig } from "@/src/shared/infrastructure/next/cache.config"
@@ -106,6 +110,19 @@ export function listCityIdsWithPlacesCached() {
     () => listCityIdsWithPlacesUseCase(anonRepo),
     CacheKeys.place("city-ids-with-places"),
     { ...CacheConfig.long, tags: ["places", "cities"] }
+  )()
+}
+
+export function listMapSearchCatalogCached(): Promise<MapSearchCatalog> {
+  return unstable_cache(
+    () =>
+      listMapSearchCatalogUseCase({
+        placesRepo: anonRepo,
+        getActiveFictions: getActiveFictionsCached,
+        getAllCities: getAllCitiesCached,
+      }),
+    CacheKeys.place("map-search-catalog"),
+    { ...CacheConfig.long, tags: ["places", "cities", "fictions"] },
   )()
 }
 

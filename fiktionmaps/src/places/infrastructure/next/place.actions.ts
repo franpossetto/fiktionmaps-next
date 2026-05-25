@@ -20,8 +20,10 @@ import {
   getPlaceLocationByIdCached,
   getPlaceLocationByIdDetailCached,
   listCityIdsWithPlacesCached,
+  listMapSearchCatalogCached,
   listPlacesInBboxForFictionIds,
 } from "./place.queries"
+import type { MapSearchCatalog } from "@/src/places/domain/map-search-catalog.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
 import { getFictionByIdCached } from "@/src/fictions/infrastructure/next/fiction.queries"
@@ -133,6 +135,11 @@ export async function getPlacesInBboxAction(fictionIds: string[], bbox: MapBbox)
 /** City IDs that have at least one place (map city picker: disable others). */
 export async function getCityIdsWithPlacesAction(): Promise<string[]> {
   return listCityIdsWithPlacesCached()
+}
+
+/** Fiction × city pairs and cities with places (map unified search). */
+export async function getMapSearchCatalogAction(): Promise<MapSearchCatalog> {
+  return listMapSearchCatalogCached()
 }
 
 export async function createPlaceAction(data: CreatePlaceData): Promise<CreatePlaceResult> {

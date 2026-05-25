@@ -361,6 +361,48 @@ export function createPlacesSupabaseAdapter(
       return [...ids]
     }),
 
+    listDistinctFictionCityPairs: cache(async () => {
+      const supabase = await getSupabase()
+      const seen = new Set<string>()
+      const pairs: { fictionId: string; cityId: string }[] = []
+      const pageSize = 1000
+
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("places")
+          .select("fiction_id, locations!inner(city_id)")
+          .eq("active", true)
+          .order("id", { ascending: true })
+          .range(from, from + pageSize - 1)
+
+        if (error) {
+          console.error("[places repo] listDistinctFictionCityPairs:", error.message)
+          break
+        }
+        if (!data?.length) break
+
+        for (const row of data as Record<string, unknown>[]) {
+          const fictionId = row.fiction_id
+          if (typeof fictionId !== "string" || !fictionId) continue
+          const rawLoc = row.locations
+          const loc = Array.isArray(rawLoc) ? rawLoc[0] : rawLoc
+          const cityId =
+            loc && typeof loc === "object" && loc !== null && "city_id" in loc
+              ? (loc as { city_id?: string }).city_id
+              : undefined
+          if (typeof cityId !== "string" || !cityId) continue
+          const key = `${fictionId}:${cityId}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          pairs.push({ fictionId, cityId })
+        }
+
+        if (data.length < pageSize) break
+      }
+
+      return pairs
+    }),
+
     getById: cache(async (placeId: string, avatarVariant: "sm" | "lg" = "sm"): Promise<Place | null> => {
       const supabase = await getSupabase()
       const { data: row, error } = await supabase

@@ -2,11 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import {
-  Map as ReactMapGL,
-  NavigationControl,
-  FullscreenControl,
-} from "react-map-gl/mapbox"
+import { Map as ReactMapGL, FullscreenControl } from "react-map-gl/mapbox"
 import "mapbox-gl/dist/mapbox-gl.css"
 import type { Map as MapboxMap } from "mapbox-gl"
 import type { MapContainerProps } from "../types"
@@ -88,7 +84,6 @@ export function MapboxContainer({
     : colorScheme === "light"
       ? MAPBOX_DAY_STYLE
       : MAPBOX_NIGHT_STYLE
-  const showZoom = controls?.zoom ?? interactive
   const showFullscreen = controls?.fullscreen ?? false
 
   return (
@@ -142,10 +137,9 @@ export function MapboxContainer({
         }
         style={{ width: "100%", height: "100%" }}
         attributionControl={false}
-        logoPosition="bottom-right"
+        logoPosition="bottom-left"
       >
         <MapLoadedProvider value={mapLoaded}>
-          {showZoom && <NavigationControl showCompass={false} position="bottom-right" />}
           {showFullscreen && <FullscreenControl position="top-right" />}
           {children}
           {interactive && <MapboxBuildings3D />}

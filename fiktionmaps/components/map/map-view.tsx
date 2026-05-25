@@ -321,7 +321,7 @@ export function MapView({
       defaultZoom={effectiveZoom}
       minZoom={ZOOM_2D_MIN}
       maxZoom={ZOOM_2D_MAX}
-      controls={{ zoom: true, fullscreen: false }}
+      controls={{ fullscreen: false }}
       showLoadingOverlay={false}
       className="h-full w-full"
       onCenterChange={onCenterChange}

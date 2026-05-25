@@ -1,3 +1,4 @@
+import type { FictionCityPairKey } from "@/src/places/domain/map-fiction-city-pair.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { MapBbox } from "@/lib/validation/map-query"
 import type { CreatePlaceRepoInput, UpdatePlaceData } from "./place.schemas"
@@ -14,6 +15,8 @@ export interface PlacesRepositoryPort {
   getFictionIdsByCityId(cityId: string): Promise<string[]>
   /** Distinct city IDs that have at least one place (via location). */
   listCityIdsWithPlaces(): Promise<string[]>
+  /** Distinct (fiction_id, city_id) for active places with a location. */
+  listDistinctFictionCityPairs(): Promise<FictionCityPairKey[]>
   getByBboxAndFictionIds(fictionIds: string[], bbox: MapBbox): Promise<Place[]>
   create(data: CreatePlaceRepoInput): Promise<{ placeId: string; slug: string } | null>
   update(placeId: string, data: UpdatePlaceData): Promise<boolean>

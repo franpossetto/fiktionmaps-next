@@ -53,7 +53,6 @@ export interface MapContainerProps {
   /** When false, skips the Mapbox tile loading overlay (e.g. main map uses its own bootstrap). Default true. */
   showLoadingOverlay?: boolean
   controls?: {
-    zoom?: boolean
     fullscreen?: boolean
   }
 }

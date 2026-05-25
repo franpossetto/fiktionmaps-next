@@ -366,7 +366,6 @@ export function CityMapPicker({
             onCenterChange={handleCenterChange}
             onZoomChange={onZoomChange}
             onMapReady={handleMapReady}
-            controls={{ zoom: false }}
           >
             <CityMapSync
               zoom={safeZoom}
