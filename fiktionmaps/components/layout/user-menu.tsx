@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { AuthModal } from "@/components/auth/auth-modal"
-import { LogOut, User, Settings, Shield, BookOpen, Map, Inbox } from "lucide-react"
+import { LogOut, User, Settings, Shield, BookOpen, Map, Inbox, Plus } from "lucide-react"
 import { Link } from "@/i18n/navigation"
 import { LocaleMenuSub } from "@/components/layout/locale-switcher"
 
@@ -100,6 +100,12 @@ export function UserMenu() {
           <Link href="/profile">
             <User className="mr-2 h-4 w-4" />
             {t("profile")}
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
+          <Link href="/profile/contribute">
+            <Plus className="mr-2 h-4 w-4" />
+            {t("contribute")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">

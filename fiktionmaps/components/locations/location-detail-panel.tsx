@@ -10,7 +10,7 @@ export function LocationDetailPanel({ place }: LocationDetailPanelProps) {
       <div className="flex flex-col gap-3">
         <div>
           <h3 className="text-lg font-semibold text-foreground">
-            {place.name ?? place.location.name}
+            {place.name}
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">{place.location.address}</p>
         </div>

@@ -1,13 +1,10 @@
 import type { Metadata } from "next"
-import { notFound, redirect } from "next/navigation"
-import { RedirectType } from "next/dist/client/components/redirect"
+import { notFound } from "next/navigation"
 import { getTranslations } from "next-intl/server"
-import { getFictionByIdCached, getFictionBySlugCached } from "@/src/fictions/infrastructure/next/fiction.queries"
+import { getFictionBySlugCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { getPlaceLocationByIdCached } from "@/src/places/infrastructure/next/place.queries"
 import { getSceneByIdUncached, getScenesForFiction } from "@/src/scenes/infrastructure/next/scene.queries"
-import { isUuidString } from "@/lib/validation/primitives"
 import { getSiteUrl } from "@/lib/site"
-import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import { FictionSceneWatchClient } from "@/components/fictions/fiction-scene-watch-client"
 import { FictionSlugDetailShell } from "@/components/fictions/fiction-slug-detail-shell"
@@ -23,26 +20,6 @@ function mapLocaleToOpenGraph(locale: string): string {
   return locale
 }
 
-async function loadActiveFiction(slug: string): Promise<FictionWithMedia | null> {
-  if (isUuidString(slug)) {
-    const fiction = await getFictionByIdCached(slug)
-    return fiction?.active ? fiction : null
-  }
-  const fiction = await getFictionBySlugCached(slug)
-  return fiction?.active ? fiction : null
-}
-
-function redirectLegacyUuidSlugIfNeeded(
-  slug: string,
-  locale: string,
-  sceneId: string,
-  fiction: FictionWithMedia,
-) {
-  if (isUuidString(slug) && fiction.slug) {
-    redirect(`/${locale}/fictions/${fiction.slug}/scenes/${sceneId}`, RedirectType.replace)
-  }
-}
-
 async function loadRelatedPlaces(fictionScenes: { placeId: string }[], primaryPlaceId: string): Promise<Place[]> {
   const placeIds = [...new Set([...fictionScenes.map((s) => s.placeId), primaryPlaceId])]
   const places = await Promise.all(placeIds.map((id) => getPlaceLocationByIdCached(id)))
@@ -52,17 +29,17 @@ async function loadRelatedPlaces(fictionScenes: { placeId: string }[], primaryPl
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug, sceneId, locale } = await params
   const siteUrl = getSiteUrl()
-  const fiction = await loadActiveFiction(slug)
+  const fiction = await getFictionBySlugCached(slug.trim())
   const scene = fiction ? await getSceneByIdUncached(sceneId) : null
   const tMeta = await getTranslations({ locale, namespace: "Metadata" })
-  if (!fiction || !fiction.active || !scene || scene.fictionId !== fiction.id) {
+  if (!fiction?.active || !scene || scene.fictionId !== fiction.id) {
     return {
       title: tMeta("sceneNotFound"),
       robots: { index: false, follow: false },
     }
   }
-  const effectiveSlug = fiction.slug?.trim() || slug
-  const canonicalPath = `/${locale}/fictions/${effectiveSlug}/scenes/${sceneId}`
+  const fictionSlug = fiction.slug.trim()
+  const canonicalPath = `/${locale}/fictions/${fictionSlug}/scenes/${sceneId}`
   const canonicalUrl = `${siteUrl}${canonicalPath}`
   const title = tMeta("sceneDetailTitle", { sceneTitle: scene.title, fictionTitle: fiction.title })
   const description =
@@ -75,8 +52,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: {
       canonical: canonicalUrl,
       languages: {
-        en: `${siteUrl}/en/fictions/${effectiveSlug}/scenes/${sceneId}`,
-        es: `${siteUrl}/es/fictions/${effectiveSlug}/scenes/${sceneId}`,
+        en: `${siteUrl}/en/fictions/${fictionSlug}/scenes/${sceneId}`,
+        es: `${siteUrl}/es/fictions/${fictionSlug}/scenes/${sceneId}`,
       },
     },
     robots: { index: true, follow: true },
@@ -99,9 +76,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function FictionSceneUnderSlugPage({ params }: Props) {
   const { slug, sceneId, locale } = await params
-  const fiction = await loadActiveFiction(slug)
-  if (!fiction) notFound()
-  redirectLegacyUuidSlugIfNeeded(slug, locale, sceneId, fiction)
+  const fiction = await getFictionBySlugCached(slug.trim())
+  if (!fiction?.active) notFound()
 
   const scene = await getSceneByIdUncached(sceneId)
   if (!scene || scene.fictionId !== fiction.id) notFound()
@@ -116,7 +92,7 @@ export default async function FictionSceneUnderSlugPage({ params }: Props) {
 
   const relatedPlaces = await loadRelatedPlaces(fictionScenes, scene.placeId)
   const currentWatchScene = fictionScenes.find((s) => s.id === sceneId) ?? scene
-  const canonicalSlug = fiction.slug?.trim() || slug
+  const canonicalSlug = fiction.slug.trim()
 
   return (
     <FictionSlugDetailShell fiction={fiction} summaryText={sidebarSummary}>

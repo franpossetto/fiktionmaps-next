@@ -5,7 +5,7 @@ import { streetViewReferenceSchema } from "@/src/locations/domain/location-view-
 export const placeContributeDraftSchema = z.object({
   fictionId: uuidSchema,
   cityId: uuidSchema,
-  locationName: z.string().trim().min(1),
+  locationName: z.string().trim(),
   placeName: z.string().trim().min(1),
   formattedAddress: z.string().trim().min(1),
   latitude: z.coerce.number().pipe(latitudeSchema),

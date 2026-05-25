@@ -117,6 +117,7 @@ export function PlacesSection({ checkins, cityMap }: PlacesSectionProps) {
           fictionId: c.fictionId,
           fictionSlug: c.fictionSlug,
           placeId: c.placeId,
+          placeSlug: c.placeSlug,
           imageUrl:
             c.placeImage?.trim() ||
             c.fictionCover?.trim() ||
@@ -141,7 +142,7 @@ export function PlacesSection({ checkins, cityMap }: PlacesSectionProps) {
           type="button"
           onClick={() =>
             router.push(
-              publicFictionPlacePath(row.fictionSlug ?? row.fictionId, row.placeId),
+              publicFictionPlacePath(row.fictionSlug, row.placeSlug),
             )
           }
           className="block w-full text-left transition-colors hover:bg-muted/30"

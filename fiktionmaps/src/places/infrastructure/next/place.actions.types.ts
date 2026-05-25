@@ -5,7 +5,14 @@ export type CreatePlaceResult =
   | { success: false; error: string }
 
 export type CreateContributorPlaceResult =
-  | { success: true; placeId: string; fictionId: string; contributionAutoApproved?: boolean }
+  | {
+      success: true
+      placeId: string
+      placeSlug: string
+      fictionId: string
+      fictionSlug: string
+      contributionAutoApproved?: boolean
+    }
   | { success: false; error: string }
 
 export type UpdatePlaceResult =

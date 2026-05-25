@@ -26,6 +26,7 @@
     "scenes": "Scenes",
     "admin": "Admin",
     "contributions": "Contributions",
+    "contribute": "Contribute",
     "profile": "Profile",
     "settings": "Settings",
     "login": "Login",
@@ -175,7 +176,7 @@
     "fieldFpp": "FPP awarded",
     "fictionUnavailable": "We could not load this fiction. It may have been removed or you may lack permission.",
     "topContributorsTitle": "Top contributors",
-    "topContributorsSubtitle": "Points from approved contributions (FPP).",
+    "topContributorsSubtitle": "Fiktion Player Points from approved contributions.",
     "topContributorsEmpty": "No rankings yet.",
     "fppLabel": "FPP",
     "viewMoreContributors": "Show more",
@@ -285,6 +286,7 @@
   "Profile": {
     "title": "Profile",
     "logIn": "Log in",
+    "contributeCta": "Contribute to the map",
     "contributor": "Contributor",
     "visitedPlaces": "Visited places",
     "checkIns": "Check-ins",
@@ -621,6 +623,64 @@
     "cityBadge": "city"
   },
   "Contribute": {
+    "hub": {
+      "metaTitle": "Contribute",
+      "kicker": "Community",
+      "title": "Ways to contribute",
+      "subtitle": "Pick a contribution type to start. Types with an assistant are available now; the rest will open here when their flow is ready.",
+      "listAria": "Contribution types",
+      "soonBadge": "Coming soon",
+      "fppIfApproved": "Up to {count} FPP if approved",
+      "fppApprovedHint": "if approved",
+      "leftAside": {
+        "heading": "Before you start",
+        "body1": "Each type earns Fiktion Player Points (FPP) after moderation when it meets site guidelines.",
+        "body2": "Open a type with an assistant to submit your proposal. You can return to this page anytime from your profile."
+      },
+      "rightAside": {
+        "heading": "Review process",
+        "body1": "Submissions stay pending until a moderator approves or rejects them.",
+        "body2": "Approved contributions become visible on the map and count toward your contributor profile."
+      },
+      "types": {
+        "create_fiction": {
+          "title": "Add fiction",
+          "description": "Movie, series, or book for the catalog."
+        },
+        "create_place": {
+          "title": "Add place",
+          "description": "Filming spot linked to a fiction."
+        },
+        "add_scene": {
+          "title": "Add scene",
+          "description": "Scene tied to a place on the map."
+        },
+        "add_photo": {
+          "title": "Add photo",
+          "description": "Reference photos for a place or scene."
+        },
+        "enrich_entity": {
+          "title": "Enrich entry",
+          "description": "Extra context on an existing page."
+        },
+        "correct_data": {
+          "title": "Correct data",
+          "description": "Fix titles, coordinates, or facts."
+        },
+        "mark_inaccessible": {
+          "title": "Mark inaccessible",
+          "description": "Spot closed or no longer visitable."
+        },
+        "add_tip": {
+          "title": "Add tip",
+          "description": "Visitor tips: access, hours, etiquette."
+        },
+        "checkin": {
+          "title": "Check-in",
+          "description": "Log a visit to a city or place."
+        }
+      }
+    },
     "fab": {
       "button": "Contribute",
       "addFiction": "Add fiction",
@@ -810,6 +870,9 @@
       "stepsAsideAria": "Place contribution steps",
       "stepsAsideHeading": "Steps",
       "stepFiction": "Fiction",
+      "stepAddress": "Address",
+      "stepLocationGeo": "Location (real world)",
+      "stepPlaceFiction": "Place (fiction)",
       "stepLocation": "Location",
       "stepDetails": "Details",
       "stepPhoto": "Photo",
@@ -835,6 +898,14 @@
       "addressTabStreet": "Street",
       "detailsTitle": "Place details",
       "detailsDescription": "Names and type help others recognize the spot.",
+      "locationGeoTitle": "Real-world location",
+      "locationGeoDescription": "How this address appears on the map (street, station, building).",
+      "placeFictionTitle": "Place in the fiction",
+      "placeFictionDescription": "How fans know this spot in the story (scene name, nickname).",
+      "fieldLocationNameHint": "Geographic name shown on the map",
+      "fieldPlaceNameHint": "Name in the fiction — used in the public URL",
+      "placeNameRequired": "Enter the place name in the fiction to submit.",
+      "placeholderFromMap": "e.g. {suggestion}",
       "fieldLocationName": "Location name",
       "fieldPlaceName": "Place name",
       "fieldLocationType": "Location type",
@@ -938,6 +1009,7 @@
     "fictionDetailDescriptionBook": "Discover {title} real-world locations, explore them on the map, and plan your visit with practical travel tips.",
     "fictionNotFound": "Fiction not found",
     "placeNotFound": "Place not found",
+    "unnamedPlace": "Unnamed place",
     "sceneNotFound": "Scene not found",
     "placeDetailTitle": "{placeName} · {fictionTitle}",
     "sceneDetailTitle": "{sceneTitle} · {fictionTitle}",

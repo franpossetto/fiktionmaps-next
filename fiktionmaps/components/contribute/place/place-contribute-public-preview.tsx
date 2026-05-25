@@ -56,7 +56,8 @@ export function PlaceContributePublicPreview({
     return {
       id: PREVIEW_PLACE_ID,
       placeId: PREVIEW_PLACE_ID,
-      name: placeName.trim() || null,
+      name: placeName.trim() || "Place",
+      slug: "preview",
       fictionId: fiction.id,
       location: {
         name: locationName.trim(),
@@ -87,7 +88,7 @@ export function PlaceContributePublicPreview({
     placeName,
   ])
 
-  const fictionPathSlug = fiction.slug?.trim() || fiction.id
+  const fictionPathSlug = fiction.slug.trim()
   const exploreMapHref = `/map?fiction=${encodeURIComponent(fiction.id)}&place=${PREVIEW_PLACE_ID}`
 
   const sidebarSummary =
@@ -123,7 +124,7 @@ export function PlaceContributePublicPreview({
           <FictionPlaceDetailView
             fiction={fiction}
             fictionPathSlug={fictionPathSlug}
-            location={location}
+            place={location}
             city={city}
             scenes={[]}
             exploreMapHref={exploreMapHref}

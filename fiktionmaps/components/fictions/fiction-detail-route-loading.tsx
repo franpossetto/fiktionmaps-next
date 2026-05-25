@@ -2,10 +2,8 @@
 
 import { useParams } from "next/navigation"
 import { useTranslations } from "next-intl"
-import { isUuidString } from "@/lib/validation/primitives"
-
 function slugSegmentToDisplayTitle(slug: string): string | null {
-  if (!slug || isUuidString(slug)) return null
+  if (!slug) return null
   try {
     return decodeURIComponent(slug).replace(/-/g, " ").trim() || null
   } catch {

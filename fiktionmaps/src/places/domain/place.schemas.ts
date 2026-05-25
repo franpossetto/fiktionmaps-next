@@ -26,4 +26,5 @@ export type UpdatePlaceData = z.infer<typeof updatePlaceSchema>
 export type CreatePlaceRepoInput = CreatePlaceData & {
   status: z.infer<typeof fictionRowStatusSchema>
   created_by: string
+  slug: string
 }

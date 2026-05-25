@@ -264,7 +264,7 @@ function renderMapPin(
   item: MapPinClusterItem,
   state: { isSelected: boolean; isHovered: boolean; stackSize?: number },
 ) {
-  const label = item.place.name ?? item.place.location.name
+  const label = item.place.name
   const props = {
     imageSrc: item.place.image,
     label,

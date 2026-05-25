@@ -1,13 +1,10 @@
 import type { Metadata } from "next"
-import { notFound, redirect } from "next/navigation"
-import { RedirectType } from "next/dist/client/components/redirect"
+import { notFound } from "next/navigation"
 import { getTranslations } from "next-intl/server"
-import { getFictionByIdCached, getFictionBySlugCached, getFictionCitiesCached } from "@/src/fictions/infrastructure/next/fiction.queries"
-import { getPlaceLocationByIdDetailCached } from "@/src/places/infrastructure/next/place.queries"
+import { getFictionBySlugCached, getFictionCitiesCached } from "@/src/fictions/infrastructure/next/fiction.queries"
+import { resolvePlaceForFictionPathCached } from "@/src/places/infrastructure/next/place.queries"
 import { getScenesForPlace } from "@/src/scenes/infrastructure/next/scene.queries"
-import { isUuidString } from "@/lib/validation/primitives"
 import { getSiteUrl } from "@/lib/site"
-import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { FictionPlaceDetailView } from "@/components/fictions/fiction-place-detail-view"
 import { FictionSlugDetailShell } from "@/components/fictions/fiction-slug-detail-shell"
 import { getPlaceContributorsWithDatesCached } from "@/src/contributions/infrastructure/next/contribution.queries"
@@ -23,49 +20,36 @@ function mapLocaleToOpenGraph(locale: string): string {
   return locale
 }
 
-async function loadActiveFiction(slug: string): Promise<FictionWithMedia | null> {
-  if (isUuidString(slug)) {
-    const fiction = await getFictionByIdCached(slug)
-    return fiction?.active ? fiction : null
-  }
-  const fiction = await getFictionBySlugCached(slug)
-  return fiction?.active ? fiction : null
-}
-
-function redirectLegacyUuidSlugIfNeeded(slug: string, locale: string, placeId: string, fiction: FictionWithMedia) {
-  if (isUuidString(slug) && fiction.slug) {
-    redirect(`/${locale}/fictions/${fiction.slug}/places/${placeId}`, RedirectType.replace)
-  }
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug, placeId, locale } = await params
+  const { slug, placeId: placeSegment, locale } = await params
   const siteUrl = getSiteUrl()
-  const fiction = await loadActiveFiction(slug)
-  const location = fiction ? await getPlaceLocationByIdDetailCached(placeId) : null
+  const fiction = await getFictionBySlugCached(slug.trim())
+  const place =
+    fiction?.active ? await resolvePlaceForFictionPathCached(fiction.id, placeSegment) : null
   const tMeta = await getTranslations({ locale, namespace: "Metadata" })
-  if (!fiction || !fiction.active || !location || location.fictionId !== fiction.id) {
+  if (!fiction || !fiction.active || !place || place.fictionId !== fiction.id) {
     return {
       title: tMeta("placeNotFound"),
       robots: { index: false, follow: false },
     }
   }
-  const effectiveSlug = fiction.slug?.trim() || slug
-  const canonicalPath = `/${locale}/fictions/${effectiveSlug}/places/${placeId}`
+  const fictionSlug = fiction.slug.trim()
+  const placeSlug = place.slug.trim()
+  const canonicalPath = `/${locale}/fictions/${fictionSlug}/places/${placeSlug}`
   const canonicalUrl = `${siteUrl}${canonicalPath}`
-  const displayName = location.name?.trim() || location.location?.name || "Sin nombre"
+  const displayName = place.name.trim() || tMeta("unnamedPlace")
   const title = tMeta("placeDetailTitle", { placeName: displayName, fictionTitle: fiction.title })
   const description =
-    location.description?.slice(0, 160) || tMeta("fictionDetailDescriptionFilm", { title: fiction.title })
-  const image = location.image?.trim() || fiction.coverImage?.trim() || fiction.bannerImage?.trim()
+    place.description?.slice(0, 160) || tMeta("fictionDetailDescriptionFilm", { title: fiction.title })
+  const image = place.image?.trim() || fiction.coverImage?.trim() || fiction.bannerImage?.trim()
   return {
     title,
     description,
     alternates: {
       canonical: canonicalUrl,
       languages: {
-        en: `${siteUrl}/en/fictions/${effectiveSlug}/places/${placeId}`,
-        es: `${siteUrl}/es/fictions/${effectiveSlug}/places/${placeId}`,
+        en: `${siteUrl}/en/fictions/${fictionSlug}/places/${placeSlug}`,
+        es: `${siteUrl}/es/fictions/${fictionSlug}/places/${placeSlug}`,
       },
     },
     robots: { index: true, follow: true },
@@ -87,28 +71,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function FictionPlaceUnderSlugPage({ params }: Props) {
-  const { slug, placeId, locale } = await params
-  const fiction = await loadActiveFiction(slug)
-  if (!fiction) notFound()
-  redirectLegacyUuidSlugIfNeeded(slug, locale, placeId, fiction)
+  const { slug, placeId: placeSegment, locale } = await params
+  const fiction = await getFictionBySlugCached(slug.trim())
+  if (!fiction?.active) notFound()
 
-  const location = await getPlaceLocationByIdDetailCached(placeId)
-  if (!location || location.id !== placeId || location.fictionId !== fiction.id) notFound()
+  const place = await resolvePlaceForFictionPathCached(fiction.id, placeSegment)
+  if (!place || place.fictionId !== fiction.id) notFound()
 
   const [initialCities, scenes, sidebarSummary, placeContributors] = await Promise.all([
     getFictionCitiesCached(fiction.id),
-    getScenesForPlace(placeId),
+    getScenesForPlace(place.id),
     getFictionSidebarSummaryText(fiction, locale),
-    getPlaceContributorsWithDatesCached(placeId),
+    getPlaceContributorsWithDatesCached(place.id),
   ])
 
   const cityById = new Map(initialCities.map((c) => [c.id, c]))
-  const geo = location.location
+  const geo = place.location
   const city = geo?.cityId ? cityById.get(geo.cityId) : undefined
-  const canonicalSlug = fiction.slug?.trim() || slug
+  const fictionSlug = fiction.slug.trim()
   const baseMapParams = new URLSearchParams({
     fiction: fiction.id,
-    place: placeId,
+    place: place.id,
   })
   if (city) baseMapParams.set("city", city.id)
   const exploreMapHref = `/map?${baseMapParams.toString()}`
@@ -117,8 +100,8 @@ export default async function FictionPlaceUnderSlugPage({ params }: Props) {
     <FictionSlugDetailShell fiction={fiction} summaryText={sidebarSummary}>
       <FictionPlaceDetailView
         fiction={fiction}
-        fictionPathSlug={canonicalSlug}
-        location={location}
+        fictionPathSlug={fictionSlug}
+        place={place}
         city={city}
         scenes={scenes}
         exploreMapHref={exploreMapHref}

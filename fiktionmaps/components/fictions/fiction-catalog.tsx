@@ -282,7 +282,7 @@ export function FictionCatalog({
                   key={fiction.id}
                   fiction={fiction}
                   locationCount={locationCountMap.get(fiction.id) ?? 0}
-                  href={`/fictions/${fiction.slug ?? fiction.id}`}
+                  href={`/fictions/${fiction.slug}`}
                   likeCount={likeCountById[fiction.id] ?? 0}
                   liked={likedSet.has(fiction.id)}
                   onToggleLike={user ? toggleLike : undefined}

@@ -159,7 +159,7 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
       fictionId: editingLocation.fictionId,
       cityId: editingLocation.location.cityId,
       locationName: editingLocation.location.name ?? "",
-      placeName: editingLocation.name ?? editingLocation.location.name ?? "",
+      placeName: editingLocation.name ?? "",
       address: editingLocation.location.address ?? "",
       formattedAddress: editingLocation.location.address ?? "",
       description: editingLocation.description ?? "",

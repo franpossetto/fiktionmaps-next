@@ -125,7 +125,7 @@ export type Database = {
           genre: string
           description: string
           active: boolean
-          slug: string | null
+          slug: string
           duration_sec: number | null
           status: "pending" | "approved" | "rejected"
           created_by: string | null
@@ -141,7 +141,7 @@ export type Database = {
           genre: string
           description: string
           active?: boolean
-          slug?: string | null
+          slug: string
           duration_sec?: number | null
           status?: "pending" | "approved" | "rejected"
           created_by?: string | null
@@ -157,7 +157,7 @@ export type Database = {
           genre?: string
           description?: string
           active?: boolean
-          slug?: string | null
+          slug?: string
           duration_sec?: number | null
           status?: "pending" | "approved" | "rejected"
           created_by?: string | null
@@ -350,7 +350,8 @@ export type Database = {
           location_id: string | null
           description: string | null
           active: boolean
-          name: string | null
+          name: string
+          slug: string
           status: "pending" | "approved" | "rejected"
           created_by: string | null
           created_at: string
@@ -362,7 +363,8 @@ export type Database = {
           location_id?: string | null
           description?: string | null
           active?: boolean
-          name?: string | null
+          name: string
+          slug: string
           status?: "pending" | "approved" | "rejected"
           created_by?: string | null
           created_at?: string
@@ -374,7 +376,8 @@ export type Database = {
           location_id?: string | null
           description?: string | null
           active?: boolean
-          name?: string | null
+          name?: string
+          slug?: string
           status?: "pending" | "approved" | "rejected"
           created_by?: string | null
           created_at?: string

@@ -164,7 +164,8 @@ type LocFromJoin = {
 
 function placeGeoFromSceneJoinRow(r: unknown): {
   placeId: string
-  placeName: string | null
+  placeName: string
+  placeSlug: string
   loc: LocFromJoin | null
 } | null {
   const row = r as { places?: unknown }
@@ -174,11 +175,13 @@ function placeGeoFromSceneJoinRow(r: unknown): {
   const pid = (placeObj as { id?: string }).id
   if (!pid) return null
   const rawName = (placeObj as { name?: string | null }).name
-  const placeName = rawName == null || rawName === "" ? null : String(rawName)
+  const placeName = rawName == null || rawName === "" ? "Place" : String(rawName)
+  const rawSlug = (placeObj as { slug?: string | null }).slug
+  const placeSlug = rawSlug == null || rawSlug === "" ? pid : String(rawSlug)
   const locRaw = "locations" in placeObj ? (placeObj as { locations?: unknown }).locations : undefined
   const locObj = Array.isArray(locRaw) ? locRaw[0] : locRaw
-  if (!locObj || typeof locObj !== "object") return { placeId: pid, placeName, loc: null }
-  return { placeId: pid, placeName, loc: locObj as LocFromJoin }
+  if (!locObj || typeof locObj !== "object") return { placeId: pid, placeName, placeSlug, loc: null }
+  return { placeId: pid, placeName, placeSlug, loc: locObj as LocFromJoin }
 }
 
 async function fetchScenesWithVideoForPlaceIds(
@@ -203,6 +206,7 @@ async function fetchScenesWithVideoForPlaceIds(
         places!inner (
           id,
           name,
+          slug,
           location_id,
           locations!inner (
             id,
@@ -261,7 +265,8 @@ async function fetchScenesWithVideoForPlaceIds(
     return {
       id: r.id,
       placeId: geo?.placeId ?? "",
-      name: geo?.placeName ?? null,
+      name: geo?.placeName ?? "Place",
+      slug: geo?.placeSlug ?? geo?.placeId ?? r.id,
       fictionId: r.fiction_id ?? "",
       location: {
         name: loc?.name ?? "Unknown place",

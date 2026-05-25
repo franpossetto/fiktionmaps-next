@@ -13,14 +13,14 @@ export function PlaceContributeCriteriaAside({
   className,
 }: {
   step: PlaceContributeFormStep
-  /** Step 5: uploaded place photo shown in the layout right rail. */
+  /** Step 6: uploaded place photo shown in the layout right rail. */
   photoPreviewUrl?: string | null
   className?: string
 }) {
   const t = useTranslations("Contribute.place")
   const tc = useTranslations("Contribute.criteria")
 
-  if (step === 7) {
+  if (step === 8) {
     return (
       <ContributePublicPreviewAside
         className={className}
@@ -41,10 +41,12 @@ export function PlaceContributeCriteriaAside({
       case 3:
         return [t("criteriaDetails1")]
       case 4:
-        return [t("criteriaPhoto1"), t("criteriaPhoto2")]
+        return [t("criteriaDetails1")]
       case 5:
-        return [t("criteriaStreetView1"), t("criteriaStreetView2")]
+        return [t("criteriaPhoto1"), t("criteriaPhoto2")]
       case 6:
+        return [t("criteriaStreetView1"), t("criteriaStreetView2")]
+      case 7:
         return [t("criteriaDescription1")]
       default:
         return []
@@ -53,7 +55,7 @@ export function PlaceContributeCriteriaAside({
 
   return (
     <aside className={cn("w-full min-w-0 space-y-6", className)}>
-      {step === 5 ? <PlaceContributeReferencePhotoAside previewUrl={photoPreviewUrl ?? null} /> : null}
+      {step === 6 ? <PlaceContributeReferencePhotoAside previewUrl={photoPreviewUrl ?? null} /> : null}
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{tc("heading")}</p>
         <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">

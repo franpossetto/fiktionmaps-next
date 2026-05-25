@@ -5,7 +5,7 @@ import { BookOpen, Eye, FileImage, FileText, MapPin, PenLine, ScanEye } from "lu
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 
-export type PlaceContributeFormStep = 1 | 2 | 3 | 4 | 5 | 6 | 7
+export type PlaceContributeFormStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
 
 type RailItem = {
   id: string
@@ -28,12 +28,13 @@ export function PlaceContributeStepsAside({ step, onNavigate, className }: Place
 
   const steps: RailItem[] = [
     { id: "fiction", step: 1, label: t("stepFiction"), Icon: BookOpen },
-    { id: "location", step: 2, label: t("stepLocation"), Icon: MapPin },
-    { id: "details", step: 3, label: t("stepDetails"), Icon: PenLine },
-    { id: "photo", step: 4, label: t("stepPhoto"), Icon: FileImage },
-    { id: "streetView", step: 5, label: t("stepStreetView"), Icon: ScanEye },
-    { id: "description", step: 6, label: t("stepDescription"), Icon: FileText },
-    { id: "preview", step: 7, label: t("stepPreview"), Icon: Eye },
+    { id: "address", step: 2, label: t("stepAddress"), Icon: MapPin },
+    { id: "location", step: 3, label: t("stepLocationGeo"), Icon: MapPin },
+    { id: "place", step: 4, label: t("stepPlaceFiction"), Icon: PenLine },
+    { id: "photo", step: 5, label: t("stepPhoto"), Icon: FileImage },
+    { id: "streetView", step: 6, label: t("stepStreetView"), Icon: ScanEye },
+    { id: "description", step: 7, label: t("stepDescription"), Icon: FileText },
+    { id: "preview", step: 8, label: t("stepPreview"), Icon: Eye },
   ]
 
   return (

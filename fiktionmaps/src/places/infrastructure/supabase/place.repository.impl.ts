@@ -7,6 +7,7 @@ import type { MapBbox } from "@/lib/validation/map-query"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { CreatePlaceRepoInput, UpdatePlaceData } from "@/src/places/domain/place.schemas"
 import type { PlacesRepositoryPort } from "@/src/places/domain/place.repository"
+import type { SitemapPlaceEntry } from "@/src/places/domain/place-sitemap.entity"
 import {
   type StreetViewReference,
   LOCATION_VIEW_REFERENCE_PROVIDER,
@@ -151,10 +152,14 @@ function mapPlaceRowsToPlaces(
     const isLandmark = loc ? Boolean(loc.is_landmark ?? loc.isLandmark) : false
     const streetViewReference = loc ? parseStreetViewReferenceFromLocationEmbed(loc) : null
 
+    const placeName = str(p, "name", "name") || "Place"
+    const placeSlug = str(p, "slug", "slug") || placeId
+
     return {
       id: placeId,
       placeId,
-      name: optStr(p, "name", "name"),
+      name: placeName,
+      slug: placeSlug,
       fictionId,
       location: {
         name: geoName,
@@ -179,13 +184,13 @@ function mapPlaceRowsToPlaces(
 export function createPlacesSupabaseAdapter(
   getSupabase: () => Promise<SupabaseClient<Database>>
 ): PlacesRepositoryPort {
-  return {
+  const port: PlacesRepositoryPort = {
     listAllPlaces: cache(async (): Promise<Place[]> => {
       const supabase = await getSupabase()
       const { data: placeRows, error: placesError } = await supabase
         .from("places")
         .select(
-          `id, fiction_id, description, active, location_id, name, locations(${LOCATION_EMBED_SELECT})`
+          `id, fiction_id, description, active, location_id, name, slug, locations(${LOCATION_EMBED_SELECT})`
         )
         .order("created_at", { ascending: false })
         .range(0, 9999)
@@ -252,7 +257,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error } = await supabase
         .from("places")
         .select(
-          `id, fiction_id, description, active, location_id, name, locations(${LOCATION_EMBED_SELECT})`
+          `id, fiction_id, description, active, location_id, name, slug, locations(${LOCATION_EMBED_SELECT})`
         )
         .eq("fiction_id", fictionId)
         .order("created_at", { ascending: false })
@@ -285,7 +290,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error } = await supabase
         .from("places")
         .select(
-          `id, fiction_id, description, active, location_id, name, locations!inner(${LOCATION_EMBED_SELECT})`
+          `id, fiction_id, description, active, location_id, name, slug, locations!inner(${LOCATION_EMBED_SELECT})`
         )
         .eq("locations.city_id", cityId)
         .order("created_at", { ascending: false })
@@ -361,7 +366,7 @@ export function createPlacesSupabaseAdapter(
       const { data: row, error } = await supabase
         .from("places")
         .select(
-          `id, fiction_id, description, active, name,
+          `id, fiction_id, description, active, name, slug,
            location:locations!inner (
              ${LOCATION_EMBED_SELECT}
            )`
@@ -393,10 +398,15 @@ export function createPlacesSupabaseAdapter(
 
       const pid = row.id as string
 
+      const rowRec = row as Record<string, unknown>
+      const placeName = str(rowRec, "name", "name") || "Place"
+      const placeSlug = str(rowRec, "slug", "slug") || pid
+
       return {
         id: pid,
         placeId: pid,
-        name: optStr(row as Record<string, unknown>, "name", "name"),
+        name: placeName,
+        slug: placeSlug,
         fictionId: row.fiction_id as string,
         location: {
           name: loc ? str(loc, "name", "name") || "Unknown place" : "Unknown place",
@@ -423,7 +433,7 @@ export function createPlacesSupabaseAdapter(
       const { data: rows, error } = await supabase
         .from("places")
         .select(
-          `id, fiction_id, description, active, name,
+          `id, fiction_id, description, active, name, slug,
            location:locations!inner (
              ${LOCATION_EMBED_SELECT}
            )`
@@ -458,10 +468,14 @@ export function createPlacesSupabaseAdapter(
         const rRec = r as Record<string, unknown>
         const loc = parseLocationEmbedFromPlaceRow(rRec)
         const pid = r.id as string
+        const placeName = str(rRec, "name", "name") || "Place"
+        const placeSlug = str(rRec, "slug", "slug") || pid
+
         return {
           id: pid,
           placeId: pid,
-          name: optStr(rRec, "name", "name"),
+          name: placeName,
+          slug: placeSlug,
           fictionId: (r.fiction_id as string) ?? "",
           location: {
             name: loc ? str(loc, "name", "name") || "Unknown place" : "Unknown place",
@@ -483,7 +497,63 @@ export function createPlacesSupabaseAdapter(
       })
     },
 
-    async create(data: CreatePlaceRepoInput): Promise<{ placeId: string } | null> {
+    getByFictionIdAndSlug: cache(
+      async (fictionId: string, slug: string, avatarVariant: "sm" | "lg" = "sm"): Promise<Place | null> => {
+        const supabase = await getSupabase()
+        const { data: row, error } = await supabase
+          .from("places")
+          .select(
+            `id, fiction_id, description, active, name, slug,
+             location:locations!inner (
+               ${LOCATION_EMBED_SELECT}
+             )`
+          )
+          .eq("fiction_id", fictionId)
+          .eq("slug", slug.trim())
+          .maybeSingle()
+
+        if (error || !row) return null
+        return port.getById(row.id as string, avatarVariant)
+      },
+    ),
+
+    listSlugsByFictionId: cache(async (fictionId: string): Promise<string[]> => {
+      const supabase = await getSupabase()
+      const { data, error } = await supabase.from("places").select("slug").eq("fiction_id", fictionId)
+      if (error) return []
+      return (data ?? []).map((r) => String(r.slug)).filter(Boolean)
+    }),
+
+    listActivePlacesForSitemap: cache(async (): Promise<SitemapPlaceEntry[]> => {
+      const supabase = await getSupabase()
+      const { data, error } = await supabase
+        .from("places")
+        .select("slug, updated_at, fictions!inner ( slug, active )")
+        .eq("active", true)
+        .eq("status", "approved")
+
+      if (error || !data) return []
+
+      return (data as Record<string, unknown>[])
+        .map((row) => {
+          const rawFiction = row.fictions
+          const fiction = Array.isArray(rawFiction) ? rawFiction[0] : rawFiction
+          if (!fiction || typeof fiction !== "object") return null
+          const f = fiction as Record<string, unknown>
+          if (!f.active) return null
+          const fictionSlug = typeof f.slug === "string" ? f.slug.trim() : ""
+          const placeSlug = typeof row.slug === "string" ? row.slug.trim() : ""
+          if (!fictionSlug || !placeSlug) return null
+          return {
+            placeSlug,
+            fictionSlug,
+            updatedAt: String(row.updated_at ?? new Date().toISOString()),
+          }
+        })
+        .filter((e): e is SitemapPlaceEntry => e != null)
+    }),
+
+    async create(data: CreatePlaceRepoInput): Promise<{ placeId: string; slug: string } | null> {
       const supabase = await getSupabase()
 
       const locationName = data.locationName.trim()
@@ -527,12 +597,13 @@ export function createPlacesSupabaseAdapter(
           fiction_id: data.fictionId,
           location_id: locationId,
           name: placeName,
+          slug: data.slug,
           description: data.description.trim(),
           active: data.status !== "pending",
           status: data.status,
           created_by: data.created_by,
         })
-        .select("id")
+        .select("id, slug")
         .single()
 
       if (placeError || !placeRow) {
@@ -540,7 +611,10 @@ export function createPlacesSupabaseAdapter(
         return null
       }
 
-      return { placeId: placeRow.id }
+      return {
+        placeId: placeRow.id as string,
+        slug: String(placeRow.slug),
+      }
     },
 
     async update(placeId: string, data: UpdatePlaceData): Promise<boolean> {
@@ -640,6 +714,7 @@ export function createPlacesSupabaseAdapter(
       return Array.isArray(data) && data.length === 1
     },
   }
+  return port
 }
 
 export const supabaseRepositoryAdapter = createPlacesSupabaseAdapter(createClient)

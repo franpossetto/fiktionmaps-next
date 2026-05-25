@@ -3,7 +3,6 @@ import { z } from "zod"
 const slugField = z
   .string()
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Only lowercase letters, numbers and hyphens")
-  .nullable()
 
 /** Matches `public.contribution_status` on fictions / places / scenes. */
 export const fictionRowStatusSchema = z.enum(["pending", "approved", "rejected"])

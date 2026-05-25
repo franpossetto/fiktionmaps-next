@@ -119,7 +119,7 @@ export function LocationDetail({
     }
   }, [place.id])
 
-  const displayName = place.name ?? place.location.name
+  const displayName = place.name
   const heroSrc =
     placeDetail?.image?.trim() || place.image?.trim() || DEFAULT_FICTION_COVER
   const placeDescription = placeDetail?.description?.trim() || place.description?.trim()
@@ -127,8 +127,9 @@ export function LocationDetail({
   const fictionCoverSrc =
     fiction?.coverImage?.trim() || fiction?.coverImageLarge?.trim() || "/placeholder.svg"
   const hasSceneNarrative = Boolean(place.sceneDescription?.trim() || place.sceneQuote?.trim())
-  const fictionSlug = fiction?.slug ?? fiction?.id ?? place.fictionId
-  const placePageHref = fictionSlug ? publicFictionPlacePath(fictionSlug, place.id) : null
+  const fictionSlug = fiction?.slug
+  const placePageHref =
+    fictionSlug && place.slug ? publicFictionPlacePath(fictionSlug, place.slug) : null
 
   useEffect(() => {
     closeButtonRef.current?.focus()
@@ -287,7 +288,7 @@ export function LocationDetail({
                         <div className="relative h-14 w-18 shrink-0 overflow-hidden rounded-md border border-border/60">
                           <Image
                             src={related.image || "/placeholder.svg"}
-                            alt={related.name ?? related.location.name}
+                            alt={related.name}
                             fill
                             className="object-cover"
                             sizes="72px"
@@ -295,7 +296,7 @@ export function LocationDetail({
                         </div>
                         <div className="min-w-0">
                           <p className="line-clamp-1 text-sm font-semibold text-foreground">
-                            {related.name ?? related.location.name}
+                            {related.name}
                           </p>
                           <p className="line-clamp-1 text-xs text-muted-foreground">{related.location.address}</p>
                         </div>
@@ -318,7 +319,7 @@ export function LocationDetail({
                   {relatedFictions.slice(0, 4).map((relatedFiction) => (
                     <li key={relatedFiction.id}>
                       <Link
-                        href={`/fictions/${relatedFiction.slug ?? relatedFiction.id}`}
+                        href={`/fictions/${relatedFiction.slug}`}
                         className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/30 p-2.5 transition-colors hover:bg-card/60"
                       >
                         <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-md border border-border/60">

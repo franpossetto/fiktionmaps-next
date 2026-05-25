@@ -24,6 +24,7 @@ import {
 } from "./place.queries"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
+import { getFictionByIdCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { createContributionAction } from "@/src/contributions/infrastructure/next/contribution.actions"
 import { parsePlaceContributeFormData } from "@/src/places/domain/place-contribute.schemas"
 import type {
@@ -193,11 +194,16 @@ export async function createContributorPlaceWithImageAction(
   )
   const { status, created_by } = resolveEntityContributionInsertDefaults(isStaffModerator, user.id)
 
+  const locationName =
+    parsed.data.locationName.trim() ||
+    parsed.data.formattedAddress.trim().split(",")[0]?.trim() ||
+    "Location"
+
   const result = await createPlaceUseCase(
     {
       fictionId: parsed.data.fictionId,
       cityId: parsed.data.cityId,
-      locationName: parsed.data.locationName,
+      locationName,
       placeName: parsed.data.placeName,
       formattedAddress: parsed.data.formattedAddress,
       latitude: parsed.data.latitude,
@@ -238,10 +244,14 @@ export async function createContributorPlaceWithImageAction(
   updateTag(`place-${result.placeId}`)
   updateTag("contributions")
 
+  const fiction = await getFictionByIdCached(parsed.data.fictionId)
+
   const out: CreateContributorPlaceResult = {
     success: true,
     placeId: result.placeId,
+    placeSlug: result.slug,
     fictionId: parsed.data.fictionId,
+    fictionSlug: fiction?.slug ?? "",
   }
   if (typeof contributionAutoApproved === "boolean") {
     return { ...out, contributionAutoApproved }

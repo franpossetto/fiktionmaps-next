@@ -7,6 +7,8 @@ import { createPlacesSupabaseAdapter } from "@/src/places/infrastructure/supabas
 import { listAllPlacesUseCase } from "@/src/places/application/list-all-places.usecase"
 import { getPlaceCountsByFictionIdsUseCase } from "@/src/places/application/get-place-counts-by-fiction-ids.usecase"
 import { getPlaceByIdUseCase } from "@/src/places/application/get-place-by-id.usecase"
+import { resolvePlaceForFictionPathUseCase } from "@/src/places/application/resolve-place-for-fiction-path.usecase"
+import { listActivePlacesForSitemapUseCase } from "@/src/places/application/list-active-places-for-sitemap.usecase"
 import { getFictionPlacesUseCase } from "@/src/places/application/get-fiction-places.usecase"
 import { getCityPlacesUseCase } from "@/src/places/application/get-city-places.usecase"
 import { getPlacesInBboxUseCase } from "@/src/places/application/get-places-in-bbox.usecase"
@@ -49,6 +51,23 @@ export function getPlaceLocationByIdDetailCached(placeId: string) {
     () => getPlaceByIdUseCase(placeId, anonRepo, "lg"),
     CacheKeys.place(`${placeId}:detail-lg:v2`),
     { ...CacheConfig.medium, tags: ["places", `place-${placeId}`] }
+  )()
+}
+
+export function resolvePlaceForFictionPathCached(fictionId: string, segment: string) {
+  const key = `${fictionId}:${segment.trim()}`
+  return unstable_cache(
+    () => resolvePlaceForFictionPathUseCase(fictionId, segment, anonRepo, "lg"),
+    CacheKeys.place(`resolve:${key}:lg`),
+    { ...CacheConfig.medium, tags: ["places", `fiction-${fictionId}`] },
+  )()
+}
+
+export function listActivePlacesForSitemapCached() {
+  return unstable_cache(
+    () => listActivePlacesForSitemapUseCase(anonRepo),
+    CacheKeys.place("sitemap-active"),
+    { ...CacheConfig.long, tags: ["places", "fictions", "sitemap"] },
   )()
 }
 

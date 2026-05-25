@@ -61,7 +61,7 @@ const INPUT_ROW =
 const INPUT_AREA =
   "min-h-[100px] w-full resize-y rounded-xl border border-border bg-card px-4 py-2.5 text-sm outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:ring-2 focus:ring-foreground/20"
 
-const TOTAL_STEPS = 7
+const TOTAL_STEPS = 8
 const PLACE_MAP_ID = "contribute-place-map"
 
 const stepVariants = {
@@ -90,6 +90,8 @@ type Draft = {
   description: string
   imageFile: File | null
   streetViewReference: StreetViewReference | null
+  /** Mapbox label for input placeholders only (not auto-filled). */
+  mapSuggestion: string
 }
 
 export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceContributeWizardProps) {
@@ -101,6 +103,7 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
   const [done, setDone] = useState<{
     variant: "pending" | "approved"
     placeId: string
+    placeSlug: string
     fictionSlug: string
     placeName: string
     imageUrl: string | null
@@ -121,6 +124,7 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
     description: "",
     imageFile: null,
     streetViewReference: null,
+    mapSuggestion: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -211,11 +215,7 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
       const next: Record<string, string> = {}
       if (s === 1 && !draft.fictionId) next.fictionId = t("fictionRequired")
       if (s === 2 && !addressLocked) next.address = t("addressRequired")
-      if (s === 3) {
-        if (!draft.locationName.trim()) next.locationName = t("detailsTitle")
-        if (!draft.placeName.trim()) next.placeName = t("detailsTitle")
-      }
-      if (s === 4) {
+      if (s === 5) {
         if (!draft.imageFile) {
           next.image = t("photoRequired")
         } else if (!photoImageDims || !isPlaceHeroAspectRatioOk(photoImageDims.width, photoImageDims.height)) {
@@ -224,7 +224,7 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
           next.image = tVal("imageResolutionLow")
         }
       }
-      if (s === 6 && !draft.description.trim()) next.description = t("descriptionRequired")
+      if (s === 7 && !draft.description.trim()) next.description = t("descriptionRequired")
       setErrors(next)
       return Object.keys(next).length === 0
     },
@@ -248,8 +248,7 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
         formattedAddress: result.place_name,
         address: result.place_name,
         cityId,
-        locationName: prev.locationName || suggested,
-        placeName: prev.placeName || suggested,
+        mapSuggestion: suggested,
       }))
       setAddressLocked(true)
       flyMapToLocation(mapControlRef.current, result.lat, result.lng)
@@ -294,11 +293,11 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
         setSubmitError(res.error)
         return
       }
-      const slug = selectedFiction?.slug?.trim() || selectedFiction?.id || draft.fictionId
       setDone({
         variant: res.contributionAutoApproved ? "approved" : "pending",
         placeId: res.placeId,
-        fictionSlug: slug,
+        placeSlug: res.placeSlug,
+        fictionSlug: res.fictionSlug,
         placeName: draft.placeName.trim(),
         imageUrl: imagePreviewForDone,
       })
@@ -308,8 +307,13 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
   )
 
   const handleSubmitClick = useCallback(() => {
-    if (!validateStep(7)) return
-    for (let s = 1; s <= 6; s++) {
+    if (!draft.placeName.trim()) {
+      setErrors({ placeName: t("placeNameRequired") })
+      setStep(4)
+      return
+    }
+    if (!validateStep(8)) return
+    for (let s = 1; s <= 7; s++) {
       if (!validateStep(s as PlaceContributeFormStep)) {
         setStep(s as PlaceContributeFormStep)
         return
@@ -327,7 +331,7 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
             variant={done.variant}
             placeName={done.placeName}
             imageSrc={done.imageUrl}
-            placeHref={`/fictions/${done.fictionSlug}/places/${done.placeId}`}
+            placeHref={`/fictions/${done.fictionSlug}/places/${done.placeSlug}`}
           />
         </div>
       </FictionContributeLayout>
@@ -338,8 +342,12 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
     <PlaceContributeStepsAside step={step} onNavigate={(s) => setStep(s)} className="min-[900px]:pl-1" />
   )
   const rightAside = (
-    <PlaceContributeCriteriaAside step={step} photoPreviewUrl={step === 5 ? previewUrl : undefined} />
+    <PlaceContributeCriteriaAside step={step} photoPreviewUrl={step === 6 ? previewUrl : undefined} />
   )
+
+  const mapPlaceholder = draft.mapSuggestion.trim()
+    ? t("placeholderFromMap", { suggestion: draft.mapSuggestion.trim() })
+    : undefined
 
   const stepTitle = (() => {
     switch (step) {
@@ -348,14 +356,16 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
       case 2:
         return t("locationTitle")
       case 3:
-        return t("detailsTitle")
+        return t("locationGeoTitle")
       case 4:
-        return t("photoTitle")
+        return t("placeFictionTitle")
       case 5:
-        return t("streetViewTitle")
+        return t("photoTitle")
       case 6:
-        return t("descriptionTitle")
+        return t("streetViewTitle")
       case 7:
+        return t("descriptionTitle")
+      case 8:
         return t("previewTitle")
     }
   })()
@@ -367,14 +377,16 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
       case 2:
         return t("locationDescription")
       case 3:
-        return t("detailsDescription")
+        return t("locationGeoDescription")
       case 4:
-        return t("photoDescription")
+        return t("placeFictionDescription")
       case 5:
-        return t("streetViewDescription")
+        return t("photoDescription")
       case 6:
-        return t("descriptionDescription")
+        return t("streetViewDescription")
       case 7:
+        return t("descriptionDescription")
+      case 8:
         return t("previewDescription")
     }
   })()
@@ -385,7 +397,7 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
         stepIndex={step - 1}
         totalSteps={TOTAL_STEPS}
         contentMaxWidthClassName={
-          step === 2 ? "max-w-4xl" : step === 5 ? "max-w-4xl" : step === 7 ? "max-w-[min(100%,1900px)]" : "max-w-md"
+          step === 2 ? "max-w-4xl" : step === 6 ? "max-w-4xl" : step === 8 ? "max-w-[min(100%,1900px)]" : "max-w-md"
         }
         footerNav={{
           showBack: step > 1,
@@ -400,17 +412,17 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
           showTrailingArrow: step < TOTAL_STEPS,
         }}
       >
-        {step !== 7 ? (
+        {step !== 8 ? (
           <div className="min-[900px]:hidden">
             <PlaceContributeFppRewardCompactStrip className="mb-4" />
           </div>
         ) : null}
 
-        {step !== 7 ? (
+        {step !== 8 ? (
           <ContributeStepHeader
             title={stepTitle}
             description={stepLead}
-            badge={step === 5 ? "enrichment" : "required"}
+            badge={step === 6 ? "enrichment" : "required"}
             stepNumber={step}
             totalSteps={TOTAL_STEPS}
             variant="minimal"
@@ -518,18 +530,13 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
 
             {step === 3 ? (
               <div className="space-y-4">
-                <ContributeFieldWrapper label={t("fieldLocationName")} required error={errors.locationName}>
+                <p className="text-sm text-muted-foreground">{t("fieldLocationNameHint")}</p>
+                <ContributeFieldWrapper label={t("fieldLocationName")} error={errors.locationName}>
                   <input
                     className={INPUT_ROW}
                     value={draft.locationName}
+                    placeholder={mapPlaceholder}
                     onChange={(e) => setDraft((p) => ({ ...p, locationName: e.target.value }))}
-                  />
-                </ContributeFieldWrapper>
-                <ContributeFieldWrapper label={t("fieldPlaceName")} required error={errors.placeName}>
-                  <input
-                    className={INPUT_ROW}
-                    value={draft.placeName}
-                    onChange={(e) => setDraft((p) => ({ ...p, placeName: e.target.value }))}
                   />
                 </ContributeFieldWrapper>
                 <ContributeFieldWrapper label={t("fieldLocationType")}>
@@ -562,6 +569,20 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
             ) : null}
 
             {step === 4 ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">{t("fieldPlaceNameHint")}</p>
+                <ContributeFieldWrapper label={t("fieldPlaceName")} error={errors.placeName}>
+                  <input
+                    className={INPUT_ROW}
+                    value={draft.placeName}
+                    placeholder={mapPlaceholder}
+                    onChange={(e) => setDraft((p) => ({ ...p, placeName: e.target.value }))}
+                  />
+                </ContributeFieldWrapper>
+              </div>
+            ) : null}
+
+            {step === 5 ? (
               <div className="w-full space-y-3">
                 <ContributeFieldWrapper label={t("photoTitle")} required error={errors.image}>
                   <PlaceContributePhotoField
@@ -575,7 +596,7 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
               </div>
             ) : null}
 
-            {step === 5 ? (
+            {step === 6 ? (
               <div className="w-full space-y-4">
                 <div className="min-[900px]:hidden">
                   <PlaceContributeReferencePhotoAside previewUrl={previewUrl} />
@@ -589,7 +610,7 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
               </div>
             ) : null}
 
-            {step === 6 ? (
+            {step === 7 ? (
               <ContributeFieldWrapper label={t("descriptionTitle")} required error={errors.description}>
                 <textarea
                   className={INPUT_AREA}
@@ -600,7 +621,7 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
               </ContributeFieldWrapper>
             ) : null}
 
-            {step === 7 && selectedFiction ? (
+            {step === 8 && selectedFiction ? (
               <div className="w-full space-y-3">
                 {submitError ? (
                   <p className="text-center text-xs text-destructive">{submitError}</p>
@@ -626,7 +647,7 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
               </div>
             ) : null}
 
-            {submitError && step !== 7 ? (
+            {submitError && step !== 8 ? (
               <p className="mt-4 text-sm text-destructive">{submitError}</p>
             ) : null}
           </motion.div>

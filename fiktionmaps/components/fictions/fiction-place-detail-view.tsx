@@ -84,7 +84,7 @@ export interface FictionPlaceDetailViewProps {
   fiction: FictionWithMedia
   /** Slug segment for `/fictions/...` paths. */
   fictionPathSlug: string
-  location: Place
+  place: Place
   city: City | undefined
   scenes: Scene[]
   exploreMapHref: string
@@ -96,7 +96,7 @@ export interface FictionPlaceDetailViewProps {
 export function FictionPlaceDetailView({
   fiction,
   fictionPathSlug,
-  location,
+  place,
   city,
   scenes,
   exploreMapHref,
@@ -106,7 +106,7 @@ export function FictionPlaceDetailView({
   const t = useTranslations("Fictions")
   const tMeta = useTranslations("Metadata")
   const geo: Location =
-    location.location ?? {
+    place.location ?? {
       name: "",
       address: "",
       lat: 0,
@@ -115,8 +115,8 @@ export function FictionPlaceDetailView({
       locationType: null,
       isLandmark: undefined,
     }
-  const displayName = location.name?.trim() || geo.name || "Sin nombre"
-  const heroSrc = location.image?.trim() ? location.image.trim() : DEFAULT_FICTION_COVER
+  const displayName = place.name.trim() || tMeta("unnamedPlace")
+  const heroSrc = place.image?.trim() ? place.image.trim() : DEFAULT_FICTION_COVER
   const heroUnoptimized = heroSrc.startsWith("blob:")
   const coordsOk = hasValidPlaceCoordinates(geo.lat, geo.lng)
   const addressLine =
@@ -202,8 +202,8 @@ export function FictionPlaceDetailView({
                   unoptimized={heroUnoptimized}
                 />
               </div>
-              {location.description ? (
-                <p className="max-w-[75ch] text-base leading-8 text-muted-foreground">{location.description}</p>
+              {place.description ? (
+                <p className="max-w-[75ch] text-base leading-8 text-muted-foreground">{place.description}</p>
               ) : null}
             </header>
 
@@ -251,7 +251,7 @@ export function FictionPlaceDetailView({
               </div>
               {coordsOk ? (
                 <FictionPlaceDirectionsMap
-                  mapInstanceId={`fiction-place-directions-${location.id}`}
+                  mapInstanceId={`fiction-place-directions-${place.id}`}
                   center={{ lat: geo.lat, lng: geo.lng }}
                   placeName={displayName}
                   imageSrc={heroSrc}

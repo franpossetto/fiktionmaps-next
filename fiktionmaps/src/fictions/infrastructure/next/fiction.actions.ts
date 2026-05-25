@@ -449,16 +449,19 @@ export async function getActiveFictionsAction(): Promise<FictionWithMedia[]> {
   return getActiveFictionsCached()
 }
 
-/** Public read: resolve an active fiction from URL segment (slug or legacy UUID). */
-export async function resolvePublicFictionFromSlugOrIdAction(
-  slugOrId: string,
+/** Public read: resolve an active fiction from URL slug segment. */
+export async function resolvePublicFictionFromSlugAction(
+  slug: string,
 ): Promise<FictionWithMedia | null> {
-  const raw = slugOrId.trim()
-  if (!raw) return null
-  const fiction = isUuidString(raw) ? await getFictionByIdCached(raw) : await getFictionBySlugCached(raw)
+  const raw = slug.trim()
+  if (!raw || isUuidString(raw)) return null
+  const fiction = await getFictionBySlugCached(raw)
   if (!fiction?.active) return null
   return fiction
 }
+
+/** @deprecated Use resolvePublicFictionFromSlugAction */
+export const resolvePublicFictionFromSlugOrIdAction = resolvePublicFictionFromSlugAction
 
 export async function getFictionCitiesAction(fictionId: string): Promise<City[]> {
   if (!uuidSchema.safeParse(fictionId).success) return []

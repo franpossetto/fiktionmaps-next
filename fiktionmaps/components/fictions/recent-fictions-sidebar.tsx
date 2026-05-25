@@ -33,7 +33,7 @@ export function RecentFictionsSidebar({ initialFictions }: RecentFictionsSidebar
         {recentFictions.map((fiction) => (
           <li key={fiction.id}>
             <Link
-              href={`/fictions/${fiction.slug ?? fiction.id}`}
+              href={`/fictions/${fiction.slug}`}
               className="flex items-start gap-1.5 rounded-md px-1 py-1 text-sm leading-snug text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
             >
               <div className="relative mt-0.5 h-7 w-7 shrink-0 overflow-hidden rounded-full border border-border/60 bg-muted/30">

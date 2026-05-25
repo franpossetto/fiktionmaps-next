@@ -198,7 +198,7 @@ export function CheckinsList({
                   type="button"
                   onClick={() =>
                     router.push(
-                      publicFictionPlacePath(c.fictionSlug ?? c.fictionId, c.placeId),
+                      publicFictionPlacePath(c.fictionSlug, c.placeSlug),
                     )
                   }
                   className="block w-full text-left transition-colors hover:bg-muted/30"

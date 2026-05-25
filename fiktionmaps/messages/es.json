@@ -26,6 +26,7 @@
     "scenes": "Escenas",
     "admin": "Admin",
     "contributions": "Contribuciones",
+    "contribute": "Colaborar",
     "profile": "Perfil",
     "settings": "Ajustes",
     "login": "Iniciar sesión",
@@ -175,7 +176,7 @@
     "fieldFpp": "FPP otorgados",
     "fictionUnavailable": "No pudimos cargar esta ficción. Puede haberse eliminado o faltar permiso.",
     "topContributorsTitle": "Top colaboradores",
-    "topContributorsSubtitle": "Puntos por contribuciones aprobadas (FPP).",
+    "topContributorsSubtitle": "Fiktion Player Points por contribuciones aprobadas.",
     "topContributorsEmpty": "Aún no hay ranking.",
     "fppLabel": "FPP",
     "viewMoreContributors": "Ver más",
@@ -285,6 +286,7 @@
   "Profile": {
     "title": "Perfil",
     "logIn": "Iniciar sesión",
+    "contributeCta": "Colaborar con el mapa",
     "contributor": "Colaborador",
     "visitedPlaces": "Lugares visitados",
     "checkIns": "Registros",
@@ -621,6 +623,64 @@
     "cityBadge": "ciudad"
   },
   "Contribute": {
+    "hub": {
+      "metaTitle": "Colaborar",
+      "kicker": "Comunidad",
+      "title": "Formas de colaborar",
+      "subtitle": "Elegí un tipo de contribución para empezar. Los que tienen asistente ya están disponibles; el resto se habilitará acá cuando esté listo el flujo.",
+      "listAria": "Tipos de contribución",
+      "soonBadge": "Próximamente",
+      "fppIfApproved": "Hasta {count} FPP si se aprueba",
+      "fppApprovedHint": "si se aprueba",
+      "leftAside": {
+        "heading": "Antes de empezar",
+        "body1": "Cada tipo suma Fiktion Player Points (FPP) tras la moderación si cumple las normas del sitio.",
+        "body2": "Abrí un tipo con asistente para enviar tu propuesta. Podés volver a esta página cuando quieras desde tu perfil."
+      },
+      "rightAside": {
+        "heading": "Proceso de revisión",
+        "body1": "Los envíos quedan pendientes hasta que un moderador los apruebe o rechace.",
+        "body2": "Las contribuciones aprobadas se publican en el mapa y suman a tu perfil de colaborador."
+      },
+      "types": {
+        "create_fiction": {
+          "title": "Añadir ficción",
+          "description": "Película, serie o libro para el catálogo."
+        },
+        "create_place": {
+          "title": "Añadir lugar",
+          "description": "Lugar de rodaje vinculado a una ficción."
+        },
+        "add_scene": {
+          "title": "Añadir escena",
+          "description": "Escena ligada a un lugar del mapa."
+        },
+        "add_photo": {
+          "title": "Añadir foto",
+          "description": "Fotos de referencia de un lugar o escena."
+        },
+        "enrich_entity": {
+          "title": "Enriquecer ficha",
+          "description": "Más contexto en una página existente."
+        },
+        "correct_data": {
+          "title": "Corregir datos",
+          "description": "Corregí títulos, coordenadas o datos."
+        },
+        "mark_inaccessible": {
+          "title": "Marcar inaccesible",
+          "description": "Lugar cerrado o ya no visitable."
+        },
+        "add_tip": {
+          "title": "Añadir consejo",
+          "description": "Tips para visitantes: acceso y horarios."
+        },
+        "checkin": {
+          "title": "Check-in",
+          "description": "Registrá visita a ciudad o lugar."
+        }
+      }
+    },
     "fab": {
       "button": "Contribuir",
       "addFiction": "Añadir ficción",
@@ -810,6 +870,9 @@
       "stepsAsideAria": "Pasos para añadir lugar",
       "stepsAsideHeading": "Pasos",
       "stepFiction": "Ficción",
+      "stepAddress": "Dirección",
+      "stepLocationGeo": "Ubicación (mundo real)",
+      "stepPlaceFiction": "Lugar (ficción)",
       "stepLocation": "Ubicación",
       "stepDetails": "Detalles",
       "stepPhoto": "Foto",
@@ -835,6 +898,14 @@
       "addressTabStreet": "Calle",
       "detailsTitle": "Detalles del lugar",
       "detailsDescription": "Los nombres y el tipo ayudan a reconocer el sitio.",
+      "locationGeoTitle": "Ubicación en el mundo real",
+      "locationGeoDescription": "Cómo aparece esta dirección en el mapa (calle, estación, edificio).",
+      "placeFictionTitle": "Lugar en la ficción",
+      "placeFictionDescription": "Cómo los fans conocen este sitio en la historia (nombre de escena, apodo).",
+      "fieldLocationNameHint": "Nombre geográfico en el mapa",
+      "fieldPlaceNameHint": "Nombre en la ficción — se usa en la URL pública",
+      "placeNameRequired": "Indica el nombre del lugar en la ficción para enviar.",
+      "placeholderFromMap": "p. ej. {suggestion}",
       "fieldLocationName": "Nombre del lugar (geográfico)",
       "fieldPlaceName": "Nombre del lugar (ficción)",
       "fieldLocationType": "Tipo de ubicación",
@@ -938,6 +1009,7 @@
     "fictionDetailDescriptionBook": "Descubre las ubicaciones reales de {title}, explóralas en el mapa y planifica tu visita con consejos prácticos de viaje.",
     "fictionNotFound": "Ficción no encontrada",
     "placeNotFound": "Lugar no encontrado",
+    "unnamedPlace": "Lugar sin nombre",
     "sceneNotFound": "Escena no encontrada",
     "placeDetailTitle": "{placeName} · {fictionTitle}",
     "sceneDetailTitle": "{sceneTitle} · {fictionTitle}",
