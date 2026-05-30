@@ -147,7 +147,7 @@ export default async function FictionSlugPage({ params }: Props) {
     description: fiction.description || undefined,
     url: canonicalUrl,
     image: fiction.coverImage || fiction.bannerImage || undefined,
-    inLanguage: locale,
+    ...(fiction.original_language ? { inLanguage: fiction.original_language } : {}),
   }
 
   const [

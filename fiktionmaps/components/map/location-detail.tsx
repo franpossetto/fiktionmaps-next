@@ -7,6 +7,9 @@ import { Link } from "@/i18n/navigation"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
+import type { ContributorProfileWithDate } from "@/src/contributions/domain/contribution.entity"
+import { PlaceContributorsByline } from "@/components/fictions/place-contributors-byline"
+import { getPlaceContributorsAction } from "@/src/contributions/infrastructure/next/contribution.actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -47,6 +50,7 @@ export function LocationDetail({
   )
   const [placeScenes, setPlaceScenes] = useState<Scene[]>([])
   const [placeDetail, setPlaceDetail] = useState<Place | null>(null)
+  const [placeContributors, setPlaceContributors] = useState<ContributorProfileWithDate[]>([])
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLElement>(null)
 
@@ -113,6 +117,21 @@ export function LocationDetail({
       })
       .catch(() => {
         if (!cancelled) setPlaceScenes([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [place.id])
+
+  useEffect(() => {
+    let cancelled = false
+    setPlaceContributors([])
+    getPlaceContributorsAction(place.id)
+      .then((rows) => {
+        if (!cancelled) setPlaceContributors(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setPlaceContributors([])
       })
     return () => {
       cancelled = true
@@ -200,6 +219,8 @@ export function LocationDetail({
                   priority
                 />
               </div>
+
+              <PlaceContributorsByline contributors={placeContributors} className="max-w-full" />
 
               {placeDescription ? (
                 <p className="text-sm leading-relaxed text-muted-foreground sm:text-base sm:leading-8">

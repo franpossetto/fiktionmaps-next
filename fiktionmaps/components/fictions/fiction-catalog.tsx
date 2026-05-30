@@ -190,10 +190,10 @@ export function FictionCatalog({
           })}
 
           {/* Separator */}
-          <div className="mx-1.5 h-3 w-px shrink-0 bg-border" />
+          <div className="mx-1.5 hidden h-3 w-px shrink-0 bg-border md:block" />
 
-          {/* Genre — "Género [Todos ▼]" */}
-          <div className="relative flex items-center gap-1">
+          {/* Genre — "Género [Todos ▼]" (desktop) */}
+          <div className="relative hidden items-center gap-1 md:flex">
             <span className="text-[12px] text-muted-foreground">{t("genrePlaceholder")}</span>
             <div className="relative">
               <select
@@ -215,10 +215,10 @@ export function FictionCatalog({
           </div>
 
           {/* Separator */}
-          <div className="mx-1.5 h-3 w-px shrink-0 bg-border" />
+          <div className="mx-1.5 hidden h-3 w-px shrink-0 bg-border md:block" />
 
-          {/* Sort — "Ordenar por [Popularidad ▼]" */}
-          <div className="relative flex items-center gap-1">
+          {/* Sort — "Ordenar por [Popularidad ▼]" (desktop) */}
+          <div className="relative hidden items-center gap-1 md:flex">
             <span className="text-[12px] text-muted-foreground">{t("sortByLabel")}</span>
             <div className="relative">
               <select

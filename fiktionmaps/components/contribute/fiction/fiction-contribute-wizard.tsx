@@ -9,6 +9,7 @@ import { Check, ImagePlus, Loader2, X } from "lucide-react"
 import { z } from "zod"
 import { cn } from "@/lib/utils"
 import { FICTION_GENRES } from "@/lib/constants/fiction-genres"
+import { FICTION_LANGUAGE_CODES, FICTION_LANGUAGE_LABELS } from "@/lib/constants/fiction-languages"
 import type { InterestCatalogItem } from "@/src/interests"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 import {
@@ -143,7 +144,7 @@ function loadImageDimensionsFromFile(file: File): Promise<{ width: number; heigh
   })
 }
 
-function emptyIdentity(): FictionContributeIdentityDraft {
+function emptyIdentity(locale: string): FictionContributeIdentityDraft {
   return {
     title: "",
     type: "movie",
@@ -153,6 +154,8 @@ function emptyIdentity(): FictionContributeIdentityDraft {
     imdbId: "",
     coverFile: null,
     bannerFile: undefined,
+    originalLanguage: "",
+    contentLanguage: locale,
   }
 }
 
@@ -173,7 +176,7 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
   const baseId = useId()
 
   const [step, setStep] = useState<FictionContributeFormStep>(1)
-  const [identity, setIdentity] = useState<FictionContributeIdentityDraft>(() => emptyIdentity())
+  const [identity, setIdentity] = useState<FictionContributeIdentityDraft>(() => emptyIdentity(locale))
   const [director, setDirector] = useState("")
   const [directorPersonId, setDirectorPersonId] = useState<string | null>(null)
   const [directorCatalog, setDirectorCatalog] = useState<Person[]>([])
@@ -220,6 +223,8 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
         imageTooLarge: tVal("imageTooLarge"),
         directorRequired:
           identity.type === "book" ? tVal("authorRequired") : tVal("directorRequired"),
+        originalLanguageRequired: tVal("originalLanguageRequired"),
+        contentLanguageRequired: tVal("contentLanguageRequired"),
       }),
     [identity.type, locale, tVal],
   )
@@ -319,7 +324,7 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
   }, [])
 
   /** Evita que `fictionStepNavBlocked` quede en true con mensajes obsoletos tras corregir el campo. */
-  const clearStep1BasicsFieldError = useCallback((field: ContributeBasicsCriterionKey | "type") => {
+  const clearStep1BasicsFieldError = useCallback((field: ContributeBasicsCriterionKey | "type" | "originalLanguage" | "contentLanguage") => {
     setStep1Errors((prev) => {
       if (!prev[field]) return prev
       const next = { ...prev }
@@ -471,6 +476,8 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
       year: identity.year,
       genre: identity.genre,
       imdbId: showImdbField ? identity.imdbId : "",
+      originalLanguage: identity.originalLanguage,
+      contentLanguage: identity.contentLanguage,
     })
     if (!parsed.success) {
       setStep1Errors((e) => ({ ...e, ...zodIssuesToRecord(parsed.error) }))
@@ -478,11 +485,11 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
     }
     setStep1Errors((e) => {
       const next = { ...e }
-      for (const k of ["title", "type", "year", "genre", "imdbId"]) delete next[k]
+      for (const k of ["title", "type", "year", "genre", "imdbId", "originalLanguage", "contentLanguage"]) delete next[k]
       return next
     })
     return true
-  }, [contributeSchemas.basicsCore, identity.genre, identity.imdbId, identity.title, identity.type, identity.year, showImdbField])
+  }, [contributeSchemas.basicsCore, identity.contentLanguage, identity.genre, identity.imdbId, identity.originalLanguage, identity.title, identity.type, identity.year, showImdbField])
 
   const validateDescriptionStep = useCallback(() => {
     const parsed = contributeSchemas.descriptionStep.safeParse({
@@ -581,6 +588,8 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
       year: identity.year,
       genre: identity.genre,
       imdbId: showImdbField ? identity.imdbId : "",
+      originalLanguage: identity.originalLanguage,
+      contentLanguage: identity.contentLanguage,
     })
     const description = contributeSchemas.descriptionStep.safeParse({
       description: identity.description,
@@ -791,6 +800,8 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
     fd.set("imdbId", showImdbField ? identity.imdbId.trim() : "")
     fd.set("runtimeMinutes", "")
     fd.set("slug", slug)
+    fd.set("originalLanguage", identity.originalLanguage.trim())
+    fd.set("contentLanguage", identity.contentLanguage.trim())
     if (identity.coverFile) fd.set("coverFile", identity.coverFile)
     if (identity.bannerFile instanceof File && identity.bannerFile.size > 0) {
       fd.set("bannerFile", identity.bannerFile)
@@ -857,7 +868,7 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
 
   const fictionStepNavBlocked = useMemo(() => {
     if (step === 1) {
-      const basicsKeys = ["title", "type", "year", "genre", "imdbId"] as const
+      const basicsKeys = ["title", "type", "year", "genre", "imdbId", "originalLanguage", "contentLanguage"] as const
       if (basicsKeys.some((k) => Boolean(step1Errors[k]))) return true
       if (showImdbField && identity.imdbId.trim()) {
         if (duplicateCheckLoading || Boolean(duplicateCheckError) || Boolean(duplicateMatch)) return true
@@ -1149,6 +1160,57 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
                           {FICTION_GENRES.map((g) => (
                             <option key={g} value={g}>
                               {g}
+                            </option>
+                          ))}
+                        </select>
+                      </ContributeFieldWrapper>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div data-contribute-basics-field="originalLanguage">
+                      <ContributeFieldWrapper
+                        label={tf("fieldOriginalLanguage")}
+                        required
+                        hint={tf("fieldOriginalLanguageHint")}
+                        error={step1Errors.originalLanguage}
+                      >
+                        <select
+                          value={identity.originalLanguage}
+                          onChange={(e) => {
+                            clearStep1BasicsFieldError("originalLanguage")
+                            setIdentity((s) => ({ ...s, originalLanguage: e.target.value }))
+                          }}
+                          className={INPUT_ROW}
+                        >
+                          <option value="">{tf("languagePlaceholder")}</option>
+                          {FICTION_LANGUAGE_CODES.map((code) => (
+                            <option key={code} value={code}>
+                              {FICTION_LANGUAGE_LABELS[code]}
+                            </option>
+                          ))}
+                        </select>
+                      </ContributeFieldWrapper>
+                    </div>
+                    <div data-contribute-basics-field="contentLanguage">
+                      <ContributeFieldWrapper
+                        label={tf("fieldContentLanguage")}
+                        required
+                        hint={tf("fieldContentLanguageHint")}
+                        error={step1Errors.contentLanguage}
+                      >
+                        <select
+                          value={identity.contentLanguage}
+                          onChange={(e) => {
+                            clearStep1BasicsFieldError("contentLanguage")
+                            setIdentity((s) => ({ ...s, contentLanguage: e.target.value }))
+                          }}
+                          className={INPUT_ROW}
+                        >
+                          <option value="">{tf("languagePlaceholder")}</option>
+                          {FICTION_LANGUAGE_CODES.map((code) => (
+                            <option key={code} value={code}>
+                              {FICTION_LANGUAGE_LABELS[code]}
                             </option>
                           ))}
                         </select>

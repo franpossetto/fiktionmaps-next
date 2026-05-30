@@ -209,6 +209,8 @@ export function createFictionsSupabaseAdapter(
         slug: data.slug ?? null,
         ...(data.status != null ? { status: data.status } : {}),
         ...(data.created_by != null ? { created_by: data.created_by } : {}),
+        ...(data.original_language != null ? { original_language: data.original_language } : {}),
+        ...(data.content_language != null ? { content_language: data.content_language } : {}),
       }
       const { data: row, error } = await supabase.from("fictions").insert(insertRow).select().single()
       if (error || !row) return null

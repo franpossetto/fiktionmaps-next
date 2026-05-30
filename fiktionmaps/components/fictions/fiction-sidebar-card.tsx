@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server"
 import { cn } from "@/lib/utils"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import { FICTION_LANGUAGE_LABELS, type FictionLanguageCode } from "@/lib/constants/fiction-languages"
 
 type SidebarAlign = "left" | "center" | "right"
 
@@ -69,6 +70,14 @@ export async function FictionSidebarCard({
             <dd className="font-medium text-foreground">{fiction.year || "—"}</dd>
             <dt className="text-muted-foreground">{t("sidebarGenre")}</dt>
             <dd className="font-medium text-foreground">{fiction.genre || "—"}</dd>
+            {fiction.original_language ? (
+              <>
+                <dt className="text-muted-foreground">{t("sidebarOriginalLanguage")}</dt>
+                <dd className="font-medium text-foreground">
+                  {FICTION_LANGUAGE_LABELS[fiction.original_language as FictionLanguageCode] ?? fiction.original_language}
+                </dd>
+              </>
+            ) : null}
           </dl>
         </div>
       </div>

@@ -2,7 +2,10 @@
 
 import { revalidatePath, updateTag } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { uuidSchema } from "@/lib/validation/primitives"
 import { zodErrorMessage } from "@/lib/validation/http"
+import type { ContributorProfileWithDate } from "@/src/contributions/domain/contribution.entity"
+import { getPlaceContributorsWithDatesCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { approveContributionUseCase } from "@/src/contributions/application/approve-contribution.usecase"
 import { createContributionUseCase } from "@/src/contributions/application/create-contribution.usecase"
 import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/ensure-user-is-moderator.usecase"
@@ -29,6 +32,13 @@ export type {
   CreateContributionResult,
   RejectContributionResult,
 } from "./contribution.actions.types"
+
+export async function getPlaceContributorsAction(
+  placeId: string,
+): Promise<ContributorProfileWithDate[]> {
+  if (!uuidSchema.safeParse(placeId).success) return []
+  return getPlaceContributorsWithDatesCached(placeId)
+}
 
 function revalidateContributionEntityTags(entityType: ContributionEntityType, entityId: string) {
   switch (entityType) {

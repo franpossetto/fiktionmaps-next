@@ -31,6 +31,10 @@ const FICTION_GENRE_VALUES = [
 
 const FICTION_TYPE_VALUES = ["movie", "book", "tv-series"] as const
 
+const FICTION_LANGUAGE_CODE_VALUES = [
+  "en", "es", "de", "fr", "it", "pt", "ja", "ko", "zh", "ar", "ru",
+] as const
+
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
 
@@ -81,6 +85,8 @@ export type FictionContributeValidationMessages = {
   imageFormatInvalid: string
   imageTooLarge: string
   directorRequired: string
+  originalLanguageRequired: string
+  contentLanguageRequired: string
 }
 
 function validateContributedImageFile(file: File, m: Pick<FictionContributeValidationMessages, "imageFormatInvalid" | "imageTooLarge">): string | null {
@@ -122,6 +128,8 @@ export function createFictionContributeSchemas(m: FictionContributeValidationMes
         .refine((y) => y <= new Date().getFullYear(), m.yearInvalid),
       genre: z.enum(FICTION_GENRE_VALUES, { message: m.genreRequired }),
       imdbId: z.string().optional(),
+      originalLanguage: z.enum(FICTION_LANGUAGE_CODE_VALUES, { message: m.originalLanguageRequired }),
+      contentLanguage: z.enum(FICTION_LANGUAGE_CODE_VALUES, { message: m.contentLanguageRequired }),
     })
     .superRefine((data, ctx) => imdbIdSuperRefine(data, ctx, m))
 
@@ -137,6 +145,8 @@ export function createFictionContributeSchemas(m: FictionContributeValidationMes
       genre: z.enum(FICTION_GENRE_VALUES, { message: m.genreRequired }),
       description: z.string().trim().min(1, m.descriptionRequired),
       imdbId: z.string().optional(),
+      originalLanguage: z.enum(FICTION_LANGUAGE_CODE_VALUES, { message: m.originalLanguageRequired }),
+      contentLanguage: z.enum(FICTION_LANGUAGE_CODE_VALUES, { message: m.contentLanguageRequired }),
     })
     .superRefine((data, ctx) => imdbIdSuperRefine(data, ctx, m))
 
@@ -187,5 +197,7 @@ export type FictionContributeIdentityDraft = {
   /** Segmento tt… (solo película/serie). */
   imdbId: string
   coverFile: File | null
+  originalLanguage: string
+  contentLanguage: string
   bannerFile?: File | null
 }

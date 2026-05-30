@@ -1,6 +1,7 @@
 "use client"
 
 import Image from "next/image"
+import { Map } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { useTranslations } from "next-intl"
 import { Link, usePathname, useRouter } from "@/i18n/navigation"
@@ -21,7 +22,11 @@ import { publicFictionPlacePath, publicFictionScenePath } from "@/lib/fictions/p
 const TOP_NAV_HEADER_CLASS =
   "sticky top-0 z-40 h-[60px] border-b border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90"
 
-const TOP_NAV_INNER_PAD = "mx-auto h-full w-full max-w-[1900px] px-4 sm:px-6 lg:px-10"
+const TOP_NAV_INNER_PAD =
+  "mx-auto h-full w-full max-w-[1900px] px-3 sm:px-6 lg:px-10"
+
+/** Ancho fijo de acciones laterales en móvil (mapa + perfil) para que el buscador no se solape. */
+const TOP_NAV_MOBILE_SIDE_SLOT = "flex h-10 w-10 shrink-0 items-center justify-center"
 
 const GLOBAL_SCOPE: NavSearchScope = { kind: "global" }
 
@@ -208,8 +213,18 @@ export function AppTopNavbar() {
 
   return (
     <header className={TOP_NAV_HEADER_CLASS}>
-      <div className={`${TOP_NAV_INNER_PAD} grid h-full grid-cols-[1fr_minmax(280px,520px)_1fr] items-center gap-4`}>
-        <div className="flex min-w-0 items-center gap-3 justify-self-start">
+      <div
+        className={`${TOP_NAV_INNER_PAD} flex h-full items-center gap-2 md:grid md:grid-cols-[1fr_minmax(280px,520px)_1fr] md:gap-4`}
+      >
+        <Link
+          href="/map"
+          aria-label={tNav("openMap")}
+          title={tNav("map")}
+          className={`${TOP_NAV_MOBILE_SIDE_SLOT} rounded-xl text-foreground transition-colors hover:bg-accent md:hidden`}
+        >
+          <Map className="h-5 w-5" aria-hidden />
+        </Link>
+        <div className="hidden min-w-0 items-center gap-3 md:flex md:justify-self-start">
           <Link href="/map" className="inline-flex shrink-0 items-center rounded-md">
             <Image
               src="/fiktionmaps-logo.svg"
@@ -222,7 +237,7 @@ export function AppTopNavbar() {
           </Link>
         </div>
         <div
-          className="relative w-full"
+          className="relative flex min-w-0 flex-1 items-center gap-1.5 md:w-full md:flex-none md:gap-0"
           onFocus={() => {
             setIsFocused(true)
             void ensureSearchCorpusLoaded()
@@ -238,7 +253,7 @@ export function AppTopNavbar() {
             onChange={setSearch}
             placeholder={placeholder}
             chip={chip}
-            className="w-full"
+            className="min-w-0 flex-1"
           />
           {showDropdown ? (
             <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-xl border border-border bg-background shadow-lg">
@@ -305,7 +320,9 @@ export function AppTopNavbar() {
             </div>
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-2 justify-self-end">
+        <div
+          className={`${TOP_NAV_MOBILE_SIDE_SLOT} shrink-0 md:w-auto md:justify-self-end`}
+        >
           <UserMenu />
         </div>
       </div>

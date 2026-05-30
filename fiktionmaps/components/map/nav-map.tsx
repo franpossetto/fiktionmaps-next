@@ -8,6 +8,7 @@ import { MapContainer, MapMarker, useMapLoaded } from "@/lib/map"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import { Expand, Map, Minimize2, X } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useNavCollapsedStorage } from "@/lib/local-storage-service-hooks"
 
@@ -96,7 +97,10 @@ function NavMapPins({
 
 export function NavMapSlot() {
   return (
-    <div id={MINIMAP_SLOT_ID} className="absolute bottom-4 right-4 z-[1000]" />
+    <div
+      id={MINIMAP_SLOT_ID}
+      className="pointer-events-none absolute bottom-4 right-4 z-[4800] hidden md:block [&>*]:pointer-events-auto"
+    />
   )
 }
 
@@ -110,11 +114,12 @@ interface NavMapProps {
 }
 
 export function NavMap({ city, viewportCenter, places, onMinimapClick }: NavMapProps) {
+  const t = useTranslations("Map")
   const isMobile = useIsMobile()
   const [container, setContainer] = useState<HTMLElement | null>(null)
   const [isExpanded, setIsExpanded] = useState(false)
   const [navCollapsed, setNavCollapsed] = useNavCollapsedStorage()
-  const isVisible = isMobile ? false : !navCollapsed
+  const isVisible = !navCollapsed
 
   useEffect(() => {
     const el = document.getElementById(MINIMAP_SLOT_ID)
@@ -128,6 +133,8 @@ export function NavMap({ city, viewportCenter, places, onMinimapClick }: NavMapP
     [onMinimapClick],
   )
 
+  if (isMobile) return null
+
   if (!container) return null
 
   if (!isVisible) {
@@ -136,10 +143,10 @@ export function NavMap({ city, viewportCenter, places, onMinimapClick }: NavMapP
         type="button"
         onClick={() => setNavCollapsed(false)}
         className="flex items-center gap-2 rounded-lg border border-border bg-chrome/95 px-3 py-2 text-xs font-medium text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.2)] backdrop-blur-sm transition-colors hover:bg-chrome"
-        aria-label="Show nav map"
+        aria-label={t("showNavMap")}
       >
         <Map className="h-4 w-4" />
-        Show map
+        {t("showNavMap")}
       </button>,
       container,
     )
@@ -154,7 +161,7 @@ export function NavMap({ city, viewportCenter, places, onMinimapClick }: NavMapP
           type="button"
           onClick={() => setNavCollapsed(true)}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-chrome/95 text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.2)] backdrop-blur-sm transition-colors hover:bg-chrome"
-          aria-label="Hide nav map"
+          aria-label={t("hideNavMap")}
         >
           <X className="h-4 w-4" />
         </button>
@@ -162,7 +169,7 @@ export function NavMap({ city, viewportCenter, places, onMinimapClick }: NavMapP
           type="button"
           onClick={() => setIsExpanded((e) => !e)}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-chrome/95 text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.2)] backdrop-blur-sm transition-colors hover:bg-chrome"
-          aria-label={isExpanded ? "Collapse map" : "Expand map"}
+          aria-label={isExpanded ? t("collapseMap") : t("expandMap")}
         >
           {isExpanded ? (
             <Minimize2 className="h-4 w-4" />

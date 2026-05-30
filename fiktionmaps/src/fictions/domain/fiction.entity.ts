@@ -15,6 +15,8 @@ export interface Fiction {
   duration_sec?: number | null
   created_at: string
   updated_at: string
+  original_language?: string | null
+  content_language?: string | null
 }
 
 /** Fiction with asset_images (cover/banner URLs) joined. */
