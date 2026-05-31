@@ -1,8 +1,11 @@
 import { z } from "zod"
+import { FICTION_LANGUAGE_CODES } from "@/lib/constants/fiction-languages"
 
 const slugField = z
   .string()
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Only lowercase letters, numbers and hyphens")
+
+export const fictionLanguageCodeSchema = z.enum(FICTION_LANGUAGE_CODES)
 
 /** Matches `public.contribution_status` on fictions / places / scenes. */
 export const fictionRowStatusSchema = z.enum(["pending", "approved", "rejected"])
@@ -18,6 +21,8 @@ export const createFictionFormSchema = z.object({
   slug: slugField,
   status: fictionRowStatusSchema.optional(),
   created_by: z.string().uuid().optional(),
+  original_language: fictionLanguageCodeSchema,
+  content_language: fictionLanguageCodeSchema,
 })
 
 export const updateFictionFormSchema = z.object({
@@ -30,6 +35,8 @@ export const updateFictionFormSchema = z.object({
   duration_sec: z.number().nullable(),
   slug: slugField,
   author: z.string().trim().nullable().optional(),
+  original_language: fictionLanguageCodeSchema.nullable().optional(),
+  content_language: fictionLanguageCodeSchema.nullable().optional(),
 })
 
 export type CreateFictionData = z.infer<typeof createFictionFormSchema>

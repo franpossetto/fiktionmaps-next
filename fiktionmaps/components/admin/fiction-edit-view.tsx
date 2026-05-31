@@ -10,6 +10,7 @@ import { FICTION_PERSON_ROLES } from "@/src/persons/domain/person.entity"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
 import { FICTION_GENRES } from "@/lib/constants/fiction-genres"
+import { FICTION_LANGUAGE_CODES, FICTION_LANGUAGE_LABELS } from "@/lib/constants/fiction-languages"
 import {
   updateFictionAction,
   uploadFictionImageAction,
@@ -61,6 +62,8 @@ function toFormState(f: Fiction) {
       f.duration_sec != null && f.duration_sec > 0
         ? String(Math.round(f.duration_sec / 60))
         : "",
+    originalLanguage: f.original_language ?? "",
+    contentLanguage: f.content_language ?? "",
   }
 }
 
@@ -297,6 +300,8 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
     fd.set("active", formData.active ? "true" : "false")
     fd.set("runtimeMinutes", formData.runtimeMinutes ?? "")
     fd.set("slug", formData.slug ?? "")
+    fd.set("originalLanguage", formData.originalLanguage ?? "")
+    fd.set("contentLanguage", formData.contentLanguage ?? "")
     const result = await updateFictionAction(initialFiction.id, fd)
     setSaving(false)
     if (result.success) {
@@ -400,6 +405,34 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
                       !FICTION_GENRES.includes(formData.genre as (typeof FICTION_GENRES)[number]) && (
                         <option value={formData.genre}>{formData.genre}</option>
                       )}
+                  </select>
+                </FormField>
+                <FormField label="Work language">
+                  <select
+                    value={formData.originalLanguage}
+                    onChange={(e) => setFormData((p) => ({ ...p, originalLanguage: e.target.value }))}
+                    className={cn(inputClass, "text-foreground")}
+                  >
+                    <option value="">—</option>
+                    {FICTION_LANGUAGE_CODES.map((code) => (
+                      <option key={code} value={code}>
+                        {FICTION_LANGUAGE_LABELS[code]}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+                <FormField label="Entry language">
+                  <select
+                    value={formData.contentLanguage}
+                    onChange={(e) => setFormData((p) => ({ ...p, contentLanguage: e.target.value }))}
+                    className={cn(inputClass, "text-foreground")}
+                  >
+                    <option value="">—</option>
+                    {FICTION_LANGUAGE_CODES.map((code) => (
+                      <option key={code} value={code}>
+                        {FICTION_LANGUAGE_LABELS[code]}
+                      </option>
+                    ))}
                   </select>
                 </FormField>
               </div>

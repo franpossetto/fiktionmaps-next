@@ -2,12 +2,14 @@
 
 import { useEffect, useState, useRef, useCallback } from "react"
 import Image from "next/image"
+import { useLocale } from "next-intl"
 import { useRouter } from "@/i18n/navigation"
 import { Plus, MoreVertical, Edit2, Trash2, Book, Search, Loader2, CheckCircle, CircleOff, ArrowLeft, ArrowRight, ImagePlus, Film, Pencil } from "lucide-react"
 import type { Fiction, FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
 import { FICTION_GENRES } from "@/lib/constants/fiction-genres"
+import { FICTION_LANGUAGE_CODES, FICTION_LANGUAGE_LABELS } from "@/lib/constants/fiction-languages"
 import { createFictionWithImagesAction, deleteFictionAction, setFictionActiveAction } from "@/src/fictions/infrastructure/next/fiction.actions"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import {
@@ -44,6 +46,8 @@ interface FictionFormData {
   active: boolean
   runtimeMinutes: string
   slug: string
+  originalLanguage: string
+  contentLanguage: string
 }
 
 type ViewMode = "cards" | "table"
@@ -56,6 +60,7 @@ interface FictionsTabProps {
 
 export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards" }: FictionsTabProps) {
   const router = useRouter()
+  const locale = useLocale()
   const [fictions, setFictions] = useState<FictionWithMedia[]>(initialFictions ?? [])
   const [showWizard, setShowWizard] = useState(false)
   const [wizardStep, setWizardStep] = useState(0)
@@ -69,6 +74,8 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
     active: true,
     runtimeMinutes: "",
     slug: "",
+    originalLanguage: "",
+    contentLanguage: locale,
   })
   const [slugEdited, setSlugEdited] = useState(false)
   const [slugEditing, setSlugEditing] = useState(false)
@@ -129,6 +136,8 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
       active: true,
       runtimeMinutes: "",
       slug: "",
+      originalLanguage: "",
+      contentLanguage: locale,
     })
     setSlugEdited(false)
     setSlugEditing(false)
@@ -170,6 +179,8 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
     if (!formData.description.trim()) newErrors.description = "Description is required"
     if (formData.year < 1900 || formData.year > new Date().getFullYear())
       newErrors.year = "Invalid year"
+    if (!formData.originalLanguage) newErrors.originalLanguage = "Original language is required"
+    if (!formData.contentLanguage) newErrors.contentLanguage = "Entry language is required"
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -188,6 +199,8 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
     fd.set("active", formData.active ? "true" : "false")
     fd.set("runtimeMinutes", formData.runtimeMinutes ?? "")
     fd.set("slug", formData.slug ?? "")
+    fd.set("originalLanguage", formData.originalLanguage)
+    fd.set("contentLanguage", formData.contentLanguage)
     if (coverFile) fd.set("coverFile", coverFile)
     if (bannerFile) fd.set("bannerFile", bannerFile)
     const result = await createFictionWithImagesAction(fd)
@@ -337,6 +350,34 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                       {FICTION_GENRES.map((g) => (
                         <option key={g} value={g}>
                           {g}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                  <FormField label="Work language" required error={errors.originalLanguage}>
+                    <select
+                      value={formData.originalLanguage}
+                      onChange={(e) => setFormData({ ...formData, originalLanguage: e.target.value })}
+                      className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground/20 transition-all"
+                    >
+                      <option value="">Select language</option>
+                      {FICTION_LANGUAGE_CODES.map((code) => (
+                        <option key={code} value={code}>
+                          {FICTION_LANGUAGE_LABELS[code]}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                  <FormField label="Entry language" error={errors.contentLanguage}>
+                    <select
+                      value={formData.contentLanguage}
+                      onChange={(e) => setFormData({ ...formData, contentLanguage: e.target.value })}
+                      className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground/20 transition-all"
+                    >
+                      <option value="">Select language</option>
+                      {FICTION_LANGUAGE_CODES.map((code) => (
+                        <option key={code} value={code}>
+                          {FICTION_LANGUAGE_LABELS[code]}
                         </option>
                       ))}
                     </select>

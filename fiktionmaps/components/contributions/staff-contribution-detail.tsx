@@ -4,6 +4,7 @@ import { Link } from "@/i18n/navigation"
 import type { ContributorModerationContext, FictionContributionFeedItem } from "@/src/contributions/domain/contribution.entity"
 import type { FictionWithMediaAndCatalogIds } from "@/src/fictions/domain/fiction.entity"
 import { FICTION_EXTERNAL_ID_PROVIDER } from "@/src/fiction-external-ids/domain/fiction-external-id.entity"
+import { FICTION_LANGUAGE_LABELS, type FictionLanguageCode } from "@/lib/constants/fiction-languages"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import { StaffContributionReviewSection } from "@/components/contributions/staff-contribution-review-section"
 import { contributionTypeMessageKey } from "@/components/contributions/contribution-type-label"
@@ -191,6 +192,26 @@ export async function StaffContributionDetail({ item, fiction, contributorContex
                 <div className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-baseline sm:gap-4">
                   <dt className="shrink-0 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground sm:w-36">{t("fieldCatalogRuntime")}</dt>
                   <dd className="tabular-nums text-sm text-foreground sm:flex-1">{formatRuntimeSec(fiction.duration_sec)}</dd>
+                </div>
+              ) : null}
+              {fiction.original_language ? (
+                <div className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-baseline sm:gap-4">
+                  <dt className="shrink-0 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground sm:w-36">
+                    {t("fieldOriginalLanguage")}
+                  </dt>
+                  <dd className="text-sm text-foreground sm:flex-1">
+                    {FICTION_LANGUAGE_LABELS[fiction.original_language as FictionLanguageCode] ?? fiction.original_language}
+                  </dd>
+                </div>
+              ) : null}
+              {fiction.content_language ? (
+                <div className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-baseline sm:gap-4">
+                  <dt className="shrink-0 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground sm:w-36">
+                    {t("fieldContentLanguage")}
+                  </dt>
+                  <dd className="text-sm text-foreground sm:flex-1">
+                    {FICTION_LANGUAGE_LABELS[fiction.content_language as FictionLanguageCode] ?? fiction.content_language}
+                  </dd>
                 </div>
               ) : null}
             </>

@@ -474,8 +474,8 @@ function MapPageInner() {
       ) : (
         <div className="absolute inset-0 min-h-0 flex flex-col">
           <header className="pointer-events-none absolute inset-x-0 top-0 z-[1000]">
-            <div className="relative grid w-full grid-cols-[1fr_minmax(280px,520px)_1fr] items-start gap-4 px-4 py-4 sm:px-6 lg:px-8">
-              <div className="pointer-events-auto flex items-center gap-2 justify-self-start">
+            <div className="relative flex w-full items-start justify-between gap-2 px-3 py-3 sm:px-6 sm:py-4 md:grid md:grid-cols-[1fr_minmax(280px,520px)_1fr] md:gap-4 lg:px-8">
+              <div className="pointer-events-auto flex min-w-0 items-center gap-2 md:justify-self-start">
                 <FictionSelector
                   availableFictions={availableFictions}
                   selectedFictionIds={selectedFictionIds}
@@ -485,7 +485,7 @@ function MapPageInner() {
                 />
               </div>
 
-              <div className="pointer-events-auto relative w-full justify-self-center">
+              <div className="pointer-events-auto relative hidden w-full min-w-0 justify-self-center md:block">
                 <MapFictionCitySearch
                   selectedCity={selectedCity}
                   availableFictions={availableFictions}

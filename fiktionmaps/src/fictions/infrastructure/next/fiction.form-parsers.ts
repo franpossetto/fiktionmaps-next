@@ -27,6 +27,12 @@ function parseOptionalFictionStatus(entry: FormDataEntryValue | null): string | 
   return s.length > 0 ? s : undefined
 }
 
+function parseLanguageCode(entry: FormDataEntryValue | null): string | null {
+  if (!entry) return null
+  const s = String(entry).trim()
+  return s.length > 0 ? s : null
+}
+
 function parseCreateFictionFormPayload(formData: FormData) {
   return {
     title: String(formData.get("title") ?? ""),
@@ -39,6 +45,8 @@ function parseCreateFictionFormPayload(formData: FormData) {
     slug: parseSlug(formData.get("slug")),
     created_by: parseOptionalFormUuid(formData.get("createdBy")),
     status: parseOptionalFictionStatus(formData.get("fictionStatus")),
+    original_language: parseLanguageCode(formData.get("originalLanguage")),
+    content_language: parseLanguageCode(formData.get("contentLanguage")),
   }
 }
 
@@ -60,6 +68,8 @@ export function parseUpdateFictionFormData(formData: FormData) {
     active: formData.get("active") !== "false",
     duration_sec: parseRuntimeSec(formData.get("runtimeMinutes")),
     slug: parseSlug(formData.get("slug")),
+    original_language: parseLanguageCode(formData.get("originalLanguage")),
+    content_language: parseLanguageCode(formData.get("contentLanguage")),
   }
   return updateFictionFormSchema.safeParse(base)
 }
