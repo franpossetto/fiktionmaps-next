@@ -180,6 +180,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
     if (formData.year < 1900 || formData.year > new Date().getFullYear())
       newErrors.year = "Invalid year"
     if (!formData.originalLanguage) newErrors.originalLanguage = "Original language is required"
+    if (!formData.contentLanguage) newErrors.contentLanguage = "Entry language is required"
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -367,7 +368,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                       ))}
                     </select>
                   </FormField>
-                  <FormField label="Entry language">
+                  <FormField label="Entry language" error={errors.contentLanguage}>
                     <select
                       value={formData.contentLanguage}
                       onChange={(e) => setFormData({ ...formData, contentLanguage: e.target.value })}
