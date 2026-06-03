@@ -19,6 +19,7 @@ export interface ContributionsFeedTabBarProps {
   labelAll: string
   labelPending: string
   labelApproved: string
+  labelRejected: string
 }
 
 export function ContributionsFeedTabBar({
@@ -29,11 +30,13 @@ export function ContributionsFeedTabBar({
   labelAll,
   labelPending,
   labelApproved,
+  labelRejected,
 }: ContributionsFeedTabBarProps) {
   const tabs: { value: ContributionsFeedTab; label: string }[] = [
     { value: "all", label: labelAll },
     { value: "pending", label: labelPending },
     { value: "approved", label: labelApproved },
+    { value: "rejected", label: labelRejected },
   ]
 
   return (

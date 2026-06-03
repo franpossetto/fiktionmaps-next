@@ -895,6 +895,41 @@ export type Database = {
           },
         ]
       }
+      contribution_pending_images: {
+        Row: {
+          id: string
+          contribution_id: string
+          role: "avatar" | "hero"
+          variant: "sm" | "lg"
+          storage_path: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          contribution_id: string
+          role: "avatar" | "hero"
+          variant: "sm" | "lg"
+          storage_path: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          contribution_id?: string
+          role?: "avatar" | "hero"
+          variant?: "sm" | "lg"
+          storage_path?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contribution_pending_images_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       place_checkins: {
         Row: {
           id: string
@@ -1123,6 +1158,9 @@ export type PlaceCheckinInsert = TablesInsert<"place_checkins">
 export type PlaceCheckinUpdate = TablesUpdate<"place_checkins">
 
 export type ContributionRow = Tables<"contributions">
+export type ContributionPendingImageRow = Tables<"contribution_pending_images">
+export type ContributionPendingImageInsert = TablesInsert<"contribution_pending_images">
+export type ContributionPendingImageUpdate = TablesUpdate<"contribution_pending_images">
 export type ContributionInsert = TablesInsert<"contributions">
 export type ContributionUpdate = TablesUpdate<"contributions">
 

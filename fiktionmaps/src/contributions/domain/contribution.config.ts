@@ -4,6 +4,9 @@ import { STAFF_ROLES } from "@/src/users/domain/user.roles"
 /** Staff `/contributions` fiction create feed: items per page (Supabase `.range`). */
 export const STAFF_FICTION_CONTRIBUTIONS_FEED_PAGE_SIZE = 10
 
+/** Places store a single image in `asset_images` with role `avatar` (map + detail). */
+export const PLACE_PHOTO_ASSET_ROLE = "avatar" as const
+
 export const CONTRIBUTION_FPP: Record<ContributionType, number> = {
   create_fiction: 5,
   create_place: 13,

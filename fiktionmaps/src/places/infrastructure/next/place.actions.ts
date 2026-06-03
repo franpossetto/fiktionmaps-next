@@ -9,6 +9,7 @@ import { resolveEntityContributionInsertDefaults } from "@/src/contributions/app
 import { uuidSchema } from "@/lib/validation/primitives"
 import type { MapBbox } from "@/lib/validation/map-query"
 import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
+import { listApprovedFictionPlacesUseCase } from "@/src/places/application/list-approved-fiction-places.usecase"
 import { createPlaceUseCase } from "@/src/places/application/create-place.usecase"
 import { updatePlaceUseCase } from "@/src/places/application/update-place.usecase"
 import { deletePlaceUseCase } from "@/src/places/application/delete-place.usecase"
@@ -121,6 +122,36 @@ export async function getFictionPlacesAction(fictionId: string): Promise<Place[]
   return getFictionPlacesCached(fictionId)
 }
 
+/** Approved active places for contribute photo wizard (fiction-scoped list). */
+export async function getApprovedFictionPlacesForContributeAction(fictionId: string): Promise<Place[]> {
+  if (!uuidSchema.safeParse(fictionId).success) return []
+  return listApprovedFictionPlacesUseCase(fictionId, placesRepo)
+}
+
+export type PlacePhotoContributeContext = {
+  placeId: string
+  placeName: string
+  fictionId: string
+  currentImageUrl: string | null
+}
+
+export async function getPlacePhotoContributeContextAction(
+  placeId: string,
+): Promise<PlacePhotoContributeContext | null> {
+  if (!uuidSchema.safeParse(placeId).success) return null
+  const eligible = await placesRepo.isApprovedActivePlace(placeId)
+  if (!eligible) return null
+  const place = await placesRepo.getById(placeId, "lg")
+  if (!place) return null
+  const url = place.image?.trim()
+  return {
+    placeId: place.id,
+    placeName: place.name,
+    fictionId: place.fictionId,
+    currentImageUrl: url && !url.endsWith("/placeholder.svg") ? url : null,
+  }
+}
+
 export async function getCityPlacesAction(cityId: string): Promise<Place[]> {
   if (!uuidSchema.safeParse(cityId).success) return []
   return getCityPlacesCached(cityId)
@@ -159,7 +190,16 @@ export async function createPlaceAction(data: CreatePlaceData): Promise<CreatePl
 
   const result = await createPlaceUseCase({ ...data, status, created_by }, placesRepo)
   if (!result) return { success: false, error: "Failed to create place" }
+
+  const contributionAutoApproved = await recordCreatePlaceContribution(result.placeId, "createPlaceAction")
+
+  revalidatePath("/admin")
+  revalidatePath("/contributions")
   updateTag("places")
+  updateTag(`place-${result.placeId}`)
+  updateTag("contributions")
+  if (contributionAutoApproved) updateTag("profiles")
+
   const places = await getAllPlacesCached()
   return { success: true, createdPlaceId: result.placeId, places }
 }

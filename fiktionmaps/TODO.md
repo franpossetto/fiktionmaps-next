@@ -26,7 +26,7 @@
 
 - [ ] **People model for fictions**: replace `author` TEXT column with a normalized `persons` table + `fiction_persons` junction table (fields: `fiction_id`, `person_id`, `role`). Roles: `author`, `director`, `actor`, `screenwriter`, `producer`, etc. One person can have multiple roles across multiple fictions (e.g. Clint Eastwood as actor + director). Phases: (1) DB migration + backfill existing `author` text, (2) domain/infra layer update (entity, repo, actions), (3) UI update (person search/select in create + edit forms).
 
-- [ ] Edit Place: replacing the existing image does not work.
+- [x] Edit Place: replacing the existing image does not work.
 
 - [ ] **Place likes (persisted)**: Fiction likes are backed by `fiction_likes`, use cases, and server actions. Place hearts in `fiction-detail.tsx` (`likedPlaces` / `togglePlaceLike`) and `PlaceDetailLikeCluster` in `fiction-place-detail-view.tsx` are client-only (no DB). Add a `place_likes`-style table + RLS, domain/repo/application/`infrastructure/next` wiring (same architectural rules as `fiction-likes`), SSR counts and per-user liked state, then replace the placeholder UI.
 

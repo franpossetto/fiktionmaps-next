@@ -46,6 +46,12 @@ function emptyMessageKeys(
       body: isPlace ? "feedEmptyFilteredApprovedPlace" : "feedEmptyFilteredApproved",
     }
   }
+  if (submitterFiltered && statusTab === "rejected") {
+    return {
+      title: isPlace ? "feedEmptyFilteredRejectedPlaceTitle" : "feedEmptyFilteredRejectedTitle",
+      body: isPlace ? "feedEmptyFilteredRejectedPlace" : "feedEmptyFilteredRejected",
+    }
+  }
   if (submitterFiltered) {
     return {
       title: isPlace ? "feedEmptyFilteredPlaceTitle" : "feedEmptyFilteredTitle",
@@ -62,6 +68,12 @@ function emptyMessageKeys(
     return {
       title: isPlace ? "feedEmptyTabApprovedPlaceTitle" : "feedEmptyTabApprovedTitle",
       body: isPlace ? "feedEmptyTabApprovedPlace" : "feedEmptyTabApproved",
+    }
+  }
+  if (statusTab === "rejected") {
+    return {
+      title: isPlace ? "feedEmptyTabRejectedPlaceTitle" : "feedEmptyTabRejectedTitle",
+      body: isPlace ? "feedEmptyTabRejectedPlace" : "feedEmptyTabRejected",
     }
   }
   return {

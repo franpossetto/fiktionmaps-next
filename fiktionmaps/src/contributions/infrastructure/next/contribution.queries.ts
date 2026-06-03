@@ -1,15 +1,18 @@
+import { cache } from "react"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { unstable_cache } from "next/cache"
+import { getSessionUserId } from "@/lib/auth/auth.service"
 import { createAnonymousClient, createClient } from "@/lib/supabase/server"
+import type { Database } from "@/supabase/database.types"
 import { getContributionByIdUseCase } from "@/src/contributions/application/get-contribution-by-id.usecase"
 import { getContributionsByUserUseCase } from "@/src/contributions/application/get-contributions-by-user.usecase"
 import { getApprovedByEntityUseCase } from "@/src/contributions/application/get-approved-by-entity.usecase"
 import { getContributorsByEntityUseCase } from "@/src/contributions/application/get-contributors-by-entity.usecase"
 import { getContributorsFirstContributionByEntityUseCase } from "@/src/contributions/application/get-contributors-first-contribution-by-entity.usecase"
 import { getPendingContributionsUseCase } from "@/src/contributions/application/get-pending-contributions.usecase"
-import { getStaffFictionContributionDetailUseCase } from "@/src/contributions/application/get-staff-fiction-contribution-detail.usecase"
+import { getStaffContributionDetailUseCase } from "@/src/contributions/application/get-staff-contribution-detail.usecase"
 import { getStaffFictionContributionsFeedPageUseCase } from "@/src/contributions/application/get-staff-fiction-contributions-feed-page.usecase"
 import { getStaffCreateContributionsFeedPageUseCase } from "@/src/contributions/application/get-staff-create-contributions-feed-page.usecase"
-import { getStaffPlaceContributionDetailUseCase } from "@/src/contributions/application/get-staff-place-contribution-detail.usecase"
 import { getContributorModerationContextUseCase } from "@/src/contributions/application/get-contributor-moderation-context.usecase"
 import { getTopContributorsUseCase } from "@/src/contributions/application/get-top-contributors.usecase"
 import {
@@ -24,18 +27,37 @@ import type {
   FictionContributorProfile,
   PlaceContributionFeedItem,
   StaffContributionsFeedKind,
+  StaffCreateContributionFeedItem,
   StaffCreateContributionsFeedPageResult,
   StaffFictionContributionsFeedPageResult,
   StaffFictionContributionsFeedStatusTab,
   TopContributorProfile,
 } from "@/src/contributions/domain/contribution.entity"
 import { createContributionsSupabaseAdapter } from "@/src/contributions/infrastructure/supabase/contribution.repository.impl"
+import { createUsersSupabaseAdapter } from "@/src/users/infrastructure/supabase/user.repository.impl"
 import { getIsUserStaff } from "@/src/users/infrastructure/next/user.queries"
 import { CacheKeys } from "@/src/shared/infrastructure/next/cache.keys"
 import { CacheConfig } from "@/src/shared/infrastructure/next/cache.config"
 
 const anon = () => Promise.resolve(createAnonymousClient())
 const anonRepo = createContributionsSupabaseAdapter(anon)
+
+type StaffContributionsSession = {
+  supabase: SupabaseClient<Database>
+}
+
+const getStaffContributionsSession = cache(async (): Promise<StaffContributionsSession | null> => {
+  const userId = await getSessionUserId()
+  if (!userId) return null
+  const staff = await getIsUserStaff(userId)
+  if (!staff) return null
+  const supabase = await createClient()
+  return { supabase }
+})
+
+function staffContributionsRepo(session: StaffContributionsSession) {
+  return createContributionsSupabaseAdapter(async () => session.supabase)
+}
 
 /** Caller must ensure userId matches the authenticated session (or rely on RLS). */
 export function getContributionsByUserCached(userId: string) {
@@ -86,16 +108,9 @@ export function getPlaceContributorsWithDatesCached(placeId: string): Promise<Co
  * Caller must invoke from a trusted server boundary (staff-only pages). Requires admin or moderator JWT.
  */
 export async function getPendingContributionsForStaffSession(): Promise<Contribution[]> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error || !user) return []
-  const staff = await getIsUserStaff(user.id)
-  if (!staff) return []
-  const repo = createContributionsSupabaseAdapter(async () => supabase)
-  return getPendingContributionsUseCase(repo)
+  const session = await getStaffContributionsSession()
+  if (!session) return []
+  return getPendingContributionsUseCase(staffContributionsRepo(session))
 }
 
 /** create_fiction / create_place staff queue (paginated); staff session only. */
@@ -105,19 +120,12 @@ export async function getCreateContributionsFeedPageForStaffSession(options: {
   submitterUserId: string
   kind: StaffContributionsFeedKind
 }): Promise<StaffCreateContributionsFeedPageResult> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error || !user) return { items: [], totalCount: 0 }
-  const staff = await getIsUserStaff(user.id)
-  if (!staff) return { items: [], totalCount: 0 }
+  const session = await getStaffContributionsSession()
+  if (!session) return { items: [], totalCount: 0 }
 
   const pageSize = STAFF_FICTION_CONTRIBUTIONS_FEED_PAGE_SIZE
   const safePage = Number.isFinite(options.page) && options.page >= 1 ? Math.floor(options.page) : 1
   const offset = (safePage - 1) * pageSize
-  const repo = createContributionsSupabaseAdapter(async () => supabase)
   return getStaffCreateContributionsFeedPageUseCase(
     {
       kind: options.kind,
@@ -126,7 +134,7 @@ export async function getCreateContributionsFeedPageForStaffSession(options: {
       limit: pageSize,
       offset,
     },
-    repo,
+    staffContributionsRepo(session),
   )
 }
 
@@ -136,19 +144,12 @@ export async function getFictionContributionsFeedPageForStaffSession(options: {
   statusTab: StaffFictionContributionsFeedStatusTab
   submitterUserId: string
 }): Promise<StaffFictionContributionsFeedPageResult> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error || !user) return { items: [], totalCount: 0 }
-  const staff = await getIsUserStaff(user.id)
-  if (!staff) return { items: [], totalCount: 0 }
+  const session = await getStaffContributionsSession()
+  if (!session) return { items: [], totalCount: 0 }
 
   const pageSize = STAFF_FICTION_CONTRIBUTIONS_FEED_PAGE_SIZE
   const safePage = Number.isFinite(options.page) && options.page >= 1 ? Math.floor(options.page) : 1
   const offset = (safePage - 1) * pageSize
-  const repo = createContributionsSupabaseAdapter(async () => supabase)
   return getStaffFictionContributionsFeedPageUseCase(
     {
       userIdFilter: options.submitterUserId.trim() || undefined,
@@ -156,54 +157,47 @@ export async function getFictionContributionsFeedPageForStaffSession(options: {
       limit: pageSize,
       offset,
     },
-    repo,
+    staffContributionsRepo(session),
   )
+}
+
+/** Single DB lookup for staff detail (fiction or place contribution). */
+export async function getStaffContributionDetailForStaffSession(
+  id: string,
+): Promise<StaffCreateContributionFeedItem | null> {
+  const session = await getStaffContributionsSession()
+  if (!session) return null
+  return getStaffContributionDetailUseCase(id, staffContributionsRepo(session))
 }
 
 export async function getFictionContributionDetailForStaffSession(
   id: string,
 ): Promise<FictionContributionFeedItem | null> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error || !user) return null
-  const staff = await getIsUserStaff(user.id)
-  if (!staff) return null
-  const repo = createContributionsSupabaseAdapter(async () => supabase)
-  return getStaffFictionContributionDetailUseCase(id, repo)
+  const item = await getStaffContributionDetailForStaffSession(id)
+  if (!item || item.entityType !== "fiction" || item.type !== "create_fiction") return null
+  return item as FictionContributionFeedItem
 }
 
 export async function getPlaceContributionDetailForStaffSession(
   id: string,
 ): Promise<PlaceContributionFeedItem | null> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error || !user) return null
-  const staff = await getIsUserStaff(user.id)
-  if (!staff) return null
-  const repo = createContributionsSupabaseAdapter(async () => supabase)
-  return getStaffPlaceContributionDetailUseCase(id, repo)
+  const item = await getStaffContributionDetailForStaffSession(id)
+  if (!item || item.entityType !== "place") return null
+  if (item.type !== "create_place" && item.type !== "add_photo") return null
+  return item as PlaceContributionFeedItem
 }
 
-/** Submitter activity + lifetime FPP (profiles.fpp_total); staff session only. */
+/** Submitter activity + FPP from profiles.fpp_total; staff session only. */
 export async function getContributorModerationContextForStaffSession(
   userId: string,
 ): Promise<ContributorModerationContext | null> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error || !user) return null
-  const staff = await getIsUserStaff(user.id)
-  if (!staff) return null
-  const contributions = createContributionsSupabaseAdapter(async () => supabase)
-  return getContributorModerationContextUseCase(userId, { contributions })
+  const session = await getStaffContributionsSession()
+  if (!session) return null
+  const usersRepo = createUsersSupabaseAdapter(async () => session.supabase)
+  return getContributorModerationContextUseCase(userId, {
+    contributions: staffContributionsRepo(session),
+    users: usersRepo,
+  })
 }
 
 export function getTopContributorsCached(limit = 8): Promise<TopContributorProfile[]> {

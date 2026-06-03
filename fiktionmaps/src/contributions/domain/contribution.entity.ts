@@ -6,6 +6,38 @@ export type ContributionType = ContributionRow["type"]
 
 export type ContributionEntityType = ContributionRow["entity_type"]
 
+export type PlaceContributionPendingImageRole = "avatar" | "hero"
+
+export type ContributionPendingImageVariant = "sm" | "lg"
+
+export interface ContributionPendingImage {
+  id: string
+  contributionId: string
+  role: PlaceContributionPendingImageRole
+  variant: ContributionPendingImageVariant
+  storagePath: string
+  createdAt: string
+}
+
+/** Pending assets for staff review (e.g. add_photo). */
+export type ContributionPendingImagesSnapshot = {
+  role: PlaceContributionPendingImageRole
+  paths: Partial<Record<ContributionPendingImageVariant, string>>
+}
+
+export function pendingImagesToSnapshot(
+  rows: ContributionPendingImage[],
+): ContributionPendingImagesSnapshot | null {
+  if (rows.length === 0) return null
+  const role = rows[0].role
+  const paths: Partial<Record<ContributionPendingImageVariant, string>> = {}
+  for (const row of rows) {
+    if (row.role !== role) continue
+    paths[row.variant] = row.storagePath
+  }
+  return Object.keys(paths).length > 0 ? { role, paths } : null
+}
+
 export interface Contribution {
   id: string
   userId: string
@@ -55,7 +87,7 @@ export interface ContributorModerationContext {
 }
 
 /** Staff fiction create feed tab — matches UI `ContributionsFeedTab`. */
-export type StaffFictionContributionsFeedStatusTab = "all" | "pending" | "approved"
+export type StaffFictionContributionsFeedStatusTab = "all" | "pending" | "approved" | "rejected"
 
 /** Staff `/contributions` feed filter for create_fiction vs create_place. */
 export type StaffContributionsFeedKind = "fiction" | "place" | "all"
@@ -79,6 +111,7 @@ export interface PlaceContributionFeedItem extends Contribution {
   placeAvatarUrl: string | null
   fictionTitle: string | null
   fictionId: string | null
+  pendingImages: ContributionPendingImagesSnapshot | null
 }
 
 export type StaffCreateContributionsFeedPageInput = {
@@ -99,5 +132,9 @@ export type StaffCreateContributionsFeedPageResult = {
 export function isPlaceContributionFeedItem(
   item: StaffCreateContributionFeedItem,
 ): item is PlaceContributionFeedItem {
-  return item.entityType === "place" && item.type === "create_place"
+  return item.entityType === "place" && (item.type === "create_place" || item.type === "add_photo")
+}
+
+export function isPlaceAddPhotoContribution(item: Contribution): boolean {
+  return item.entityType === "place" && item.type === "add_photo"
 }

@@ -21,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 function parseStatusTab(raw: string | undefined): ContributionsFeedTab {
   const s = raw?.trim().toLowerCase() ?? ""
-  if (s === "pending" || s === "approved") return s
+  if (s === "pending" || s === "approved" || s === "rejected") return s
   return "all"
 }
 
@@ -99,6 +99,7 @@ export default async function ContributionsStaffPage({
           labelAll={t("feedTab_all")}
           labelPending={t("feedTab_pending")}
           labelApproved={t("feedTab_approved")}
+          labelRejected={t("feedTab_rejected")}
         />
         <ContributionsFeedList
           items={items}

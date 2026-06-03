@@ -1,3 +1,4 @@
+import { cache } from "react"
 import * as supabase from "./auth.supabase"
 import type { AuthUser, AuthResult, SignInCredentials, SignUpCredentials } from "./auth.types"
 
@@ -27,7 +28,7 @@ export async function getAuthenticatedUser(): Promise<AuthResult<AuthUser>> {
 }
 
 /** Resolves the current user id via `getUser()` (validated with Auth), not from session storage alone. */
-export async function getSessionUserId(): Promise<string | null> {
+export const getSessionUserId = cache(async (): Promise<string | null> => {
   const result = await supabase.getUser()
   return result.data?.id ?? null
-}
+})

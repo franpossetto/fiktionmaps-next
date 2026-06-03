@@ -11,13 +11,16 @@ import { createContributionUseCase } from "@/src/contributions/application/creat
 import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/ensure-user-is-moderator.usecase"
 import { getContributionByIdUseCase } from "@/src/contributions/application/get-contribution-by-id.usecase"
 import { rejectContributionUseCase } from "@/src/contributions/application/reject-contribution.usecase"
+import { submitPlaceAddPhotoContributionUseCase } from "@/src/contributions/application/submit-place-add-photo-contribution.usecase"
 import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
 import type { ContributionEntityType } from "@/src/contributions/domain/contribution.entity"
 import {
   approveContributionSchema,
   createContributionSchema,
   rejectContributionSchema,
+  submitPlaceAddPhotoContributionSchema,
 } from "@/src/contributions/domain/contribution.schemas"
+import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
 import { supabaseRepositoryAdapter as contributionsRepo } from "@/src/contributions/infrastructure/supabase/contribution.repository.impl"
 import { profilesReaderSupabaseAdapter } from "@/src/contributions/infrastructure/supabase/profiles-reader.supabase"
 import type {
@@ -95,6 +98,62 @@ export async function createContributionAction(data: CreateContributionData): Pr
     updateTag("profiles")
   }
   return { success: true, contributionId: result.contributionId, autoApproved: result.autoApproved }
+}
+
+export type SubmitPlaceAddPhotoContributionResult =
+  | { success: true; contributionId: string; autoApproved: boolean; previewUrl: string }
+  | { success: false; error: string }
+
+export async function submitPlaceAddPhotoContributionAction(
+  formData: FormData,
+): Promise<SubmitPlaceAddPhotoContributionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const placeId = formData.get("placeId")
+  const file = formData.get("imageFile")
+
+  const parsed = submitPlaceAddPhotoContributionSchema.safeParse({
+    placeId: typeof placeId === "string" ? placeId : "",
+  })
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+  if (!(file instanceof File) || file.size === 0) {
+    return { success: false, error: "No image file provided" }
+  }
+
+  const autoApprove = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+
+  const result = await submitPlaceAddPhotoContributionUseCase(
+    {
+      userId: user.id,
+      placeId: parsed.data.placeId,
+      imageFile: file,
+      autoApprove,
+    },
+    contributionsRepo,
+    placesRepo,
+  )
+
+  if (!result.success) return result
+
+  revalidatePath("/contributions")
+  revalidatePath("/profile/contribute")
+  updateTag("contributions")
+  updateTag("places")
+  updateTag(`place-${parsed.data.placeId}`)
+  if (result.autoApproved) updateTag("profiles")
+
+  return result
 }
 
 export async function approveContributionAction(data: ApproveContributionData): Promise<ApproveContributionResult> {

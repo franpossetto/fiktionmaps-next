@@ -38,3 +38,9 @@ export type RejectContributionData = z.infer<typeof rejectContributionSchema>
 export type CreateContributionInput = CreateContributionData & { userId: string }
 export type ApproveContributionInput = ApproveContributionData & { moderatorId: string }
 export type RejectContributionInput = RejectContributionData & { moderatorId: string }
+
+export const submitPlaceAddPhotoContributionSchema = z.object({
+  placeId: uuidSchema,
+})
+
+export type SubmitPlaceAddPhotoContributionData = z.infer<typeof submitPlaceAddPhotoContributionSchema>

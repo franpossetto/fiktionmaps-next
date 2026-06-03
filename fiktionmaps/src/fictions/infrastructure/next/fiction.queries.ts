@@ -8,6 +8,7 @@ import { createCitiesSupabaseAdapter } from "@/src/cities/infrastructure/supabas
 import { createPlacesSupabaseAdapter } from "@/src/places/infrastructure/supabase/place.repository.impl"
 import { getAllFictionsUseCase } from "@/src/fictions/application/get-all-fictions.usecase"
 import { getActiveFictionsUseCase } from "@/src/fictions/application/get-active-fictions.usecase"
+import { listActiveFictionsWithApprovedPlacesUseCase } from "@/src/fictions/application/list-active-fictions-with-approved-places.usecase"
 import { getFictionByIdUseCase } from "@/src/fictions/application/get-fiction-by-id.usecase"
 import { getFictionWithCatalogExternalIdsForStaffUseCase } from "@/src/fictions/application/get-fiction-with-catalog-external-ids-for-staff.usecase"
 import { createFictionExternalIdsSupabaseAdapter } from "@/src/fiction-external-ids/infrastructure/supabase/fiction-external-ids.repository.impl"
@@ -46,6 +47,15 @@ export async function getActiveFictionsCached(): Promise<FictionWithMedia[]> {
     () => getActiveFictionsUseCase(fictionsRepo),
     CacheKeys.fiction("active"),
     { ...CacheConfig.long, tags: ["fictions"] }
+  )()
+}
+
+/** Active fictions that have at least one approved, active place (contribute photo wizard). */
+export function getActiveFictionsWithApprovedPlacesCached(): Promise<FictionWithMedia[]> {
+  return unstable_cache(
+    () => listActiveFictionsWithApprovedPlacesUseCase(fictionsRepo, placesRepo),
+    CacheKeys.fiction("active-with-approved-places"),
+    { ...CacheConfig.long, tags: ["fictions", "places"] },
   )()
 }
 

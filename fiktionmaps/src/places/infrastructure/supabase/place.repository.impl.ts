@@ -6,7 +6,7 @@ import { ASSET_IMAGES_BUCKET } from "@/lib/asset-images/variant-sizes"
 import type { MapBbox } from "@/lib/validation/map-query"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { CreatePlaceRepoInput, UpdatePlaceData } from "@/src/places/domain/place.schemas"
-import type { PlacesRepositoryPort } from "@/src/places/domain/place.repository"
+import type { PlaceImageRoleUrls, PlacesRepositoryPort } from "@/src/places/domain/place.repository"
 import type { SitemapPlaceEntry } from "@/src/places/domain/place-sitemap.entity"
 import {
   type StreetViewReference,
@@ -185,6 +185,88 @@ export function createPlacesSupabaseAdapter(
   getSupabase: () => Promise<SupabaseClient<Database>>
 ): PlacesRepositoryPort {
   const port: PlacesRepositoryPort = {
+    listFictionIdsWithApprovedPlaces: cache(async (): Promise<string[]> => {
+      const supabase = await getSupabase()
+      const fictionIds = new Set<string>()
+      const pageSize = 1000
+
+      for (let from = 0; ; from += pageSize) {
+        const to = from + pageSize - 1
+        const { data, error } = await supabase
+          .from("places")
+          .select("fiction_id")
+          .eq("status", "approved")
+          .eq("active", true)
+          .range(from, to)
+
+        if (error) {
+          console.error("[places repo] listFictionIdsWithApprovedPlaces:", error.message)
+          return []
+        }
+
+        for (const row of data ?? []) {
+          if (row.fiction_id) fictionIds.add(row.fiction_id)
+        }
+
+        if (!data || data.length < pageSize) break
+      }
+
+      return [...fictionIds]
+    }),
+
+    isApprovedActivePlace: async (placeId: string): Promise<boolean> => {
+      const supabase = await getSupabase()
+      const { data, error } = await supabase
+        .from("places")
+        .select("id")
+        .eq("id", placeId)
+        .eq("status", "approved")
+        .eq("active", true)
+        .maybeSingle()
+      if (error) {
+        console.error("[places repo] isApprovedActivePlace:", error.message)
+        return false
+      }
+      return Boolean(data?.id)
+    },
+
+    getPlaceImageUrlsByRole: async (
+      placeId: string,
+      variant: "sm" | "lg" = "lg",
+    ): Promise<PlaceImageRoleUrls> => {
+      const supabase = await getSupabase()
+      const out: PlaceImageRoleUrls = { avatar: null, hero: null }
+      for (const role of ["avatar", "hero"] as const) {
+        const { data, error } = await supabase
+          .from("asset_images")
+          .select("url")
+          .eq("entity_type", "place")
+          .eq("entity_id", placeId)
+          .eq("role", role)
+          .eq("variant", variant)
+          .limit(1)
+        if (error) {
+          console.error("[places repo] getPlaceImageUrlsByRole:", error.message)
+          continue
+        }
+        const url = data?.[0]?.url?.trim()
+        if (url) out[role] = url
+      }
+      if (!out.avatar && variant === "lg") {
+        const { data } = await supabase
+          .from("asset_images")
+          .select("url")
+          .eq("entity_type", "place")
+          .eq("entity_id", placeId)
+          .eq("role", "avatar")
+          .eq("variant", "sm")
+          .limit(1)
+        const url = data?.[0]?.url?.trim()
+        if (url) out.avatar = url
+      }
+      return out
+    },
+
     listAllPlaces: cache(async (): Promise<Place[]> => {
       const supabase = await getSupabase()
       const { data: placeRows, error: placesError } = await supabase
@@ -250,6 +332,41 @@ export function createPlacesSupabaseAdapter(
       }
 
       return counts
+    }),
+
+    listApprovedByFictionId: cache(async (fictionId: string): Promise<Place[]> => {
+      const supabase = await getSupabase()
+      const { data: placeRows, error } = await supabase
+        .from("places")
+        .select(
+          `id, fiction_id, description, active, location_id, name, slug, locations(${LOCATION_EMBED_SELECT})`
+        )
+        .eq("fiction_id", fictionId)
+        .eq("status", "approved")
+        .eq("active", true)
+        .order("created_at", { ascending: false })
+
+      if (error || !placeRows) return []
+      const places = placeRows as Record<string, unknown>[]
+      const placeIds = places.map((p) => p.id as string).filter(Boolean)
+
+      const avatarByPlaceId = new Map<string, string>()
+      if (placeIds.length > 0) {
+        const { data: avatarRows } = await supabase
+          .from("asset_images")
+          .select("entity_id, url")
+          .eq("entity_type", "place")
+          .eq("role", "avatar")
+          .eq("variant", "sm")
+          .in("entity_id", placeIds)
+        for (const r of avatarRows ?? []) {
+          const row = r as Record<string, unknown>
+          const eid = row.entity_id ?? row.entityId
+          const url = row.url
+          if (eid && url) avatarByPlaceId.set(String(eid), String(url))
+        }
+      }
+      return mapPlaceRowsToPlaces(places, avatarByPlaceId)
     }),
 
     getByFictionId: cache(async (fictionId: string): Promise<Place[]> => {

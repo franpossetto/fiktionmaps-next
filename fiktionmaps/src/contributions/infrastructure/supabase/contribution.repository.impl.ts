@@ -1,6 +1,6 @@
 import { cache } from "react"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { ContributionRow, Database } from "@/supabase/database.types"
+import type { ContributionPendingImageRow, ContributionRow, Database } from "@/supabase/database.types"
 import { createClient } from "@/lib/supabase/server"
 import {
   CONTRIBUTION_FPP,
@@ -22,11 +22,20 @@ import type {
   TopContributorProfile,
 } from "@/src/contributions/domain/contribution.entity"
 import type { ContributionsRepositoryPort } from "@/src/contributions/domain/contribution.repository"
+import type { InsertContributionPendingPlaceImagesInput } from "@/src/contributions/domain/contribution.repository"
 import type {
   ApproveContributionInput,
   CreateContributionInput,
   RejectContributionInput,
 } from "@/src/contributions/domain/contribution.schemas"
+import {
+  promotePendingPlacePhotoToAssetImages,
+  removePendingContributionStoragePaths,
+} from "@/lib/asset-images/pending-contribution-image"
+import {
+  pendingImagesToSnapshot,
+  type ContributionPendingImage,
+} from "@/src/contributions/domain/contribution.entity"
 
 function mapRow(row: ContributionRow): Contribution {
   return {
@@ -42,6 +51,10 @@ function mapRow(row: ContributionRow): Contribution {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
+}
+
+function isCreateContributionType(type: ContributionType): boolean {
+  return type === "create_fiction" || type === "create_place"
 }
 
 type ProfileEmbed = {
@@ -90,7 +103,46 @@ function mapPlaceFeedItem(
     placeAvatarUrl: null,
     fictionTitle: null,
     fictionId: null,
+    pendingImages: null,
   }
+}
+
+function mapPendingImageRow(row: ContributionPendingImageRow): ContributionPendingImage {
+  return {
+    id: row.id,
+    contributionId: row.contribution_id,
+    role: row.role,
+    variant: row.variant,
+    storagePath: row.storage_path,
+    createdAt: row.created_at,
+  }
+}
+
+async function listPendingImagesForContributionIds(
+  supabase: SupabaseClient<Database>,
+  contributionIds: string[],
+): Promise<Map<string, ContributionPendingImage[]>> {
+  const unique = [...new Set(contributionIds)].filter(Boolean)
+  const map = new Map<string, ContributionPendingImage[]>()
+  if (unique.length === 0) return map
+
+  const { data, error } = await supabase
+    .from("contribution_pending_images")
+    .select("*")
+    .in("contribution_id", unique)
+
+  if (error) {
+    console.error("[contributions repo] listPendingImagesForContributionIds:", error.message)
+    return map
+  }
+
+  for (const row of data ?? []) {
+    const cid = row.contribution_id
+    const list = map.get(cid) ?? []
+    list.push(mapPendingImageRow(row as ContributionPendingImageRow))
+    map.set(cid, list)
+  }
+  return map
 }
 
 type PlaceMeta = { name: string | null; fictionId: string }
@@ -113,49 +165,48 @@ async function placeMetaByIds(
   return m
 }
 
-async function placeAvatarThumbByIds(
+async function assetThumbByEntityIds(
   supabase: SupabaseClient<Database>,
-  placeIds: string[],
+  entityType: "fiction" | "place",
+  role: "cover" | "avatar",
+  entityIds: string[],
 ): Promise<Map<string, string>> {
-  const unique = [...new Set(placeIds)].filter(Boolean)
+  const unique = [...new Set(entityIds)].filter(Boolean)
   if (unique.length === 0) return new Map()
   const map = new Map<string, string>()
 
-  const { data: smRows, error: smErr } = await supabase
+  const { data, error } = await supabase
     .from("asset_images")
-    .select("entity_id, url")
-    .eq("entity_type", "place")
-    .eq("role", "avatar")
-    .eq("variant", "sm")
+    .select("entity_id, url, variant")
+    .eq("entity_type", entityType)
+    .eq("role", role)
+    .in("variant", ["sm", "lg"])
     .in("entity_id", unique)
 
-  if (smErr) {
-    console.error("[contributions repo] placeAvatarThumbByIds sm:", smErr.message)
-  } else {
-    for (const row of smRows ?? []) {
-      if (!map.has(row.entity_id)) map.set(row.entity_id, row.url)
-    }
-  }
-
-  const missing = unique.filter((id) => !map.has(id))
-  if (missing.length === 0) return map
-
-  const { data: lgRows, error: lgErr } = await supabase
-    .from("asset_images")
-    .select("entity_id, url")
-    .eq("entity_type", "place")
-    .eq("role", "avatar")
-    .eq("variant", "lg")
-    .in("entity_id", missing)
-
-  if (lgErr) {
-    console.error("[contributions repo] placeAvatarThumbByIds lg:", lgErr.message)
+  if (error) {
+    console.error(`[contributions repo] assetThumbByEntityIds ${entityType}/${role}:`, error.message)
     return map
   }
-  for (const row of lgRows ?? []) {
-    if (!map.has(row.entity_id)) map.set(row.entity_id, row.url)
+
+  for (const row of data ?? []) {
+    if (row.variant === "sm" && !map.has(row.entity_id)) {
+      map.set(row.entity_id, row.url)
+    }
+  }
+  for (const row of data ?? []) {
+    if (!map.has(row.entity_id) && row.variant === "lg") {
+      map.set(row.entity_id, row.url)
+    }
   }
   return map
+}
+
+async function fictionCoverThumbByIds(supabase: SupabaseClient<Database>, fictionIds: string[]): Promise<Map<string, string>> {
+  return assetThumbByEntityIds(supabase, "fiction", "cover", fictionIds)
+}
+
+async function placeAvatarThumbByIds(supabase: SupabaseClient<Database>, placeIds: string[]): Promise<Map<string, string>> {
+  return assetThumbByEntityIds(supabase, "place", "avatar", placeIds)
 }
 
 async function fictionTitlesByIds(supabase: SupabaseClient<Database>, fictionIds: string[]): Promise<Map<string, string>> {
@@ -173,46 +224,45 @@ async function fictionTitlesByIds(supabase: SupabaseClient<Database>, fictionIds
   return m
 }
 
-async function fictionCoverThumbByIds(supabase: SupabaseClient<Database>, fictionIds: string[]): Promise<Map<string, string>> {
-  const unique = [...new Set(fictionIds)].filter(Boolean)
-  if (unique.length === 0) return new Map()
-  const map = new Map<string, string>()
-
-  const { data: smRows, error: smErr } = await supabase
-    .from("asset_images")
-    .select("entity_id, url")
-    .eq("entity_type", "fiction")
-    .eq("role", "cover")
-    .eq("variant", "sm")
-    .in("entity_id", unique)
-
-  if (smErr) {
-    console.error("[contributions repo] fictionCoverThumbByIds sm:", smErr.message)
-  } else {
-    for (const row of smRows ?? []) {
-      if (!map.has(row.entity_id)) map.set(row.entity_id, row.url)
-    }
+async function enrichFictionFeedItem(
+  supabase: SupabaseClient<Database>,
+  base: FictionContributionFeedItem,
+): Promise<FictionContributionFeedItem> {
+  const [titles, covers] = await Promise.all([
+    fictionTitlesByIds(supabase, [base.entityId]),
+    fictionCoverThumbByIds(supabase, [base.entityId]),
+  ])
+  return {
+    ...base,
+    fictionTitle: titles.get(base.entityId) ?? null,
+    fictionCoverUrl: covers.get(base.entityId) ?? null,
   }
+}
 
-  const missing = unique.filter((id) => !map.has(id))
-  if (missing.length === 0) return map
-
-  const { data: lgRows, error: lgErr } = await supabase
-    .from("asset_images")
-    .select("entity_id, url")
-    .eq("entity_type", "fiction")
-    .eq("role", "cover")
-    .eq("variant", "lg")
-    .in("entity_id", missing)
-
-  if (lgErr) {
-    console.error("[contributions repo] fictionCoverThumbByIds lg:", lgErr.message)
-    return map
+async function enrichPlaceFeedItem(
+  supabase: SupabaseClient<Database>,
+  base: PlaceContributionFeedItem,
+): Promise<PlaceContributionFeedItem> {
+  const [meta, avatars] = await Promise.all([
+    placeMetaByIds(supabase, [base.entityId]),
+    placeAvatarThumbByIds(supabase, [base.entityId]),
+  ])
+  const placeMetaRow = meta.get(base.entityId)
+  const fid = placeMetaRow?.fictionId ?? null
+  const fictionTitles = fid ? await fictionTitlesByIds(supabase, [fid]) : new Map<string, string>()
+  const pendingMap =
+    base.type === "add_photo"
+      ? await listPendingImagesForContributionIds(supabase, [base.id])
+      : new Map<string, ContributionPendingImage[]>()
+  const pendingRows = pendingMap.get(base.id) ?? []
+  return {
+    ...base,
+    placeName: placeMetaRow?.name ?? null,
+    placeAvatarUrl: avatars.get(base.entityId) ?? null,
+    fictionId: fid,
+    fictionTitle: fid ? (fictionTitles.get(fid) ?? null) : null,
+    pendingImages: pendingImagesToSnapshot(pendingRows),
   }
-  for (const row of lgRows ?? []) {
-    if (!map.has(row.entity_id)) map.set(row.entity_id, row.url)
-  }
-  return map
 }
 
 function entityTable(entityType: ContributionEntityType): "fictions" | "places" | "scenes" {
@@ -321,9 +371,9 @@ export function createContributionsSupabaseAdapter(
       if (kind === "fiction") {
         q = q.eq("entity_type", "fiction").eq("type", "create_fiction")
       } else if (kind === "place") {
-        q = q.eq("entity_type", "place").eq("type", "create_place")
+        q = q.eq("entity_type", "place").in("type", ["create_place", "add_photo"])
       } else {
-        q = q.in("type", ["create_fiction", "create_place"])
+        q = q.in("type", ["create_fiction", "create_place", "add_photo"])
       }
 
       if (userIdFilter) q = q.eq("user_id", userIdFilter)
@@ -351,7 +401,7 @@ export function createContributionsSupabaseAdapter(
       const placeItems: PlaceContributionFeedItem[] = []
 
       for (const row of (data ?? []) as Row[]) {
-        if (row.entity_type === "place" && row.type === "create_place") {
+        if (row.entity_type === "place" && (row.type === "create_place" || row.type === "add_photo")) {
           const item = mapPlaceFeedItem(row, row.profiles)
           if (item) placeItems.push(item)
         } else if (row.entity_type === "fiction" && row.type === "create_fiction") {
@@ -376,15 +426,20 @@ export function createContributionsSupabaseAdapter(
         fictionCoverUrl: fictionCovers.get(i.entityId) ?? null,
       }))
 
+      const addPhotoIds = placeItems.filter((i) => i.type === "add_photo").map((i) => i.id)
+      const pendingByContribution = await listPendingImagesForContributionIds(supabase, addPhotoIds)
+
       const enrichedPlace = placeItems.map((i) => {
         const meta = placeMeta.get(i.entityId)
         const fid = meta?.fictionId ?? null
+        const pendingRows = pendingByContribution.get(i.id) ?? []
         return {
           ...i,
           placeName: meta?.name ?? null,
           placeAvatarUrl: placeAvatars.get(i.entityId) ?? null,
           fictionId: fid,
           fictionTitle: fid ? (parentFictionTitles.get(fid) ?? null) : null,
+          pendingImages: pendingImagesToSnapshot(pendingRows),
         }
       })
 
@@ -422,6 +477,83 @@ export function createContributionsSupabaseAdapter(
       }
       return { contributionId: data.id }
     },
+
+    async insertPendingPlaceImages(input: InsertContributionPendingPlaceImagesInput): Promise<boolean> {
+      const supabase = await getSupabase()
+      const rows: Database["public"]["Tables"]["contribution_pending_images"]["Insert"][] = (
+        ["sm", "lg"] as const
+      ).map((variant) => ({
+        contribution_id: input.contributionId,
+        role: input.role,
+        variant,
+        storage_path: input.paths[variant],
+      }))
+
+      const { error } = await supabase.from("contribution_pending_images").insert(rows)
+      if (error) {
+        console.error("[contributions repo] insertPendingPlaceImages:", error.message)
+        return false
+      }
+      return true
+    },
+
+    async listPendingImagesByContributionId(contributionId: string): Promise<ContributionPendingImage[]> {
+      const supabase = await getSupabase()
+      const { data, error } = await supabase
+        .from("contribution_pending_images")
+        .select("*")
+        .eq("contribution_id", contributionId)
+
+      if (error) {
+        console.error("[contributions repo] listPendingImagesByContributionId:", error.message)
+        return []
+      }
+      return (data as ContributionPendingImageRow[] | null)?.map(mapPendingImageRow) ?? []
+    },
+
+    async deletePendingImagesByContributionId(contributionId: string): Promise<string[]> {
+      const supabase = await getSupabase()
+      const { data, error: fetchErr } = await supabase
+        .from("contribution_pending_images")
+        .select("storage_path")
+        .eq("contribution_id", contributionId)
+
+      if (fetchErr) {
+        console.error("[contributions repo] deletePendingImagesByContributionId fetch:", fetchErr.message)
+        return []
+      }
+
+      const paths = (data ?? []).map((r) => r.storage_path).filter(Boolean)
+      if (paths.length === 0) return []
+
+      const { error } = await supabase
+        .from("contribution_pending_images")
+        .delete()
+        .eq("contribution_id", contributionId)
+
+      if (error) {
+        console.error("[contributions repo] deletePendingImagesByContributionId:", error.message)
+        return []
+      }
+      return paths
+    },
+
+    countPendingAddPhotoByPlace: cache(async (placeId: string): Promise<number> => {
+      const supabase = await getSupabase()
+      const { count, error } = await supabase
+        .from("contributions")
+        .select("*", { count: "exact", head: true })
+        .eq("entity_type", "place")
+        .eq("entity_id", placeId)
+        .eq("type", "add_photo")
+        .eq("status", "pending")
+
+      if (error) {
+        console.error("[contributions repo] countPendingAddPhotoByPlace:", error.message)
+        return 0
+      }
+      return count ?? 0
+    }),
 
     getById: cache(async (id: string): Promise<Contribution | null> => {
       const supabase = await getSupabase()
@@ -706,34 +838,22 @@ export function createContributionsSupabaseAdapter(
 
         type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
         const row = data as Row
-        if (row.type !== "create_place" || row.entity_type !== "place") return null
+        if (row.entity_type !== "place") return null
+        if (row.type !== "create_place" && row.type !== "add_photo") return null
         const base = mapPlaceFeedItem(row, row.profiles)
         if (!base) return null
-        const [meta, avatars] = await Promise.all([
-          placeMetaByIds(supabase, [base.entityId]),
-          placeAvatarThumbByIds(supabase, [base.entityId]),
-        ])
-        const placeMetaRow = meta.get(base.entityId)
-        const fid = placeMetaRow?.fictionId ?? null
-        const fictionTitles = fid ? await fictionTitlesByIds(supabase, [fid]) : new Map<string, string>()
-        return {
-          ...base,
-          placeName: placeMetaRow?.name ?? null,
-          placeAvatarUrl: avatars.get(base.entityId) ?? null,
-          fictionId: fid,
-          fictionTitle: fid ? (fictionTitles.get(fid) ?? null) : null,
-        }
+        return enrichPlaceFeedItem(supabase, base)
       },
     ),
 
-    listTopContributors: cache(async (limit: number): Promise<TopContributorProfile[]> => {
-      const supabase = await getSupabase()
-      const { data, error } = await supabase
-        .from("contributions")
-        .select(
-          `
-          user_id,
-          fpp_awarded,
+    getCreateContributionFeedItemById: cache(
+      async (id: string): Promise<StaffCreateContributionFeedItem | null> => {
+        const supabase = await getSupabase()
+        const { data, error } = await supabase
+          .from("contributions")
+          .select(
+            `
+          *,
           profiles!contributions_user_id_fkey (
             id,
             username,
@@ -741,37 +861,57 @@ export function createContributionsSupabaseAdapter(
             avatar_url
           )
         `,
-        )
-        .eq("status", "approved")
-        .gt("fpp_awarded", 0)
+          )
+          .eq("id", id)
+          .maybeSingle()
+
+        if (error) {
+          console.error("[contributions repo] getCreateContributionFeedItemById:", error.message)
+          return null
+        }
+        if (!data) return null
+
+        type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
+        const row = data as Row
+
+        if (row.entity_type === "fiction" && row.type === "create_fiction") {
+          const base = mapFictionFeedItem(row, row.profiles)
+          if (!base) return null
+          return enrichFictionFeedItem(supabase, base)
+        }
+
+        if (row.entity_type === "place" && (row.type === "create_place" || row.type === "add_photo")) {
+          const base = mapPlaceFeedItem(row, row.profiles)
+          if (!base) return null
+          return enrichPlaceFeedItem(supabase, base)
+        }
+
+        return null
+      },
+    ),
+
+    listTopContributors: cache(async (limit: number): Promise<TopContributorProfile[]> => {
+      const supabase = await getSupabase()
+      const safeLimit = Math.max(1, limit)
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, username, full_name, avatar_url, fpp_total")
+        .gt("fpp_total", 0)
+        .order("fpp_total", { ascending: false })
+        .limit(safeLimit)
 
       if (error) {
         console.error("[contributions repo] listTopContributors error:", error.message)
         return []
       }
 
-      type Row = { user_id: string; fpp_awarded: number | null; profiles: ProfileEmbed | ProfileEmbed[] | null }
-
-      const totals = new Map<string, { profile: FictionContributorProfile; fppTotal: number }>()
-      for (const row of (data ?? []) as Row[]) {
-        const raw = row.profiles
-        const prof = Array.isArray(raw) ? raw[0] : raw
-        if (!prof?.id) continue
-        const existing = totals.get(prof.id)
-        if (existing) {
-          existing.fppTotal += row.fpp_awarded ?? 0
-        } else {
-          totals.set(prof.id, {
-            profile: { id: prof.id, username: prof.username, fullName: prof.full_name, avatarUrl: prof.avatar_url },
-            fppTotal: row.fpp_awarded ?? 0,
-          })
-        }
-      }
-
-      return [...totals.values()]
-        .sort((a, b) => b.fppTotal - a.fppTotal)
-        .slice(0, limit)
-        .map(({ profile, fppTotal }) => ({ ...profile, fppTotal }))
+      return (data ?? []).map((row) => ({
+        id: row.id,
+        username: row.username,
+        fullName: row.full_name,
+        avatarUrl: row.avatar_url,
+        fppTotal: row.fpp_total ?? 0,
+      }))
     }),
 
     async approve(input: ApproveContributionInput): Promise<boolean> {
@@ -797,6 +937,31 @@ export function createContributionsSupabaseAdapter(
       const entityId = contribRow.entity_id
       const now = new Date().toISOString()
 
+      if (contributionType === "add_photo" && entityType === "place") {
+        const pendingMap = await listPendingImagesForContributionIds(supabase, [input.id])
+        const snapshot = pendingImagesToSnapshot(pendingMap.get(input.id) ?? [])
+        const smPath = snapshot?.paths.sm
+        const lgPath = snapshot?.paths.lg
+        const role = snapshot?.role
+        if (!role || !smPath || !lgPath) {
+          console.error("[contributions repo] approve add_photo missing pending assets")
+          return false
+        }
+        const promoted = await promotePendingPlacePhotoToAssetImages(entityId, role, smPath, lgPath)
+        if (!promoted.success) {
+          console.error("[contributions repo] approve add_photo promote:", promoted.error)
+          return false
+        }
+        const { error: pendingDelErr } = await supabase
+          .from("contribution_pending_images")
+          .delete()
+          .eq("contribution_id", input.id)
+        if (pendingDelErr) {
+          console.error("[contributions repo] approve add_photo delete pending rows:", pendingDelErr.message)
+          return false
+        }
+      }
+
       const { error: contribErr } = await supabase
         .from("contributions")
         .update({
@@ -812,18 +977,20 @@ export function createContributionsSupabaseAdapter(
         return false
       }
 
-      const table = entityTable(entityType)
-      const { error: entityErr } = await supabase
-        .from(table)
-        .update({
-          ...ENTITY_PATCH_ON_CONTRIBUTION_APPROVE,
-          updated_at: now,
-        })
-        .eq("id", entityId)
+      if (isCreateContributionType(contributionType)) {
+        const table = entityTable(entityType)
+        const { error: entityErr } = await supabase
+          .from(table)
+          .update({
+            ...ENTITY_PATCH_ON_CONTRIBUTION_APPROVE,
+            updated_at: now,
+          })
+          .eq("id", entityId)
 
-      if (entityErr) {
-        console.error("[contributions repo] approve update entity:", entityErr.message)
-        return false
+        if (entityErr) {
+          console.error("[contributions repo] approve update entity:", entityErr.message)
+          return false
+        }
       }
 
       const { data: profile, error: profileFetchErr } = await supabase
@@ -859,7 +1026,7 @@ export function createContributionsSupabaseAdapter(
       const supabase = await getSupabase()
       const { data: row, error: fetchErr } = await supabase
         .from("contributions")
-        .select("id, status, entity_type, entity_id")
+        .select("*")
         .eq("id", input.id)
         .maybeSingle()
 
@@ -868,12 +1035,38 @@ export function createContributionsSupabaseAdapter(
         return false
       }
 
-      const r = row as Pick<ContributionRow, "status" | "entity_type" | "entity_id">
-      if (r.status !== "pending") return false
+      const contribRow = row as ContributionRow
+      if (contribRow.status !== "pending") return false
 
-      const entityType = r.entity_type as ContributionEntityType
-      const entityId = r.entity_id
+      const contributionType = contribRow.type as ContributionType
+      const entityType = contribRow.entity_type as ContributionEntityType
+      const entityId = contribRow.entity_id
       const now = new Date().toISOString()
+
+      if (contributionType === "add_photo") {
+        const { data: pendingRows, error: pendingFetchErr } = await supabase
+          .from("contribution_pending_images")
+          .select("storage_path")
+          .eq("contribution_id", input.id)
+
+        if (pendingFetchErr) {
+          console.error("[contributions repo] reject add_photo fetch pending:", pendingFetchErr.message)
+          return false
+        }
+
+        const paths = (pendingRows ?? []).map((r) => r.storage_path).filter(Boolean)
+        await removePendingContributionStoragePaths(paths)
+
+        const { error: pendingDelErr } = await supabase
+          .from("contribution_pending_images")
+          .delete()
+          .eq("contribution_id", input.id)
+
+        if (pendingDelErr) {
+          console.error("[contributions repo] reject add_photo delete pending rows:", pendingDelErr.message)
+          return false
+        }
+      }
 
       const { error: contribErr } = await supabase
         .from("contributions")
@@ -890,18 +1083,20 @@ export function createContributionsSupabaseAdapter(
         return false
       }
 
-      const table = entityTable(entityType)
-      const { error: entityErr } = await supabase
-        .from(table)
-        .update({
-          status: "rejected",
-          updated_at: now,
-        })
-        .eq("id", entityId)
+      if (isCreateContributionType(contributionType)) {
+        const table = entityTable(entityType)
+        const { error: entityErr } = await supabase
+          .from(table)
+          .update({
+            status: "rejected",
+            updated_at: now,
+          })
+          .eq("id", entityId)
 
-      if (entityErr) {
-        console.error("[contributions repo] reject update entity:", entityErr.message)
-        return false
+        if (entityErr) {
+          console.error("[contributions repo] reject update entity:", entityErr.message)
+          return false
+        }
       }
 
       return true
