@@ -5,6 +5,7 @@ import { createUsersSupabaseAdapter } from "@/src/users/infrastructure/supabase/
 import { getProfileUseCase } from "@/src/users/application/get-profile.usecase"
 import { isUserAdminUseCase } from "@/src/users/application/is-user-admin.usecase"
 import { isUserStaffUseCase } from "@/src/users/application/is-user-staff.usecase"
+import { isUserContributorUseCase } from "@/src/users/application/is-user-contributor.usecase"
 import type { Profile } from "@/src/users/domain/user.entity"
 import { createFictionLikesSupabaseAdapter } from "@/src/fiction-likes/infrastructure/supabase/fiction-likes.repository.impl"
 import { getUserFictionLikesUseCase } from "@/src/fiction-likes/application/get-user-fiction-likes.usecase"
@@ -19,6 +20,11 @@ export async function getIsUserAdmin(userId: string): Promise<boolean> {
 /** Admin or moderator (RLS «staff», contributions queue). Request-scoped dedupe via React cache. */
 export const getIsUserStaff = cache(async (userId: string): Promise<boolean> => {
   return isUserStaffUseCase(userId, usersRepo)
+})
+
+/** Contributor, moderator, or admin — can access experimental features (e.g. AI wizards). */
+export const getIsUserContributor = cache(async (userId: string): Promise<boolean> => {
+  return isUserContributorUseCase(userId, usersRepo)
 })
 
 /** Dynamic read: staff session only (e.g. display name on contribution review). */

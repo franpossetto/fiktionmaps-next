@@ -1,8 +1,8 @@
 # Roles & permissions
 
-`profiles.role`: `user` | `moderator` | `admin`. Promoted via DB only (`moderator-role-promotion.md`).
+`profiles.role`: `user` | `contributor` | `moderator` | `admin`. Stored as TEXT with a CHECK constraint; ordinary clients cannot change their own role (trigger `profiles_preserve_role`).
 
-**No `contributor` role.** In the UI, “contributor” = user with approved history / FPP.
+Hierarchy: `user` < `contributor` < `moderator` < `admin`
 
 ## Roles
 
@@ -10,36 +10,50 @@
 |------|-----|
 | Guest | Not logged in |
 | `user` | Registered (default) |
+| `contributor` | Trusted user — access to experimental features (e.g. AI wizards) |
 | `moderator` | Staff — moderation queue |
 | `admin` | Staff + `/admin` dashboard |
 
-## Contributions (today)
+## Permissions matrix
 
-Any logged-in `user` can submit. Quality via `pending` + staff review.
+| | Guest | user | contributor | moderator | admin |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Submit contributions | ✗ | ✓ | ✓ | ✓ | ✓ |
+| Goes to **pending** | — | ✓ | ✓ | ✗ | ✗ |
+| AI wizard flows (experimental) | ✗ | ✗ | ✓ | ✓ | ✓ |
+| Staff queue `/contributions` | ✗ | ✗ | ✗ | ✓ | ✓ |
+| Approve / reject contributions | ✗ | ✗ | ✗ | ✓ | ✓ |
+| `/admin` dashboard | ✗ | ✗ | ✗ | ✗ | ✓ |
 
-| | Guest | user | moderator | admin |
-|---|:---:|:---:|:---:|:---:|
-| Submit | ✗ | ✓ | ✓ | ✓ |
-| Goes to **pending** | — | ✓ | ✗ (auto-approved) | ✗ |
-| Staff queue `/contributions` | ✗ | ✗ | ✓ | ✓ |
-| Approve / reject | ✗ | ✗ | ✓ | ✓ |
+RLS: `public.is_staff_profile()` covers only `moderator` and `admin` — `contributor` is not staff and does not bypass pending review.
 
-Types: fiction, place, photo, scene, enrich, correct, mark inaccessible, tip, check-in.
+## Promoting a user
 
-## Admin
+No self-service escalation via the REST API. Pick one privileged workflow:
 
-Only **`admin`**: manage fictions, cities, places, scenes, people at `/admin`.
+1. **Supabase SQL editor (dashboard)**
 
-## Future (optional, not built)
+   ```sql
+   UPDATE public.profiles SET role = 'contributor' WHERE id = '<uuid>';
+   UPDATE public.profiles SET role = 'moderator'   WHERE id = '<uuid>';
+   UPDATE public.profiles SET role = 'admin'        WHERE id = '<uuid>';
+   ```
 
-If spam or queue volume grows, unlock types by track record — **not** a new role:
+2. **Service role key** (backend script or Edge Function) — never expose to the browser.
 
-| Tier | Examples | Gate |
-|------|----------|------|
-| Open | photo, tip, check-in | any `user` |
-| Established | place, scene, enrich | ≥ 1 approved |
-| Trusted | create fiction | ≥ 3 approved or FPP ≥ 10 |
+3. **Future in-app tooling** — admin-only server action backed by `isUserAdminUseCase` + repo; must follow use case + repo pattern, no raw Supabase in UI.
 
-Staff bypass all gates. **For now:** everything stays open.
+After promotion the user must **reload or sign in again** for the client (`AuthProvider`) to pick up the new role. Server-side checks always read the profile fresh.
 
-**Summary:** `user` submits and waits. `moderator` moderates and auto-publishes. `admin` = moderator + `/admin`.
+## Code references
+
+| Concern | Symbol | File |
+|---|---|---|
+| Type | `UserRole` | `src/users/domain/user.dtos.ts` |
+| Staff set | `STAFF_ROLES` | `src/users/domain/user.roles.ts` |
+| Contributor set | `CONTRIBUTOR_ROLES` | `src/users/domain/user.roles.ts` |
+| Staff guard | `getIsUserStaff` | `src/users/infrastructure/next/user.queries.ts` |
+| Contributor guard | `getIsUserContributor` | `src/users/infrastructure/next/user.queries.ts` |
+| DB constraint | `profiles_role_check` | `supabase/migrations/051_profiles_role_contributor.sql` |
+| RLS staff fn | `is_staff_profile()` | `supabase/migrations/034_contributions_rls.sql` |
+| Client flags | `isAdmin`, `isStaffModerator`, `isContributor` | `context/auth-context.tsx` |
