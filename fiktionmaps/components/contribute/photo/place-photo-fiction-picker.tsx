@@ -14,6 +14,7 @@ type PlacePhotoFictionPickerProps = {
   fictionId: string
   onSelect: (fictionId: string) => void
   error?: string
+  emptyListMessage?: "noFictionsWithPlaces" | "noFictionsApproved"
 }
 
 export function PlacePhotoFictionPicker({
@@ -21,6 +22,7 @@ export function PlacePhotoFictionPicker({
   fictionId,
   onSelect,
   error,
+  emptyListMessage = "noFictionsWithPlaces",
 }: PlacePhotoFictionPickerProps) {
   const t = useTranslations("Contribute.photo")
   const [fictionSearch, setFictionSearch] = useState("")
@@ -43,7 +45,7 @@ export function PlacePhotoFictionPicker({
       <ContributeFieldWrapper label={t("stepFiction")} required error={error}>
         <div className="max-h-[min(50vh,22rem)] space-y-1 overflow-y-auto rounded-xl border border-border p-2">
           {fictions.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t("noFictionsWithPlaces")}</p>
+            <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t(emptyListMessage)}</p>
           ) : filteredFictions.length === 0 ? (
             <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t("noFictions")}</p>
           ) : (

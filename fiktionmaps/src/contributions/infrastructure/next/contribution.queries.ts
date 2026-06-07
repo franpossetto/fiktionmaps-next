@@ -174,7 +174,8 @@ export async function getFictionContributionDetailForStaffSession(
   id: string,
 ): Promise<FictionContributionFeedItem | null> {
   const item = await getStaffContributionDetailForStaffSession(id)
-  if (!item || item.entityType !== "fiction" || item.type !== "create_fiction") return null
+  if (!item || item.entityType !== "fiction") return null
+  if (item.type !== "create_fiction" && item.type !== "add_photo") return null
   return item as FictionContributionFeedItem
 }
 

@@ -6,12 +6,25 @@ import { useTranslations } from "next-intl"
 import { ImageIcon, Loader2, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+export type ContributePhotoFieldLayout = "place-hero" | "fiction-cover" | "fiction-banner"
+
+const LAYOUT_ASPECT: Record<ContributePhotoFieldLayout, string> = {
+  "place-hero": "aspect-[21/9]",
+  "fiction-cover": "aspect-[2/3] max-w-[336px]",
+  "fiction-banner": "aspect-[21/9] max-w-3xl",
+}
+
 export interface PlaceContributePhotoFieldProps {
   previewUrl: string | null
   inspecting: boolean
   onPickFile: (file: File) => void
   onClear: () => void
   className?: string
+  layout?: ContributePhotoFieldLayout
+  /** Override upload hint (e.g. fiction cover aspect copy). */
+  aspectHint?: string
+  /** Fills parent width (e.g. side-by-side current vs new image). */
+  inline?: boolean
 }
 
 export function PlaceContributePhotoField({
@@ -20,9 +33,17 @@ export function PlaceContributePhotoField({
   onPickFile,
   onClear,
   className,
+  layout = "place-hero",
+  aspectHint,
+  inline = false,
 }: PlaceContributePhotoFieldProps) {
   const t = useTranslations("Contribute.place")
   const inputRef = useRef<HTMLInputElement>(null)
+  const aspectClass = cn(
+    LAYOUT_ASPECT[layout],
+    inline && (layout === "fiction-cover" || layout === "fiction-banner") && "max-w-none",
+  )
+  const hint = aspectHint ?? t("photoAspectHint")
 
   return (
     <div className={cn("w-full space-y-3", className)}>
@@ -38,9 +59,14 @@ export function PlaceContributePhotoField({
         }}
       />
 
-      <div className="mx-auto flex w-full max-w-3xl flex-col items-center">
+      <div
+        className={cn(
+          "flex w-full flex-col",
+          inline ? "items-stretch" : "mx-auto max-w-3xl items-center",
+        )}
+      >
         {previewUrl ? (
-          <div className="relative aspect-[21/9] w-full overflow-hidden rounded-xl border border-border bg-muted/30">
+          <div className={cn("relative w-full overflow-hidden rounded-xl border border-border bg-muted/30", aspectClass)}>
             <Image
               src={previewUrl}
               alt={t("photoPreviewAlt")}
@@ -84,7 +110,10 @@ export function PlaceContributePhotoField({
             disabled={inspecting}
             aria-busy={inspecting}
             onClick={() => inputRef.current?.click()}
-            className="group relative flex aspect-[21/9] w-full items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30 text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-60"
+            className={cn(
+              "group relative flex w-full items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30 text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-60",
+              aspectClass,
+            )}
           >
             {inspecting ? (
               <Loader2 className="h-8 w-8 animate-spin" aria-hidden />
@@ -92,7 +121,7 @@ export function PlaceContributePhotoField({
               <span className="flex flex-col items-center gap-2 px-4 text-center">
                 <ImageIcon className="h-8 w-8 opacity-70" aria-hidden />
                 <span className="text-sm font-medium">{t("photoUploadPrompt")}</span>
-                <span className="text-xs text-muted-foreground">{t("photoAspectHint")}</span>
+                <span className="text-xs text-muted-foreground">{hint}</span>
               </span>
             )}
           </button>

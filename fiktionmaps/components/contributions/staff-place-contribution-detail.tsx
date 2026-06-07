@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server"
 import Image from "next/image"
 import { Link } from "@/i18n/navigation"
 import {
+  getPendingPathsForRole,
   isPlaceAddPhotoContribution,
   type ContributorModerationContext,
   type PlaceContributionFeedItem,
@@ -44,7 +45,7 @@ export async function StaffPlaceContributionDetail({
     isAddPhoto && photoContext?.currentImageUrl?.trim()
       ? photoContext.currentImageUrl.trim()
       : avatarSrc
-  const proposedLgPath = item.pendingImages?.paths.lg
+  const proposedLgPath = getPendingPathsForRole(item.pendingImagesByRole, "avatar")?.lg
   const proposedSrc = proposedLgPath ? publicAssetImageUrl(proposedLgPath) : null
   const fictionTitle = fiction?.title?.trim() || item.fictionTitle?.trim() || "—"
   const streetViewReference = place?.location.streetViewReference ?? null

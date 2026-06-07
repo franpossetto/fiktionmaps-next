@@ -196,6 +196,49 @@ export function createFictionsSupabaseAdapter(
       return (data ?? []).map((r) => r.slug).filter(Boolean) as string[]
     },
 
+    listApprovedActive: cache(async (): Promise<FictionWithMedia[]> => {
+      const supabase = await getSupabase()
+      const { data: fictionsData, error } = await supabase
+        .from("fictions")
+        .select("*")
+        .eq("status", "approved")
+        .eq("active", true)
+        .order("title")
+      if (error || !fictionsData?.length) return []
+
+      const ids = fictionsData.map((f) => f.id)
+      const { data: imagesData } = await supabase
+        .from("asset_images")
+        .select("entity_id, role, variant, url")
+        .eq("entity_type", "fiction")
+        .in("entity_id", ids)
+
+      const imagesByEntity = new Map<string, AssetImageRow[]>()
+      for (const row of imagesData ?? []) {
+        const list = imagesByEntity.get(row.entity_id) ?? []
+        list.push(row as AssetImageRow)
+        imagesByEntity.set(row.entity_id, list)
+      }
+
+      return fictionsData.map((f) => mapAssetImagesToFiction(f, imagesByEntity.get(f.id) ?? []))
+    }),
+
+    isApprovedActiveFiction: async (fictionId: string): Promise<boolean> => {
+      const supabase = await getSupabase()
+      const { data, error } = await supabase
+        .from("fictions")
+        .select("id")
+        .eq("id", fictionId)
+        .eq("status", "approved")
+        .eq("active", true)
+        .maybeSingle()
+      if (error) {
+        console.error("[fictions repo] isApprovedActiveFiction:", error.message)
+        return false
+      }
+      return Boolean(data?.id)
+    },
+
     async create(data: CreateFictionData): Promise<FictionWithMedia | null> {
       const supabase = await getSupabase()
       const insertRow = {

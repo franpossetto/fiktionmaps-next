@@ -34,6 +34,10 @@ import { getFictionInterestsUseCase } from "@/src/fiction-interests/application/
 import { setFictionInterestsUseCase } from "@/src/fiction-interests/application/set-fiction-interests.usecase"
 import { getRecommendedFictionsUseCase } from "@/src/fictions/application/get-recommended-fictions.usecase"
 import { resolveNavSearchScopeUseCase } from "@/src/fictions/application/resolve-nav-search-scope.usecase"
+import {
+  getFictionPhotoContributeContextUseCase,
+  type FictionPhotoContributeContext,
+} from "@/src/fictions/application/get-fiction-photo-contribute-context.usecase"
 import { parseFictionAppRoute } from "@/lib/navigation/parse-fiction-app-route"
 import type { NavSearchScope } from "@/src/fictions/domain/nav-search-scope"
 import { resolvePlaceForFictionPathCached } from "@/src/places/infrastructure/next/place.queries"
@@ -542,4 +546,13 @@ export async function getFictionDetailRecommendationsAction(
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed to load recommendations" }
   }
+}
+
+export type { FictionPhotoContributeContext } from "@/src/fictions/application/get-fiction-photo-contribute-context.usecase"
+
+export async function getFictionPhotoContributeContextAction(
+  fictionId: string,
+): Promise<FictionPhotoContributeContext | null> {
+  if (!uuidSchema.safeParse(fictionId).success) return null
+  return getFictionPhotoContributeContextUseCase(fictionId, fictionsRepo)
 }

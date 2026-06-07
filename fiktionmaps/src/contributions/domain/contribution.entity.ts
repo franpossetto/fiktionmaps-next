@@ -6,36 +6,60 @@ export type ContributionType = ContributionRow["type"]
 
 export type ContributionEntityType = ContributionRow["entity_type"]
 
-export type PlaceContributionPendingImageRole = "avatar" | "hero"
+export type ContributionPendingImageRole = "avatar" | "hero" | "cover" | "banner"
+
+/** @deprecated Use ContributionPendingImageRole */
+export type PlaceContributionPendingImageRole = Extract<ContributionPendingImageRole, "avatar" | "hero">
 
 export type ContributionPendingImageVariant = "sm" | "lg"
 
 export interface ContributionPendingImage {
   id: string
   contributionId: string
-  role: PlaceContributionPendingImageRole
+  role: ContributionPendingImageRole
   variant: ContributionPendingImageVariant
   storagePath: string
   createdAt: string
 }
 
-/** Pending assets for staff review (e.g. add_photo). */
+/** Pending storage paths grouped by asset role (sm/lg are variants of the same upload per role). */
+export type ContributionPendingImagesByRole = Partial<
+  Record<ContributionPendingImageRole, Partial<Record<ContributionPendingImageVariant, string>>>
+>
+
+/** @deprecated Single-role snapshot; use ContributionPendingImagesByRole. */
 export type ContributionPendingImagesSnapshot = {
-  role: PlaceContributionPendingImageRole
+  role: ContributionPendingImageRole
   paths: Partial<Record<ContributionPendingImageVariant, string>>
 }
 
-export function pendingImagesToSnapshot(
-  rows: ContributionPendingImage[],
-): ContributionPendingImagesSnapshot | null {
+export function pendingImagesRowsToByRole(rows: ContributionPendingImage[]): ContributionPendingImagesByRole | null {
   if (rows.length === 0) return null
-  const role = rows[0].role
-  const paths: Partial<Record<ContributionPendingImageVariant, string>> = {}
+  const byRole: ContributionPendingImagesByRole = {}
   for (const row of rows) {
-    if (row.role !== role) continue
-    paths[row.variant] = row.storagePath
+    const rolePaths = byRole[row.role] ?? {}
+    rolePaths[row.variant] = row.storagePath
+    byRole[row.role] = rolePaths
   }
-  return Object.keys(paths).length > 0 ? { role, paths } : null
+  return Object.keys(byRole).length > 0 ? byRole : null
+}
+
+export function getPendingPathsForRole(
+  byRole: ContributionPendingImagesByRole | null | undefined,
+  role: ContributionPendingImageRole,
+): Partial<Record<ContributionPendingImageVariant, string>> | null {
+  const paths = byRole?.[role]
+  return paths && Object.keys(paths).length > 0 ? paths : null
+}
+
+/** @deprecated Use pendingImagesRowsToByRole */
+export function pendingImagesToSnapshot(rows: ContributionPendingImage[]): ContributionPendingImagesSnapshot | null {
+  const byRole = pendingImagesRowsToByRole(rows)
+  if (!byRole) return null
+  const role = (Object.keys(byRole)[0] ?? null) as ContributionPendingImageRole | null
+  if (!role) return null
+  const paths = byRole[role]
+  return paths ? { role, paths } : null
 }
 
 export interface Contribution {
@@ -67,6 +91,7 @@ export interface FictionContributionFeedItem extends Contribution {
   fictionTitle: string | null
   /** Cover thumbnail URL (`asset_images` cover sm) when present. */
   fictionCoverUrl: string | null
+  pendingImagesByRole: ContributionPendingImagesByRole | null
 }
 
 /** Same as FictionContributorProfile plus first approved contribution timestamp for this entity (deduped per user). */
@@ -111,7 +136,7 @@ export interface PlaceContributionFeedItem extends Contribution {
   placeAvatarUrl: string | null
   fictionTitle: string | null
   fictionId: string | null
-  pendingImages: ContributionPendingImagesSnapshot | null
+  pendingImagesByRole: ContributionPendingImagesByRole | null
 }
 
 export type StaffCreateContributionsFeedPageInput = {
@@ -137,4 +162,18 @@ export function isPlaceContributionFeedItem(
 
 export function isPlaceAddPhotoContribution(item: Contribution): boolean {
   return item.entityType === "place" && item.type === "add_photo"
+}
+
+export function isFictionAddPhotoContribution(item: Contribution): boolean {
+  return item.entityType === "fiction" && item.type === "add_photo"
+}
+
+export function isFictionContributionFeedItem(
+  item: StaffCreateContributionFeedItem,
+): item is FictionContributionFeedItem {
+  return item.entityType === "fiction" && (item.type === "create_fiction" || item.type === "add_photo")
+}
+
+export function isFictionCreateContributionFeedItem(item: FictionContributionFeedItem): boolean {
+  return item.type === "create_fiction"
 }

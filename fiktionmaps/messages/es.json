@@ -127,6 +127,10 @@
     "addPhotoCurrent": "Actual (publicada)",
     "addPhotoProposed": "Propuesta (pendiente)",
     "addPhotoProposedMissing": "Sin archivo pendiente",
+    "addPhotoCoverLabel": "Cover",
+    "addPhotoHeroLabel": "Hero",
+    "addPhotoBannerLabel": "Banner de cabecera",
+    "addPhotoBannerNotSubmitted": "No enviado (se mantiene el banner actual)",
     "fieldStreetViewReference": "Referencia de Street View",
     "streetViewReferenceMissing": "El contribuidor no añadió una referencia de Street View.",
     "streetViewPreviewUnavailable": "Vista previa de Street View no disponible",
@@ -709,7 +713,7 @@
         },
         "add_photo": {
           "title": "Añadir foto",
-          "description": "Reemplazá la imagen de un lugar ya publicado."
+          "description": "Reemplazá la portada de una ficción publicada o la foto de un lugar."
         },
         "enrich_entity": {
           "title": "Enriquecer ficha",
@@ -924,7 +928,14 @@
       "errorDirectorRegister": "No se pudo registrar al director. Intentá de nuevo."
     },
     "photo": {
-      "metaTitle": "Añadir foto de lugar",
+      "metaTitle": "Añadir foto",
+      "hubTitle": "¿Qué querés actualizar?",
+      "hubDescription": "Foto de un lugar o imagen de una ficción.",
+      "hubPlaceTitle": "Foto de lugar",
+      "hubPlaceDescription": "Imagen del mapa y ficha de un lugar publicado.",
+      "hubFictionTitle": "Ficción",
+      "hubFictionDescription": "Cover o hero de una obra publicada.",
+      "noFictionsApproved": "No hay ficciones publicadas disponibles para actualizar la portada.",
       "step1Title": "¿Qué ficción?",
       "step1Description": "Elegí la obra a la que pertenece el lugar.",
       "step2Title": "¿Qué lugar?",
@@ -951,7 +962,60 @@
       "summaryPlace": "Lugar",
       "summaryFiction": "Ficción",
       "submit": "Enviar para revisión",
-      "fppHint": "Hasta {count} FPP si se aprueba."
+      "fppHint": "Hasta {count} FPP si se aprueba.",
+      "fictionHub": {
+        "title": "¿Qué querés cambiar?",
+        "description": "",
+        "fppHint": "Hasta {count} FPP si se aprueba.",
+        "coverTitle": "Cover",
+        "coverDescription": "Tapa vertical del libro o la película.",
+        "heroTitle": "Hero",
+        "heroDescription": "Imagen horizontal de la ficha."
+      },
+      "fiction": {
+        "cover": {
+          "step1Title": "¿Qué ficción?",
+          "step1Description": "Elegí la obra.",
+          "step2Title": "Nuevo cover",
+          "step2Description": "Subí la tapa vertical del libro o la película.",
+          "step3Title": "Revisar y enviar",
+          "step3Description": "Comprobá antes de enviar.",
+          "fictionRequired": "Elegí una ficción.",
+          "photoRequired": "Subí una imagen para continuar.",
+          "selectedFiction": "Ficción: {title}",
+          "loadingImages": "Cargando…",
+          "currentImageLabel": "Cover actual",
+          "replacingCurrent": "Reemplaza al actual al aprobarse.",
+          "summaryFiction": "Ficción",
+          "summaryImageType": "Imagen",
+          "summaryImageTypeValue": "Cover",
+          "summaryNewImage": "Nuevo cover",
+          "submit": "Enviar para revisión",
+          "fppHint": "Hasta {count} FPP si se aprueba.",
+          "aspectHint": "Vertical, aprox. 2:3 (póster o libro)."
+        },
+        "hero": {
+          "step1Title": "¿Qué ficción?",
+          "step1Description": "Elegí la obra.",
+          "step2Title": "Nuevo hero",
+          "step2Description": "Subí la imagen horizontal de la ficha.",
+          "step3Title": "Revisar y enviar",
+          "step3Description": "Comprobá antes de enviar.",
+          "fictionRequired": "Elegí una ficción.",
+          "photoRequired": "Subí una imagen para continuar.",
+          "selectedFiction": "Ficción: {title}",
+          "loadingImages": "Cargando…",
+          "currentImageLabel": "Hero actual",
+          "replacingCurrent": "Reemplaza al actual al aprobarse.",
+          "summaryFiction": "Ficción",
+          "summaryImageType": "Imagen",
+          "summaryImageTypeValue": "Hero",
+          "summaryNewImage": "Nuevo hero",
+          "submit": "Enviar para revisión",
+          "fppHint": "Hasta {count} FPP si se aprueba.",
+          "aspectHint": "Horizontal, más ancha que alta."
+        }
+      }
     },
     "place": {
       "stepsAsideAria": "Pasos para añadir lugar",

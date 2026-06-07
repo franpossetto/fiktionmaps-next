@@ -1,7 +1,14 @@
 import { getTranslations } from "next-intl/server"
 import Image from "next/image"
 import { Link } from "@/i18n/navigation"
-import type { ContributorModerationContext, FictionContributionFeedItem } from "@/src/contributions/domain/contribution.entity"
+import {
+  getPendingPathsForRole,
+  isFictionAddPhotoContribution,
+  type ContributorModerationContext,
+  type FictionContributionFeedItem,
+} from "@/src/contributions/domain/contribution.entity"
+import { publicAssetImageUrl } from "@/lib/asset-images/public-asset-url"
+import { getFictionPhotoContributeContextAction } from "@/src/fictions/infrastructure/next/fiction.actions"
 import type { FictionWithMediaAndCatalogIds } from "@/src/fictions/domain/fiction.entity"
 import { FICTION_EXTERNAL_ID_PROVIDER } from "@/src/fiction-external-ids/domain/fiction-external-id.entity"
 import { FICTION_LANGUAGE_LABELS, type FictionLanguageCode } from "@/lib/constants/fiction-languages"
@@ -63,12 +70,26 @@ export interface StaffContributionDetailProps {
  */
 export async function StaffContributionDetail({ item, fiction, contributorContext }: StaffContributionDetailProps) {
   const t = await getTranslations("Contributions")
+  const isAddPhoto = isFictionAddPhotoContribution(item)
+  const photoContext = isAddPhoto ? await getFictionPhotoContributeContextAction(item.entityId) : null
   const coverFromFiction = fiction?.coverImageLarge ?? fiction?.coverImage
   const cover = coverFromFiction?.trim() || item.fictionCoverUrl?.trim() || null
   const coverSrc = cover || DEFAULT_FICTION_COVER
   const heroFromFiction =
     fiction?.bannerImage?.trim() || fiction?.coverImageLarge?.trim() || fiction?.coverImage?.trim() || null
   const heroSrc = heroFromFiction || coverSrc
+  const currentCoverSrc =
+    isAddPhoto && photoContext?.currentCoverUrl?.trim()
+      ? photoContext.currentCoverUrl.trim()
+      : coverSrc
+  const currentBannerSrc =
+    isAddPhoto && photoContext?.currentBannerUrl?.trim()
+      ? photoContext.currentBannerUrl.trim()
+      : fiction?.bannerImage?.trim() || heroSrc
+  const proposedCoverLg = getPendingPathsForRole(item.pendingImagesByRole, "cover")?.lg
+  const proposedBannerLg = getPendingPathsForRole(item.pendingImagesByRole, "banner")?.lg
+  const proposedCoverSrc = proposedCoverLg ? publicAssetImageUrl(proposedCoverLg) : null
+  const proposedBannerSrc = proposedBannerLg ? publicAssetImageUrl(proposedBannerLg) : null
   const workTitle =
     fiction?.title?.trim() || item.fictionTitle?.trim() || t("feedCard_untitledFiction")
 
@@ -127,6 +148,65 @@ export async function StaffContributionDetail({ item, fiction, contributorContex
         </div>
       </section>
 
+      {isAddPhoto ? (
+        <section className="border-b border-border/60 py-6">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">
+            {t("sectionAddPhotoReview")}
+          </h2>
+          <div className="mx-auto mt-6 w-full max-w-3xl space-y-8">
+            {proposedCoverSrc ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {t("addPhotoCoverLabel")}
+                </p>
+                <div className="mt-3 grid gap-6 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      {t("addPhotoCurrent")}
+                    </p>
+                    <div className="relative mx-auto aspect-[2/3] w-full max-w-[200px] overflow-hidden rounded-xl border border-border bg-muted/30">
+                      <Image src={currentCoverSrc} alt={workTitle} fill className="object-cover" sizes="200px" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      {t("addPhotoProposed")}
+                    </p>
+                    <div className="relative mx-auto aspect-[2/3] w-full max-w-[200px] overflow-hidden rounded-xl border border-border bg-muted/30">
+                      <Image src={proposedCoverSrc} alt={workTitle} fill className="object-cover" sizes="200px" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+            {proposedBannerSrc ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {t("addPhotoHeroLabel")}
+                </p>
+                <div className="mt-3 grid gap-6 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      {t("addPhotoCurrent")}
+                    </p>
+                    <div className="relative aspect-[21/9] w-full overflow-hidden rounded-xl border border-border bg-muted/30">
+                      <Image src={currentBannerSrc} alt={workTitle} fill className="object-cover" sizes="400px" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      {t("addPhotoProposed")}
+                    </p>
+                    <div className="relative aspect-[21/9] w-full overflow-hidden rounded-xl border border-border bg-muted/30">
+                      <Image src={proposedBannerSrc} alt={workTitle} fill className="object-cover" sizes="400px" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : (
       <section className="border-b border-border/60 py-6">
         <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">{t("sectionFictionDetails")}</h2>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{t("sectionFictionDetailsHelp")}</p>
@@ -223,6 +303,7 @@ export async function StaffContributionDetail({ item, fiction, contributorContex
           )}
         </dl>
       </section>
+      )}
 
       <section className="py-10">
         <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">{t("sectionContributor")}</h2>

@@ -10,6 +10,10 @@ import { uuidSchema } from "@/lib/validation/primitives"
 import type { MapBbox } from "@/lib/validation/map-query"
 import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
 import { listApprovedFictionPlacesUseCase } from "@/src/places/application/list-approved-fiction-places.usecase"
+import {
+  getPlacePhotoContributeContextUseCase,
+  type PlacePhotoContributeContext,
+} from "@/src/places/application/get-place-photo-contribute-context.usecase"
 import { createPlaceUseCase } from "@/src/places/application/create-place.usecase"
 import { updatePlaceUseCase } from "@/src/places/application/update-place.usecase"
 import { deletePlaceUseCase } from "@/src/places/application/delete-place.usecase"
@@ -128,28 +132,13 @@ export async function getApprovedFictionPlacesForContributeAction(fictionId: str
   return listApprovedFictionPlacesUseCase(fictionId, placesRepo)
 }
 
-export type PlacePhotoContributeContext = {
-  placeId: string
-  placeName: string
-  fictionId: string
-  currentImageUrl: string | null
-}
+export type { PlacePhotoContributeContext } from "@/src/places/application/get-place-photo-contribute-context.usecase"
 
 export async function getPlacePhotoContributeContextAction(
   placeId: string,
 ): Promise<PlacePhotoContributeContext | null> {
   if (!uuidSchema.safeParse(placeId).success) return null
-  const eligible = await placesRepo.isApprovedActivePlace(placeId)
-  if (!eligible) return null
-  const place = await placesRepo.getById(placeId, "lg")
-  if (!place) return null
-  const url = place.image?.trim()
-  return {
-    placeId: place.id,
-    placeName: place.name,
-    fictionId: place.fictionId,
-    currentImageUrl: url && !url.endsWith("/placeholder.svg") ? url : null,
-  }
+  return getPlacePhotoContributeContextUseCase(placeId, placesRepo)
 }
 
 export async function getCityPlacesAction(cityId: string): Promise<Place[]> {

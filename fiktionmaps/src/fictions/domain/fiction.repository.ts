@@ -15,6 +15,9 @@ export interface FictionsRepositoryPort {
   /** Active fictions only; title + year + type (case-insensitive title). */
   findActiveDuplicateForContribute(params: FindActiveContributeDuplicateParams): Promise<FictionWithMedia | null>
   findSlugsByPrefix(prefix: string, excludeId?: string): Promise<string[]>
+  /** Published catalog fiction eligible for cover photo contributions. */
+  isApprovedActiveFiction(fictionId: string): Promise<boolean>
+  listApprovedActive(): Promise<FictionWithMedia[]>
   create(data: CreateFictionData): Promise<FictionWithMedia | null>
   update(id: string, data: UpdateFictionData): Promise<FictionWithMedia | null>
   delete(id: string): Promise<boolean>

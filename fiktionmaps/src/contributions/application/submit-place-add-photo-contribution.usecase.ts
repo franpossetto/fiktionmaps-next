@@ -1,5 +1,5 @@
 import { validateImageFile } from "@/lib/asset-images/image-variant-service"
-import { uploadPendingPlaceContributionImage } from "@/lib/asset-images/pending-contribution-image"
+import { uploadPendingContributionImage } from "@/lib/asset-images/pending-contribution-image"
 import { approveContributionUseCase } from "@/src/contributions/application/approve-contribution.usecase"
 import { PLACE_PHOTO_ASSET_ROLE } from "@/src/contributions/domain/contribution.config"
 import type { ContributionsRepositoryPort } from "@/src/contributions/domain/contribution.repository"
@@ -42,7 +42,7 @@ export async function submitPlaceAddPhotoContributionUseCase(
   })
   if (!created) return { success: false, error: "Failed to create contribution" }
 
-  const uploaded = await uploadPendingPlaceContributionImage(
+  const uploaded = await uploadPendingContributionImage(
     created.contributionId,
     PLACE_PHOTO_ASSET_ROLE,
     input.imageFile,
@@ -51,10 +51,16 @@ export async function submitPlaceAddPhotoContributionUseCase(
     return { success: false, error: uploaded.error }
   }
 
-  const linked = await contributionsRepo.insertPendingPlaceImages({
+  const smPath = uploaded.paths.sm
+  const lgPath = uploaded.paths.lg
+  if (!smPath || !lgPath) {
+    return { success: false, error: "Failed to save pending photo variants" }
+  }
+
+  const linked = await contributionsRepo.insertPendingContributionImages({
     contributionId: created.contributionId,
     role: PLACE_PHOTO_ASSET_ROLE,
-    paths: { sm: uploaded.smPath, lg: uploaded.lgPath },
+    paths: { sm: smPath, lg: lgPath },
   })
   if (!linked) {
     return { success: false, error: "Failed to save pending photo" }

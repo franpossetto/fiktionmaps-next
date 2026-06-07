@@ -12,7 +12,10 @@ import {
   getContributorModerationContextForStaffSession,
   getStaffContributionDetailForStaffSession,
 } from "@/src/contributions/infrastructure/next/contribution.queries"
-import { isPlaceContributionFeedItem } from "@/src/contributions/domain/contribution.entity"
+import {
+  isFictionAddPhotoContribution,
+  isPlaceContributionFeedItem,
+} from "@/src/contributions/domain/contribution.entity"
 import { getFictionByIdForStaffSession } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { getPlaceLocationByIdForStaffSession } from "@/src/places/infrastructure/next/place.queries"
 import { getProfileForStaffSession } from "@/src/users/infrastructure/next/user.queries"
@@ -115,7 +118,10 @@ export default async function StaffContributionPage({ params }: Props) {
             ariaLabel={tMeta("breadcrumbNavAriaLabel")}
             className="min-w-0"
             items={[
-              { label: tContrib("title"), href: "/contributions" },
+              {
+                label: tContrib("title"),
+                href: isFictionAddPhotoContribution(item) ? "/contributions?kind=fiction" : "/contributions",
+              },
               { label: workTitle },
             ]}
           />

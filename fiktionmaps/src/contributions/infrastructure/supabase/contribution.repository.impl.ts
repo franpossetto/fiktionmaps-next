@@ -22,18 +22,18 @@ import type {
   TopContributorProfile,
 } from "@/src/contributions/domain/contribution.entity"
 import type { ContributionsRepositoryPort } from "@/src/contributions/domain/contribution.repository"
-import type { InsertContributionPendingPlaceImagesInput } from "@/src/contributions/domain/contribution.repository"
+import type { InsertContributionPendingImagesInput } from "@/src/contributions/domain/contribution.repository"
 import type {
   ApproveContributionInput,
   CreateContributionInput,
   RejectContributionInput,
 } from "@/src/contributions/domain/contribution.schemas"
 import {
-  promotePendingPlacePhotoToAssetImages,
+  promotePendingContributionPhotoToAssetImages,
   removePendingContributionStoragePaths,
 } from "@/lib/asset-images/pending-contribution-image"
 import {
-  pendingImagesToSnapshot,
+  pendingImagesRowsToByRole,
   type ContributionPendingImage,
 } from "@/src/contributions/domain/contribution.entity"
 
@@ -81,6 +81,7 @@ function mapFictionFeedItem(
     },
     fictionTitle: null,
     fictionCoverUrl: null,
+    pendingImagesByRole: null,
   }
 }
 
@@ -103,7 +104,7 @@ function mapPlaceFeedItem(
     placeAvatarUrl: null,
     fictionTitle: null,
     fictionId: null,
-    pendingImages: null,
+    pendingImagesByRole: null,
   }
 }
 
@@ -232,10 +233,16 @@ async function enrichFictionFeedItem(
     fictionTitlesByIds(supabase, [base.entityId]),
     fictionCoverThumbByIds(supabase, [base.entityId]),
   ])
+  const pendingMap =
+    base.type === "add_photo"
+      ? await listPendingImagesForContributionIds(supabase, [base.id])
+      : new Map<string, ContributionPendingImage[]>()
+  const pendingRows = pendingMap.get(base.id) ?? []
   return {
     ...base,
     fictionTitle: titles.get(base.entityId) ?? null,
     fictionCoverUrl: covers.get(base.entityId) ?? null,
+    pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
   }
 }
 
@@ -261,7 +268,7 @@ async function enrichPlaceFeedItem(
     placeAvatarUrl: avatars.get(base.entityId) ?? null,
     fictionId: fid,
     fictionTitle: fid ? (fictionTitles.get(fid) ?? null) : null,
-    pendingImages: pendingImagesToSnapshot(pendingRows),
+    pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
   }
 }
 
@@ -302,7 +309,7 @@ export function createContributionsSupabaseAdapter(
           { count: "exact" },
         )
         .eq("entity_type", "fiction")
-        .eq("type", "create_fiction")
+        .in("type", ["create_fiction", "add_photo"])
 
       if (userIdFilter) q = q.eq("user_id", userIdFilter)
 
@@ -334,11 +341,21 @@ export function createContributionsSupabaseAdapter(
         fictionTitlesByIds(supabase, items.map((i) => i.entityId)),
         fictionCoverThumbByIds(supabase, items.map((i) => i.entityId)),
       ])
-      const withMedia = items.map((i) => ({
-        ...i,
-        fictionTitle: titles.get(i.entityId) ?? null,
-        fictionCoverUrl: covers.get(i.entityId) ?? null,
-      }))
+      const fictionAddPhotoIds = items.filter((i) => i.type === "add_photo").map((i) => i.id)
+      const pendingByContribution = await listPendingImagesForContributionIds(
+        supabase,
+        fictionAddPhotoIds,
+      )
+
+      const withMedia = items.map((i) => {
+        const pendingRows = pendingByContribution.get(i.id) ?? []
+        return {
+          ...i,
+          fictionTitle: titles.get(i.entityId) ?? null,
+          fictionCoverUrl: covers.get(i.entityId) ?? null,
+          pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
+        }
+      })
 
       return { items: withMedia, totalCount: count ?? 0 }
     },
@@ -369,7 +386,7 @@ export function createContributionsSupabaseAdapter(
         )
 
       if (kind === "fiction") {
-        q = q.eq("entity_type", "fiction").eq("type", "create_fiction")
+        q = q.eq("entity_type", "fiction").in("type", ["create_fiction", "add_photo"])
       } else if (kind === "place") {
         q = q.eq("entity_type", "place").in("type", ["create_place", "add_photo"])
       } else {
@@ -404,7 +421,10 @@ export function createContributionsSupabaseAdapter(
         if (row.entity_type === "place" && (row.type === "create_place" || row.type === "add_photo")) {
           const item = mapPlaceFeedItem(row, row.profiles)
           if (item) placeItems.push(item)
-        } else if (row.entity_type === "fiction" && row.type === "create_fiction") {
+        } else if (
+          row.entity_type === "fiction" &&
+          (row.type === "create_fiction" || row.type === "add_photo")
+        ) {
           const item = mapFictionFeedItem(row, row.profiles)
           if (item) fictionItems.push(item)
         }
@@ -420,14 +440,22 @@ export function createContributionsSupabaseAdapter(
       const fictionIdsForPlaces = [...new Set(placeItems.map((i) => placeMeta.get(i.entityId)?.fictionId).filter(Boolean) as string[])]
       const parentFictionTitles = await fictionTitlesByIds(supabase, fictionIdsForPlaces)
 
-      const enrichedFiction = fictionItems.map((i) => ({
-        ...i,
-        fictionTitle: fictionTitles.get(i.entityId) ?? null,
-        fictionCoverUrl: fictionCovers.get(i.entityId) ?? null,
-      }))
+      const fictionAddPhotoIds = fictionItems.filter((i) => i.type === "add_photo").map((i) => i.id)
+      const placeAddPhotoIds = placeItems.filter((i) => i.type === "add_photo").map((i) => i.id)
+      const pendingByContribution = await listPendingImagesForContributionIds(supabase, [
+        ...fictionAddPhotoIds,
+        ...placeAddPhotoIds,
+      ])
 
-      const addPhotoIds = placeItems.filter((i) => i.type === "add_photo").map((i) => i.id)
-      const pendingByContribution = await listPendingImagesForContributionIds(supabase, addPhotoIds)
+      const enrichedFiction = fictionItems.map((i) => {
+        const pendingRows = pendingByContribution.get(i.id) ?? []
+        return {
+          ...i,
+          fictionTitle: fictionTitles.get(i.entityId) ?? null,
+          fictionCoverUrl: fictionCovers.get(i.entityId) ?? null,
+          pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
+        }
+      })
 
       const enrichedPlace = placeItems.map((i) => {
         const meta = placeMeta.get(i.entityId)
@@ -439,7 +467,7 @@ export function createContributionsSupabaseAdapter(
           placeAvatarUrl: placeAvatars.get(i.entityId) ?? null,
           fictionId: fid,
           fictionTitle: fid ? (parentFictionTitles.get(fid) ?? null) : null,
-          pendingImages: pendingImagesToSnapshot(pendingRows),
+          pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
         }
       })
 
@@ -478,20 +506,30 @@ export function createContributionsSupabaseAdapter(
       return { contributionId: data.id }
     },
 
-    async insertPendingPlaceImages(input: InsertContributionPendingPlaceImagesInput): Promise<boolean> {
+    async insertPendingContributionImages(input: InsertContributionPendingImagesInput): Promise<boolean> {
       const supabase = await getSupabase()
-      const rows: Database["public"]["Tables"]["contribution_pending_images"]["Insert"][] = (
-        ["sm", "lg"] as const
-      ).map((variant) => ({
-        contribution_id: input.contributionId,
-        role: input.role,
-        variant,
-        storage_path: input.paths[variant],
-      }))
+      const rows: Database["public"]["Tables"]["contribution_pending_images"]["Insert"][] = []
+      if (input.paths.sm?.trim()) {
+        rows.push({
+          contribution_id: input.contributionId,
+          role: input.role,
+          variant: "sm",
+          storage_path: input.paths.sm,
+        })
+      }
+      if (input.paths.lg?.trim()) {
+        rows.push({
+          contribution_id: input.contributionId,
+          role: input.role,
+          variant: "lg",
+          storage_path: input.paths.lg,
+        })
+      }
+      if (rows.length === 0) return false
 
       const { error } = await supabase.from("contribution_pending_images").insert(rows)
       if (error) {
-        console.error("[contributions repo] insertPendingPlaceImages:", error.message)
+        console.error("[contributions repo] insertPendingContributionImages:", error.message)
         return false
       }
       return true
@@ -554,6 +592,43 @@ export function createContributionsSupabaseAdapter(
       }
       return count ?? 0
     }),
+
+    countPendingAddPhotoByFiction: cache(async (fictionId: string): Promise<number> => {
+      const supabase = await getSupabase()
+      const { count, error } = await supabase
+        .from("contributions")
+        .select("*", { count: "exact", head: true })
+        .eq("entity_type", "fiction")
+        .eq("entity_id", fictionId)
+        .eq("type", "add_photo")
+        .eq("status", "pending")
+
+      if (error) {
+        console.error("[contributions repo] countPendingAddPhotoByFiction:", error.message)
+        return 0
+      }
+      return count ?? 0
+    }),
+
+    countPendingAddPhotoByFictionAndRole: cache(
+      async (fictionId: string, role: "cover" | "banner"): Promise<number> => {
+        const supabase = await getSupabase()
+        const { data, error } = await supabase
+          .from("contributions")
+          .select("id, contribution_pending_images!inner(role)")
+          .eq("entity_type", "fiction")
+          .eq("entity_id", fictionId)
+          .eq("type", "add_photo")
+          .eq("status", "pending")
+          .eq("contribution_pending_images.role", role)
+
+        if (error) {
+          console.error("[contributions repo] countPendingAddPhotoByFictionAndRole:", error.message)
+          return 0
+        }
+        return data?.length ?? 0
+      },
+    ),
 
     getById: cache(async (id: string): Promise<Contribution | null> => {
       const supabase = await getSupabase()
@@ -796,18 +871,11 @@ export function createContributionsSupabaseAdapter(
 
         type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
         const row = data as Row
-        if (row.type !== "create_fiction" || row.entity_type !== "fiction") return null
+        if (row.entity_type !== "fiction") return null
+        if (row.type !== "create_fiction" && row.type !== "add_photo") return null
         const base = mapFictionFeedItem(row, row.profiles)
         if (!base) return null
-        const [titles, covers] = await Promise.all([
-          fictionTitlesByIds(supabase, [base.entityId]),
-          fictionCoverThumbByIds(supabase, [base.entityId]),
-        ])
-        return {
-          ...base,
-          fictionTitle: titles.get(base.entityId) ?? null,
-          fictionCoverUrl: covers.get(base.entityId) ?? null,
-        }
+        return enrichFictionFeedItem(supabase, base)
       },
     ),
 
@@ -874,7 +942,10 @@ export function createContributionsSupabaseAdapter(
         type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
         const row = data as Row
 
-        if (row.entity_type === "fiction" && row.type === "create_fiction") {
+        if (
+          row.entity_type === "fiction" &&
+          (row.type === "create_fiction" || row.type === "add_photo")
+        ) {
           const base = mapFictionFeedItem(row, row.profiles)
           if (!base) return null
           return enrichFictionFeedItem(supabase, base)
@@ -937,20 +1008,59 @@ export function createContributionsSupabaseAdapter(
       const entityId = contribRow.entity_id
       const now = new Date().toISOString()
 
-      if (contributionType === "add_photo" && entityType === "place") {
+      if (
+        contributionType === "add_photo" &&
+        (entityType === "place" || entityType === "fiction")
+      ) {
         const pendingMap = await listPendingImagesForContributionIds(supabase, [input.id])
-        const snapshot = pendingImagesToSnapshot(pendingMap.get(input.id) ?? [])
-        const smPath = snapshot?.paths.sm
-        const lgPath = snapshot?.paths.lg
-        const role = snapshot?.role
-        if (!role || !smPath || !lgPath) {
+        const byRole = pendingImagesRowsToByRole(pendingMap.get(input.id) ?? [])
+        if (!byRole) {
           console.error("[contributions repo] approve add_photo missing pending assets")
           return false
         }
-        const promoted = await promotePendingPlacePhotoToAssetImages(entityId, role, smPath, lgPath)
-        if (!promoted.success) {
-          console.error("[contributions repo] approve add_photo promote:", promoted.error)
-          return false
+
+        if (entityType === "place") {
+          const avatar = byRole.avatar
+          if (!avatar?.sm || !avatar?.lg) {
+            console.error("[contributions repo] approve add_photo place missing avatar variants")
+            return false
+          }
+          const promoted = await promotePendingContributionPhotoToAssetImages("place", entityId, "avatar", {
+            sm: avatar.sm,
+            lg: avatar.lg,
+          })
+          if (!promoted.success) {
+            console.error("[contributions repo] approve add_photo promote:", promoted.error)
+            return false
+          }
+        } else {
+          const cover = byRole.cover
+          const banner = byRole.banner
+          const hasCover = Boolean(cover?.sm && cover?.lg)
+          const hasBanner = Boolean(banner?.lg)
+          if (!hasCover && !hasBanner) {
+            console.error("[contributions repo] approve add_photo fiction missing pending images")
+            return false
+          }
+          if (hasCover) {
+            const coverPromoted = await promotePendingContributionPhotoToAssetImages("fiction", entityId, "cover", {
+              sm: cover!.sm!,
+              lg: cover!.lg!,
+            })
+            if (!coverPromoted.success) {
+              console.error("[contributions repo] approve add_photo promote cover:", coverPromoted.error)
+              return false
+            }
+          }
+          if (hasBanner) {
+            const bannerPromoted = await promotePendingContributionPhotoToAssetImages("fiction", entityId, "banner", {
+              lg: banner!.lg!,
+            })
+            if (!bannerPromoted.success) {
+              console.error("[contributions repo] approve add_photo promote banner:", bannerPromoted.error)
+              return false
+            }
+          }
         }
         const { error: pendingDelErr } = await supabase
           .from("contribution_pending_images")

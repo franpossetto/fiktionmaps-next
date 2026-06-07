@@ -899,7 +899,7 @@ export type Database = {
         Row: {
           id: string
           contribution_id: string
-          role: "avatar" | "hero"
+          role: "avatar" | "hero" | "cover" | "banner"
           variant: "sm" | "lg"
           storage_path: string
           created_at: string
@@ -907,7 +907,7 @@ export type Database = {
         Insert: {
           id?: string
           contribution_id: string
-          role: "avatar" | "hero"
+          role: "avatar" | "hero" | "cover" | "banner"
           variant: "sm" | "lg"
           storage_path: string
           created_at?: string
@@ -915,7 +915,7 @@ export type Database = {
         Update: {
           id?: string
           contribution_id?: string
-          role?: "avatar" | "hero"
+          role?: "avatar" | "hero" | "cover" | "banner"
           variant?: "sm" | "lg"
           storage_path?: string
           created_at?: string

@@ -127,6 +127,10 @@
     "addPhotoCurrent": "Current (live)",
     "addPhotoProposed": "Proposed (pending)",
     "addPhotoProposedMissing": "No pending file",
+    "addPhotoCoverLabel": "Cover",
+    "addPhotoHeroLabel": "Hero",
+    "addPhotoBannerLabel": "Header banner",
+    "addPhotoBannerNotSubmitted": "Not submitted (current banner kept)",
     "fieldStreetViewReference": "Street View reference",
     "streetViewReferenceMissing": "The contributor did not add a Street View reference.",
     "streetViewPreviewUnavailable": "Street View preview unavailable",
@@ -709,7 +713,7 @@
         },
         "add_photo": {
           "title": "Add photo",
-          "description": "Replace the image on a published place."
+          "description": "Replace the cover on a published fiction or the photo on a place."
         },
         "enrich_entity": {
           "title": "Enrich entry",
@@ -924,7 +928,14 @@
       "errorDirectorRegister": "Could not register the director. Try again."
     },
     "photo": {
-      "metaTitle": "Add place photo",
+      "metaTitle": "Add photo",
+      "hubTitle": "What do you want to update?",
+      "hubDescription": "Choose whether you are updating a place photo or a fiction image (cover or hero).",
+      "hubPlaceTitle": "Place photo",
+      "hubPlaceDescription": "Map and place page image for a published location.",
+      "hubFictionTitle": "Fiction images",
+      "hubFictionDescription": "Update the vertical cover or the wide hero on a published fiction.",
+      "noFictionsApproved": "No published fictions are available for cover updates.",
       "step1Title": "Which fiction?",
       "step1Description": "Pick the work the place belongs to.",
       "step2Title": "Which place?",
@@ -951,7 +962,60 @@
       "summaryPlace": "Place",
       "summaryFiction": "Fiction",
       "submit": "Submit for review",
-      "fppHint": "Up to {count} FPP if approved."
+      "fppHint": "Up to {count} FPP if approved.",
+      "fictionHub": {
+        "title": "What do you want to change?",
+        "description": "",
+        "fppHint": "Up to {count} FPP if approved.",
+        "coverTitle": "Cover",
+        "coverDescription": "Vertical book or movie cover art.",
+        "heroTitle": "Hero",
+        "heroDescription": "Horizontal image on the fiction page."
+      },
+      "fiction": {
+        "cover": {
+          "step1Title": "Which fiction?",
+          "step1Description": "Pick the published work whose cover you want to update.",
+          "step2Title": "New cover",
+          "step2Description": "Upload a vertical cover (approx. 2:3, poster or book style).",
+          "step3Title": "Review and submit",
+          "step3Description": "Check everything before sending for review.",
+          "fictionRequired": "Select a fiction.",
+          "photoRequired": "Upload a cover to continue.",
+          "selectedFiction": "Fiction: {title}",
+          "loadingImages": "Loading current cover…",
+          "currentImageLabel": "Current cover",
+          "replacingCurrent": "The new cover replaces the current one when approved.",
+          "summaryFiction": "Fiction",
+          "summaryImageType": "Image type",
+          "summaryImageTypeValue": "Cover",
+          "summaryNewImage": "New cover",
+          "submit": "Submit for review",
+          "fppHint": "Up to {count} FPP if approved.",
+          "aspectHint": "Approximate 2:3 aspect ratio (typical poster or book)."
+        },
+        "hero": {
+          "step1Title": "Which fiction?",
+          "step1Description": "Pick the published work whose hero you want to update.",
+          "step2Title": "New hero",
+          "step2Description": "Upload a wide horizontal image for the fiction page header.",
+          "step3Title": "Review and submit",
+          "step3Description": "Check everything before sending for review.",
+          "fictionRequired": "Select a fiction.",
+          "photoRequired": "Upload a hero image to continue.",
+          "selectedFiction": "Fiction: {title}",
+          "loadingImages": "Loading current hero…",
+          "currentImageLabel": "Current hero",
+          "replacingCurrent": "The new hero replaces the current one when approved.",
+          "summaryFiction": "Fiction",
+          "summaryImageType": "Image type",
+          "summaryImageTypeValue": "Hero",
+          "summaryNewImage": "New hero",
+          "submit": "Submit for review",
+          "fppHint": "Up to {count} FPP if approved.",
+          "aspectHint": "Clearly wider than tall (page header)."
+        }
+      }
     },
     "place": {
       "stepsAsideAria": "Place contribution steps",

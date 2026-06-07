@@ -12,6 +12,7 @@ import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/en
 import { getContributionByIdUseCase } from "@/src/contributions/application/get-contribution-by-id.usecase"
 import { rejectContributionUseCase } from "@/src/contributions/application/reject-contribution.usecase"
 import { submitPlaceAddPhotoContributionUseCase } from "@/src/contributions/application/submit-place-add-photo-contribution.usecase"
+import { submitFictionAddPhotoContributionUseCase } from "@/src/contributions/application/submit-fiction-add-photo-contribution.usecase"
 import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
 import type { ContributionEntityType } from "@/src/contributions/domain/contribution.entity"
 import {
@@ -19,8 +20,10 @@ import {
   createContributionSchema,
   rejectContributionSchema,
   submitPlaceAddPhotoContributionSchema,
+  submitFictionAddPhotoContributionSchema,
 } from "@/src/contributions/domain/contribution.schemas"
 import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
+import { supabaseRepositoryAdapter as fictionsRepo } from "@/src/fictions/infrastructure/supabase/fiction.repository.impl"
 import { supabaseRepositoryAdapter as contributionsRepo } from "@/src/contributions/infrastructure/supabase/contribution.repository.impl"
 import { profilesReaderSupabaseAdapter } from "@/src/contributions/infrastructure/supabase/profiles-reader.supabase"
 import type {
@@ -151,6 +154,65 @@ export async function submitPlaceAddPhotoContributionAction(
   updateTag("contributions")
   updateTag("places")
   updateTag(`place-${parsed.data.placeId}`)
+  if (result.autoApproved) updateTag("profiles")
+
+  return result
+}
+
+export type SubmitFictionAddPhotoContributionResult =
+  | { success: true; contributionId: string; autoApproved: boolean; previewUrl: string }
+  | { success: false; error: string }
+
+export async function submitFictionAddPhotoContributionAction(
+  formData: FormData,
+): Promise<SubmitFictionAddPhotoContributionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const fictionId = formData.get("fictionId")
+  const targetRole = formData.get("targetRole")
+  const photoFile = formData.get("photoFile")
+
+  const parsed = submitFictionAddPhotoContributionSchema.safeParse({
+    fictionId: typeof fictionId === "string" ? fictionId : "",
+    targetRole: typeof targetRole === "string" ? targetRole : "",
+  })
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+  if (!(photoFile instanceof File) || photoFile.size === 0) {
+    return { success: false, error: "No image provided" }
+  }
+
+  const autoApprove = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+
+  const result = await submitFictionAddPhotoContributionUseCase(
+    {
+      userId: user.id,
+      fictionId: parsed.data.fictionId,
+      targetRole: parsed.data.targetRole,
+      file: photoFile,
+      autoApprove,
+    },
+    contributionsRepo,
+    fictionsRepo,
+  )
+
+  if (!result.success) return result
+
+  revalidatePath("/contributions")
+  revalidatePath("/profile/contribute")
+  updateTag("contributions")
+  updateTag("fictions")
+  updateTag(`fiction-${parsed.data.fictionId}`)
   if (result.autoApproved) updateTag("profiles")
 
   return result

@@ -13,22 +13,30 @@ import type {
   TopContributorProfile,
   StaffCreateContributionFeedItem,
 } from "./contribution.entity"
-import type { PlaceContributionPendingImageRole } from "./contribution.entity"
+import type { ContributionPendingImageRole } from "./contribution.entity"
 import type {
   ApproveContributionInput,
   CreateContributionInput,
   RejectContributionInput,
 } from "./contribution.schemas"
 
-export type InsertContributionPendingPlaceImagesInput = {
+export type InsertContributionPendingImagesInput = {
   contributionId: string
-  role: PlaceContributionPendingImageRole
-  paths: { sm: string; lg: string }
+  role: ContributionPendingImageRole
+  paths: { sm?: string; lg: string }
 }
+
+/** @deprecated Use InsertContributionPendingImagesInput */
+export type InsertContributionPendingPlaceImagesInput = InsertContributionPendingImagesInput
 
 export interface ContributionsRepositoryPort {
   create(input: CreateContributionInput): Promise<{ contributionId: string } | null>
-  insertPendingPlaceImages(input: InsertContributionPendingPlaceImagesInput): Promise<boolean>
+  insertPendingContributionImages(input: InsertContributionPendingImagesInput): Promise<boolean>
+  countPendingAddPhotoByFiction(fictionId: string): Promise<number>
+  countPendingAddPhotoByFictionAndRole(
+    fictionId: string,
+    role: Extract<ContributionPendingImageRole, "cover" | "banner">,
+  ): Promise<number>
   listPendingImagesByContributionId(contributionId: string): Promise<ContributionPendingImage[]>
   deletePendingImagesByContributionId(contributionId: string): Promise<string[]>
   countPendingAddPhotoByPlace(placeId: string): Promise<number>

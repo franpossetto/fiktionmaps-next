@@ -7,6 +7,12 @@ export const STAFF_FICTION_CONTRIBUTIONS_FEED_PAGE_SIZE = 10
 /** Places store a single image in `asset_images` with role `avatar` (map + detail). */
 export const PLACE_PHOTO_ASSET_ROLE = "avatar" as const
 
+/** Fictions store cover art in `asset_images` with role `cover` (cards + detail). */
+export const FICTION_COVER_ASSET_ROLE = "cover" as const
+
+/** Wide header image on fiction detail (`asset_images` role `banner`). */
+export const FICTION_BANNER_ASSET_ROLE = "banner" as const
+
 export const CONTRIBUTION_FPP: Record<ContributionType, number> = {
   create_fiction: 5,
   create_place: 13,

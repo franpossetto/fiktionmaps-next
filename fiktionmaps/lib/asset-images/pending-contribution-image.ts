@@ -2,21 +2,26 @@ import sharp from "sharp"
 import { createClient } from "@/lib/supabase/server"
 import { ASSET_IMAGES_BUCKET, VARIANT_SIZES, type ImageVariant } from "./variant-sizes"
 import type { ImageRole } from "./image-variant-service"
+import type { ContributionEntityType } from "@/src/contributions/domain/contribution.entity"
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 
-export type PlaceContributionImageRole = Extract<ImageRole, "avatar" | "hero">
+export type PendingContributionImageRole = Extract<ImageRole, "avatar" | "hero" | "cover" | "banner">
 
-function pendingBasePath(contributionId: string, role: PlaceContributionImageRole): string {
+/** @deprecated Use PendingContributionImageRole */
+export type PlaceContributionImageRole = Extract<PendingContributionImageRole, "avatar" | "hero">
+
+function pendingBasePath(contributionId: string, role: PendingContributionImageRole): string {
   return `pending/contributions/${contributionId}/${role}`
 }
 
-export async function uploadPendingPlaceContributionImage(
+export async function uploadPendingContributionImage(
   contributionId: string,
-  role: PlaceContributionImageRole,
+  role: PendingContributionImageRole,
   file: File | Buffer,
+  variants: readonly ImageVariant[] = ["sm", "lg"],
 ): Promise<
-  | { success: true; smPath: string; lgPath: string; previewUrl: string }
+  | { success: true; paths: Partial<Record<ImageVariant, string>>; previewUrl: string }
   | { success: false; error: string }
 > {
   const buffer = Buffer.isBuffer(file) ? file : Buffer.from(await file.arrayBuffer())
@@ -24,12 +29,16 @@ export async function uploadPendingPlaceContributionImage(
     return { success: false, error: "File too large (max 10 MB)" }
   }
 
+  if (variants.length === 0) {
+    return { success: false, error: "No variants requested" }
+  }
+
   const supabase = await createClient()
   const basePath = pendingBasePath(contributionId, role)
   const version = Date.now()
   const paths: Partial<Record<ImageVariant, string>> = {}
 
-  for (const variant of ["sm", "lg"] as const) {
+  for (const variant of variants) {
     const width = VARIANT_SIZES[variant]
     const webpBuffer = await sharp(buffer)
       .resize(width, null, { withoutEnlargement: true })
@@ -51,15 +60,17 @@ export async function uploadPendingPlaceContributionImage(
     paths[variant] = storagePath
   }
 
-  const lgPath = paths.lg
-  const smPath = paths.sm
-  if (!lgPath || !smPath) {
-    return { success: false, error: "Upload failed: missing variants" }
+  const lgPath = paths.lg ?? paths.sm
+  if (!lgPath) {
+    return { success: false, error: "Upload failed: missing preview variant" }
   }
 
   const { data: urlData } = supabase.storage.from(ASSET_IMAGES_BUCKET).getPublicUrl(lgPath)
-  return { success: true, smPath, lgPath, previewUrl: urlData.publicUrl }
+  return { success: true, paths, previewUrl: urlData.publicUrl }
 }
+
+/** @deprecated Use uploadPendingContributionImage */
+export const uploadPendingPlaceContributionImage = uploadPendingContributionImage
 
 export async function removePendingContributionImagePaths(
   smPath: string | null | undefined,
@@ -77,28 +88,35 @@ export async function removePendingContributionStoragePaths(paths: string[]): Pr
   await supabase.storage.from(ASSET_IMAGES_BUCKET).remove(toRemove)
 }
 
-export async function promotePendingPlacePhotoToAssetImages(
-  placeId: string,
-  role: PlaceContributionImageRole,
-  smPath: string,
-  lgPath: string,
+export async function promotePendingContributionPhotoToAssetImages(
+  entityType: Extract<ContributionEntityType, "place" | "fiction">,
+  entityId: string,
+  role: PendingContributionImageRole,
+  paths: { sm?: string; lg?: string },
 ): Promise<{ success: true } | { success: false; error: string }> {
+  const pairs: { variant: ImageVariant; from: string }[] = []
+  if (paths.sm?.trim()) pairs.push({ variant: "sm", from: paths.sm })
+  if (paths.lg?.trim()) pairs.push({ variant: "lg", from: paths.lg })
+  if (pairs.length === 0) {
+    return { success: false, error: "No paths to promote" }
+  }
+
   const supabase = await createClient()
   const version = Date.now()
 
   const { data: existing } = await supabase
     .from("asset_images")
     .select("id, url")
-    .eq("entity_type", "place")
-    .eq("entity_id", placeId)
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
     .eq("role", role)
 
   if (existing?.length) {
     await supabase
       .from("asset_images")
       .delete()
-      .eq("entity_type", "place")
-      .eq("entity_id", placeId)
+      .eq("entity_type", entityType)
+      .eq("entity_id", entityId)
       .eq("role", role)
     for (const row of existing) {
       try {
@@ -111,21 +129,17 @@ export async function promotePendingPlacePhotoToAssetImages(
   }
 
   const inserts: { entity_type: string; entity_id: string; role: string; variant: string; url: string }[] = []
-  const pairs: { variant: ImageVariant; from: string }[] = [
-    { variant: "sm", from: smPath },
-    { variant: "lg", from: lgPath },
-  ]
 
   for (const { variant, from } of pairs) {
-    const dest = `place/${placeId}/${role}/${variant}_${version}.webp`
+    const dest = `${entityType}/${entityId}/${role}/${variant}_${version}.webp`
     const { error: copyErr } = await supabase.storage.from(ASSET_IMAGES_BUCKET).copy(from, dest)
     if (copyErr) {
       return { success: false, error: `Copy failed: ${copyErr.message}` }
     }
     const { data: urlData } = supabase.storage.from(ASSET_IMAGES_BUCKET).getPublicUrl(dest)
     inserts.push({
-      entity_type: "place",
-      entity_id: placeId,
+      entity_type: entityType,
+      entity_id: entityId,
       role,
       variant,
       url: urlData.publicUrl,
@@ -139,6 +153,18 @@ export async function promotePendingPlacePhotoToAssetImages(
     }
   }
 
-  await removePendingContributionImagePaths(smPath, lgPath)
+  await removePendingContributionStoragePaths(
+    [paths.sm, paths.lg].filter((p): p is string => Boolean(p?.trim())),
+  )
   return { success: true }
+}
+
+/** @deprecated Use promotePendingContributionPhotoToAssetImages */
+export async function promotePendingPlacePhotoToAssetImages(
+  placeId: string,
+  role: PlaceContributionImageRole,
+  smPath: string,
+  lgPath: string,
+): Promise<{ success: true } | { success: false; error: string }> {
+  return promotePendingContributionPhotoToAssetImages("place", placeId, role, { sm: smPath, lg: lgPath })
 }

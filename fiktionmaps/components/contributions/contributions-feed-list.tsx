@@ -2,12 +2,15 @@ import { getTranslations } from "next-intl/server"
 import Image from "next/image"
 import { Link } from "@/i18n/navigation"
 import {
+  getPendingPathsForRole,
   isPlaceContributionFeedItem,
+  isFictionAddPhotoContribution,
   type StaffCreateContributionFeedItem,
   type StaffContributionsFeedKind,
 } from "@/src/contributions/domain/contribution.entity"
 import { contributionTypeMessageKey } from "@/components/contributions/contribution-type-label"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
+import { publicAssetImageUrl } from "@/lib/asset-images/public-asset-url"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import type { ContributionsFeedTab } from "@/components/contributions/contributions-feed-tab-bar"
@@ -115,9 +118,16 @@ export async function ContributionsFeedList({
         const title = isPlace
           ? item.placeName?.trim() || t("feedCard_untitledPlace")
           : item.fictionTitle?.trim() || t("feedCard_untitledFiction")
+        const fictionProposedLg = !isPlace
+          ? getPendingPathsForRole(item.pendingImagesByRole, "cover")?.lg
+          : null
+        const fictionProposed =
+          isFictionAddPhotoContribution(item) && fictionProposedLg
+            ? publicAssetImageUrl(fictionProposedLg)
+            : null
         const coverSrc = isPlace
           ? item.placeAvatarUrl?.trim() || DEFAULT_FICTION_COVER
-          : item.fictionCoverUrl?.trim() || DEFAULT_FICTION_COVER
+          : fictionProposed || item.fictionCoverUrl?.trim() || DEFAULT_FICTION_COVER
         const subtitle = isPlace && item.fictionTitle?.trim() ? item.fictionTitle.trim() : null
 
         return (

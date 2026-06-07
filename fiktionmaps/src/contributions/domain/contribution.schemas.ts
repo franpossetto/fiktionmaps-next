@@ -44,3 +44,12 @@ export const submitPlaceAddPhotoContributionSchema = z.object({
 })
 
 export type SubmitPlaceAddPhotoContributionData = z.infer<typeof submitPlaceAddPhotoContributionSchema>
+
+export const fictionAddPhotoTargetRoleSchema = z.enum(["cover", "banner"])
+
+export const submitFictionAddPhotoContributionSchema = z.object({
+  fictionId: uuidSchema,
+  targetRole: fictionAddPhotoTargetRoleSchema,
+})
+
+export type SubmitFictionAddPhotoContributionData = z.infer<typeof submitFictionAddPhotoContributionSchema>
