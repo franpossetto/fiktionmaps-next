@@ -707,6 +707,10 @@
           "title": "Añadir lugar",
           "description": "Lugar de rodaje vinculado a una ficción."
         },
+        "hunt_place": {
+          "title": "Añadir lugar",
+          "description": "Deja que la IA extraiga locaciones de filmación de artículos o listas por vos."
+        },
         "add_scene": {
           "title": "Añadir escena",
           "description": "Escena ligada a un lugar del mapa."
@@ -754,6 +758,27 @@
       "sending": "Enviando…"
     },
     "progressAriaLabel": "Progreso del asistente",
+    "huntReview": {
+      "reviewKicker": "Revisión · {fictionTitle}",
+      "locationProgress": "Ubicación {current} de {total}",
+      "noDescription": "No se extrajo descripción de escena de la página fuente.",
+      "streetViewHeading": "Verificar con Street View",
+      "mapHeading": "Revisar en el mapa",
+      "mapHint": "Hacé clic en el mapa para mover el pin si la ubicación no coincide.",
+      "resetPin": "Restablecer pin a la ubicación original",
+      "fixCoords": "Corregir",
+      "fixCoordsModalTitle": "Ingresar coordenadas",
+      "fixCoordsModalDescription": "Pegá la latitud y longitud de la ubicación correcta. Podés copiarlas desde Google Maps.",
+      "fixCoordsLatLabel": "Latitud",
+      "fixCoordsLngLabel": "Longitud",
+      "fixCoordsLatPlaceholder": "ej. 48.8584",
+      "fixCoordsLngPlaceholder": "ej. 2.2945",
+      "fixCoordsApply": "Aplicar",
+      "fixCoordsInvalid": "Ingresá latitud válida (−90 a 90) y longitud (−180 a 180).",
+      "noCoords": "Sin coordenadas — no se puede mostrar mapa ni Street View. Omití este lugar o terminá sin aprobarlo.",
+      "duplicateBannerKicker": "Posible duplicado",
+      "duplicateVisit": "Visitar"
+    },
     "categoryPicker": {
       "title": "¿Qué vas a sumar al mapa?",
       "subtitle": "Elegí un tipo para continuar con los datos de la ficha.",

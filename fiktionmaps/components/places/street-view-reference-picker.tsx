@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl"
 import { Check, Loader2 } from "lucide-react"
 import type { StreetViewReference } from "@/src/locations/domain/location-view-reference.schemas"
 import { isGoogleMapsConfigured, loadGoogleMaps } from "@/lib/google-maps/load-google-maps"
+import { positionPanoramaAtPlace } from "@/lib/google-maps/street-view-at-place"
 import {
   STREET_VIEW_FOV_DEFAULT,
   STREET_VIEW_FOV_MAX,
@@ -26,69 +27,8 @@ export interface StreetViewReferencePickerProps {
 
 type LoadState = "loading" | "ready" | "no_coverage" | "error" | "missing_key"
 
-const STREET_VIEW_SEARCH_RADIUS_M = 150
-
 function isValidCoordinate(lat: number, lng: number): boolean {
   return Number.isFinite(lat) && Number.isFinite(lng)
-}
-
-/** Initial camera heading from panorama position toward the place coordinates. */
-function bearingTowardPlace(
-  fromLat: number,
-  fromLng: number,
-  toLat: number,
-  toLng: number,
-): number {
-  const φ1 = (fromLat * Math.PI) / 180
-  const φ2 = (toLat * Math.PI) / 180
-  const Δλ = ((toLng - fromLng) * Math.PI) / 180
-  const y = Math.sin(Δλ) * Math.cos(φ2)
-  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ)
-  const deg = (Math.atan2(y, x) * 180) / Math.PI
-  return (deg + 360) % 360
-}
-
-function positionPanoramaAtPlace(
-  googleMaps: typeof google,
-  panorama: google.maps.StreetViewPanorama,
-  placeLatitude: number,
-  placeLongitude: number,
-): Promise<boolean> {
-  const service = new googleMaps.maps.StreetViewService()
-  const target = { lat: placeLatitude, lng: placeLongitude }
-
-  const tryGetPanorama = (
-    source: google.maps.StreetViewSource,
-    radius: number,
-  ): Promise<google.maps.StreetViewPanoramaData | null> =>
-    new Promise((resolve) => {
-      service.getPanorama({ location: target, radius, source }, (data, status) => {
-        resolve(
-          status === googleMaps.maps.StreetViewStatus.OK && data?.location?.latLng ? data : null,
-        )
-      })
-    })
-
-  return (async () => {
-    let data =
-      (await tryGetPanorama(googleMaps.maps.StreetViewSource.OUTDOOR, 75)) ??
-      (await tryGetPanorama(googleMaps.maps.StreetViewSource.DEFAULT, STREET_VIEW_SEARCH_RADIUS_M))
-
-    if (!data?.location?.latLng) return false
-
-    if (data.location.pano) {
-      panorama.setPano(data.location.pano)
-    }
-    panorama.setPosition(target)
-
-    const panoLat = data.location.latLng.lat()
-    const panoLng = data.location.latLng.lng()
-    const heading = bearingTowardPlace(panoLat, panoLng, placeLatitude, placeLongitude)
-
-    panorama.setPov({ heading, pitch: 0 })
-    panorama.setZoom(streetViewFovToZoom(STREET_VIEW_FOV_DEFAULT))
-    return true
-  })()
 }
 
 function buildReferenceFromPanorama(panorama: google.maps.StreetViewPanorama): StreetViewReference | null {
@@ -154,6 +94,7 @@ export function StreetViewReferencePicker({
         if (cancelled || !panoramaRef.current) return
 
         const panorama = new googleMaps.maps.StreetViewPanorama(panoramaRef.current, {
+          visible: false,
           disableDefaultUI: true,
           clickToGo: true,
           scrollwheel: true,
@@ -177,6 +118,7 @@ export function StreetViewReferencePicker({
 
         if (value) {
           applyReference(value)
+          panorama.setVisible(true)
           setLoadState("ready")
         } else {
           const positioned = await positionPanoramaAtPlace(
@@ -187,6 +129,7 @@ export function StreetViewReferencePicker({
           )
           if (cancelled) return
           if (positioned) {
+            panorama.setVisible(true)
             syncControlsFromPanorama(panorama)
             setLoadState("ready")
           } else {

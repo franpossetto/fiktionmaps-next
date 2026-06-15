@@ -707,6 +707,10 @@
           "title": "Add place",
           "description": "Filming spot linked to a fiction."
         },
+        "hunt_place": {
+          "title": "Add place",
+          "description": "Let AI extract filming locations from articles or lists for you."
+        },
         "add_scene": {
           "title": "Add scene",
           "description": "Scene tied to a place on the map."
@@ -754,6 +758,27 @@
       "sending": "Sending…"
     },
     "progressAriaLabel": "Assistant progress",
+    "huntReview": {
+      "reviewKicker": "Review · {fictionTitle}",
+      "locationProgress": "Location {current} of {total}",
+      "noDescription": "No scene description extracted from the source page.",
+      "streetViewHeading": "Verify with Street View",
+      "mapHeading": "Check on map",
+      "mapHint": "Click the map to move the pin if the location looks wrong.",
+      "resetPin": "Reset pin to original location",
+      "fixCoords": "Fix coordinates",
+      "fixCoordsModalTitle": "Enter coordinates",
+      "fixCoordsModalDescription": "Paste the latitude and longitude of the correct location. You can copy them from Google Maps.",
+      "fixCoordsLatLabel": "Latitude",
+      "fixCoordsLngLabel": "Longitude",
+      "fixCoordsLatPlaceholder": "e.g. 48.8584",
+      "fixCoordsLngPlaceholder": "e.g. 2.2945",
+      "fixCoordsApply": "Apply",
+      "fixCoordsInvalid": "Enter valid latitude (−90 to 90) and longitude (−180 to 180).",
+      "noCoords": "No coordinates — cannot show map or Street View. Skip this location or finish without approving it.",
+      "duplicateBannerKicker": "Possible duplicate",
+      "duplicateVisit": "Visit"
+    },
     "categoryPicker": {
       "title": "What will you add to the map?",
       "subtitle": "Choose a type to continue with the fiction details.",

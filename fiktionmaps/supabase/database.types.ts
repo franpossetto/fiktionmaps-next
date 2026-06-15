@@ -831,6 +831,8 @@ export type Database = {
           moderator_id: string | null
           moderator_note: string | null
           fpp_awarded: number | null
+          origin: string
+          external_id: string | null
           created_at: string
           updated_at: string
         }
@@ -853,6 +855,8 @@ export type Database = {
           moderator_id?: string | null
           moderator_note?: string | null
           fpp_awarded?: number | null
+          origin?: string
+          external_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -875,6 +879,8 @@ export type Database = {
           moderator_id?: string | null
           moderator_note?: string | null
           fpp_awarded?: number | null
+          origin?: string
+          external_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -977,6 +983,129 @@ export type Database = {
             columns: ["place_id"]
             isOneToOne: false
             referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hunt_sources: {
+        Row: {
+          id: string
+          fiction_id: string | null
+          context_label: string | null
+          context_label_normalized: string | null
+          source_url: string
+          source_url_normalized: string
+          scraped_markdown: string | null
+          scrape_provider: string | null
+          scrape_status: string
+          research_note: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          fiction_id?: string | null
+          context_label?: string | null
+          context_label_normalized?: string | null
+          source_url: string
+          source_url_normalized: string
+          scraped_markdown?: string | null
+          scrape_provider?: string | null
+          scrape_status?: string
+          research_note?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          fiction_id?: string | null
+          context_label?: string | null
+          context_label_normalized?: string | null
+          source_url?: string
+          source_url_normalized?: string
+          scraped_markdown?: string | null
+          scrape_provider?: string | null
+          scrape_status?: string
+          research_note?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hunt_sources_fiction_id_fkey"
+            columns: ["fiction_id"]
+            isOneToOne: false
+            referencedRelation: "fictions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hunt_sources_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hunts: {
+        Row: {
+          id: string
+          hunt_source_id: string
+          payload: { places: unknown[] }
+          status: string
+          outcome: string | null
+          hunter_note: string | null
+          stats: Record<string, number>
+          created_by: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          hunt_source_id: string
+          payload?: { places: unknown[] }
+          status?: string
+          outcome?: string | null
+          hunter_note?: string | null
+          stats?: Record<string, number>
+          created_by?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          hunt_source_id?: string
+          payload?: { places: unknown[] }
+          status?: string
+          outcome?: string | null
+          hunter_note?: string | null
+          stats?: Record<string, number>
+          created_by?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hunts_hunt_source_id_fkey"
+            columns: ["hunt_source_id"]
+            isOneToOne: false
+            referencedRelation: "hunt_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hunts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

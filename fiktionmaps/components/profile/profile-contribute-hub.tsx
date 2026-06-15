@@ -60,9 +60,10 @@ export function ProfileContributeHub({ topContributors }: ProfileContributeHubPr
           className="mt-8 grid auto-rows-fr grid-cols-1 items-stretch gap-3 sm:grid-cols-2 sm:gap-4"
           aria-label={t("listAria")}
         >
-          {CONTRIBUTION_TYPES_CATALOG.map(({ type, icon: Icon, hasWizard, href }) => {
-            const label = t(`types.${type}.title`)
-            const description = t(`types.${type}.description`)
+          {CONTRIBUTION_TYPES_CATALOG.map(({ id, type, icon: Icon, hasWizard, href, tag }) => {
+            const key = id ?? type
+            const label = t(`types.${key}.title`)
+            const description = t(`types.${key}.description`)
             const fpp = CONTRIBUTION_FPP[type]
 
             const cardClass = cn(
@@ -75,9 +76,16 @@ export function ProfileContributeHub({ topContributors }: ProfileContributeHubPr
             const cardInner = (
               <>
                 <div
-                  className="absolute right-2 top-2 flex flex-col items-end leading-none"
+                  className="absolute right-2 top-2 flex flex-col items-end gap-1 leading-none"
                   aria-label={t("fppIfApproved", { count: fpp })}
                 >
+                  {tag && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-violet-500/15 px-1.5 py-1 dark:bg-violet-500/20">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-violet-700/90 dark:text-violet-400/90">
+                        {tag}
+                      </span>
+                    </span>
+                  )}
                   <span
                     className={cn(
                       "inline-flex items-center gap-1 rounded-md px-1.5 py-1",
@@ -141,7 +149,7 @@ export function ProfileContributeHub({ topContributors }: ProfileContributeHubPr
 
             if (hasWizard && href) {
               return (
-                <li key={type} className="h-full min-h-0">
+                <li key={key} className="h-full min-h-0">
                   <Link href={href} className={cardClass}>
                     {cardInner}
                   </Link>
@@ -150,7 +158,7 @@ export function ProfileContributeHub({ topContributors }: ProfileContributeHubPr
             }
 
             return (
-              <li key={type} className="h-full min-h-0">
+              <li key={key} className="h-full min-h-0">
                 <div className={cardClass} aria-disabled="true">
                   {cardInner}
                 </div>

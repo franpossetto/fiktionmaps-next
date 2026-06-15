@@ -43,10 +43,10 @@ export interface AppDetailRailsShellProps {
  * the rails appear/disappear; the 1fr outer tracks expand/shrink with the viewport.
  */
 const RAILS_GRID_COLUMNS =
-  "grid-cols-1 @[920px]/rails:[grid-template-columns:1fr_920px_1fr] @[1200px]/rails:[grid-template-columns:1fr_266px_920px_1fr] @[1500px]/rails:[grid-template-columns:1fr_266px_920px_266px_1fr]"
+  "grid-cols-1 @[920px]/rails:[grid-template-columns:1fr_920px_1fr] @[1200px]/rails:[grid-template-columns:1fr_266px_920px_1fr] @[1600px]/rails:[grid-template-columns:1fr_266px_920px_320px_1fr] @[1900px]/rails:[grid-template-columns:1fr_266px_920px_420px_1fr]"
 
 const RAILS_GRID_COLUMNS_MAIN_RIGHT_ONLY =
-  "grid-cols-1 @[920px]/rails:[grid-template-columns:1fr_920px_1fr] @[1500px]/rails:[grid-template-columns:1fr_920px_266px_1fr]"
+  "grid-cols-1 @[920px]/rails:[grid-template-columns:1fr_920px_1fr] @[1600px]/rails:[grid-template-columns:1fr_920px_320px_1fr] @[1900px]/rails:[grid-template-columns:1fr_920px_420px_1fr]"
 
 export function AppDetailRailsShell({
   children,
@@ -86,6 +86,11 @@ export function AppDetailRailsShell({
         {isPageScroll ? (
           <div className="min-w-0 border-x border-border/50 max-lg:min-h-full @[1200px]/rails:border-x-0">
             {children}
+            {rightAside && (
+              <div className="border-t border-border/50 p-5 @[1600px]/rails:hidden">
+                {rightAside}
+              </div>
+            )}
           </div>
         ) : (
           <div
@@ -93,9 +98,14 @@ export function AppDetailRailsShell({
             className={cn("min-h-0 h-full min-w-0 bg-background", mainOverflowClass)}
           >
             {children}
+            {rightAside && (
+              <div className="border-t border-border/50 p-5 @[1600px]/rails:hidden">
+                {rightAside}
+              </div>
+            )}
           </div>
         )}
-        <aside className="hidden min-h-0 border-l border-border/50 px-5 py-10 @[1500px]/rails:block">
+        <aside className="hidden min-h-0 border-l border-border/50 px-5 py-10 @[1600px]/rails:block">
           {rightAside ?? null}
         </aside>
         <div className="hidden min-h-0 @[920px]/rails:block" aria-hidden />

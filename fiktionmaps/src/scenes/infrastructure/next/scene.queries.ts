@@ -9,6 +9,7 @@ import { listScenesUseCase } from "@/src/scenes/application/list-scenes.usecase"
 import { CacheKeys } from "@/src/shared/infrastructure/next/cache.keys"
 import { CacheConfig } from "@/src/shared/infrastructure/next/cache.config"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 
 const repo = scenesSupabaseAdapter
 
@@ -66,4 +67,17 @@ export async function getScenesForPlace(placeId: string): Promise<Scene[]> {
 /** Active scenes for a fiction (public detail / watch page). */
 export async function getScenesForFiction(fictionId: string): Promise<Scene[]> {
   return listScenesUseCase({ fictionId, active: true }, repo)
+}
+
+/** All scenes with video in a city, grouped with their fiction slugs for linking. */
+export async function getScenesForCityCached(cityId: string): Promise<{
+  scenes: Place[]
+  fictionSlugById: Record<string, string>
+}> {
+  const fictions = await getCityFictionsWithScenesForViewer(cityId)
+  const fictionIds = fictions.map((f) => f.id)
+  if (fictionIds.length === 0) return { scenes: [], fictionSlugById: {} }
+  const scenes = await repo.listScenesWithVideoInCity({ fictionIds, cityId })
+  const fictionSlugById = Object.fromEntries(fictions.map((f) => [f.id, f.slug.trim()]))
+  return { scenes, fictionSlugById }
 }

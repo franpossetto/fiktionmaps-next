@@ -54,6 +54,11 @@ export interface ContributionWizardFooterNavProps {
   disabled?: boolean
   loading?: boolean
   showTrailingArrow?: boolean
+  /** Segundo CTA a la izquierda del botón principal (p. ej. Finish junto a Next). */
+  secondaryCta?: {
+    label: string
+    onClick: () => void
+  }
 }
 
 function ContributionWizardFooterBack({
@@ -142,6 +147,8 @@ export interface ContributionWizardShellProps {
   contentMaxWidthClassName?: string
   /** Clases extra en el contenedor interno del scroll (p. ej. ajuste fino de márgenes). */
   contentInnerClassName?: string
+  /** Ref al div scrolleable interno, útil para resetear el scroll desde el padre. */
+  scrollRef?: React.RefObject<HTMLDivElement>
   className?: string
 }
 
@@ -161,6 +168,7 @@ export function ContributionWizardShell({
   showProgressDots = true,
   contentMaxWidthClassName = "max-w-md",
   contentInnerClassName,
+  scrollRef,
   className,
 }: ContributionWizardShellProps) {
   const dotsIndex = progressDotsIndex ?? stepIndex
@@ -172,7 +180,7 @@ export function ContributionWizardShell({
     <div
       className={cn("flex h-full min-h-0 w-full min-w-0 flex-col bg-background text-foreground", className)}
     >
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
         <div
           className={cn("mx-auto w-full px-4 pb-4 sm:pb-6", contentInnerClassName, contentMaxWidthClassName)}
         >
@@ -183,6 +191,9 @@ export function ContributionWizardShell({
       {useStickyFooterBar ? (
         <footer className="relative z-10 shrink-0 bg-background">
           <div className="h-px w-full bg-border/60" aria-hidden />
+          {footerHint ? (
+            <p className="px-4 pt-2 text-center text-xs text-muted-foreground">{footerHint}</p>
+          ) : null}
           <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <div className="flex min-w-0 justify-start">
               <ContributionWizardFooterBack
@@ -199,7 +210,19 @@ export function ContributionWizardShell({
                 <span className="block min-h-[1.25rem] w-px shrink-0" aria-hidden />
               )}
             </div>
-            <div className="flex min-w-0 justify-end">
+            <div className="flex min-w-0 justify-end gap-2">
+              {footerNav.secondaryCta ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="default"
+                  onClick={footerNav.secondaryCta.onClick}
+                  disabled={footerNav.loading}
+                  className="h-9 w-fit shrink-0 rounded-lg px-4 text-sm font-medium"
+                >
+                  {footerNav.secondaryCta.label}
+                </Button>
+              ) : null}
               <ContributionWizardFooterCta
                 isLastStep={footerNav.isLastStep}
                 onNext={footerNav.onNext}

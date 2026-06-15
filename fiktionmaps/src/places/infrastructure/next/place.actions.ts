@@ -50,6 +50,15 @@ export type {
   UploadPlaceImageResult,
 } from "./place.actions.types"
 
+export async function getPlaceUrlAction(placeId: string): Promise<string | null> {
+  const place = await getPlaceLocationByIdCached(placeId)
+  if (!place) return null
+  const { getFictionByIdCached } = await import("@/src/fictions/infrastructure/next/fiction.queries")
+  const fiction = await getFictionByIdCached(place.fictionId)
+  if (!fiction) return null
+  return `/fictions/${fiction.slug}/places/${place.slug}`
+}
+
 const CREATE_PLACE_CONTRIBUTION = {
   type: "create_place" as const,
   entityType: "place" as const,
