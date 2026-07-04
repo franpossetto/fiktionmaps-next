@@ -50,7 +50,18 @@
     "noMatchingInScope": "Sin resultados en este ámbito",
     "noMatchingFictions": "No hay ficciones coincidentes",
     "logoAlt": "fiktionmaps",
-    "searchResultCity": "Ciudad"
+    "searchResultCity": "Ciudad",
+    "contributors": "Colaboradores"
+  },
+  "Contributors": {
+    "metaTitle": "Colaboradores",
+    "pageTitle": "Colaboradores",
+    "pageSubtitle": "Clasificados por Fiktion Player Points",
+    "memberFallback": "Miembro",
+    "emptyState": "Aún no hay colaboradores.",
+    "fppLabel": "fpp",
+    "prevPage": "Anterior",
+    "nextPage": "Siguiente"
   },
   "Contributions": {
     "metaTitle": "Contribuciones",

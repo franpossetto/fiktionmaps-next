@@ -50,7 +50,18 @@
     "noMatchingInScope": "No results in this scope",
     "noMatchingFictions": "No matching fictions",
     "logoAlt": "fiktionmaps",
-    "searchResultCity": "City"
+    "searchResultCity": "City",
+    "contributors": "Contributors"
+  },
+  "Contributors": {
+    "metaTitle": "Contributors",
+    "pageTitle": "Contributors",
+    "pageSubtitle": "Ranked by Fiktion Player Points",
+    "memberFallback": "Member",
+    "emptyState": "No contributors yet.",
+    "fppLabel": "fpp",
+    "prevPage": "Previous",
+    "nextPage": "Next"
   },
   "Contributions": {
     "metaTitle": "Contributions",

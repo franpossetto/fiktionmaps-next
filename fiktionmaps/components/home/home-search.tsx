@@ -66,9 +66,11 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
   const [rouletteSpinning, setRouletteSpinning] = useState(false)
   const [noPlacesModal, setNoPlacesModal] = useState<{ city: City; suggestions: City[] } | null>(null)
   const [isNavigating, startTransition] = useTransition()
+  const [activeIndex, setActiveIndex] = useState(-1)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const modeRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
 
   const taglines = TAGLINES[locale] ?? TAGLINES.en
   const [taglineIndex, setTaglineIndex] = useState(() => globalTaglineIndex % taglines.length)
@@ -125,6 +127,20 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
   }, [query, cities, fictions])
 
   const showDropdown = isFocused && !pendingHit && query.trim().length > 0
+
+  // Reset active index whenever the hit list changes
+  useEffect(() => { setActiveIndex(-1) }, [hits])
+
+  // Scroll the highlighted item into view
+  useEffect(() => {
+    if (activeIndex < 0 || !listRef.current) return
+    const item = listRef.current.children[activeIndex] as HTMLElement | undefined
+    item?.scrollIntoView({ block: "nearest" })
+  }, [activeIndex])
+
+  function isHitDisabled(hit: SearchHit): boolean {
+    return hit.kind === "fiction" && !hasPlaces(hit.fiction.id)
+  }
 
   function typeBadge(type: FictionWithMedia["type"]) {
     if (type === "movie") return tFictions("typeMovie")
@@ -290,7 +306,39 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleSubmit() }}
+                onKeyDown={(e) => {
+                  if (!showDropdown || hits.length === 0) {
+                    if (e.key === "Enter") handleSubmit()
+                    return
+                  }
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault()
+                    setActiveIndex((prev) => {
+                      let next = prev + 1
+                      while (next < hits.length && isHitDisabled(hits[next])) next++
+                      return next < hits.length ? next : prev
+                    })
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault()
+                    setActiveIndex((prev) => {
+                      if (prev <= 0) return -1
+                      let next = prev - 1
+                      while (next > 0 && isHitDisabled(hits[next])) next--
+                      return isHitDisabled(hits[next]) ? -1 : next
+                    })
+                  } else if (e.key === "Escape") {
+                    e.preventDefault()
+                    setIsFocused(false)
+                    setActiveIndex(-1)
+                  } else if (e.key === "Enter") {
+                    if (activeIndex >= 0 && !isHitDisabled(hits[activeIndex])) {
+                      e.preventDefault()
+                      selectHit(hits[activeIndex])
+                    } else {
+                      handleSubmit()
+                    }
+                  }
+                }}
                 placeholder={t("searchPlaceholder")}
                 className="flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground"
                 autoComplete="off"
@@ -378,8 +426,8 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
               {hits.length === 0 ? (
                 <div className="px-4 py-3 text-sm text-muted-foreground">{t("noResults")}</div>
               ) : (
-                <ul className="max-h-80 overflow-y-auto p-1">
-                  {hits.map((hit) => {
+                <ul ref={listRef} className="max-h-80 overflow-y-auto p-1" role="listbox">
+                  {hits.map((hit, index) => {
                     const key = hit.kind === "city" ? `city-${hit.city.id}` : `fiction-${hit.fiction.id}`
                     const label = hit.kind === "city" ? hit.city.name : hit.fiction.title
                     const badge = hit.kind === "city" ? t("cityBadge") : typeBadge(hit.fiction.type)
@@ -392,14 +440,19 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
                       : hit.kind === "city"
                         ? hit.city.country
                         : (hit.fiction.year?.toString() ?? "")
+                    const isActive = index === activeIndex
                     return (
-                      <li key={key}>
+                      <li key={key} role="option" aria-selected={isActive}>
                         <button
                           type="button"
                           disabled={noPlaces}
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => selectHit(hit)}
-                          className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+                          onMouseEnter={() => !noPlaces && setActiveIndex(index)}
+                          className={cn(
+                            "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                            isActive && !noPlaces ? "bg-accent" : "hover:bg-accent disabled:hover:bg-transparent",
+                          )}
                         >
                           <span className="flex min-w-0 items-center gap-2">
                             <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">

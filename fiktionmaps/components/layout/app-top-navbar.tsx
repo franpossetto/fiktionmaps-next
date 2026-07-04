@@ -62,6 +62,25 @@ type ScopedHit =
 /**
  * Misma barra que `AppTopNavbar` pero sin buscador (flujos de contribución y otras pantallas donde no aplica).
  */
+function NavLinks({ tNav }: { tNav: ReturnType<typeof useTranslations<"Nav">> }) {
+  return (
+    <nav className="hidden items-center gap-1.5 md:flex">
+      <Link
+        href="/fictions"
+        className="inline-flex items-center rounded-lg border border-border/60 bg-background px-3 py-1.5 text-sm font-medium text-foreground/80 shadow-sm transition-colors hover:bg-accent hover:text-foreground"
+      >
+        {tNav("catalog")}
+      </Link>
+      <Link
+        href="/contributors"
+        className="inline-flex items-center rounded-lg border border-border/60 bg-background px-3 py-1.5 text-sm font-medium text-foreground/80 shadow-sm transition-colors hover:bg-accent hover:text-foreground"
+      >
+        {tNav("contributors")}
+      </Link>
+    </nav>
+  )
+}
+
 export function AppTopNavbarNoSearch() {
   const tNav = useTranslations("Nav")
 
@@ -74,6 +93,7 @@ export function AppTopNavbarNoSearch() {
           </Link>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <NavLinks tNav={tNav} />
           <UserMenu />
         </div>
       </div>
@@ -373,8 +393,9 @@ export function AppTopNavbar() {
           ) : null}
         </div>
         <div
-          className={`${TOP_NAV_MOBILE_SIDE_SLOT} shrink-0 md:w-auto md:justify-self-end`}
+          className={`${TOP_NAV_MOBILE_SIDE_SLOT} shrink-0 md:flex md:w-auto md:items-center md:gap-2 md:justify-self-end`}
         >
+          <NavLinks tNav={tNav} />
           <UserMenu />
         </div>
       </div>
