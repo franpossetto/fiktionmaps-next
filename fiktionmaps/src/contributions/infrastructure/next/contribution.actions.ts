@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server"
 import { uuidSchema } from "@/lib/validation/primitives"
 import { zodErrorMessage } from "@/lib/validation/http"
 import type { ContributorProfileWithDate } from "@/src/contributions/domain/contribution.entity"
+import { getFictionScopeContributorContributionsUseCase } from "@/src/contributions/application/get-fiction-scope-contributor-contributions.usecase"
+import { getContributorEntityScopeCountsUseCase } from "@/src/contributions/application/get-contributor-entity-scope-counts.usecase"
 import { getPlaceContributorsWithDatesCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { approveContributionUseCase } from "@/src/contributions/application/approve-contribution.usecase"
 import { createContributionUseCase } from "@/src/contributions/application/create-contribution.usecase"
@@ -30,6 +32,7 @@ import type {
   ApproveContributionResult,
   CreateContributionResult,
   RejectContributionResult,
+  GetFictionScopeContributorContributionsResult,
 } from "./contribution.actions.types"
 import type { ApproveContributionData, CreateContributionData, RejectContributionData } from "@/src/contributions/domain/contribution.schemas"
 
@@ -37,6 +40,7 @@ export type {
   ApproveContributionResult,
   CreateContributionResult,
   RejectContributionResult,
+  GetFictionScopeContributorContributionsResult,
 } from "./contribution.actions.types"
 
 export async function getPlaceContributorsAction(
@@ -46,16 +50,22 @@ export async function getPlaceContributorsAction(
   return getPlaceContributorsWithDatesCached(placeId)
 }
 
-function revalidateContributionEntityTags(entityType: ContributionEntityType, entityId: string) {
+async function revalidateContributionEntityTags(entityType: ContributionEntityType, entityId: string) {
   switch (entityType) {
     case "fiction":
       updateTag("fictions")
       updateTag(`fiction-${entityId}`)
       break
-    case "place":
+    case "place": {
       updateTag("places")
       updateTag(`place-${entityId}`)
+      const place = await placesRepo.getById(entityId)
+      if (place?.fictionId) {
+        updateTag("fictions")
+        updateTag(`fiction-${place.fictionId}`)
+      }
       break
+    }
     case "scene":
       updateTag("scenes")
       updateTag(`scene-${entityId}`)
@@ -96,7 +106,7 @@ export async function createContributionAction(data: CreateContributionData): Pr
   revalidatePath("/admin")
   revalidatePath("/contributions")
   updateTag("contributions")
-  revalidateContributionEntityTags(parsed.data.entityType, parsed.data.entityId)
+  await revalidateContributionEntityTags(parsed.data.entityType, parsed.data.entityId)
   if (result.autoApproved) {
     updateTag("profiles")
   }
@@ -250,7 +260,7 @@ export async function approveContributionAction(data: ApproveContributionData): 
   revalidatePath("/contributions")
   updateTag("contributions")
   updateTag("profiles")
-  revalidateContributionEntityTags(contributionBefore.entityType, contributionBefore.entityId)
+  await revalidateContributionEntityTags(contributionBefore.entityType, contributionBefore.entityId)
   return { success: true }
 }
 
@@ -286,6 +296,25 @@ export async function rejectContributionAction(data: RejectContributionData): Pr
   revalidatePath("/contributions")
   updateTag("contributions")
   updateTag("profiles")
-  revalidateContributionEntityTags(contributionBefore.entityType, contributionBefore.entityId)
+  await revalidateContributionEntityTags(contributionBefore.entityType, contributionBefore.entityId)
   return { success: true }
+}
+
+export async function getFictionScopeContributorContributionsAction(
+  fictionId: string,
+  userId: string,
+): Promise<GetFictionScopeContributorContributionsResult> {
+  if (!uuidSchema.safeParse(fictionId).success || !uuidSchema.safeParse(userId).success) {
+    return { success: false, error: "Invalid id" }
+  }
+
+  try {
+    const [items, scopeCounts] = await Promise.all([
+      getFictionScopeContributorContributionsUseCase(fictionId, userId, contributionsRepo),
+      getContributorEntityScopeCountsUseCase(userId, contributionsRepo),
+    ])
+    return { success: true, items, scopeCounts }
+  } catch {
+    return { success: false, error: "Failed to load contributor details" }
+  }
 }

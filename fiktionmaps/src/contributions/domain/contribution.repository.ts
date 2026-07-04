@@ -2,9 +2,13 @@ import type {
   Contribution,
   ContributionEntityType,
   ContributionPendingImage,
+  ContributionType,
+  ContributorEntityScopeCounts,
   ContributorProfileWithDate,
   FictionContributionFeedItem,
   FictionContributorProfile,
+  FictionContributorScopeEntry,
+  FictionScopeContributorContributionItem,
   PlaceContributionFeedItem,
   StaffCreateContributionsFeedPageInput,
   StaffCreateContributionsFeedPageResult,
@@ -43,6 +47,8 @@ export interface ContributionsRepositoryPort {
   getById(id: string): Promise<Contribution | null>
   getByUser(userId: string): Promise<Contribution[]>
   countByUser(userId: string): Promise<number>
+  /** Distinct fictions (direct + via places) and places with approved contributions. */
+  countApprovedFictionAndPlaceScopesByUser(userId: string): Promise<ContributorEntityScopeCounts>
   /** Sum of `fpp_awarded` for approved contributions (legacy; prefer profiles.fpp_total). */
   sumApprovedFppAwardedByUser(userId: string): Promise<number>
   getApprovedByEntity(entityType: ContributionEntityType, entityId: string): Promise<Contribution[]>
@@ -51,11 +57,18 @@ export interface ContributionsRepositoryPort {
     entityType: ContributionEntityType,
     entityId: string,
   ): Promise<FictionContributorProfile[]>
+  /** One row per approved contribution on the fiction and its places; callers aggregate FPP by profile id. */
+  listApprovedContributorProfilesForFictionScope(fictionId: string): Promise<FictionContributorScopeEntry[]>
   /** One row per user; contributedAt = earliest approved contribution for this entity. */
   listApprovedContributorProfilesFirstContributionAt(
     entityType: ContributionEntityType,
     entityId: string,
   ): Promise<ContributorProfileWithDate[]>
+  /** Approved contribution detail rows for one user in a fiction scope (fiction + its places). */
+  listApprovedContributionsForUserInFictionScope(
+    fictionId: string,
+    userId: string,
+  ): Promise<FictionScopeContributorContributionItem[]>
   getPending(): Promise<Contribution[]>
   /**
    * Staff feed: tab "all" = pending + approved; tab "rejected" = solo rejected.

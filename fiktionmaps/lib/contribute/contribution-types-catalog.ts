@@ -24,6 +24,10 @@ export type ContributionTypeCatalogEntry = {
   href?: "/contribute/fiction" | "/contribute/place" | "/contribute/photo" | "/contribute/hunt"
   /** Short badge label shown on the card (e.g. "AI Hunt"). */
   tag?: string
+  /** Requires contributor, moderator, or admin role (e.g. AI wizards). */
+  requiresContributor?: boolean
+  /** Hidden when no AI provider key is configured. */
+  aiRequired?: boolean
 }
 
 const CONTRIBUTION_TYPES_CATALOG_BASE: ContributionTypeCatalogEntry[] = [
@@ -36,6 +40,8 @@ const CONTRIBUTION_TYPES_CATALOG_BASE: ContributionTypeCatalogEntry[] = [
     hasWizard: true,
     href: "/contribute/hunt",
     tag: "AI Hunt",
+    requiresContributor: true,
+    aiRequired: true,
   },
   { type: "add_scene", icon: Clapperboard, hasWizard: false },
   { type: "add_photo", icon: ImagePlus, hasWizard: true, href: "/contribute/photo" },

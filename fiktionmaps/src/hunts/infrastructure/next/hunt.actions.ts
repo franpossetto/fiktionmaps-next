@@ -122,7 +122,7 @@ export async function createHuntAction(sourceId: string): Promise<CreateHuntResu
   if ("error" in auth) return { success: false, error: auth.error }
 
   const fictionsRepo = createFictionsSupabaseAdapter(createClient)
-  const llm = getLLMProvider()
+  const llm = await getLLMProvider()
   const geocoder = getGeocodingProvider()
 
   try {
@@ -199,7 +199,7 @@ export async function previewHuntAction(input: unknown): Promise<PreviewHuntResu
 
   try {
     const fictionsRepo = createFictionsSupabaseAdapter(createClient)
-    const llm = getLLMProvider()
+    const llm = await getLLMProvider()
     const geocoder = getGeocodingProvider()
     const result = await previewHuntUseCase(
       parsed.data.source_url,

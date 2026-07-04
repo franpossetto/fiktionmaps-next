@@ -1,18 +1,24 @@
 import Image from "next/image"
 import { MapPin } from "lucide-react"
 import { getTranslations } from "next-intl/server"
+import { Link } from "@/i18n/navigation"
+import { TopContributorsSection } from "@/components/contributions/top-contributors-section"
 import { FictionInterestTags } from "@/components/fictions/fiction-interest-tags"
 import type { City } from "@/src/cities/domain/city.entity"
-import type { FictionContributorProfile } from "@/src/contributions/domain/contribution.entity"
+import type { FictionContributorRankedProfile } from "@/src/contributions/domain/contribution.entity"
 import { cn } from "@/lib/utils"
 
 export async function FictionDetailRightRail({
+  fictionId,
+  fictionTitle,
   fictionInterestTags,
   contributors,
   initialCities,
 }: {
+  fictionId: string
+  fictionTitle: string
   fictionInterestTags: { id: string; label: string }[]
-  contributors: FictionContributorProfile[]
+  contributors: FictionContributorRankedProfile[]
   initialCities: City[]
 }) {
   const t = await getTranslations("Fictions")
@@ -22,15 +28,11 @@ export async function FictionDetailRightRail({
   const hasRightRail = showInterests || showCities || showContributors
   if (!hasRightRail) return null
 
-  function displayName(p: FictionContributorProfile): string {
-    return p.username?.trim() || t("contributorNameFallback")
-  }
-
   const citiesSectionBorderTop = showInterests
   const contributorsSectionBorderTop = showInterests || showCities
 
   return (
-    <div className="mx-auto w-full max-w-[260px] space-y-4">
+    <div className="w-full space-y-4">
       <FictionInterestTags tags={fictionInterestTags} />
 
       {showCities && (
@@ -38,12 +40,15 @@ export async function FictionDetailRightRail({
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">{t("citiesHeading")}</p>
           <ul className="space-y-2">
             {initialCities.map((city) => (
-              <li key={city.id} className="text-sm text-muted-foreground">
-                <span className="inline-flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5" />
+              <li key={city.id} className="text-sm">
+                <Link
+                  href={`/cities/${city.id}`}
+                  className="inline-flex items-center gap-1 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
                   {city.name}
                   {city.country ? `, ${city.country}` : ""}
-                </span>
+                </Link>
               </li>
             ))}
           </ul>
@@ -51,31 +56,13 @@ export async function FictionDetailRightRail({
       )}
 
       {showContributors && (
-        <section
-          className={cn("space-y-2", contributorsSectionBorderTop && "border-t border-border/60 pt-4")}
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">{t("contributorsHeading")}</p>
-          <ul className="space-y-2">
-            {contributors.map((p) => {
-              const label = displayName(p)
-              const initial = label.charAt(0).toUpperCase()
-              return (
-                <li key={p.id} className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full bg-muted">
-                    {p.avatarUrl?.trim() ? (
-                      <Image src={p.avatarUrl.trim()} alt={label} width={28} height={28} className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
-                        {initial}
-                      </span>
-                    )}
-                  </span>
-                  <span className="min-w-0 truncate text-foreground">{label}</span>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
+        <TopContributorsSection
+          contributors={contributors}
+          title={t("contributorsHeading")}
+          nameFallback={t("contributorNameFallback")}
+          showBorderTop={contributorsSectionBorderTop}
+          modalContext={{ type: "fiction", fictionId, fictionTitle }}
+        />
       )}
     </div>
   )

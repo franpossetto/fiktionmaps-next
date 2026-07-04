@@ -20,6 +20,7 @@ function toFormState(c: City) {
     lat: String(c.lat),
     lng: String(c.lng),
     zoom: String(c.zoom),
+    image_url: c.image_url ?? "",
   }
 }
 
@@ -60,6 +61,7 @@ export function CityEditView({ initialCity }: CityEditViewProps) {
     fd.set("lat", formData.lat)
     fd.set("lng", formData.lng)
     fd.set("zoom", formData.zoom)
+    fd.set("image_url", formData.image_url.trim())
     const result = await updateCityAction(initialCity.id, fd)
     setSaving(false)
     if (result.success) {
@@ -95,6 +97,23 @@ export function CityEditView({ initialCity }: CityEditViewProps) {
           </h1>
           <p className="font-sans text-sm text-muted-foreground mt-1">
             {formData.name || initialCity.name}
+          </p>
+        </div>
+
+        {/* Image URL field */}
+        <div className="px-4 sm:px-6 pb-4">
+          <label className="block text-sm font-medium text-foreground mb-1">
+            City photo URL
+          </label>
+          <input
+            type="url"
+            value={formData.image_url}
+            onChange={(e) => setFormData((p) => ({ ...p, image_url: e.target.value }))}
+            placeholder="https://images.unsplash.com/…"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Used as the hero image on the public city page. Paste any direct image URL.
           </p>
         </div>
 

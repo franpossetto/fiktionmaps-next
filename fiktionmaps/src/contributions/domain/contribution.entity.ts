@@ -84,6 +84,16 @@ export interface FictionContributorProfile {
   avatarUrl: string | null
 }
 
+/** Fiction contributor with FPP earned in this fiction scope (fiction + its places). */
+export interface FictionContributorRankedProfile extends FictionContributorProfile {
+  fppTotal: number
+}
+
+/** One approved contribution row in a fiction scope (for FPP aggregation). */
+export interface FictionContributorScopeEntry extends FictionContributorProfile {
+  fppAwarded: number
+}
+
 /** Staff feed row: a create_fiction contribution on a fiction entity plus submitter profile. */
 export interface FictionContributionFeedItem extends Contribution {
   contributor: FictionContributorProfile
@@ -103,6 +113,26 @@ export interface ContributorProfileWithDate extends FictionContributorProfile {
 export interface TopContributorProfile extends FictionContributorProfile {
   fppTotal: number
 }
+
+/** Distinct fiction and place scopes with approved contributions (global user footprint). */
+export interface ContributorEntityScopeCounts {
+  fictionCount: number
+  placeCount: number
+}
+
+/** One approved contribution row for the fiction-scope contributor modal. */
+export interface FictionScopeContributorContributionItem {
+  id: string
+  type: ContributionType
+  entityType: ContributionEntityType
+  entityId: string
+  entityLabel: string | null
+  fppAwarded: number
+  createdAt: string
+}
+
+/** Which contributor modal to open from TopContributorsList (one variant per page context). */
+export type TopContributorsModalContext = { type: "fiction"; fictionId: string; fictionTitle: string }
 
 /** Staff: submitter activity + lifetime FPP on profile (contributions detail). */
 export interface ContributorModerationContext {

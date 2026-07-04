@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
 import { useTranslations } from "next-intl"
 import { useAuth } from "@/context/auth-context"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,19 +61,11 @@ export function UserMenu() {
           className="flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 hover:bg-chrome-hover mx-auto overflow-hidden"
           aria-label={t("userMenu")}
         >
-          {user.avatar ? (
-            <Image
-              src={user.avatar}
-              alt={user.name}
-              width={28}
-              height={28}
-              className="rounded-full"
-            />
-          ) : (
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-          )}
+          <UserAvatar
+            avatarId={user.avatar}
+            fallback={user.name.charAt(0).toUpperCase()}
+            className="h-7 w-7"
+          />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -87,13 +79,13 @@ export function UserMenu() {
         <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
           <Link href="/fictions">
             <BookOpen className="mr-2 h-4 w-4" />
-            {t("fictions")}
+            {t("catalog")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
           <Link href="/map">
             <Map className="mr-2 h-4 w-4" />
-            {t("exploreMap")}
+            {t("map")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">

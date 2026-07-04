@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { getTranslations } from "next-intl/server"
-import { ContributionsFeedSidebar } from "@/components/contributions/contributions-feed-sidebar"
+import { TopContributorsSection } from "@/components/contributions/top-contributors-section"
 import type { TopContributorProfile } from "@/src/contributions/domain/contribution.entity"
 import { cn } from "@/lib/utils"
 
@@ -29,7 +29,14 @@ export async function ContributionsRightRail(props: FeedProps | DetailProps) {
             <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">{t("subtitleFeed")}</p>
           </header>
           <div className="border-t border-border/60 pt-6">
-            <ContributionsFeedSidebar contributors={props.contributors} />
+            <TopContributorsSection
+              contributors={props.contributors}
+              title={t("topContributorsTitle")}
+              emptyMessage={t("topContributorsEmpty")}
+              initialLimit={6}
+              viewMoreLabel={t("viewMoreContributors")}
+              nameFallback={t("contributorNameFallback")}
+            />
           </div>
         </>
       ) : (
@@ -37,7 +44,11 @@ export async function ContributionsRightRail(props: FeedProps | DetailProps) {
           {props.reviewRail ? <div>{props.reviewRail}</div> : null}
           {props.contributors && props.contributors.length > 0 ? (
             <div className="border-t border-border/60 pt-6">
-              <ContributionsFeedSidebar contributors={props.contributors} />
+              <TopContributorsSection
+                contributors={props.contributors}
+                title={t("topContributorsTitle")}
+                nameFallback={t("contributorNameFallback")}
+              />
             </div>
           ) : null}
         </>

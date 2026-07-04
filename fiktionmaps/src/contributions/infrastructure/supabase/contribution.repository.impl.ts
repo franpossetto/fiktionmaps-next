@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import {
   CONTRIBUTION_FPP,
   ENTITY_PATCH_ON_CONTRIBUTION_APPROVE,
+  resolveContributionFpp,
 } from "@/src/contributions/domain/contribution.config"
 import type {
   Contribution,
@@ -13,6 +14,8 @@ import type {
   ContributorProfileWithDate,
   FictionContributionFeedItem,
   FictionContributorProfile,
+  FictionContributorScopeEntry,
+  FictionScopeContributorContributionItem,
   PlaceContributionFeedItem,
   StaffContributionsFeedKind,
   StaffCreateContributionFeedItem,
@@ -62,6 +65,248 @@ type ProfileEmbed = {
   username: string | null
   full_name: string | null
   avatar_url: string | null
+}
+
+type ProfileContributionRow = {
+  type: ContributionType
+  fpp_awarded: number | null
+  profiles: ProfileEmbed | ProfileEmbed[] | null
+}
+
+function mapProfileContributionRows(rows: ProfileContributionRow[]): FictionContributorProfile[] {
+  const out: FictionContributorProfile[] = []
+  for (const row of rows) {
+    const raw = row.profiles
+    const prof = Array.isArray(raw) ? raw[0] : raw
+    if (!prof?.id) continue
+    out.push({
+      id: prof.id,
+      username: prof.username,
+      fullName: prof.full_name,
+      avatarUrl: prof.avatar_url,
+    })
+  }
+  return out
+}
+
+function mapFictionScopeContributionRows(rows: ProfileContributionRow[]): FictionContributorScopeEntry[] {
+  const out: FictionContributorScopeEntry[] = []
+  for (const row of rows) {
+    const raw = row.profiles
+    const prof = Array.isArray(raw) ? raw[0] : raw
+    if (!prof?.id) continue
+    out.push({
+      id: prof.id,
+      username: prof.username,
+      fullName: prof.full_name,
+      avatarUrl: prof.avatar_url,
+      fppAwarded: resolveContributionFpp(row.type, row.fpp_awarded),
+    })
+  }
+  return out
+}
+
+const FICTION_SCOPE_CONTRIBUTION_SELECT = `
+  user_id,
+  type,
+  fpp_awarded,
+  profiles!contributions_user_id_fkey (
+    id,
+    username,
+    full_name,
+    avatar_url
+  )
+`
+
+async function listApprovedScopeRowsForEntity(
+  supabase: SupabaseClient<Database>,
+  entityType: ContributionEntityType,
+  entityId: string,
+): Promise<FictionContributorScopeEntry[]> {
+  const { data, error } = await supabase
+    .from("contributions")
+    .select(FICTION_SCOPE_CONTRIBUTION_SELECT)
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .eq("status", "approved")
+
+  if (error) {
+    console.error("[contributions repo] listApprovedScopeRowsForEntity:", error.message)
+    return []
+  }
+
+  return mapFictionScopeContributionRows((data ?? []) as ProfileContributionRow[])
+}
+
+async function listApprovedScopeRowsForPlaceIds(
+  supabase: SupabaseClient<Database>,
+  placeIds: string[],
+): Promise<FictionContributorScopeEntry[]> {
+  if (placeIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from("contributions")
+    .select(FICTION_SCOPE_CONTRIBUTION_SELECT)
+    .eq("entity_type", "place")
+    .in("entity_id", placeIds)
+    .eq("status", "approved")
+
+  if (error) {
+    console.error("[contributions repo] listApprovedScopeRowsForPlaceIds:", error.message)
+    return []
+  }
+
+  return mapFictionScopeContributionRows((data ?? []) as ProfileContributionRow[])
+}
+
+type ApprovedContributionDetailRow = {
+  id: string
+  type: ContributionType
+  entity_type: ContributionEntityType
+  entity_id: string
+  fpp_awarded: number | null
+  created_at: string
+}
+
+const APPROVED_CONTRIBUTION_DETAIL_SELECT = "id, type, entity_type, entity_id, fpp_awarded, created_at"
+
+function mapApprovedContributionDetailRow(row: ApprovedContributionDetailRow): Omit<FictionScopeContributorContributionItem, "entityLabel"> {
+  return {
+    id: row.id,
+    type: row.type,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    fppAwarded: resolveContributionFpp(row.type, row.fpp_awarded),
+    createdAt: row.created_at,
+  }
+}
+
+async function listApprovedContributionDetailRowsForUserOnEntity(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  entityType: ContributionEntityType,
+  entityId: string,
+): Promise<Omit<FictionScopeContributorContributionItem, "entityLabel">[]> {
+  const { data, error } = await supabase
+    .from("contributions")
+    .select(APPROVED_CONTRIBUTION_DETAIL_SELECT)
+    .eq("user_id", userId)
+    .eq("status", "approved")
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("[contributions repo] listApprovedContributionDetailRowsForUserOnEntity:", error.message)
+    return []
+  }
+
+  return ((data ?? []) as ApprovedContributionDetailRow[]).map(mapApprovedContributionDetailRow)
+}
+
+async function listApprovedContributionDetailRowsForUserOnPlaceIds(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  placeIds: string[],
+): Promise<Omit<FictionScopeContributorContributionItem, "entityLabel">[]> {
+  if (placeIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from("contributions")
+    .select(APPROVED_CONTRIBUTION_DETAIL_SELECT)
+    .eq("user_id", userId)
+    .eq("status", "approved")
+    .eq("entity_type", "place")
+    .in("entity_id", placeIds)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("[contributions repo] listApprovedContributionDetailRowsForUserOnPlaceIds:", error.message)
+    return []
+  }
+
+  return ((data ?? []) as ApprovedContributionDetailRow[]).map(mapApprovedContributionDetailRow)
+}
+
+async function listPlaceIdsForFictionIds(
+  supabase: SupabaseClient<Database>,
+  fictionIds: string[],
+): Promise<string[]> {
+  if (fictionIds.length === 0) return []
+
+  const { data, error } = await supabase.from("places").select("id").in("fiction_id", fictionIds)
+
+  if (error) {
+    console.error("[contributions repo] listPlaceIdsForFictionIds:", error.message)
+    return []
+  }
+
+  return (data ?? []).map((row) => row.id).filter(Boolean)
+}
+
+async function listApprovedContributionsForUserInFictionScopeInternal(
+  supabase: SupabaseClient<Database>,
+  fictionId: string,
+  userId: string,
+): Promise<FictionScopeContributorContributionItem[]> {
+  const placeIds = await listPlaceIdsForFictionIds(supabase, [fictionId])
+  const [fictionRows, placeRows, fictionResult, placesResult] = await Promise.all([
+    listApprovedContributionDetailRowsForUserOnEntity(supabase, userId, "fiction", fictionId),
+    listApprovedContributionDetailRowsForUserOnPlaceIds(supabase, userId, placeIds),
+    supabase.from("fictions").select("title").eq("id", fictionId).maybeSingle(),
+    placeIds.length > 0
+      ? supabase.from("places").select("id, name").in("id", placeIds)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
+  if (placesResult.error) {
+    console.error("[contributions repo] listApprovedContributionsForUserInFictionScope places:", placesResult.error.message)
+  }
+
+  const fictionTitle = fictionResult.data?.title?.trim() || null
+  const placeNameById = new Map(
+    (placesResult.data ?? []).map((place) => [place.id, place.name?.trim() || null] as const),
+  )
+
+  return [...fictionRows, ...placeRows]
+    .map((row) => ({
+      ...row,
+      entityLabel:
+        row.entityType === "place"
+          ? placeNameById.get(row.entityId) ?? null
+          : fictionTitle,
+    }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
+async function listApprovedProfileRowsForEntity(
+  supabase: SupabaseClient<Database>,
+  entityType: ContributionEntityType,
+  entityId: string,
+): Promise<FictionContributorProfile[]> {
+  const { data, error } = await supabase
+    .from("contributions")
+    .select(
+      `
+      user_id,
+      profiles!contributions_user_id_fkey (
+        id,
+        username,
+        full_name,
+        avatar_url
+      )
+    `,
+    )
+    .eq("entity_type", entityType)
+    .eq("entity_id", entityId)
+    .eq("status", "approved")
+
+  if (error) {
+    console.error("[contributions repo] listApprovedProfileRowsForEntity:", error.message)
+    return []
+  }
+
+  return mapProfileContributionRows((data ?? []) as ProfileContributionRow[])
 }
 
 function mapFictionFeedItem(
@@ -669,6 +914,46 @@ export function createContributionsSupabaseAdapter(
       return count ?? 0
     }),
 
+    countApprovedFictionAndPlaceScopesByUser: cache(async (userId: string) => {
+      const supabase = await getSupabase()
+      const { data, error } = await supabase
+        .from("contributions")
+        .select("entity_type, entity_id")
+        .eq("user_id", userId)
+        .eq("status", "approved")
+        .in("entity_type", ["fiction", "place"])
+
+      if (error) {
+        console.error("[contributions repo] countApprovedFictionAndPlaceScopesByUser error:", error.message)
+        return { fictionCount: 0, placeCount: 0 }
+      }
+
+      const placeIds = new Set<string>()
+      const fictionIds = new Set<string>()
+
+      for (const row of data ?? []) {
+        if (row.entity_type === "fiction") fictionIds.add(row.entity_id)
+        if (row.entity_type === "place") placeIds.add(row.entity_id)
+      }
+
+      if (placeIds.size > 0) {
+        const { data: places, error: placesError } = await supabase
+          .from("places")
+          .select("fiction_id")
+          .in("id", [...placeIds])
+
+        if (placesError) {
+          console.error("[contributions repo] countApprovedFictionAndPlaceScopesByUser places:", placesError.message)
+        } else {
+          for (const place of places ?? []) {
+            if (place.fiction_id) fictionIds.add(place.fiction_id)
+          }
+        }
+      }
+
+      return { fictionCount: fictionIds.size, placeCount: placeIds.size }
+    }),
+
     sumApprovedFppAwardedByUser: cache(async (userId: string): Promise<number> => {
       const supabase = await getSupabase()
       const { data, error } = await supabase
@@ -713,45 +998,32 @@ export function createContributionsSupabaseAdapter(
         entityType: ContributionEntityType,
         entityId: string,
       ): Promise<FictionContributorProfile[]> => {
-      const supabase = await getSupabase()
-      const { data, error } = await supabase
-        .from("contributions")
-        .select(
-          `
-          user_id,
-          profiles!contributions_user_id_fkey (
-            id,
-            username,
-            full_name,
-            avatar_url
+        const supabase = await getSupabase()
+        return listApprovedProfileRowsForEntity(supabase, entityType, entityId)
+      },
+    ),
+
+    listApprovedContributorProfilesForFictionScope: cache(
+      async (fictionId: string): Promise<FictionContributorScopeEntry[]> => {
+        const supabase = await getSupabase()
+        const [fictionEntries, placeIdsResult] = await Promise.all([
+          listApprovedScopeRowsForEntity(supabase, "fiction", fictionId),
+          supabase.from("places").select("id").eq("fiction_id", fictionId),
+        ])
+
+        if (placeIdsResult.error) {
+          console.error(
+            "[contributions repo] listApprovedContributorProfilesForFictionScope places:",
+            placeIdsResult.error.message,
           )
-        `,
-        )
-        .eq("entity_type", entityType)
-        .eq("entity_id", entityId)
-        .eq("status", "approved")
+          return fictionEntries
+        }
 
-      if (error) {
-        console.error("[contributions repo] listApprovedProfilesForEntity:", error.message)
-        return []
-      }
-
-      type Row = { profiles: ProfileEmbed | ProfileEmbed[] | null }
-
-      const out: FictionContributorProfile[] = []
-      for (const row of (data ?? []) as Row[]) {
-        const raw = row.profiles
-        const prof = Array.isArray(raw) ? raw[0] : raw
-        if (!prof?.id) continue
-        out.push({
-          id: prof.id,
-          username: prof.username,
-          fullName: prof.full_name,
-          avatarUrl: prof.avatar_url,
-        })
-      }
-      return out
-    }),
+        const placeIds = (placeIdsResult.data ?? []).map((row) => row.id).filter(Boolean)
+        const placeEntries = await listApprovedScopeRowsForPlaceIds(supabase, placeIds)
+        return [...fictionEntries, ...placeEntries]
+      },
+    ),
 
     listApprovedContributorProfilesFirstContributionAt: cache(
       async (
@@ -958,6 +1230,13 @@ export function createContributionsSupabaseAdapter(
         }
 
         return null
+      },
+    ),
+
+    listApprovedContributionsForUserInFictionScope: cache(
+      async (fictionId: string, userId: string): Promise<FictionScopeContributorContributionItem[]> => {
+        const supabase = await getSupabase()
+        return listApprovedContributionsForUserInFictionScopeInternal(supabase, fictionId, userId)
       },
     ),
 

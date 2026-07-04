@@ -84,13 +84,6 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const pathWithoutLocale = pathnameWithoutLocale(pathname)
 
-  if (pathWithoutLocale === "/" || pathWithoutLocale === "") {
-    const locale = getLocaleFromPathname(pathname)
-    const mapUrl = request.nextUrl.clone()
-    mapUrl.pathname = `/${locale}/map`
-    return NextResponse.redirect(mapUrl)
-  }
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 

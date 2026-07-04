@@ -19,7 +19,6 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
       { protocol: "https", hostname: "image.tmdb.org", pathname: "/t/p/**" },
       { protocol: "https", hostname: "api.mapbox.com", pathname: "/styles/**" },
-      { protocol: "https", hostname: "api.dicebear.com", pathname: "/**" },
       { protocol: "https", hostname: "**.supabase.co", pathname: "/**" },
     ],
   },

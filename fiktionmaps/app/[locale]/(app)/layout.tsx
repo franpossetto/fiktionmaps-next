@@ -12,6 +12,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isMapView = pathname?.startsWith("/map")
   const isContributeFlow = pathname != null && /(^|\/)contribute(\/|$)/.test(pathname)
+  const isNoSearchNavbar = isContributeFlow || pathname === "/"
 
   return (
     <MapEngineProvider engine={mapboxEngine}>
@@ -22,7 +23,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               children
             ) : (
               <div className="flex h-full flex-col">
-                {isContributeFlow ? <AppTopNavbarNoSearch /> : <AppTopNavbar />}
+                {isNoSearchNavbar ? <AppTopNavbarNoSearch /> : <AppTopNavbar />}
                 <div className="min-h-0 flex-1">{children}</div>
               </div>
             )}

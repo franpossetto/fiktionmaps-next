@@ -188,6 +188,7 @@ export type Database = {
           lat: number
           lng: number
           zoom: number
+          image_url: string | null
           created_at: string
           updated_at: string
         }
@@ -198,6 +199,7 @@ export type Database = {
           lat: number
           lng: number
           zoom: number
+          image_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -208,6 +210,7 @@ export type Database = {
           lat?: number
           lng?: number
           zoom?: number
+          image_url?: string | null
           created_at?: string
           updated_at?: string
         }

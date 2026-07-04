@@ -15,7 +15,7 @@ import { contributionTypeMessageKey } from "@/components/contributions/contribut
 import { StaffContributionReviewSection } from "@/components/contributions/staff-contribution-review-section"
 import { StreetViewReferencePreview } from "@/components/places/street-view-reference-preview"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 
 function contributorLabel(c: PlaceContributionFeedItem["contributor"]): string {
   if (c.fullName?.trim()) return c.fullName.trim()
@@ -192,10 +192,11 @@ export async function StaffPlaceContributionDetail({
         <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">{t("sectionContributor")}</h2>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{t("sectionContributorHelp")}</p>
         <div className="mt-6 flex items-center gap-4">
-          <Avatar className="h-12 w-12 border border-border/60">
-            {item.contributor.avatarUrl ? <AvatarImage src={item.contributor.avatarUrl} alt="" /> : null}
-            <AvatarFallback className="font-semibold">{contributorLabel(item.contributor).charAt(0)}</AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            avatarId={item.contributor.avatarUrl}
+            fallback={contributorLabel(item.contributor).charAt(0)}
+            className="h-12 w-12 border border-border/60 font-semibold"
+          />
           <div>
             <p className="font-semibold text-foreground">{contributorLabel(item.contributor)}</p>
             {item.contributor.username ? (

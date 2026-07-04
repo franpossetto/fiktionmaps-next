@@ -5,6 +5,7 @@ export interface City {
   lat: number
   lng: number
   zoom: number
+  image_url: string | null
   created_at: string
   updated_at: string
 }

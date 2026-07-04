@@ -1,6 +1,8 @@
 import dynamic from "next/dynamic"
+import { notFound } from "next/navigation"
 import { getActiveFictionsCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { getMyHuntSourcesCached, getHuntsBySourceIdCached } from "@/src/hunts/infrastructure/next/hunt.queries"
+import { isAIAvailable } from "@/lib/ai/get-llm-provider"
 import type { Hunt } from "@/src/hunts/domain/hunt.entity"
 
 const HuntSourceWizard = dynamic(
@@ -13,6 +15,8 @@ const HuntSourceWizard = dynamic(
 )
 
 export default async function HuntPage() {
+  if (!isAIAvailable()) notFound()
+
   const [fictions, sources] = await Promise.all([
     getActiveFictionsCached(),
     getMyHuntSourcesCached(),

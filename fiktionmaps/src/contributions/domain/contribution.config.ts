@@ -25,6 +25,15 @@ export const CONTRIBUTION_FPP: Record<ContributionType, number> = {
   checkin: 8,
 }
 
+/** Same default as contribution approval when `fpp_awarded` was never persisted. */
+export function resolveContributionFpp(
+  type: ContributionType,
+  fppAwarded: number | null | undefined,
+): number {
+  if (fppAwarded != null) return fppAwarded
+  return CONTRIBUTION_FPP[type] ?? 0
+}
+
 /** Same canonical set as `STAFF_ROLES` (`@/src/users/domain/user.roles`). */
 export const MODERATOR_ROLES = STAFF_ROLES
 

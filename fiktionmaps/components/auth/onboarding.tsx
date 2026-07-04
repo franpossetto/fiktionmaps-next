@@ -39,7 +39,7 @@ function firstPendingStep(profile: { username?: string; avatar?: string } | null
   return 2 // genres, fictions, interests, cities
 }
 
-const AVATARS = (onboardingData.avatars as { id: string; label: string; url: string }[]).slice(0, 8)
+const AVATARS = (onboardingData.avatars as { id: string; label: string }[]).slice(0, 8)
 
 const MAX_SELECTION = 10
 
@@ -245,7 +245,7 @@ export function Onboarding({ forceStartAtZero = false }: OnboardingProps) {
     }
   }
 
-  const avatarSelected = AVATARS.some((avatar) => avatar.url === selectedAvatar)
+  const avatarSelected = AVATARS.some((avatar) => avatar.id === selectedAvatar)
 
   function validateUsername(value: string) {
     const trimmed = value.trim()
