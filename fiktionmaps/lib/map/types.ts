@@ -108,7 +108,7 @@ export interface ClusterLayerProps<T extends ClusterItem = ClusterItem> {
     item: T,
     state: { isSelected: boolean; isHovered: boolean; stackSize?: number },
   ) => ReactNode
-  /** 2D pin shape for cluster chrome (square = v1, round = v2). Ignored when renderItem supplies full pin. */
+  /** 2D pin shape for cluster chrome (square | round). Ignored when renderItem supplies full pin. */
   marker2dShape?: Map2dMarkerShape
   markerHoverScale?: MapMarkerHoverScaleMode
   maxZoom?: number

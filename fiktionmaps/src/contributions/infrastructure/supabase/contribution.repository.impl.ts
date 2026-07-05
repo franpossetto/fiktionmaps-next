@@ -306,7 +306,7 @@ async function listApprovedProfileRowsForEntity(
     return []
   }
 
-  return mapProfileContributionRows((data ?? []) as ProfileContributionRow[])
+  return mapProfileContributionRows((data ?? []) as unknown as ProfileContributionRow[])
 }
 
 function mapFictionFeedItem(

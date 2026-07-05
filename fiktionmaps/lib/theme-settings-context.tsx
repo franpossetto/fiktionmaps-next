@@ -238,7 +238,7 @@ export function useMapStyle(): MapStyleKey {
   return ctx.effectiveMapStyle
 }
 
-/** 2D place/cluster pin shape from saved settings (square = v1, round = v2). */
+/** 2D place/cluster pin shape from saved settings (square | round). */
 export function useMapMarker2dShape(): Map2dMarkerShape {
   const ctx = useContext(ThemeSettingsContext)
   if (!ctx) return defaultThemeSettings.marker2dShape

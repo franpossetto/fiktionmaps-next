@@ -10,7 +10,7 @@ export type TimeOfDay = "day" | "afternoon" | "evening" | "night"
 
 export type ThemeMode = "manual" | "realtime"
 
-/** 2D map pin shape: square = legacy v1, round = current v2. */
+/** 2D map pin shape: square or round (user setting in /settings). */
 export type Map2dMarkerShape = "square" | "round"
 
 /** When to show the place name chip on map pins (2D and 3D). */

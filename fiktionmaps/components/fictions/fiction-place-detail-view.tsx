@@ -198,7 +198,8 @@ export function FictionPlaceDetailView({
                   alt={displayName}
                   fill
                   className="object-cover"
-                  sizes="(max-width: 1024px) 100vw, 40vw"
+                  sizes="(max-width: 1024px) 100vw, 920px"
+                  priority
                   unoptimized={heroUnoptimized}
                 />
               </div>

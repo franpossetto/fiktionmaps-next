@@ -14,8 +14,8 @@ import { shouldShowPinLabel } from "../should-show-pin-label"
 import type { PlaceMarker2dProps } from "../types"
 import { PinMarkerRoot } from "../motion"
 
-/** Legacy square 2D pin (v1). */
-export function PlaceMarker2dV1({
+/** Square 2D pin (settings: marker2dShape = square). */
+export function PlaceMarker2dSquare({
   imageSrc,
   label,
   labelMode,

@@ -16,7 +16,6 @@ import { CitySelector } from "@/components/map/city-selector"
 import { FictionSelector } from "@/components/map/fiction-selector"
 import { MapFictionCitySearch } from "@/components/map/map-fiction-city-search"
 import { LocationDetail } from "@/components/map/location-detail"
-// import { ThumbnailCarousel } from "@/components/map/thumbnail-carousel"
 import { UserMenu } from "@/components/layout/user-menu"
 // import { usePlaceSelectorCollapsedStorage } from "@/lib/local-storage-service-hooks"
 import {
@@ -97,6 +96,7 @@ function MapPageInner() {
   const [hasAppliedInitialPlaceOpen, setHasAppliedInitialPlaceOpen] = useState(false)
   const [fictionSelectorOpen, setFictionSelectorOpen] = useState(false)
   const debouncedBounds = useDebouncedValue(bounds, BOUNDS_DEBOUNCE_MS)
+  const selectedCityId = selectedCity?.id ?? null
 
   const selectedFictionIdsKey = useMemo(
     () => selectedFictionIds.slice().sort().join(","),
@@ -149,9 +149,7 @@ function MapPageInner() {
         const fromUrl = initialCityId
           ? citiesList.find((c) => c.id === initialCityId)
           : undefined
-        const city = fromUrl ?? citiesList[0]
-
-        setSelectedCity(city)
+        setSelectedCity(fromUrl ?? citiesList[0])
         setCitiesLoading(false)
       })
       .catch(() => {
@@ -162,6 +160,20 @@ function MapPageInner() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (cities.length === 0) return
+    const fromUrl = initialCityId
+      ? cities.find((c) => c.id === initialCityId)
+      : undefined
+
+    if (fromUrl) {
+      if (selectedCityId !== fromUrl.id) setSelectedCity(fromUrl)
+      return
+    }
+
+    if (!selectedCityId) setSelectedCity(cities[0])
+  }, [cities, initialCityId, selectedCityId])
 
   useEffect(() => {
     if (!selectedCity) {

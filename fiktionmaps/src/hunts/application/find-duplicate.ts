@@ -18,7 +18,7 @@ function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number)
 export function findDuplicate(
   candidate: HuntPlace,
   existingPlaces: Place[],
-): { id: string; name: string } | null {
+): { id: string; name: string; image: string | null } | null {
   if (existingPlaces.length === 0) return null
   if (candidate.lat === null || candidate.lng === null) return null
 

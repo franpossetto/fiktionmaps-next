@@ -55,6 +55,7 @@
   },
   "Contributors": {
     "metaTitle": "Colaboradores",
+    "addContribution": "Agregar contribución",
     "pageTitle": "Colaboradores",
     "pageSubtitle": "Clasificados por Fiktion Player Points",
     "memberFallback": "Miembro",

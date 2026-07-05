@@ -148,7 +148,7 @@ export interface ContributionWizardShellProps {
   /** Clases extra en el contenedor interno del scroll (p. ej. ajuste fino de márgenes). */
   contentInnerClassName?: string
   /** Ref al div scrolleable interno, útil para resetear el scroll desde el padre. */
-  scrollRef?: React.RefObject<HTMLDivElement>
+  scrollRef?: React.RefObject<HTMLDivElement | null>
   className?: string
 }
 

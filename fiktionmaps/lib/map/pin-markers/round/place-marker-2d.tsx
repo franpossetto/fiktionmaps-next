@@ -14,8 +14,8 @@ import { shouldShowPinLabel } from "../should-show-pin-label"
 import type { PlaceMarker2dProps } from "../types"
 import { PinMarkerRoot } from "../motion"
 
-/** Round 2D pin with conic ring (v2). */
-export function PlaceMarker2dV2({
+/** Round 2D pin with conic ring (settings: marker2dShape = round). */
+export function PlaceMarker2dRound({
   imageSrc,
   label,
   labelMode,

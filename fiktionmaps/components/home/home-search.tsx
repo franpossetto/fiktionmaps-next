@@ -159,12 +159,16 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
     setModeOpen(false)
   }
 
+  function hrefForFiction(fiction: FictionWithMedia): string {
+    if (mode === "map") return `/map?fiction=${fiction.id}`
+    return `/fictions/${fiction.slug ?? fiction.id}`
+  }
+
   function hrefForHit(hit: SearchHit): string {
     if (hit.kind === "city") {
       return mode === "article" ? `/cities/${hit.city.id}` : `/map?city=${hit.city.id}`
     }
-    if (mode === "map") return `/map?fiction=${hit.fiction.id}`
-    return `/fictions/${hit.fiction.slug ?? hit.fiction.id}`
+    return hrefForFiction(hit.fiction)
   }
 
   function pushRecent(item: RecentSearchItem) {
@@ -240,14 +244,26 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [fictions, placeCounts],
   )
+  const rouletteCityPool = useMemo(
+    () => cities.filter((city) => cityWithPlacesSet.has(city.id)),
+    [cities, cityWithPlacesSet],
+  )
 
   function handleRoulette() {
-    if (rouletteSpinning || roulettePool.length === 0) return
+    if (rouletteSpinning) return
     setRouletteSpinning(true)
     setTimeout(() => {
-      const pick = roulettePool[Math.floor(Math.random() * roulettePool.length)]
       setRouletteSpinning(false)
-      navigate(`/fictions/${pick.slug ?? pick.id}`)
+      if (mode === "map") {
+        if (rouletteCityPool.length === 0) return
+        const pick = rouletteCityPool[Math.floor(Math.random() * rouletteCityPool.length)]
+        navigate(`/map?city=${encodeURIComponent(pick.id)}`)
+        return
+      }
+
+      if (roulettePool.length === 0) return
+      const pick = roulettePool[Math.floor(Math.random() * roulettePool.length)]
+      navigate(hrefForFiction(pick))
     }, 900)
   }
 
@@ -256,7 +272,7 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
       <div className="flex w-full max-w-[580px] flex-col gap-3">
 
         {/* Tagline */}
-        <div className="mb-1 flex min-h-[2rem] items-center justify-center overflow-hidden">
+        <div className="mb-4 flex min-h-[4.5rem] items-center justify-center overflow-hidden px-2">
           <AnimatePresence mode="wait">
             <motion.h1
               key={taglineIndex}
@@ -264,7 +280,7 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.3, ease: "easeInOut" }}
-              className="text-center text-xl font-medium tracking-tight text-foreground"
+              className="text-center text-4xl font-semibold tracking-tight text-foreground sm:text-5xl"
             >
               {taglines[taglineIndex]}
             </motion.h1>
@@ -477,7 +493,7 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
 
         {/* Recent searches + catalog chip */}
         {!query.trim() && (
-          <div className="flex flex-wrap justify-center gap-2 pt-1">
+          <div className="flex flex-wrap justify-center gap-2 pt-[14px]">
             {recents.map((r) => {
               const Icon = r.kind === "city"
                 ? MapPin

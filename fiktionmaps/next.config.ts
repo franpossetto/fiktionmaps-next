@@ -11,12 +11,12 @@ const nextConfig: NextConfig = {
     },
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
-    unoptimized: true,
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
+      { protocol: "https", hostname: "plus.unsplash.com", pathname: "/**" },
       { protocol: "https", hostname: "image.tmdb.org", pathname: "/t/p/**" },
       { protocol: "https", hostname: "api.mapbox.com", pathname: "/styles/**" },
       { protocol: "https", hostname: "**.supabase.co", pathname: "/**" },

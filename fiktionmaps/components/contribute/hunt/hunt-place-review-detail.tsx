@@ -71,14 +71,7 @@ export function HuntPlaceReviewDetail({
 
         {isDuplicate && (
           <HuntDuplicateBanner
-            newPlace={{
-              name: place.name,
-              address: place.address,
-              city: place.city,
-              country: place.country,
-              lat: place.lat,
-              lng: place.lng,
-            }}
+            newPlace={{ name: place.name }}
             duplicateOf={place.duplicate_of!}
           />
         )}

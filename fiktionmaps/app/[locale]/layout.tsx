@@ -6,6 +6,7 @@ import { notFound } from "next/navigation"
 import { ThemeSettingsProvider } from "@/lib/theme-settings-context"
 import { AuthProvider } from "@/context/auth-context"
 import { LangSetter } from "@/components/layout/lang-setter"
+import { Toaster } from "@/components/ui/toaster"
 import { routing } from "@/i18n/routing"
 
 type Props = {
@@ -29,7 +30,10 @@ export default async function LocaleLayout({ children, params }: Props) {
     <NextIntlClientProvider messages={messages}>
       <LangSetter locale={locale} />
       <ThemeSettingsProvider>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          <Toaster />
+        </AuthProvider>
       </ThemeSettingsProvider>
     </NextIntlClientProvider>
   )

@@ -153,7 +153,6 @@ export function CityDetail({ city, fictions, placeCounts, exploreMapHref, rightA
                     fill
                     className="object-cover"
                     sizes="(max-width: 1024px) 100vw, 920px"
-                    unoptimized
                     priority
                   />
                 ) : (

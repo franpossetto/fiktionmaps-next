@@ -12,8 +12,8 @@ import type { ClusterMarker2dProps } from "../types"
 
 const CLUSTER_IDLE_PX = 56
 
-/** Legacy square cluster pin (v1). */
-export function ClusterMarker2dV1({
+/** Square cluster pin (settings: marker2dShape = square). */
+export function ClusterMarker2dSquare({
   imageUrl,
   count,
   isHovered,

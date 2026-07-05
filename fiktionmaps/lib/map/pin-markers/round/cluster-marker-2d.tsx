@@ -11,8 +11,8 @@ import {
 import { Pin2dMarkerColumn } from "../pin-2d-marker-column"
 import type { ClusterMarker2dProps } from "../types"
 
-/** Round cluster pin with conic ring (v2). */
-export function ClusterMarker2dV2({
+/** Round cluster pin with conic ring (settings: marker2dShape = round). */
+export function ClusterMarker2dRound({
   imageUrl,
   count,
   isHovered,

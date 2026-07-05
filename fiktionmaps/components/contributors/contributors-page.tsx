@@ -2,7 +2,8 @@
 
 import { useTranslations } from "next-intl"
 import { Link } from "@/i18n/navigation"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import type { TopContributorProfile } from "@/src/contributions/domain/contribution.entity"
 
@@ -57,14 +58,22 @@ export function ContributorsPage({ contributors, page, totalPages, totalCount, p
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("pageTitle")}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("pageSubtitle")}
-          {totalCount > 0 && (
-            <span className="ml-1.5 tabular-nums text-muted-foreground/60">· {totalCount.toLocaleString()}</span>
-          )}
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("pageTitle")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("pageSubtitle")}
+            {totalCount > 0 && (
+              <span className="ml-1.5 tabular-nums text-muted-foreground/60">· {totalCount.toLocaleString()}</span>
+            )}
+          </p>
+        </div>
+        <Button asChild size="sm" className="shrink-0 gap-1.5">
+          <Link href="/profile/contribute">
+            <Plus className="h-4 w-4" aria-hidden />
+            {t("addContribution")}
+          </Link>
+        </Button>
       </div>
 
       {contributors.length === 0 ? (

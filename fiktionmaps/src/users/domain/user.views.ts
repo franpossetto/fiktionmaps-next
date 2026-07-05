@@ -41,3 +41,17 @@ export interface UserProfile {
     frictionsConnected: number
   }
 }
+
+/** Public profile row for contributors leaderboard (paginated). */
+export interface ProfileLeaderboardEntry {
+  id: string
+  username: string | null
+  fullName: string | null
+  avatarUrl: string | null
+  fppTotal: number
+}
+
+export interface ProfilesPage {
+  profiles: ProfileLeaderboardEntry[]
+  totalCount: number
+}
