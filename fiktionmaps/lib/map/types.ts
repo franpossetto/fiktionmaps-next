@@ -52,6 +52,8 @@ export interface MapContainerProps {
   onZoomChange?: (zoom: number) => void
   /** When false, skips the Mapbox tile loading overlay (e.g. main map uses its own bootstrap). Default true. */
   showLoadingOverlay?: boolean
+  /** When false, skips custom 3D building layer setup (useful for small overview maps). Default true. */
+  showBuildings3D?: boolean
   controls?: {
     fullscreen?: boolean
   }
@@ -108,7 +110,7 @@ export interface ClusterLayerProps<T extends ClusterItem = ClusterItem> {
     item: T,
     state: { isSelected: boolean; isHovered: boolean; stackSize?: number },
   ) => ReactNode
-  /** 2D pin shape for cluster chrome (square = v1, round = v2). Ignored when renderItem supplies full pin. */
+  /** 2D pin shape for cluster chrome (square | round). Ignored when renderItem supplies full pin. */
   marker2dShape?: Map2dMarkerShape
   markerHoverScale?: MapMarkerHoverScaleMode
   maxZoom?: number

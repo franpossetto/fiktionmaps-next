@@ -15,10 +15,14 @@ const contributionTypeSchema = z.enum([
 
 const contributionEntityTypeSchema = z.enum(["fiction", "place", "scene"])
 
+const contributionOriginSchema = z.enum(["manual", "hunt"]).default("manual")
+
 export const createContributionSchema = z.object({
   type: contributionTypeSchema,
   entityType: contributionEntityTypeSchema,
   entityId: uuidSchema,
+  origin: contributionOriginSchema.optional(),
+  externalId: z.string().uuid().nullable().optional(),
 })
 
 export const approveContributionSchema = z.object({
@@ -38,3 +42,18 @@ export type RejectContributionData = z.infer<typeof rejectContributionSchema>
 export type CreateContributionInput = CreateContributionData & { userId: string }
 export type ApproveContributionInput = ApproveContributionData & { moderatorId: string }
 export type RejectContributionInput = RejectContributionData & { moderatorId: string }
+
+export const submitPlaceAddPhotoContributionSchema = z.object({
+  placeId: uuidSchema,
+})
+
+export type SubmitPlaceAddPhotoContributionData = z.infer<typeof submitPlaceAddPhotoContributionSchema>
+
+export const fictionAddPhotoTargetRoleSchema = z.enum(["cover", "banner"])
+
+export const submitFictionAddPhotoContributionSchema = z.object({
+  fictionId: uuidSchema,
+  targetRole: fictionAddPhotoTargetRoleSchema,
+})
+
+export type SubmitFictionAddPhotoContributionData = z.infer<typeof submitFictionAddPhotoContributionSchema>

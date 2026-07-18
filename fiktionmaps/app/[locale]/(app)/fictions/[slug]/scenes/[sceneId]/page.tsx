@@ -3,11 +3,12 @@ import { notFound } from "next/navigation"
 import { getTranslations } from "next-intl/server"
 import { getFictionBySlugCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { getPlaceLocationByIdCached } from "@/src/places/infrastructure/next/place.queries"
-import { getSceneByIdUncached, getScenesForFiction } from "@/src/scenes/infrastructure/next/scene.queries"
+import { getSceneByIdUncached, getScenesForFiction, getScenesForCityCached } from "@/src/scenes/infrastructure/next/scene.queries"
 import { getSiteUrl } from "@/lib/site"
 import type { Place } from "@/src/places/domain/place.entity"
 import { FictionSceneWatchClient } from "@/components/fictions/fiction-scene-watch-client"
 import { FictionSlugDetailShell } from "@/components/fictions/fiction-slug-detail-shell"
+import { SceneUpNextAside } from "@/components/scenes/scene-up-next-aside"
 import { getFictionSidebarSummaryText } from "@/lib/fictions/get-fiction-sidebar-summary-text"
 
 type Props = {
@@ -85,23 +86,41 @@ export default async function FictionSceneUnderSlugPage({ params }: Props) {
   const location = await getPlaceLocationByIdCached(scene.placeId)
   if (!location || location.fictionId !== fiction.id) notFound()
 
-  const [fictionScenes, sidebarSummary] = await Promise.all([
+  const cityId = location.location.cityId
+
+  const [fictionScenes, sidebarSummary, cityData] = await Promise.all([
     getScenesForFiction(fiction.id),
     getFictionSidebarSummaryText(fiction, locale),
+    getScenesForCityCached(cityId),
   ])
 
   const relatedPlaces = await loadRelatedPlaces(fictionScenes, scene.placeId)
   const currentWatchScene = fictionScenes.find((s) => s.id === sceneId) ?? scene
   const canonicalSlug = fiction.slug.trim()
 
+  const cityScenes = cityData.scenes.filter((s) => s.fictionId !== fiction.id)
+
   return (
-    <FictionSlugDetailShell fiction={fiction} summaryText={sidebarSummary}>
+    <FictionSlugDetailShell
+      fiction={fiction}
+      summaryText={sidebarSummary}
+      rightAside={
+        <SceneUpNextAside
+          fictionPathSlug={canonicalSlug}
+          currentSceneId={sceneId}
+          scenes={fictionScenes}
+          relatedPlaces={relatedPlaces}
+          cityScenes={cityScenes}
+          cityFictionSlugs={cityData.fictionSlugById}
+        />
+      }
+    >
       <FictionSceneWatchClient
         fiction={fiction}
         fictionPathSlug={canonicalSlug}
         currentWatchScene={currentWatchScene}
-        fictionScenes={fictionScenes}
-        relatedPlaces={relatedPlaces}
+        placeName={location.name}
+        placeSlug={location.slug}
       />
     </FictionSlugDetailShell>
   )

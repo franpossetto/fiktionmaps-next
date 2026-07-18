@@ -1,14 +1,22 @@
 import { getTranslations } from "next-intl/server"
 import Image from "next/image"
 import { Link } from "@/i18n/navigation"
-import type { ContributorModerationContext, PlaceContributionFeedItem } from "@/src/contributions/domain/contribution.entity"
+import {
+  getPendingPathsForRole,
+  isPlaceAddPhotoContribution,
+  type ContributorModerationContext,
+  type PlaceContributionFeedItem,
+} from "@/src/contributions/domain/contribution.entity"
+import { publicAssetImageUrl } from "@/lib/asset-images/public-asset-url"
+import { getPlacePhotoContributeContextAction } from "@/src/places/infrastructure/next/place.actions"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import { contributionTypeMessageKey } from "@/components/contributions/contribution-type-label"
 import { StaffContributionReviewSection } from "@/components/contributions/staff-contribution-review-section"
 import { StreetViewReferencePreview } from "@/components/places/street-view-reference-preview"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
+import { PlaceShootEnvironmentBadge } from "@/components/places/place-shoot-environment-badge"
 
 function contributorLabel(c: PlaceContributionFeedItem["contributor"]): string {
   if (c.fullName?.trim()) return c.fullName.trim()
@@ -30,8 +38,17 @@ export async function StaffPlaceContributionDetail({
   contributorContext,
 }: StaffPlaceContributionDetailProps) {
   const t = await getTranslations("Contributions")
+  const tPlaces = await getTranslations("Places")
+  const isAddPhoto = isPlaceAddPhotoContribution(item)
+  const photoContext = isAddPhoto ? await getPlacePhotoContributeContextAction(item.entityId) : null
   const placeTitle = place?.name?.trim() || item.placeName?.trim() || t("feedCard_untitledPlace")
   const avatarSrc = place?.image?.trim() || item.placeAvatarUrl?.trim() || DEFAULT_FICTION_COVER
+  const currentPhotoSrc =
+    isAddPhoto && photoContext?.currentImageUrl?.trim()
+      ? photoContext.currentImageUrl.trim()
+      : avatarSrc
+  const proposedLgPath = getPendingPathsForRole(item.pendingImagesByRole, "avatar")?.lg
+  const proposedSrc = proposedLgPath ? publicAssetImageUrl(proposedLgPath) : null
   const fictionTitle = fiction?.title?.trim() || item.fictionTitle?.trim() || "—"
   const streetViewReference = place?.location.streetViewReference ?? null
 
@@ -98,6 +115,16 @@ export async function StaffPlaceContributionDetail({
                   {place.location.address?.trim() || "—"}
                 </dd>
               </div>
+              {place.shootEnvironment ? (
+                <div className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-center sm:gap-4">
+                  <dt className="shrink-0 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground sm:w-36">
+                    {tPlaces("fieldShootEnvironment")}
+                  </dt>
+                  <dd className="sm:flex-1">
+                    <PlaceShootEnvironmentBadge value={place.shootEnvironment} />
+                  </dd>
+                </div>
+              ) : null}
             </>
           ) : (
             <div className="px-3 py-3">
@@ -107,48 +134,81 @@ export async function StaffPlaceContributionDetail({
         </dl>
       </section>
 
-      <section className="border-b border-border/60 py-6">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">
-          {t("sectionPhotoStreetViewVerification")}
-        </h2>
-        <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-          {t("sectionPhotoStreetViewVerificationHelp")}
-        </p>
-        <div className="mx-auto mt-4 flex w-full max-w-3xl flex-col gap-6">
-          <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              {t("fieldSubmittedPhoto")}
-            </p>
-            <div className="relative aspect-video min-h-[min(52vw,280px)] w-full overflow-hidden rounded-xl border border-border bg-muted/30 sm:min-h-[320px]">
-              <Image src={avatarSrc} alt={placeTitle} fill className="object-cover" sizes="(max-width: 768px) 100vw, 768px" />
+      {isAddPhoto ? (
+        <section className="border-b border-border/60 py-6">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">
+            {t("sectionAddPhotoReview")}
+          </h2>
+          <div className="mx-auto mt-4 grid w-full max-w-3xl gap-6 sm:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {t("addPhotoCurrent")}
+              </p>
+              <div className="relative aspect-[21/9] w-full overflow-hidden rounded-xl border border-border bg-muted/30">
+                <Image src={currentPhotoSrc} alt={placeTitle} fill className="object-cover" sizes="400px" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {t("addPhotoProposed")}
+              </p>
+              <div className="relative aspect-[21/9] w-full overflow-hidden rounded-xl border border-border bg-muted/30">
+                {proposedSrc ? (
+                  <Image src={proposedSrc} alt={placeTitle} fill className="object-cover" sizes="400px" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    {t("addPhotoProposedMissing")}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              {t("fieldStreetViewReference")}
-            </p>
-            {streetViewReference ? (
-              <StreetViewReferencePreview
-                reference={streetViewReference}
-                className="min-h-[min(58vw,320px)] sm:min-h-[380px]"
-              />
-            ) : (
-              <div className="flex aspect-video min-h-[200px] w-full items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/15 px-4 text-center text-sm text-muted-foreground">
-                {t("streetViewReferenceMissing")}
+        </section>
+      ) : (
+        <section className="border-b border-border/60 py-6">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">
+            {t("sectionPhotoStreetViewVerification")}
+          </h2>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            {t("sectionPhotoStreetViewVerificationHelp")}
+          </p>
+          <div className="mx-auto mt-4 flex w-full max-w-3xl flex-col gap-6">
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {t("fieldSubmittedPhoto")}
+              </p>
+              <div className="relative aspect-video min-h-[min(52vw,280px)] w-full overflow-hidden rounded-xl border border-border bg-muted/30 sm:min-h-[320px]">
+                <Image src={avatarSrc} alt={placeTitle} fill className="object-cover" sizes="(max-width: 768px) 100vw, 768px" />
               </div>
-            )}
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {t("fieldStreetViewReference")}
+              </p>
+              {streetViewReference ? (
+                <StreetViewReferencePreview
+                  reference={streetViewReference}
+                  className="min-h-[min(58vw,320px)] sm:min-h-[380px]"
+                />
+              ) : (
+                <div className="flex aspect-video min-h-[200px] w-full items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/15 px-4 text-center text-sm text-muted-foreground">
+                  {t("streetViewReferenceMissing")}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <section className="py-10">
         <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">{t("sectionContributor")}</h2>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{t("sectionContributorHelp")}</p>
         <div className="mt-6 flex items-center gap-4">
-          <Avatar className="h-12 w-12 border border-border/60">
-            {item.contributor.avatarUrl ? <AvatarImage src={item.contributor.avatarUrl} alt="" /> : null}
-            <AvatarFallback className="font-semibold">{contributorLabel(item.contributor).charAt(0)}</AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            avatarId={item.contributor.avatarUrl}
+            fallback={contributorLabel(item.contributor).charAt(0)}
+            className="h-12 w-12 border border-border/60 font-semibold"
+          />
           <div>
             <p className="font-semibold text-foreground">{contributorLabel(item.contributor)}</p>
             {item.contributor.username ? (

@@ -2,13 +2,16 @@ import { getTranslations } from "next-intl/server"
 import Image from "next/image"
 import { Link } from "@/i18n/navigation"
 import {
+  getPendingPathsForRole,
   isPlaceContributionFeedItem,
+  isFictionAddPhotoContribution,
   type StaffCreateContributionFeedItem,
   type StaffContributionsFeedKind,
 } from "@/src/contributions/domain/contribution.entity"
 import { contributionTypeMessageKey } from "@/components/contributions/contribution-type-label"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { publicAssetImageUrl } from "@/lib/asset-images/public-asset-url"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { cn } from "@/lib/utils"
 import type { ContributionsFeedTab } from "@/components/contributions/contributions-feed-tab-bar"
 
@@ -46,6 +49,12 @@ function emptyMessageKeys(
       body: isPlace ? "feedEmptyFilteredApprovedPlace" : "feedEmptyFilteredApproved",
     }
   }
+  if (submitterFiltered && statusTab === "rejected") {
+    return {
+      title: isPlace ? "feedEmptyFilteredRejectedPlaceTitle" : "feedEmptyFilteredRejectedTitle",
+      body: isPlace ? "feedEmptyFilteredRejectedPlace" : "feedEmptyFilteredRejected",
+    }
+  }
   if (submitterFiltered) {
     return {
       title: isPlace ? "feedEmptyFilteredPlaceTitle" : "feedEmptyFilteredTitle",
@@ -62,6 +71,12 @@ function emptyMessageKeys(
     return {
       title: isPlace ? "feedEmptyTabApprovedPlaceTitle" : "feedEmptyTabApprovedTitle",
       body: isPlace ? "feedEmptyTabApprovedPlace" : "feedEmptyTabApproved",
+    }
+  }
+  if (statusTab === "rejected") {
+    return {
+      title: isPlace ? "feedEmptyTabRejectedPlaceTitle" : "feedEmptyTabRejectedTitle",
+      body: isPlace ? "feedEmptyTabRejectedPlace" : "feedEmptyTabRejected",
     }
   }
   return {
@@ -103,9 +118,16 @@ export async function ContributionsFeedList({
         const title = isPlace
           ? item.placeName?.trim() || t("feedCard_untitledPlace")
           : item.fictionTitle?.trim() || t("feedCard_untitledFiction")
+        const fictionProposedLg = !isPlace
+          ? getPendingPathsForRole(item.pendingImagesByRole, "cover")?.lg
+          : null
+        const fictionProposed =
+          isFictionAddPhotoContribution(item) && fictionProposedLg
+            ? publicAssetImageUrl(fictionProposedLg)
+            : null
         const coverSrc = isPlace
           ? item.placeAvatarUrl?.trim() || DEFAULT_FICTION_COVER
-          : item.fictionCoverUrl?.trim() || DEFAULT_FICTION_COVER
+          : fictionProposed || item.fictionCoverUrl?.trim() || DEFAULT_FICTION_COVER
         const subtitle = isPlace && item.fictionTitle?.trim() ? item.fictionTitle.trim() : null
 
         return (
@@ -157,12 +179,11 @@ export async function ContributionsFeedList({
 
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
                   <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
-                    <Avatar className="h-4 w-4 shrink-0 border border-border/60">
-                      {item.contributor.avatarUrl ? <AvatarImage src={item.contributor.avatarUrl} alt="" /> : null}
-                      <AvatarFallback className="text-[8px]">
-                        {(item.contributor.username?.trim().charAt(0) || item.contributor.id.charAt(0)).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      avatarId={item.contributor.avatarUrl}
+                      fallback={(item.contributor.username?.trim().charAt(0) || item.contributor.id.charAt(0)).toUpperCase()}
+                      className="h-4 w-4 shrink-0 border border-border/60 text-[8px]"
+                    />
                     <span className="min-w-0 truncate font-medium text-foreground" title={item.contributor.id}>
                       {contributorHandleLabel(item.contributor)}
                     </span>

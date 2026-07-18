@@ -10,9 +10,12 @@ import { StaffPlaceContributionReviewRightAside } from "@/components/contributio
 import { ContributionsRightRail } from "@/components/contributions/contributions-right-rail"
 import {
   getContributorModerationContextForStaffSession,
-  getFictionContributionDetailForStaffSession,
-  getPlaceContributionDetailForStaffSession,
+  getStaffContributionDetailForStaffSession,
 } from "@/src/contributions/infrastructure/next/contribution.queries"
+import {
+  isFictionAddPhotoContribution,
+  isPlaceContributionFeedItem,
+} from "@/src/contributions/domain/contribution.entity"
 import { getFictionByIdForStaffSession } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { getPlaceLocationByIdForStaffSession } from "@/src/places/infrastructure/next/place.queries"
 import { getProfileForStaffSession } from "@/src/users/infrastructure/next/user.queries"
@@ -38,30 +41,29 @@ async function resolveModeratorWho(
 
 export default async function StaffContributionPage({ params }: Props) {
   const { contributionId } = await params
-  const [tContrib, tMeta, fictionItem, placeItem] = await Promise.all([
+  const [tContrib, tMeta, item] = await Promise.all([
     getTranslations("Contributions"),
     getTranslations("Metadata"),
-    getFictionContributionDetailForStaffSession(contributionId),
-    getPlaceContributionDetailForStaffSession(contributionId),
+    getStaffContributionDetailForStaffSession(contributionId),
   ])
 
-  if (!fictionItem && !placeItem) notFound()
+  if (!item) notFound()
 
-  if (placeItem && !fictionItem) {
+  if (isPlaceContributionFeedItem(item)) {
     const [place, fiction, contributorContext, moderatorWho] = await Promise.all([
-      getPlaceLocationByIdForStaffSession(placeItem.entityId),
-      placeItem.fictionId
-        ? getFictionByIdForStaffSession(placeItem.fictionId)
+      getPlaceLocationByIdForStaffSession(item.entityId),
+      item.fictionId
+        ? getFictionByIdForStaffSession(item.fictionId)
         : Promise.resolve(null),
-      getContributorModerationContextForStaffSession(placeItem.userId),
-      resolveModeratorWho(placeItem),
+      getContributorModerationContextForStaffSession(item.userId),
+      resolveModeratorWho(item),
     ])
 
     const workTitle =
-      place?.name?.trim() || placeItem.placeName?.trim() || tContrib("feedCard_untitledPlace")
+      place?.name?.trim() || item.placeName?.trim() || tContrib("feedCard_untitledPlace")
 
     const reviewRail = (
-      <StaffPlaceContributionReviewRightAside item={placeItem} moderatorWho={moderatorWho} />
+      <StaffPlaceContributionReviewRightAside item={item} moderatorWho={moderatorWho} />
     )
 
     return (
@@ -82,7 +84,7 @@ export default async function StaffContributionPage({ params }: Props) {
           </div>
           <div className="border-b border-border/60 pb-8 min-[900px]:hidden">{reviewRail}</div>
           <StaffPlaceContributionDetail
-            item={placeItem}
+            item={item}
             place={place}
             fiction={fiction}
             contributorContext={contributorContext}
@@ -92,7 +94,6 @@ export default async function StaffContributionPage({ params }: Props) {
     )
   }
 
-  const item = fictionItem!
   const [fiction, contributorContext, moderatorWho] = await Promise.all([
     getFictionByIdForStaffSession(item.entityId),
     getContributorModerationContextForStaffSession(item.userId),
@@ -117,7 +118,10 @@ export default async function StaffContributionPage({ params }: Props) {
             ariaLabel={tMeta("breadcrumbNavAriaLabel")}
             className="min-w-0"
             items={[
-              { label: tContrib("title"), href: "/contributions" },
+              {
+                label: tContrib("title"),
+                href: isFictionAddPhotoContribution(item) ? "/contributions?kind=fiction" : "/contributions",
+              },
               { label: workTitle },
             ]}
           />

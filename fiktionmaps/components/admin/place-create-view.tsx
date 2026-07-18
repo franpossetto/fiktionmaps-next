@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ArrowLeft, Loader2 } from "lucide-react"
+import { useTranslations } from "next-intl"
 import type { MapControlHandle } from "@/lib/map/types"
 import { Button } from "@/components/ui/button"
 import {
@@ -32,6 +33,8 @@ import {
 } from "@/components/places/place-location-picker"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
+import { SHOOT_ENVIRONMENT_OPTIONS } from "@/src/places/domain/place-shoot-environment"
+import type { PlaceShootEnvironment } from "@/src/places/domain/place-shoot-environment"
 
 const PLACE_MAP_ID = "admin-place-map"
 
@@ -61,6 +64,7 @@ export function PlaceCreateView({
   onSubmit,
   submitError,
 }: PlaceCreateViewProps) {
+  const tPlaces = useTranslations("Places")
   const isEdit = !!placeId
   const [formData, setFormData] = useState<PlaceFormData>(initialFormData)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -264,6 +268,26 @@ export function PlaceCreateView({
                   {LOCATION_TYPE_OPTIONS.filter((opt) => opt.value).map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+
+            <FormField label={tPlaces("fieldShootEnvironment")}>
+              <Select
+                value={formData.shootEnvironment || undefined}
+                onValueChange={(v) =>
+                  setFormData((p) => ({ ...p, shootEnvironment: v as PlaceShootEnvironment }))
+                }
+              >
+                <SelectTrigger className="h-10 w-full rounded-lg">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent className="z-[10000]">
+                  {SHOOT_ENVIRONMENT_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {tPlaces(opt.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectContent>

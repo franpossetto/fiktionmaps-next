@@ -13,11 +13,23 @@ const KEYS = {
   selectedCityId: `${PREFIX}selected-city-id`,
   adminViewMode: `${PREFIX}admin-view-mode`,
   recentFictions: `${PREFIX}recent-fictions`,
+  recentSearches: `${PREFIX}recent-searches`,
+  searchMode: `${PREFIX}search-mode`,
 } as const
 
 export type MapStyleValue = "day" | "dawn" | "dusk" | "night"
 export type ThemeValue = "dark" | "light"
 export type AdminViewMode = "cards" | "table"
+export type SearchMode = "map" | "article"
+
+export type RecentSearchItem = {
+  readonly id: string
+  readonly label: string
+  readonly kind: "city" | "fiction"
+  readonly fictionType?: string
+  readonly href: string
+  readonly mode: SearchMode
+}
 
 export type RecentFictionItem = {
   readonly id: string
@@ -220,6 +232,63 @@ export const recentFictionsStorage = {
   },
 }
 
+const MAX_RECENT_SEARCHES = 5
+
+function parseRecentSearches(raw: string | null): RecentSearchItem[] {
+  if (raw === null) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (item): item is RecentSearchItem =>
+        item !== null &&
+        typeof item === "object" &&
+        typeof (item as Record<string, unknown>).id === "string" &&
+        typeof (item as Record<string, unknown>).label === "string" &&
+        ((item as Record<string, unknown>).kind === "city" ||
+          (item as Record<string, unknown>).kind === "fiction") &&
+        typeof (item as Record<string, unknown>).href === "string" &&
+        ((item as Record<string, unknown>).mode === "map" ||
+          (item as Record<string, unknown>).mode === "article"),
+    )
+  } catch {
+    return []
+  }
+}
+
+/** Recently used home-search entries (cities + fictions), persisted across sessions. */
+export const recentSearchesStorage = {
+  get(): readonly RecentSearchItem[] {
+    return parseRecentSearches(getItem(KEYS.recentSearches))
+  },
+  add(item: RecentSearchItem): void {
+    const current = parseRecentSearches(getItem(KEYS.recentSearches))
+    const next = [item, ...current.filter((r) => r.id !== item.id)].slice(0, MAX_RECENT_SEARCHES)
+    setItem(KEYS.recentSearches, JSON.stringify(next))
+  },
+  remove(id: string): void {
+    const current = parseRecentSearches(getItem(KEYS.recentSearches))
+    setItem(KEYS.recentSearches, JSON.stringify(current.filter((r) => r.id !== id)))
+  },
+  getDefault(): readonly RecentSearchItem[] {
+    return []
+  },
+}
+
+/** Search mode preference for the home search bar ("map" or "article"). */
+export const searchModeStorage = {
+  get(): SearchMode {
+    const raw = getItem(KEYS.searchMode)
+    return raw === "article" ? "article" : "map"
+  },
+  set(mode: SearchMode): void {
+    setItem(KEYS.searchMode, mode)
+  },
+  getDefault(): SearchMode {
+    return "map"
+  },
+}
+
 /** Single entry point for all UI local storage. */
 export const localStorageService = {
   mapStyle: mapStyleStorage,
@@ -229,4 +298,6 @@ export const localStorageService = {
   selectedCityId: selectedCityIdStorage,
   adminViewMode: adminViewModeStorage,
   recentFictions: recentFictionsStorage,
+  recentSearches: recentSearchesStorage,
+  searchMode: searchModeStorage,
 }

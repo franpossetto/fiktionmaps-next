@@ -51,6 +51,7 @@ export function createCitiesSupabaseAdapter(
           lat: data.lat,
           lng: data.lng,
           zoom: data.zoom,
+          image_url: data.image_url ?? null,
         })
         .select()
         .single()

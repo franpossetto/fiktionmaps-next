@@ -50,6 +50,9 @@ import { PlaceContributeFppRewardCompactStrip } from "@/components/contribute/pl
 import { PlaceContributePublicPreview } from "@/components/contribute/place/place-contribute-public-preview"
 import { StreetViewReferencePicker } from "@/components/places/street-view-reference-picker"
 import type { StreetViewReference } from "@/src/locations/domain/location-view-reference.schemas"
+import { SHOOT_ENVIRONMENT_OPTIONS } from "@/src/places/domain/place-shoot-environment"
+import type { PlaceShootEnvironment } from "@/src/places/domain/place-shoot-environment"
+import type { HuntPlaceContributePrefill } from "@/src/hunts/domain/hunt-candidate.helpers"
 import {
   PlaceContributeStepsAside,
   type PlaceContributeFormStep,
@@ -73,6 +76,49 @@ const stepVariants = {
 export interface PlaceContributeWizardProps {
   initialFictions: FictionWithMedia[]
   initialCities: City[]
+  huntPrefill?: HuntPlaceContributePrefill | null
+}
+
+function emptyDraft(): Draft {
+  return {
+    fictionId: "",
+    fictionSearch: "",
+    address: "",
+    formattedAddress: "",
+    latitude: Number.NaN,
+    longitude: Number.NaN,
+    cityId: "",
+    locationName: "",
+    placeName: "",
+    locationType: "",
+    isLandmark: false,
+    shootEnvironment: null,
+    description: "",
+    imageFile: null,
+    streetViewReference: null,
+    mapSuggestion: "",
+  }
+}
+
+function draftFromHuntPrefill(prefill: HuntPlaceContributePrefill): Draft {
+  return {
+    fictionId: prefill.fictionId,
+    fictionSearch: "",
+    address: prefill.formattedAddress,
+    formattedAddress: prefill.formattedAddress,
+    latitude: prefill.latitude,
+    longitude: prefill.longitude,
+    cityId: prefill.cityId,
+    locationName: prefill.locationName,
+    placeName: prefill.placeName,
+    locationType: "",
+    isLandmark: prefill.isLandmark,
+    shootEnvironment: prefill.shootEnvironment,
+    description: prefill.description,
+    imageFile: null,
+    streetViewReference: prefill.streetViewReference,
+    mapSuggestion: prefill.locationName,
+  }
 }
 
 type Draft = {
@@ -87,6 +133,7 @@ type Draft = {
   placeName: string
   locationType: string
   isLandmark: boolean
+  shootEnvironment: PlaceShootEnvironment | null
   description: string
   imageFile: File | null
   streetViewReference: StreetViewReference | null
@@ -94,12 +141,18 @@ type Draft = {
   mapSuggestion: string
 }
 
-export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceContributeWizardProps) {
+export function PlaceContributeWizard({
+  initialFictions,
+  initialCities,
+  huntPrefill = null,
+}: PlaceContributeWizardProps) {
   const t = useTranslations("Contribute.place")
+  const tPlaces = useTranslations("Places")
   const tNav = useTranslations("Contribute.nav")
   const tVal = useTranslations("Contribute.validation")
+  const tHunt = useTranslations("Contribute.huntReview")
 
-  const [step, setStep] = useState<PlaceContributeFormStep>(1)
+  const [step, setStep] = useState<PlaceContributeFormStep>(huntPrefill ? 5 : 1)
   const [done, setDone] = useState<{
     variant: "pending" | "approved"
     placeId: string
@@ -109,27 +162,13 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
     imageUrl: string | null
   } | null>(null)
 
-  const [draft, setDraft] = useState<Draft>({
-    fictionId: "",
-    fictionSearch: "",
-    address: "",
-    formattedAddress: "",
-    latitude: Number.NaN,
-    longitude: Number.NaN,
-    cityId: "",
-    locationName: "",
-    placeName: "",
-    locationType: "",
-    isLandmark: false,
-    description: "",
-    imageFile: null,
-    streetViewReference: null,
-    mapSuggestion: "",
-  })
+  const [draft, setDraft] = useState<Draft>(() =>
+    huntPrefill ? draftFromHuntPrefill(huntPrefill) : emptyDraft(),
+  )
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [addressLocked, setAddressLocked] = useState(false)
+  const [addressLocked, setAddressLocked] = useState(Boolean(huntPrefill))
   const [searchTypes, setSearchTypes] = useState<MapboxSearchType[]>(DEFAULT_MAPBOX_SEARCH_TYPES)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmCityId, setConfirmCityId] = useState("")
@@ -282,9 +321,14 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
       fd.set("description", draft.description.trim())
       fd.set("isLandmark", String(draft.isLandmark))
       fd.set("locationType", draft.locationType)
+      if (draft.shootEnvironment) fd.set("shootEnvironment", draft.shootEnvironment)
       if (draft.imageFile) fd.set("imageFile", draft.imageFile)
       if (draft.streetViewReference) {
         fd.set("streetViewReference", JSON.stringify(draft.streetViewReference))
+      }
+      if (huntPrefill) {
+        fd.set("huntId", huntPrefill.huntId)
+        fd.set("placeIndex", String(huntPrefill.placeIndex))
       }
 
       const res = await createContributorPlaceWithImageAction(fd)
@@ -303,7 +347,7 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
       })
       setConfirmOpen(false)
     },
-    [draft, imagePreviewForDone, selectedFiction],
+    [draft, huntPrefill, imagePreviewForDone, selectedFiction],
   )
 
   const handleSubmitClick = useCallback(() => {
@@ -324,6 +368,8 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
   }, [draft.cityId, initialCities, validateStep])
 
   if (done) {
+    const returnHref = huntPrefill ? `/contribute/hunt/${huntPrefill.huntId}/review` : "/map"
+    const returnLabel = huntPrefill ? tHunt("postulateBackToHunt") : t("backToMap")
     return (
       <FictionContributeLayout leftAside={null} rightAside={null} mainColumnScroll>
         <div className="flex min-h-full items-center justify-center px-4 py-10">
@@ -332,6 +378,8 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
             placeName={done.placeName}
             imageSrc={done.imageUrl}
             placeHref={`/fictions/${done.fictionSlug}/places/${done.placeSlug}`}
+            returnHref={returnHref}
+            returnLabel={returnLabel}
           />
         </div>
       </FictionContributeLayout>
@@ -417,6 +465,13 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
             <PlaceContributeFppRewardCompactStrip className="mb-4" />
           </div>
         ) : null}
+
+        {huntPrefill && (
+          <div className="mb-4 rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-sm font-medium text-foreground">{tHunt("inboxBannerTitle")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{tHunt("postulateHint")}</p>
+          </div>
+        )}
 
         {step !== 8 ? (
           <ContributeStepHeader
@@ -556,6 +611,28 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
                     </SelectContent>
                   </Select>
                 </ContributeFieldWrapper>
+                <ContributeFieldWrapper label={tPlaces("fieldShootEnvironment")}>
+                  <Select
+                    value={draft.shootEnvironment ?? undefined}
+                    onValueChange={(v) =>
+                      setDraft((p) => ({
+                        ...p,
+                        shootEnvironment: v as PlaceShootEnvironment,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className={INPUT_ROW}>
+                      <SelectValue placeholder="—" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SHOOT_ENVIRONMENT_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {tPlaces(o.labelKey)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </ContributeFieldWrapper>
                 <label className="flex items-center gap-2 text-sm text-muted-foreground">
                   <input
                     type="checkbox"
@@ -642,6 +719,7 @@ export function PlaceContributeWizard({ initialFictions, initialCities }: PlaceC
                   cityId={draft.cityId}
                   locationType={draft.locationType}
                   isLandmark={draft.isLandmark}
+                  shootEnvironment={draft.shootEnvironment}
                   imagePreviewUrl={previewUrl}
                 />
               </div>

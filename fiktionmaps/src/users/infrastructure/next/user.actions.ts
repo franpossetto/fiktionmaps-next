@@ -36,7 +36,7 @@ function profileToUserProfile(p: Profile): ProfileWithOnboarding {
   return {
     id: p.id,
     username: p.username?.trim() || "",
-    avatar: p.avatar_url || "/logo-icon.png",
+    avatar: p.avatar_url || "",
     bio: p.bio || "",
     interests: [],
     joinedDate: p.created_at,

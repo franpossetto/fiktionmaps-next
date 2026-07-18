@@ -1,13 +1,18 @@
 "use client"
 
 import type { ReactNode } from "react"
-import Image from "next/image"
 import { Search, X } from "lucide-react"
+import {
+  AssetThumbImage,
+  type AssetThumbEnsureTarget,
+} from "@/components/ui/asset-thumb-image"
 import { cn } from "@/lib/utils"
 
 export type ScopedSearchChip = {
   label: string
   imageUrl?: string | null
+  /** Lazy xs backfill target when the chip image is a fiction/place asset. */
+  imageEnsure?: AssetThumbEnsureTarget
   onClear?: () => void
   clearLabel?: string
   /** Opens a popover listing selected items (parent must wrap input in `<Popover>`). */
@@ -25,7 +30,12 @@ export function SearchScopeChip({ chip, compact }: { chip: ScopedSearchChip; com
     >
       {chip.imageUrl ? (
         <span className="relative h-5 w-5 shrink-0 overflow-hidden rounded-full bg-muted">
-          <Image src={chip.imageUrl} alt="" fill className="object-cover" sizes="20px" />
+          <AssetThumbImage
+            src={chip.imageUrl}
+            size={20}
+            className="rounded-full"
+            ensure={chip.imageEnsure}
+          />
         </span>
       ) : (
         <span className="h-5 w-5 shrink-0 rounded-full bg-muted" aria-hidden />

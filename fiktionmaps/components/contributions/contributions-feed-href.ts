@@ -1,7 +1,7 @@
 import type { StaffContributionsFeedKind } from "@/src/contributions/domain/contribution.entity"
 
 /** Matches staff feed tabs in URL (`status` query). */
-export type ContributionsFeedTab = "all" | "pending" | "approved"
+export type ContributionsFeedTab = "all" | "pending" | "approved" | "rejected"
 
 export function parseContributionsFeedKind(raw: string | undefined): StaffContributionsFeedKind {
   const s = raw?.trim().toLowerCase() ?? ""

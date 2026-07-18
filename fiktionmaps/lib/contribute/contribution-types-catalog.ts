@@ -11,21 +11,40 @@ import {
   MapPin,
   MessageSquareQuote,
   PenLine,
+  Sparkles,
 } from "lucide-react"
 
 export type ContributionTypeCatalogEntry = {
+  /** Unique key for rendering; falls back to `type` when omitted. */
+  id?: string
   type: ContributionType
   icon: LucideIcon
   /** Full wizard flow (navigates on click). */
   hasWizard: boolean
-  href?: "/contribute/fiction" | "/contribute/place"
+  href?: "/contribute/fiction" | "/contribute/place" | "/contribute/photo" | "/contribute/hunt"
+  /** Short badge label shown on the card (e.g. "AI Hunt"). */
+  tag?: string
+  /** Requires contributor, moderator, or admin role (e.g. AI wizards). */
+  requiresContributor?: boolean
+  /** Hidden when no AI provider key is configured. */
+  aiRequired?: boolean
 }
 
 const CONTRIBUTION_TYPES_CATALOG_BASE: ContributionTypeCatalogEntry[] = [
   { type: "create_fiction", icon: Film, hasWizard: true, href: "/contribute/fiction" },
   { type: "create_place", icon: MapPin, hasWizard: true, href: "/contribute/place" },
+  {
+    id: "hunt_place",
+    type: "create_place",
+    icon: Sparkles,
+    hasWizard: true,
+    href: "/contribute/hunt",
+    tag: "AI Hunt",
+    requiresContributor: true,
+    aiRequired: true,
+  },
   { type: "add_scene", icon: Clapperboard, hasWizard: false },
-  { type: "add_photo", icon: ImagePlus, hasWizard: false },
+  { type: "add_photo", icon: ImagePlus, hasWizard: true, href: "/contribute/photo" },
   { type: "enrich_entity", icon: Layers, hasWizard: false },
   { type: "correct_data", icon: PenLine, hasWizard: false },
   { type: "mark_inaccessible", icon: CircleOff, hasWizard: false },

@@ -6,6 +6,62 @@ export type ContributionType = ContributionRow["type"]
 
 export type ContributionEntityType = ContributionRow["entity_type"]
 
+export type ContributionPendingImageRole = "avatar" | "hero" | "cover" | "banner"
+
+/** @deprecated Use ContributionPendingImageRole */
+export type PlaceContributionPendingImageRole = Extract<ContributionPendingImageRole, "avatar" | "hero">
+
+export type ContributionPendingImageVariant = "xs" | "sm" | "lg"
+
+export interface ContributionPendingImage {
+  id: string
+  contributionId: string
+  role: ContributionPendingImageRole
+  variant: ContributionPendingImageVariant
+  storagePath: string
+  createdAt: string
+}
+
+/** Pending storage paths grouped by asset role (sm/lg are variants of the same upload per role). */
+export type ContributionPendingImagesByRole = Partial<
+  Record<ContributionPendingImageRole, Partial<Record<ContributionPendingImageVariant, string>>>
+>
+
+/** @deprecated Single-role snapshot; use ContributionPendingImagesByRole. */
+export type ContributionPendingImagesSnapshot = {
+  role: ContributionPendingImageRole
+  paths: Partial<Record<ContributionPendingImageVariant, string>>
+}
+
+export function pendingImagesRowsToByRole(rows: ContributionPendingImage[]): ContributionPendingImagesByRole | null {
+  if (rows.length === 0) return null
+  const byRole: ContributionPendingImagesByRole = {}
+  for (const row of rows) {
+    const rolePaths = byRole[row.role] ?? {}
+    rolePaths[row.variant] = row.storagePath
+    byRole[row.role] = rolePaths
+  }
+  return Object.keys(byRole).length > 0 ? byRole : null
+}
+
+export function getPendingPathsForRole(
+  byRole: ContributionPendingImagesByRole | null | undefined,
+  role: ContributionPendingImageRole,
+): Partial<Record<ContributionPendingImageVariant, string>> | null {
+  const paths = byRole?.[role]
+  return paths && Object.keys(paths).length > 0 ? paths : null
+}
+
+/** @deprecated Use pendingImagesRowsToByRole */
+export function pendingImagesToSnapshot(rows: ContributionPendingImage[]): ContributionPendingImagesSnapshot | null {
+  const byRole = pendingImagesRowsToByRole(rows)
+  if (!byRole) return null
+  const role = (Object.keys(byRole)[0] ?? null) as ContributionPendingImageRole | null
+  if (!role) return null
+  const paths = byRole[role]
+  return paths ? { role, paths } : null
+}
+
 export interface Contribution {
   id: string
   userId: string
@@ -28,6 +84,16 @@ export interface FictionContributorProfile {
   avatarUrl: string | null
 }
 
+/** Fiction contributor with FPP earned in this fiction scope (fiction + its places). */
+export interface FictionContributorRankedProfile extends FictionContributorProfile {
+  fppTotal: number
+}
+
+/** One approved contribution row in a fiction scope (for FPP aggregation). */
+export interface FictionContributorScopeEntry extends FictionContributorProfile {
+  fppAwarded: number
+}
+
 /** Staff feed row: a create_fiction contribution on a fiction entity plus submitter profile. */
 export interface FictionContributionFeedItem extends Contribution {
   contributor: FictionContributorProfile
@@ -35,6 +101,7 @@ export interface FictionContributionFeedItem extends Contribution {
   fictionTitle: string | null
   /** Cover thumbnail URL (`asset_images` cover sm) when present. */
   fictionCoverUrl: string | null
+  pendingImagesByRole: ContributionPendingImagesByRole | null
 }
 
 /** Same as FictionContributorProfile plus first approved contribution timestamp for this entity (deduped per user). */
@@ -47,6 +114,26 @@ export interface TopContributorProfile extends FictionContributorProfile {
   fppTotal: number
 }
 
+/** Distinct fiction and place scopes with approved contributions (global user footprint). */
+export interface ContributorEntityScopeCounts {
+  fictionCount: number
+  placeCount: number
+}
+
+/** One approved contribution row for the fiction-scope contributor modal. */
+export interface FictionScopeContributorContributionItem {
+  id: string
+  type: ContributionType
+  entityType: ContributionEntityType
+  entityId: string
+  entityLabel: string | null
+  fppAwarded: number
+  createdAt: string
+}
+
+/** Which contributor modal to open from TopContributorsList (one variant per page context). */
+export type TopContributorsModalContext = { type: "fiction"; fictionId: string; fictionTitle: string }
+
 /** Staff: submitter activity + lifetime FPP on profile (contributions detail). */
 export interface ContributorModerationContext {
   totalContributions: number
@@ -55,7 +142,7 @@ export interface ContributorModerationContext {
 }
 
 /** Staff fiction create feed tab — matches UI `ContributionsFeedTab`. */
-export type StaffFictionContributionsFeedStatusTab = "all" | "pending" | "approved"
+export type StaffFictionContributionsFeedStatusTab = "all" | "pending" | "approved" | "rejected"
 
 /** Staff `/contributions` feed filter for create_fiction vs create_place. */
 export type StaffContributionsFeedKind = "fiction" | "place" | "all"
@@ -79,6 +166,7 @@ export interface PlaceContributionFeedItem extends Contribution {
   placeAvatarUrl: string | null
   fictionTitle: string | null
   fictionId: string | null
+  pendingImagesByRole: ContributionPendingImagesByRole | null
 }
 
 export type StaffCreateContributionsFeedPageInput = {
@@ -99,5 +187,23 @@ export type StaffCreateContributionsFeedPageResult = {
 export function isPlaceContributionFeedItem(
   item: StaffCreateContributionFeedItem,
 ): item is PlaceContributionFeedItem {
-  return item.entityType === "place" && item.type === "create_place"
+  return item.entityType === "place" && (item.type === "create_place" || item.type === "add_photo")
+}
+
+export function isPlaceAddPhotoContribution(item: Contribution): boolean {
+  return item.entityType === "place" && item.type === "add_photo"
+}
+
+export function isFictionAddPhotoContribution(item: Contribution): boolean {
+  return item.entityType === "fiction" && item.type === "add_photo"
+}
+
+export function isFictionContributionFeedItem(
+  item: StaffCreateContributionFeedItem,
+): item is FictionContributionFeedItem {
+  return item.entityType === "fiction" && (item.type === "create_fiction" || item.type === "add_photo")
+}
+
+export function isFictionCreateContributionFeedItem(item: FictionContributionFeedItem): boolean {
+  return item.type === "create_fiction"
 }

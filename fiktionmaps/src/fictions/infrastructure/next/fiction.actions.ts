@@ -34,10 +34,15 @@ import { getFictionInterestsUseCase } from "@/src/fiction-interests/application/
 import { setFictionInterestsUseCase } from "@/src/fiction-interests/application/set-fiction-interests.usecase"
 import { getRecommendedFictionsUseCase } from "@/src/fictions/application/get-recommended-fictions.usecase"
 import { resolveNavSearchScopeUseCase } from "@/src/fictions/application/resolve-nav-search-scope.usecase"
+import {
+  getFictionPhotoContributeContextUseCase,
+  type FictionPhotoContributeContext,
+} from "@/src/fictions/application/get-fiction-photo-contribute-context.usecase"
 import { parseFictionAppRoute } from "@/lib/navigation/parse-fiction-app-route"
 import type { NavSearchScope } from "@/src/fictions/domain/nav-search-scope"
 import { resolvePlaceForFictionPathCached } from "@/src/places/infrastructure/next/place.queries"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
+import { THUMB_UPLOAD_VARIANTS } from "@/lib/asset-images/variant-sizes"
 import {
   getFictionByIdCached,
   getFictionBySlugCached,
@@ -230,7 +235,7 @@ async function createFictionWithImagesFromParsed(
         entityType: "fiction",
         entityId: fiction.id,
         role: "cover",
-        variants: ["sm", "lg"],
+        variants: THUMB_UPLOAD_VARIANTS,
         file: coverFile,
         replace: true,
       })
@@ -287,7 +292,7 @@ export async function uploadFictionImageAction(
   const validationError = validateImageFile(file)
   if (validationError) return { success: false, error: validationError }
 
-  const variants: ("sm" | "lg" | "xl")[] = role === "cover" ? ["sm", "lg"] : ["lg"]
+  const variants = role === "cover" ? THUMB_UPLOAD_VARIANTS : (["lg"] as const)
   const result = await uploadEntityImage({ entityType: "fiction", entityId: fictionId, role, variants, file, replace: true })
 
   if (!result.success) return result
@@ -542,4 +547,13 @@ export async function getFictionDetailRecommendationsAction(
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed to load recommendations" }
   }
+}
+
+export type { FictionPhotoContributeContext } from "@/src/fictions/application/get-fiction-photo-contribute-context.usecase"
+
+export async function getFictionPhotoContributeContextAction(
+  fictionId: string,
+): Promise<FictionPhotoContributeContext | null> {
+  if (!uuidSchema.safeParse(fictionId).success) return null
+  return getFictionPhotoContributeContextUseCase(fictionId, fictionsRepo)
 }

@@ -11,7 +11,7 @@ import {
   getCurrentUserProfileAction,
   completeOnboardingAction,
 } from "@/src/users/infrastructure/next/user.actions"
-import { isStaffUserRole } from "@/src/users/domain/user.roles"
+import { isStaffUserRole, isContributorUserRole } from "@/src/users/domain/user.roles"
 
 export interface User {
   id: string
@@ -33,6 +33,8 @@ interface AuthContextType {
   isAdmin: boolean
   /** Admin or moderator — can access staff `/contributions` (distinct from full dashboard admin). */
   isStaffModerator: boolean
+  /** Contributor, moderator, or admin — can access experimental features (e.g. AI wizards). */
+  isContributor: boolean
   isLoading: boolean
   isAuthReady: boolean
   needsOnboarding: boolean
@@ -67,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [isStaffModerator, setIsStaffModerator] = useState(false)
+  const [isContributor, setIsContributor] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isAuthReady, setIsAuthReady] = useState(false)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
@@ -86,12 +89,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsAdmin(admin)
         const staff = profileResult.data ? isStaffUserRole(profileResult.data.role) : false
         setIsStaffModerator(staff)
+        const contributor = profileResult.data ? isContributorUserRole(profileResult.data.role) : false
+        setIsContributor(contributor)
         if (process.env.NODE_ENV === "development") {
           console.info("[auth] profile role → isAdmin", profileResult.data?.role, admin)
         }
       } else {
         setIsAdmin(false)
         setIsStaffModerator(false)
+        setIsContributor(false)
       }
       setIsAuthReady(true)
     }
@@ -114,6 +120,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsAdmin(admin)
         const staff = profileResult.data ? isStaffUserRole(profileResult.data.role) : false
         setIsStaffModerator(staff)
+        const contributor = profileResult.data ? isContributorUserRole(profileResult.data.role) : false
+        setIsContributor(contributor)
         if (process.env.NODE_ENV === "development") {
           console.info("[auth] profile role → isAdmin", profileResult.data?.role, admin)
         }
@@ -133,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setNeedsOnboarding(true)
         setIsAdmin(false)
         setIsStaffModerator(false)
+        setIsContributor(false)
       }
     } finally {
       setIsLoading(false)
@@ -144,6 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
     setIsAdmin(false)
     setIsStaffModerator(false)
+    setIsContributor(false)
     setNeedsOnboarding(false)
     setPreferences(null)
     window.location.href = "/login"
@@ -171,6 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         isAdmin,
         isStaffModerator,
+        isContributor,
         isLoading,
         isAuthReady,
         needsOnboarding,

@@ -8,9 +8,9 @@ export interface UpdateProfileData {
   onboarding_completed?: boolean
 }
 
-export type UserRole = "user" | "admin" | "moderator"
+export type UserRole = "user" | "contributor" | "moderator" | "admin"
 
 export function parseProfileRole(raw: string | null | undefined): UserRole {
-  if (raw === "admin" || raw === "moderator" || raw === "user") return raw
+  if (raw === "admin" || raw === "moderator" || raw === "contributor" || raw === "user") return raw
   return "user"
 }

@@ -328,6 +328,10 @@ export function PlaceAddressSearch({
   if (!sessionTokenRef.current) {
     sessionTokenRef.current = newSessionToken()
   }
+  // Selecting a suggestion echoes its place_name back through onChange so the
+  // input reflects the pick — track it so that echo doesn't re-trigger a search
+  // and reopen the dropdown on top of whatever renders below it.
+  const lastSelectedValueRef = useRef<string | null>(null)
 
   const search = useCallback(
     async (input: string) => {
@@ -381,7 +385,7 @@ export function PlaceAddressSearch({
   )
 
   useEffect(() => {
-    if (!value.trim()) {
+    if (!value.trim() || value === lastSelectedValueRef.current) {
       setPredictions([])
       return
     }
@@ -398,6 +402,7 @@ export function PlaceAddressSearch({
           const intersection = await geocodeStreetIntersectionSuggestion(suggestion)
           if (intersection) {
             onSelect(intersection)
+            lastSelectedValueRef.current = intersection.place_name
             onChange(intersection.place_name)
             setPredictions([])
             sessionTokenRef.current = newSessionToken()
@@ -436,6 +441,7 @@ export function PlaceAddressSearch({
           text: feat.properties.name,
           context: searchBoxContextToV5(feat.properties.context ?? suggestion.context),
         })
+        lastSelectedValueRef.current = placeName
         onChange(placeName)
         setPredictions([])
         sessionTokenRef.current = newSessionToken()
@@ -459,6 +465,7 @@ export function PlaceAddressSearch({
         text: feature.text || feature.place_name.split(",")[0]?.trim() || "",
         context: feature.context,
       })
+      lastSelectedValueRef.current = feature.place_name
       onChange(feature.place_name)
       setPredictions([])
       onError?.("")

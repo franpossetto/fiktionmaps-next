@@ -7,8 +7,8 @@ import type {
   MapMarkerLabelMode,
   ThemeBase,
 } from "@/lib/theme-settings"
-import { PlaceMarker2dV1 } from "@/lib/map/pin-markers/v1/place-marker-2d"
-import { PlaceMarker2dV2 } from "@/lib/map/pin-markers/v2/place-marker-2d"
+import { PlaceMarker2dSquare } from "@/lib/map/pin-markers/square/place-marker-2d"
+import { PlaceMarker2dRound } from "@/lib/map/pin-markers/round/place-marker-2d"
 import { cn } from "@/lib/utils"
 
 /** Place photo used in settings (Central Perk — same pool as map location assets). */
@@ -62,9 +62,9 @@ export function MapMarkerShapePreview({
     >
       <div className={cn(isStandalone && "origin-center scale-[1.35]")}>
         {shape === "square" ? (
-          <PlaceMarker2dV1 {...pinProps} />
+          <PlaceMarker2dSquare {...pinProps} />
         ) : (
-          <PlaceMarker2dV2 {...pinProps} />
+          <PlaceMarker2dRound {...pinProps} />
         )}
       </div>
     </div>

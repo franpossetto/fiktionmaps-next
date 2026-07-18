@@ -9,10 +9,16 @@ import { resolveEntityContributionInsertDefaults } from "@/src/contributions/app
 import { uuidSchema } from "@/lib/validation/primitives"
 import type { MapBbox } from "@/lib/validation/map-query"
 import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
+import { listApprovedFictionPlacesUseCase } from "@/src/places/application/list-approved-fiction-places.usecase"
+import {
+  getPlacePhotoContributeContextUseCase,
+  type PlacePhotoContributeContext,
+} from "@/src/places/application/get-place-photo-contribute-context.usecase"
 import { createPlaceUseCase } from "@/src/places/application/create-place.usecase"
 import { updatePlaceUseCase } from "@/src/places/application/update-place.usecase"
 import { deletePlaceUseCase } from "@/src/places/application/delete-place.usecase"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
+import { THUMB_UPLOAD_VARIANTS } from "@/lib/asset-images/variant-sizes"
 import {
   getAllPlacesCached,
   getCityPlacesCached,
@@ -29,6 +35,9 @@ import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place
 import { getFictionByIdCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { createContributionAction } from "@/src/contributions/infrastructure/next/contribution.actions"
 import { parsePlaceContributeFormData } from "@/src/places/domain/place-contribute.schemas"
+import { markHuntCandidatePostedUseCase } from "@/src/hunts/application/mark-hunt-candidate-posted.usecase"
+import { huntSourcesSupabaseAdapter } from "@/src/hunts/infrastructure/supabase/hunt-source.repository.impl"
+import { huntsSupabaseAdapter } from "@/src/hunts/infrastructure/supabase/hunt.repository.impl"
 import type {
   CreatePlaceResult,
   CreateContributorPlaceResult,
@@ -45,6 +54,15 @@ export type {
   UploadPlaceImageResult,
 } from "./place.actions.types"
 
+export async function getPlaceUrlAction(placeId: string): Promise<string | null> {
+  const place = await getPlaceLocationByIdCached(placeId)
+  if (!place) return null
+  const { getFictionByIdCached } = await import("@/src/fictions/infrastructure/next/fiction.queries")
+  const fiction = await getFictionByIdCached(place.fictionId)
+  if (!fiction) return null
+  return `/fictions/${fiction.slug}/places/${place.slug}`
+}
+
 const CREATE_PLACE_CONTRIBUTION = {
   type: "create_place" as const,
   entityType: "place" as const,
@@ -53,8 +71,13 @@ const CREATE_PLACE_CONTRIBUTION = {
 async function recordCreatePlaceContribution(
   placeId: string,
   logContext: string,
+  huntId?: string | null,
 ): Promise<boolean | undefined> {
-  const payload = { ...CREATE_PLACE_CONTRIBUTION, entityId: placeId }
+  const payload = {
+    ...CREATE_PLACE_CONTRIBUTION,
+    entityId: placeId,
+    ...(huntId ? { origin: "hunt" as const, externalId: huntId } : {}),
+  }
   try {
     const res = await createContributionAction(payload)
     if (!res.success) {
@@ -89,7 +112,7 @@ export async function uploadPlaceImageAction(
     entityType: "place",
     entityId: placeId,
     role: "avatar",
-    variants: ["sm", "lg"],
+    variants: THUMB_UPLOAD_VARIANTS,
     file,
     replace: true,
   })
@@ -119,6 +142,21 @@ export async function getPlaceLocationDetailAction(placeId: string): Promise<Pla
 export async function getFictionPlacesAction(fictionId: string): Promise<Place[]> {
   if (!uuidSchema.safeParse(fictionId).success) return []
   return getFictionPlacesCached(fictionId)
+}
+
+/** Approved active places for contribute photo wizard (fiction-scoped list). */
+export async function getApprovedFictionPlacesForContributeAction(fictionId: string): Promise<Place[]> {
+  if (!uuidSchema.safeParse(fictionId).success) return []
+  return listApprovedFictionPlacesUseCase(fictionId, placesRepo)
+}
+
+export type { PlacePhotoContributeContext } from "@/src/places/application/get-place-photo-contribute-context.usecase"
+
+export async function getPlacePhotoContributeContextAction(
+  placeId: string,
+): Promise<PlacePhotoContributeContext | null> {
+  if (!uuidSchema.safeParse(placeId).success) return null
+  return getPlacePhotoContributeContextUseCase(placeId, placesRepo)
 }
 
 export async function getCityPlacesAction(cityId: string): Promise<Place[]> {
@@ -159,7 +197,16 @@ export async function createPlaceAction(data: CreatePlaceData): Promise<CreatePl
 
   const result = await createPlaceUseCase({ ...data, status, created_by }, placesRepo)
   if (!result) return { success: false, error: "Failed to create place" }
+
+  const contributionAutoApproved = await recordCreatePlaceContribution(result.placeId, "createPlaceAction")
+
+  revalidatePath("/admin")
+  revalidatePath("/contributions")
   updateTag("places")
+  updateTag(`place-${result.placeId}`)
+  updateTag("contributions")
+  if (contributionAutoApproved) updateTag("profiles")
+
   const places = await getAllPlacesCached()
   return { success: true, createdPlaceId: result.placeId, places }
 }
@@ -229,6 +276,7 @@ export async function createContributorPlaceWithImageAction(
   const contributionAutoApproved = await recordCreatePlaceContribution(
     result.placeId,
     "createContributorPlaceWithImageAction",
+    parsed.huntId,
   )
 
   if (parsed.imageFile) {
@@ -238,7 +286,7 @@ export async function createContributorPlaceWithImageAction(
         entityType: "place",
         entityId: result.placeId,
         role: "avatar",
-        variants: ["sm", "lg"],
+        variants: THUMB_UPLOAD_VARIANTS,
         file: parsed.imageFile,
         replace: true,
       })
@@ -252,6 +300,30 @@ export async function createContributorPlaceWithImageAction(
   updateTag("contributions")
 
   const fiction = await getFictionByIdCached(parsed.data.fictionId)
+
+  if (parsed.huntId != null && parsed.placeIndex != null) {
+    try {
+      await markHuntCandidatePostedUseCase(
+        {
+          huntId: parsed.huntId,
+          placeIndex: parsed.placeIndex,
+          placeId: result.placeId,
+        },
+        user.id,
+        huntsSupabaseAdapter,
+        huntSourcesSupabaseAdapter,
+      )
+      revalidatePath("/contribute/hunt")
+      revalidatePath(`/contribute/hunt/${parsed.huntId}/review`)
+    } catch (err) {
+      console.error("[createContributorPlaceWithImageAction] markHuntCandidatePosted failed", {
+        huntId: parsed.huntId,
+        placeIndex: parsed.placeIndex,
+        placeId: result.placeId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
 
   const out: CreateContributorPlaceResult = {
     success: true,

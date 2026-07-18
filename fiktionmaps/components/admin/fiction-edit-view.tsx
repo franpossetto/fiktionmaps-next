@@ -469,7 +469,8 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
                           alt="Cover"
                           fill
                           className="object-cover"
-                          unoptimized={coverImage.startsWith("http")}
+                          sizes="140px"
+                          unoptimized={coverImage.startsWith("blob:")}
                         />
                         <span className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end justify-center pb-2">
                           <span className="text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow">
@@ -500,7 +501,8 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
                           alt="Banner"
                           fill
                           className="object-cover"
-                          unoptimized
+                          sizes="(max-width: 640px) 100vw, 50vw"
+                          unoptimized={bannerImage.startsWith("blob:")}
                         />
                         <span className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
                           <span className="text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow">

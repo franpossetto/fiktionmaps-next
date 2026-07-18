@@ -5,6 +5,7 @@ import type { Database, Tables } from "@/supabase/database.types"
 import type { Profile } from "@/src/users/domain/user.entity"
 import type { UsersRepositoryPort } from "@/src/users/domain/user.repository"
 import type { UpdateProfileData } from "@/src/users/domain/user.dtos"
+import type { ProfilesPage } from "@/src/users/domain/user.views"
 import { parseProfileRole, type UserRole } from "@/src/users/domain/user.dtos"
 
 function mapProfileRow(row: Tables<"profiles">): Profile {
@@ -56,6 +57,34 @@ export function createUsersSupabaseAdapter(
       if (error || !data) return null
       return mapProfileRow(data)
     },
+
+    listProfilesPage: cache(async (page: number, pageSize: number): Promise<ProfilesPage> => {
+      const supabase = await getSupabase()
+      const safePage = Math.max(1, page)
+      const safeSize = Math.max(1, pageSize)
+      const from = (safePage - 1) * safeSize
+      const to = from + safeSize - 1
+
+      const { data, error, count } = await supabase
+        .from("profiles")
+        .select("id, username, full_name, avatar_url, fpp_total", { count: "exact" })
+        .order("fpp_total", { ascending: false })
+        .order("username", { ascending: true, nullsFirst: false })
+        .range(from, to)
+
+      if (error || !data) return { profiles: [], totalCount: 0 }
+
+      return {
+        profiles: data.map((row) => ({
+          id: row.id,
+          username: row.username,
+          fullName: row.full_name,
+          avatarUrl: row.avatar_url,
+          fppTotal: row.fpp_total ?? 0,
+        })),
+        totalCount: count ?? 0,
+      }
+    }),
   }
 }
 

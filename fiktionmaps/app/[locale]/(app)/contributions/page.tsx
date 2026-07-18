@@ -21,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 function parseStatusTab(raw: string | undefined): ContributionsFeedTab {
   const s = raw?.trim().toLowerCase() ?? ""
-  if (s === "pending" || s === "approved") return s
+  if (s === "pending" || s === "approved" || s === "rejected") return s
   return "all"
 }
 
@@ -32,10 +32,13 @@ function parsePage(raw: string | undefined): number {
 }
 
 export default async function ContributionsStaffPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ locale: string }>
   searchParams: Promise<{ submitter?: string; status?: string; page?: string; kind?: string }>
 }) {
+  const { locale } = await params
   const { submitter: submitterParam, status: statusParam, page: pageParam, kind: kindParam } = await searchParams
   const submitter = submitterParam?.trim() ?? ""
   const statusTab = parseStatusTab(statusParam)
@@ -65,6 +68,7 @@ export default async function ContributionsStaffPage({
         canonicalPage > 1 ? canonicalPage : undefined,
         feedKind,
       ),
+      locale,
     })
   }
 
@@ -99,6 +103,7 @@ export default async function ContributionsStaffPage({
           labelAll={t("feedTab_all")}
           labelPending={t("feedTab_pending")}
           labelApproved={t("feedTab_approved")}
+          labelRejected={t("feedTab_rejected")}
         />
         <ContributionsFeedList
           items={items}

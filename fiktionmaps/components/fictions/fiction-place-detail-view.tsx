@@ -18,6 +18,7 @@ import type { Scene } from "@/src/scenes/domain/scene.entity"
 import type { ContributorProfileWithDate } from "@/src/contributions/domain/contribution.entity"
 import { ScenePreviewThumb } from "@/components/scenes/scene-preview-thumb"
 import { PlaceContributorsByline } from "@/components/fictions/place-contributors-byline"
+import { PlaceShootEnvironmentBadge } from "@/components/places/place-shoot-environment-badge"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
 import { publicFictionScenePath } from "@/lib/fictions/public-fiction-paths"
 
@@ -185,6 +186,9 @@ export function FictionPlaceDetailView({
                     {city.country ? `, ${city.country}` : ""}
                   </span>
                 ) : null}
+                {place.shootEnvironment ? (
+                  <PlaceShootEnvironmentBadge value={place.shootEnvironment} />
+                ) : null}
               </div>
               <h1 className="w-full text-balance text-3xl font-bold leading-[1.15] tracking-tight text-foreground sm:text-4xl xl:text-[2.65rem]">
                 {t("placeDetailCatchyHeading", {
@@ -198,7 +202,8 @@ export function FictionPlaceDetailView({
                   alt={displayName}
                   fill
                   className="object-cover"
-                  sizes="(max-width: 1024px) 100vw, 40vw"
+                  sizes="(max-width: 1024px) 100vw, 920px"
+                  priority
                   unoptimized={heroUnoptimized}
                 />
               </div>

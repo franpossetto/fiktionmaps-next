@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Share2, Settings, ImageIcon } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
@@ -12,7 +12,8 @@ import {
   DEFAULT_HERO_POSITION,
   type HeroPosition,
 } from "@/lib/constants/hero-images"
-import onboardingData from "@/data/onboarding.json"
+import { useThemeEffectiveBase } from "@/lib/theme-settings-context"
+import { getAvatarSrc } from "@/lib/avatars"
 import { cn } from "@/lib/utils"
 import type { UserProfile } from "@/src/users/domain/user.views"
 
@@ -44,23 +45,10 @@ export function ProfileHeader({
   const [heroPosition, setHeroPosition] = useState<HeroPosition>(DEFAULT_HERO_POSITION)
   const [showHeroPicker, setShowHeroPicker] = useState(false)
 
-  const AVATARS = useMemo(
-    () =>
-      (onboardingData.avatars as { id: string; label: string; url: string }[]).slice(0, 8),
-    [],
-  )
-
-  const avatarUrl = useMemo(() => {
-    const allowedUrls = new Set(AVATARS.map((a) => a.url))
-    const prefsAvatar = preferences?.avatar
-    if (prefsAvatar && allowedUrls.has(prefsAvatar)) return prefsAvatar
-    if (profile.avatar && allowedUrls.has(profile.avatar)) return profile.avatar
-    if (AVATARS.length > 0) {
-      const seed = (profile.id || profile.username || "").length
-      return AVATARS[seed % AVATARS.length].url
-    }
-    return profile.avatar
-  }, [AVATARS, preferences?.avatar, profile.avatar, profile.id, profile.username])
+  const theme = useThemeEffectiveBase()
+  const avatarId = preferences?.avatar || profile.avatar || null
+  const resolvedAvatarSrc = getAvatarSrc(avatarId, theme)
+  const avatarUrl = resolvedAvatarSrc !== "/logo-icon.png" ? resolvedAvatarSrc : null
 
   useEffect(() => {
     const stored = getStoredHeroImage()
@@ -80,7 +68,7 @@ export function ProfileHeader({
     return (
       <div className="border-b border-border/50 px-5 py-4">
         <div className="flex items-center gap-3.5">
-          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border-2 border-border bg-muted">
+          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border-2 border-border bg-muted">
             {avatarUrl ? (
               <Image
                 src={avatarUrl}
@@ -176,7 +164,7 @@ export function ProfileHeader({
           {/* Avatar */}
           <div
             className={cn(
-              "relative h-28 w-28 shrink-0 overflow-hidden rounded-full border-[3px] border-background bg-muted",
+              "relative h-44 w-44 shrink-0 overflow-hidden rounded-2xl border-[3px] border-background bg-muted",
               SHOW_PROFILE_HERO_BANNER && "-mt-16",
             )}
           >
@@ -184,8 +172,8 @@ export function ProfileHeader({
               <Image
                 src={avatarUrl}
                 alt={profile.username}
-                width={112}
-                height={112}
+                width={176}
+                height={176}
                 className="h-full w-full object-cover"
               />
             ) : (

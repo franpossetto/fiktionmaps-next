@@ -1,4 +1,5 @@
 import type { Location } from "@/src/locations/domain/location.entity"
+import type { PlaceShootEnvironment } from "@/src/places/domain/place-shoot-environment"
 
 export interface Place {
   id: string
@@ -14,4 +15,5 @@ export interface Place {
   sceneQuote?: string
   visitTip?: string
   sceneTitle?: string | null
+  shootEnvironment?: PlaceShootEnvironment | null
 }

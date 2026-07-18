@@ -5,25 +5,34 @@ import { createClient } from "@/lib/supabase/server"
 import { uuidSchema } from "@/lib/validation/primitives"
 import { zodErrorMessage } from "@/lib/validation/http"
 import type { ContributorProfileWithDate } from "@/src/contributions/domain/contribution.entity"
+import { getFictionScopeContributorContributionsUseCase } from "@/src/contributions/application/get-fiction-scope-contributor-contributions.usecase"
+import { getContributorEntityScopeCountsUseCase } from "@/src/contributions/application/get-contributor-entity-scope-counts.usecase"
 import { getPlaceContributorsWithDatesCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { approveContributionUseCase } from "@/src/contributions/application/approve-contribution.usecase"
 import { createContributionUseCase } from "@/src/contributions/application/create-contribution.usecase"
 import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/ensure-user-is-moderator.usecase"
 import { getContributionByIdUseCase } from "@/src/contributions/application/get-contribution-by-id.usecase"
 import { rejectContributionUseCase } from "@/src/contributions/application/reject-contribution.usecase"
+import { submitPlaceAddPhotoContributionUseCase } from "@/src/contributions/application/submit-place-add-photo-contribution.usecase"
+import { submitFictionAddPhotoContributionUseCase } from "@/src/contributions/application/submit-fiction-add-photo-contribution.usecase"
 import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
 import type { ContributionEntityType } from "@/src/contributions/domain/contribution.entity"
 import {
   approveContributionSchema,
   createContributionSchema,
   rejectContributionSchema,
+  submitPlaceAddPhotoContributionSchema,
+  submitFictionAddPhotoContributionSchema,
 } from "@/src/contributions/domain/contribution.schemas"
+import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
+import { supabaseRepositoryAdapter as fictionsRepo } from "@/src/fictions/infrastructure/supabase/fiction.repository.impl"
 import { supabaseRepositoryAdapter as contributionsRepo } from "@/src/contributions/infrastructure/supabase/contribution.repository.impl"
 import { profilesReaderSupabaseAdapter } from "@/src/contributions/infrastructure/supabase/profiles-reader.supabase"
 import type {
   ApproveContributionResult,
   CreateContributionResult,
   RejectContributionResult,
+  GetFictionScopeContributorContributionsResult,
 } from "./contribution.actions.types"
 import type { ApproveContributionData, CreateContributionData, RejectContributionData } from "@/src/contributions/domain/contribution.schemas"
 
@@ -31,6 +40,7 @@ export type {
   ApproveContributionResult,
   CreateContributionResult,
   RejectContributionResult,
+  GetFictionScopeContributorContributionsResult,
 } from "./contribution.actions.types"
 
 export async function getPlaceContributorsAction(
@@ -40,16 +50,22 @@ export async function getPlaceContributorsAction(
   return getPlaceContributorsWithDatesCached(placeId)
 }
 
-function revalidateContributionEntityTags(entityType: ContributionEntityType, entityId: string) {
+async function revalidateContributionEntityTags(entityType: ContributionEntityType, entityId: string) {
   switch (entityType) {
     case "fiction":
       updateTag("fictions")
       updateTag(`fiction-${entityId}`)
       break
-    case "place":
+    case "place": {
       updateTag("places")
       updateTag(`place-${entityId}`)
+      const place = await placesRepo.getById(entityId)
+      if (place?.fictionId) {
+        updateTag("fictions")
+        updateTag(`fiction-${place.fictionId}`)
+      }
       break
+    }
     case "scene":
       updateTag("scenes")
       updateTag(`scene-${entityId}`)
@@ -90,11 +106,126 @@ export async function createContributionAction(data: CreateContributionData): Pr
   revalidatePath("/admin")
   revalidatePath("/contributions")
   updateTag("contributions")
-  revalidateContributionEntityTags(parsed.data.entityType, parsed.data.entityId)
+  await revalidateContributionEntityTags(parsed.data.entityType, parsed.data.entityId)
   if (result.autoApproved) {
     updateTag("profiles")
   }
   return { success: true, contributionId: result.contributionId, autoApproved: result.autoApproved }
+}
+
+export type SubmitPlaceAddPhotoContributionResult =
+  | { success: true; contributionId: string; autoApproved: boolean; previewUrl: string }
+  | { success: false; error: string }
+
+export async function submitPlaceAddPhotoContributionAction(
+  formData: FormData,
+): Promise<SubmitPlaceAddPhotoContributionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const placeId = formData.get("placeId")
+  const file = formData.get("imageFile")
+
+  const parsed = submitPlaceAddPhotoContributionSchema.safeParse({
+    placeId: typeof placeId === "string" ? placeId : "",
+  })
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+  if (!(file instanceof File) || file.size === 0) {
+    return { success: false, error: "No image file provided" }
+  }
+
+  const autoApprove = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+
+  const result = await submitPlaceAddPhotoContributionUseCase(
+    {
+      userId: user.id,
+      placeId: parsed.data.placeId,
+      imageFile: file,
+      autoApprove,
+    },
+    contributionsRepo,
+    placesRepo,
+  )
+
+  if (!result.success) return result
+
+  revalidatePath("/contributions")
+  revalidatePath("/profile/contribute")
+  updateTag("contributions")
+  updateTag("places")
+  updateTag(`place-${parsed.data.placeId}`)
+  if (result.autoApproved) updateTag("profiles")
+
+  return result
+}
+
+export type SubmitFictionAddPhotoContributionResult =
+  | { success: true; contributionId: string; autoApproved: boolean; previewUrl: string }
+  | { success: false; error: string }
+
+export async function submitFictionAddPhotoContributionAction(
+  formData: FormData,
+): Promise<SubmitFictionAddPhotoContributionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const fictionId = formData.get("fictionId")
+  const targetRole = formData.get("targetRole")
+  const photoFile = formData.get("photoFile")
+
+  const parsed = submitFictionAddPhotoContributionSchema.safeParse({
+    fictionId: typeof fictionId === "string" ? fictionId : "",
+    targetRole: typeof targetRole === "string" ? targetRole : "",
+  })
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+  if (!(photoFile instanceof File) || photoFile.size === 0) {
+    return { success: false, error: "No image provided" }
+  }
+
+  const autoApprove = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+
+  const result = await submitFictionAddPhotoContributionUseCase(
+    {
+      userId: user.id,
+      fictionId: parsed.data.fictionId,
+      targetRole: parsed.data.targetRole,
+      file: photoFile,
+      autoApprove,
+    },
+    contributionsRepo,
+    fictionsRepo,
+  )
+
+  if (!result.success) return result
+
+  revalidatePath("/contributions")
+  revalidatePath("/profile/contribute")
+  updateTag("contributions")
+  updateTag("fictions")
+  updateTag(`fiction-${parsed.data.fictionId}`)
+  if (result.autoApproved) updateTag("profiles")
+
+  return result
 }
 
 export async function approveContributionAction(data: ApproveContributionData): Promise<ApproveContributionResult> {
@@ -129,7 +260,7 @@ export async function approveContributionAction(data: ApproveContributionData): 
   revalidatePath("/contributions")
   updateTag("contributions")
   updateTag("profiles")
-  revalidateContributionEntityTags(contributionBefore.entityType, contributionBefore.entityId)
+  await revalidateContributionEntityTags(contributionBefore.entityType, contributionBefore.entityId)
   return { success: true }
 }
 
@@ -165,6 +296,25 @@ export async function rejectContributionAction(data: RejectContributionData): Pr
   revalidatePath("/contributions")
   updateTag("contributions")
   updateTag("profiles")
-  revalidateContributionEntityTags(contributionBefore.entityType, contributionBefore.entityId)
+  await revalidateContributionEntityTags(contributionBefore.entityType, contributionBefore.entityId)
   return { success: true }
+}
+
+export async function getFictionScopeContributorContributionsAction(
+  fictionId: string,
+  userId: string,
+): Promise<GetFictionScopeContributorContributionsResult> {
+  if (!uuidSchema.safeParse(fictionId).success || !uuidSchema.safeParse(userId).success) {
+    return { success: false, error: "Invalid id" }
+  }
+
+  try {
+    const [items, scopeCounts] = await Promise.all([
+      getFictionScopeContributorContributionsUseCase(fictionId, userId, contributionsRepo),
+      getContributorEntityScopeCountsUseCase(userId, contributionsRepo),
+    ])
+    return { success: true, items, scopeCounts }
+  } catch {
+    return { success: false, error: "Failed to load contributor details" }
+  }
 }
