@@ -9,6 +9,7 @@ export interface PlaceFormData {
   formattedAddress: string
   cityId: string
   locationType: string
+  shootEnvironment: string
   image?: File
   isLandmark: boolean
 }

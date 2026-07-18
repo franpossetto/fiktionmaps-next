@@ -29,6 +29,7 @@ export function MapboxContainer({
   onZoomChange,
   controls,
   showLoadingOverlay = true,
+  showBuildings3D = true,
 }: MapContainerProps) {
   const [mapLoaded, setMapLoaded] = useState(false)
   const mapRef = useRef<MapboxMap | null>(null)
@@ -142,7 +143,7 @@ export function MapboxContainer({
         <MapLoadedProvider value={mapLoaded}>
           {showFullscreen && <FullscreenControl position="top-right" />}
           {children}
-          {interactive && <MapboxBuildings3D />}
+          {interactive && showBuildings3D && <MapboxBuildings3D />}
         </MapLoadedProvider>
       </ReactMapGL>
       <AnimatePresence>

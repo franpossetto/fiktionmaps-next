@@ -5,6 +5,7 @@ import { Plus, Edit2, Trash2, Search, MapPin } from "lucide-react"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 import type { Place } from "@/src/places/domain/place.entity"
+import { parsePlaceShootEnvironment } from "@/src/places/domain/place-shoot-environment"
 import { Button } from "@/components/ui/button"
 import { PlaceCreateView, type PlaceFormData } from "./place-create-view"
 import { uploadPlaceImageAction } from "@/src/places/infrastructure/next/place.actions"
@@ -50,6 +51,7 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
     formattedAddress: "",
     cityId: defaultCity?.id ?? "",
     locationType: "",
+    shootEnvironment: "",
     isLandmark: false,
   }
 
@@ -66,6 +68,7 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
       description: data.description,
       isLandmark: data.isLandmark,
       locationType: data.locationType || null,
+      shootEnvironment: parsePlaceShootEnvironment(data.shootEnvironment),
     })
     if (!result.success) {
       setSubmitError(result.error)
@@ -95,6 +98,7 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
       description: data.description,
       isLandmark: data.isLandmark,
       locationType: data.locationType || null,
+      shootEnvironment: parsePlaceShootEnvironment(data.shootEnvironment),
     })
     if (!result.success) {
       setSubmitError(result.error)
@@ -166,6 +170,7 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
       latitude: editingLocation.location.lat,
       longitude: editingLocation.location.lng,
       locationType: editingLocation.location.locationType ?? "",
+      shootEnvironment: editingLocation.shootEnvironment ?? "",
       isLandmark: editingLocation.location.isLandmark ?? false,
     }
     return (

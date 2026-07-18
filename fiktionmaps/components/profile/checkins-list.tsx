@@ -177,7 +177,6 @@ export function CheckinsList({
                           fill
                           sizes="40px"
                           className="object-cover"
-                          unoptimized
                         />
                       ) : (
                         <span className="flex h-full w-full items-center justify-center">

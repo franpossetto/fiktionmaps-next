@@ -5,14 +5,16 @@
  * City chip fixed; fiction chips scroll; pencil expands search or opens fiction picker.
  */
 
-import Image from "next/image"
 import type { ReactNode } from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { MapPin, Plus, Search, X } from "lucide-react"
 import { useTranslations } from "next-intl"
+import { AssetThumbImage } from "@/components/ui/asset-thumb-image"
 import { SearchScopeChip, SCOPE_CHIP_CLASS } from "@/components/ui/scoped-search-input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { fictionCoverThumbUrl } from "@/lib/asset-images/fiction-cover-thumb"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
+import { prefetchCityMapData } from "@/lib/map/city-map-data-cache"
 import { resolveMapBarSearchMode } from "@/lib/map/map-search-mode"
 import { isAllFictionsSelected } from "@/lib/map/map-url"
 import { cn } from "@/lib/utils"
@@ -83,6 +85,7 @@ export type MapFictionChipPreview = {
   id: string
   title: string
   coverImage: string | null
+  coverImageThumb?: string | null
 }
 
 type FictionChipItem =
@@ -144,6 +147,8 @@ const FICTION_CHIP_SELECTED_CLASS =
 function FictionMapChip({
   title,
   coverSrc,
+  fictionId,
+  missingXs,
   isSelected,
   onSelect,
   onRemove,
@@ -151,6 +156,8 @@ function FictionMapChip({
 }: {
   title: string
   coverSrc: string | null
+  fictionId: string
+  missingXs?: boolean
   isSelected?: boolean
   onSelect?: () => void
   onRemove: () => void
@@ -162,7 +169,16 @@ function FictionMapChip({
   const labelBody = (
     <>
       <span className="relative h-5 w-5 shrink-0 overflow-hidden rounded-full bg-muted">
-        <Image src={cover} alt="" fill className="object-cover" sizes="20px" />
+        <AssetThumbImage
+          src={cover}
+          size={20}
+          className="rounded-full"
+          ensure={
+            missingXs
+              ? { entityType: "fiction", entityId: fictionId, role: "cover" }
+              : undefined
+          }
+        />
       </span>
       <span className="truncate text-xs font-semibold text-foreground">{title}</span>
     </>
@@ -211,12 +227,15 @@ function renderFictionChipItem(
   onRemoveFiction: (id: string) => void,
 ) {
   if (item.kind === "fiction") {
-    const cover = item.fiction.coverImage ?? item.fiction.coverImageLarge ?? null
+    const hasSource =
+      Boolean(item.fiction.coverImage?.trim()) || Boolean(item.fiction.coverImageLarge?.trim())
     return (
       <FictionMapChip
         key={item.fiction.id}
         title={item.fiction.title}
-        coverSrc={cover}
+        coverSrc={fictionCoverThumbUrl(item.fiction)}
+        fictionId={item.fiction.id}
+        missingXs={!item.fiction.coverImageThumb?.trim() && hasSource}
         isSelected={activeSearchFictionId === item.fiction.id}
         onSelect={() => onActivateFiction(item.fiction.id)}
         onRemove={() => onRemoveFiction(item.fiction.id)}
@@ -224,11 +243,17 @@ function renderFictionChipItem(
     )
   }
   if (item.kind === "preview") {
+    const cover =
+      item.preview.coverImageThumb?.trim() ||
+      item.preview.coverImage?.trim() ||
+      null
     return (
       <FictionMapChip
         key={item.preview.id}
         title={item.preview.title}
-        coverSrc={item.preview.coverImage}
+        coverSrc={cover}
+        fictionId={item.preview.id}
+        missingXs={!item.preview.coverImageThumb?.trim() && Boolean(cover)}
         isSelected={activeSearchFictionId === item.preview.id}
         onSelect={() => onActivateFiction(item.preview.id)}
         onRemove={() => onRemoveFiction(item.preview.id)}
@@ -333,14 +358,17 @@ export function MapFictionCitySearch({
         return {
           id: item.fiction.id,
           title: item.fiction.title,
-          coverSrc: item.fiction.coverImage ?? item.fiction.coverImageLarge ?? null,
+          coverSrc: fictionCoverThumbUrl(item.fiction),
+          missingXs: !item.fiction.coverImageThumb?.trim(),
         }
       }
       if (item.kind === "preview" && item.preview.id === activeSearchFictionId) {
         return {
           id: item.preview.id,
           title: item.preview.title,
-          coverSrc: item.preview.coverImage,
+          coverSrc:
+            item.preview.coverImageThumb?.trim() || item.preview.coverImage?.trim() || null,
+          missingXs: !item.preview.coverImageThumb?.trim(),
         }
       }
     }
@@ -525,6 +553,8 @@ export function MapFictionCitySearch({
               <FictionMapChip
                 title={activeChipInBar.title}
                 coverSrc={activeChipInBar.coverSrc}
+                fictionId={activeChipInBar.id}
+                missingXs={activeChipInBar.missingXs}
                 isSelected
                 compact
                 onSelect={() => closeSearch()}
@@ -589,7 +619,10 @@ export function MapFictionCitySearch({
                 if (hit.kind === "city") {
                   const { city } = hit
                   return (
-                    <li key={`city:${city.cityId}`}>
+                    <li
+                      key={`city:${city.cityId}`}
+                      onPointerEnter={() => prefetchCityMapData(city.cityId)}
+                    >
                       <MapSearchHitButton
                         typeLabel={tMap("searchResultCity")}
                         media={
@@ -608,16 +641,25 @@ export function MapFictionCitySearch({
                 if (hit.kind === "fiction-city") {
                   const { entry } = hit
                   return (
-                    <li key={`pair:${entry.fictionId}:${entry.cityId}`}>
+                    <li
+                      key={`pair:${entry.fictionId}:${entry.cityId}`}
+                      onPointerEnter={() => prefetchCityMapData(entry.cityId)}
+                    >
                       <MapSearchHitButton
                         typeLabel={tMap("searchResultFictionCity")}
                         media={
-                          <Image
+                          <AssetThumbImage
                             src={entry.coverImage || DEFAULT_FICTION_COVER}
-                            alt=""
-                            fill
-                            sizes="32px"
-                            className="object-cover"
+                            size={32}
+                            ensure={
+                              entry.coverImage?.trim()
+                                ? {
+                                    entityType: "fiction",
+                                    entityId: entry.fictionId,
+                                    role: "cover",
+                                  }
+                                : undefined
+                            }
                           />
                         }
                         title={entry.fictionTitle}
@@ -637,12 +679,18 @@ export function MapFictionCitySearch({
                     <MapSearchHitButton
                       typeLabel={tMap("searchResultPlace")}
                       media={
-                        <Image
+                        <AssetThumbImage
                           src={placeImg}
-                          alt=""
-                          fill
-                          sizes="32px"
-                          className="object-cover"
+                          size={32}
+                          ensure={
+                            place.image?.trim()
+                              ? {
+                                  entityType: "place",
+                                  entityId: place.id,
+                                  role: "avatar",
+                                }
+                              : undefined
+                          }
                         />
                       }
                       title={place.name.trim() || place.slug}

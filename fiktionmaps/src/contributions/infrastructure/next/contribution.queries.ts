@@ -7,7 +7,7 @@ import type { Database } from "@/supabase/database.types"
 import { getContributionByIdUseCase } from "@/src/contributions/application/get-contribution-by-id.usecase"
 import { getContributionsByUserUseCase } from "@/src/contributions/application/get-contributions-by-user.usecase"
 import { getApprovedByEntityUseCase } from "@/src/contributions/application/get-approved-by-entity.usecase"
-import { getContributorsByEntityUseCase } from "@/src/contributions/application/get-contributors-by-entity.usecase"
+import { getFictionContributorsUseCase } from "@/src/contributions/application/get-fiction-contributors.usecase"
 import { getContributorsFirstContributionByEntityUseCase } from "@/src/contributions/application/get-contributors-first-contribution-by-entity.usecase"
 import { getPendingContributionsUseCase } from "@/src/contributions/application/get-pending-contributions.usecase"
 import { getStaffContributionDetailUseCase } from "@/src/contributions/application/get-staff-contribution-detail.usecase"
@@ -24,7 +24,7 @@ import type {
   ContributorModerationContext,
   ContributorProfileWithDate,
   FictionContributionFeedItem,
-  FictionContributorProfile,
+  FictionContributorRankedProfile,
   PlaceContributionFeedItem,
   StaffContributionsFeedKind,
   StaffCreateContributionFeedItem,
@@ -87,9 +87,9 @@ export function getApprovedByEntityCached(entityType: ContributionEntityType, en
   )()
 }
 
-export function getFictionContributorsCached(fictionId: string): Promise<FictionContributorProfile[]> {
+export function getFictionContributorsCached(fictionId: string): Promise<FictionContributorRankedProfile[]> {
   return unstable_cache(
-    () => getContributorsByEntityUseCase("fiction", fictionId, anonRepo),
+    () => getFictionContributorsUseCase(fictionId, anonRepo),
     CacheKeys.fictionContributors(fictionId),
     { ...CacheConfig.medium, tags: ["contributions"] },
   )()

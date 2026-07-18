@@ -2,6 +2,7 @@ import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { FictionsRepositoryPort } from "@/src/fictions/domain/fiction.repository"
 import type { FictionInterestsRepositoryPort } from "@/src/fiction-interests/domain/fiction-interests.repository"
 import type { Place } from "@/src/places/domain/place.entity"
+import { shuffleArray } from "@/lib/utils"
 
 const SAME_CITY_LIMIT = 12
 const RANDOM_PICK_COUNT = 3
@@ -18,14 +19,7 @@ export interface FictionDetailRecommendationsResult {
   reason: FictionDetailRecommendationReason
 }
 
-function shuffle<T>(array: T[]): T[] {
-  const a = [...array]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
+const shuffle = shuffleArray
 
 /** Pick 3, 4, or 5 (or fewer if not enough candidates). */
 function pickInterestBasedCount(maxAvailable: number): number {

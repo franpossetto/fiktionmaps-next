@@ -13,10 +13,12 @@ import {
 } from "@/src/fictions/infrastructure/next/fiction.actions"
 import { getFictionPlacesAction } from "@/src/places/infrastructure/next/place.actions"
 import { listScenesAction } from "@/src/scenes/infrastructure/next/scene.actions"
+import { getAllCitiesAction } from "@/src/cities/infrastructure/next/city.actions"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { NavSearchScope } from "@/src/fictions/domain/nav-search-scope"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
+import type { City } from "@/src/cities/domain/city.entity"
 import { publicFictionPlacePath, publicFictionScenePath } from "@/lib/fictions/public-fiction-paths"
 
 const TOP_NAV_HEADER_CLASS =
@@ -30,6 +32,29 @@ const TOP_NAV_MOBILE_SIDE_SLOT = "flex h-10 w-10 shrink-0 items-center justify-c
 
 const GLOBAL_SCOPE: NavSearchScope = { kind: "global" }
 
+function NavbarLogo({ alt }: { alt: string }) {
+  return (
+    <>
+      <Image
+        src="/logo/fiktion_maps_light_logo.png"
+        alt={alt}
+        width={1916}
+        height={360}
+        priority
+        className="h-[1.56rem] w-auto shrink-0 object-contain dark:hidden"
+      />
+      <Image
+        src="/logo/fiktion_maps_dark_logo.png"
+        alt={alt}
+        width={1672}
+        height={360}
+        priority
+        className="hidden h-[1.56rem] w-auto shrink-0 object-contain dark:block"
+      />
+    </>
+  )
+}
+
 type ScopedHit =
   | { kind: "place"; place: Place }
   | { kind: "scene"; scene: Scene }
@@ -37,6 +62,25 @@ type ScopedHit =
 /**
  * Misma barra que `AppTopNavbar` pero sin buscador (flujos de contribución y otras pantallas donde no aplica).
  */
+function NavLinks({ tNav }: { tNav: ReturnType<typeof useTranslations<"Nav">> }) {
+  return (
+    <nav className="hidden items-center gap-1.5 md:flex">
+      <Link
+        href="/fictions"
+        className="inline-flex items-center rounded-lg border border-border/60 bg-background px-3 py-1.5 text-sm font-medium text-foreground/80 shadow-sm transition-colors hover:bg-accent hover:text-foreground"
+      >
+        {tNav("catalog")}
+      </Link>
+      <Link
+        href="/contributors"
+        className="inline-flex items-center rounded-lg border border-border/60 bg-background px-3 py-1.5 text-sm font-medium text-foreground/80 shadow-sm transition-colors hover:bg-accent hover:text-foreground"
+      >
+        {tNav("contributors")}
+      </Link>
+    </nav>
+  )
+}
+
 export function AppTopNavbarNoSearch() {
   const tNav = useTranslations("Nav")
 
@@ -44,18 +88,12 @@ export function AppTopNavbarNoSearch() {
     <header className={TOP_NAV_HEADER_CLASS}>
       <div className={`${TOP_NAV_INNER_PAD} flex items-center justify-between gap-4`}>
         <div className="flex min-w-0 items-center gap-3">
-          <Link href="/map" className="inline-flex shrink-0 items-center rounded-md">
-            <Image
-              src="/fiktionmaps-logo.svg"
-              alt={tNav("logoAlt")}
-              width={119}
-              height={25}
-              priority
-              className="h-[22px] w-auto shrink-0 object-contain"
-            />
+          <Link href="/" className="inline-flex shrink-0 items-center rounded-md">
+            <NavbarLogo alt={tNav("logoAlt")} />
           </Link>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <NavLinks tNav={tNav} />
           <UserMenu />
         </div>
       </div>
@@ -73,6 +111,7 @@ export function AppTopNavbar() {
   const [isFocused, setIsFocused] = useState(false)
   const [scope, setScope] = useState<NavSearchScope>(GLOBAL_SCOPE)
   const [fictions, setFictions] = useState<FictionWithMedia[]>([])
+  const [cities, setCities] = useState<City[]>([])
   const [places, setPlaces] = useState<Place[]>([])
   const [scenes, setScenes] = useState<Scene[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -95,9 +134,18 @@ export function AppTopNavbar() {
     setPlaces([])
     setScenes([])
     setFictions([])
+    setCities([])
   }, [pathname])
 
   const query = search.trim()
+  const filteredCities = useMemo(() => {
+    const q = query.toLowerCase()
+    if (!q) return []
+    return cities
+      .filter((c) => c.name.toLowerCase().includes(q) || c.country.toLowerCase().includes(q))
+      .slice(0, 3)
+  }, [cities, query])
+
   const filteredFictions = useMemo(() => {
     const q = query.toLowerCase()
     if (!q) return []
@@ -108,7 +156,7 @@ export function AppTopNavbar() {
         const genre = f.genre?.toLowerCase() ?? ""
         return title.includes(q) || author.includes(q) || genre.includes(q)
       })
-      .slice(0, 7)
+      .slice(0, 6)
   }, [fictions, query])
 
   const filteredScoped = useMemo((): ScopedHit[] => {
@@ -148,8 +196,12 @@ export function AppTopNavbar() {
     setLoadFailed(false)
     try {
       if (scope.kind === "global") {
-        const data = await getActiveFictionsAction()
+        const [data, cityData] = await Promise.all([
+          getActiveFictionsAction(),
+          getAllCitiesAction(),
+        ])
         setFictions(data)
+        setCities(cityData)
       } else if (scope.kind === "fiction") {
         const [placeRows, sceneRows] = await Promise.all([
           getFictionPlacesAction(scope.fictionId),
@@ -166,6 +218,12 @@ export function AppTopNavbar() {
       console.error("nav search corpus load failed", err)
       setLoadFailed(true)
     }
+  }
+
+  function goToCity(city: City) {
+    router.push(`/cities/${city.id}`)
+    setIsFocused(false)
+    setSearch("")
   }
 
   function goToFiction(fiction: FictionWithMedia) {
@@ -225,15 +283,8 @@ export function AppTopNavbar() {
           <Map className="h-5 w-5" aria-hidden />
         </Link>
         <div className="hidden min-w-0 items-center gap-3 md:flex md:justify-self-start">
-          <Link href="/map" className="inline-flex shrink-0 items-center rounded-md">
-            <Image
-              src="/fiktionmaps-logo.svg"
-              alt={tNav("logoAlt")}
-              width={119}
-              height={25}
-              priority
-              className="h-[22px] w-auto shrink-0 object-contain"
-            />
+          <Link href="/" className="inline-flex shrink-0 items-center rounded-md">
+            <NavbarLogo alt={tNav("logoAlt")} />
           </Link>
         </div>
         <div
@@ -262,8 +313,29 @@ export function AppTopNavbar() {
               ) : !loaded ? (
                 <div className="px-3 py-2 text-sm text-muted-foreground">{tCommon("loading")}</div>
               ) : isGlobal ? (
-                filteredFictions.length > 0 ? (
+                filteredCities.length > 0 || filteredFictions.length > 0 ? (
                   <ul className="max-h-80 overflow-y-auto p-1">
+                    {filteredCities.map((city) => (
+                      <li key={city.id}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => goToCity(city)}
+                          className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-accent"
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              {tNav("searchResultCity")}
+                            </span>
+                            <span className="truncate text-sm font-medium text-foreground">{city.name}</span>
+                          </span>
+                          <span className="ml-2 shrink-0 text-xs text-muted-foreground">{city.country}</span>
+                        </button>
+                      </li>
+                    ))}
+                    {filteredCities.length > 0 && filteredFictions.length > 0 && (
+                      <li role="separator" className="mx-3 my-1 h-px bg-border" />
+                    )}
                     {filteredFictions.map((fiction) => (
                       <li key={fiction.id}>
                         <button
@@ -321,8 +393,9 @@ export function AppTopNavbar() {
           ) : null}
         </div>
         <div
-          className={`${TOP_NAV_MOBILE_SIDE_SLOT} shrink-0 md:w-auto md:justify-self-end`}
+          className={`${TOP_NAV_MOBILE_SIDE_SLOT} shrink-0 md:flex md:w-auto md:items-center md:gap-2 md:justify-self-end`}
         >
+          <NavLinks tNav={tNav} />
           <UserMenu />
         </div>
       </div>

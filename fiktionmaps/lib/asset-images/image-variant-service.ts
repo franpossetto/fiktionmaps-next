@@ -1,6 +1,11 @@
 import sharp from "sharp"
 import { createClient } from "@/lib/supabase/server"
-import { ASSET_IMAGES_BUCKET, VARIANT_SIZES, type ImageVariant } from "./variant-sizes"
+import {
+  ASSET_IMAGES_BUCKET,
+  VARIANT_SIZES,
+  VARIANT_WEBP_QUALITY,
+  type ImageVariant,
+} from "./variant-sizes"
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
@@ -71,10 +76,11 @@ export async function uploadEntityImage(options: UploadImageOptions): Promise<
     const width = VARIANT_SIZES[variant]
     const webpBuffer = await sharp(buffer)
       .resize(width, null, { withoutEnlargement: true })
-      .webp({ quality: 85 })
+      .webp({ quality: VARIANT_WEBP_QUALITY[variant] })
       .toBuffer()
 
-    const fileName = `${variant}_${version}.webp`
+    const fileName =
+      variant === "xs" ? `xs_${VARIANT_SIZES.xs}_${version}.webp` : `${variant}_${version}.webp`
     const storagePath = `${basePath}/${fileName}`
 
     const { error: uploadError } = await supabase.storage

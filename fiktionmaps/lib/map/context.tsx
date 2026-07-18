@@ -27,8 +27,12 @@ export interface MapEngine {
 
 const MapEngineContext = createContext<MapEngine | null>(null)
 
+export function useOptionalMapEngine(): MapEngine | null {
+  return useContext(MapEngineContext)
+}
+
 export function useMapEngine(): MapEngine {
-  const engine = useContext(MapEngineContext)
+  const engine = useOptionalMapEngine()
   if (!engine) {
     throw new Error("useMapEngine must be used within a MapEngineProvider")
   }

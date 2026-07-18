@@ -12,6 +12,37 @@ import {
   type StreetViewReference,
   LOCATION_VIEW_REFERENCE_PROVIDER,
 } from "@/src/locations/domain/location-view-reference.schemas"
+import {
+  parsePlaceShootEnvironment,
+  type PlaceShootEnvironment,
+} from "@/src/places/domain/place-shoot-environment"
+
+/** Prefer xs over sm for place avatar thumbs. */
+async function loadPlaceAvatarThumbs(
+  supabase: SupabaseClient<Database>,
+  placeIds: string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  if (placeIds.length === 0) return map
+  const { data } = await supabase
+    .from("asset_images")
+    .select("entity_id, url, variant")
+    .eq("entity_type", "place")
+    .eq("role", "avatar")
+    .in("variant", ["xs", "sm"])
+    .in("entity_id", placeIds)
+  for (const r of data ?? []) {
+    if (r.variant === "xs" && r.entity_id && r.url) {
+      map.set(r.entity_id as string, r.url as string)
+    }
+  }
+  for (const r of data ?? []) {
+    if (r.variant === "sm" && r.entity_id && r.url && !map.has(r.entity_id as string)) {
+      map.set(r.entity_id as string, r.url as string)
+    }
+  }
+  return map
+}
 
 function str(row: Record<string, unknown>, snake: string, camel: string): string {
   const v = row[snake] ?? row[camel]
@@ -114,6 +145,10 @@ async function deleteLocationViewReference(
   return true
 }
 
+function optShootEnvironment(row: Record<string, unknown>): PlaceShootEnvironment | null {
+  return parsePlaceShootEnvironment(row.shoot_environment ?? row.shootEnvironment)
+}
+
 const LOCATION_EMBED_SELECT =
   "id, name, formatted_address, latitude, longitude, city_id, is_landmark, type, location_view_references(provider, camera_latitude, camera_longitude, heading, pitch, fov, external_pano_id)"
 
@@ -154,6 +189,7 @@ function mapPlaceRowsToPlaces(
 
     const placeName = str(p, "name", "name") || "Place"
     const placeSlug = str(p, "slug", "slug") || placeId
+    const shootEnvironment = optShootEnvironment(p)
 
     return {
       id: placeId,
@@ -177,6 +213,7 @@ function mapPlaceRowsToPlaces(
       sceneDescription: "",
       sceneQuote: undefined,
       visitTip: undefined,
+      shootEnvironment,
     }
   })
 }
@@ -272,7 +309,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error: placesError } = await supabase
         .from("places")
         .select(
-          `id, fiction_id, description, active, location_id, name, slug, locations(${LOCATION_EMBED_SELECT})`
+          `id, fiction_id, description, active, location_id, name, slug, shoot_environment, locations(${LOCATION_EMBED_SELECT})`
         )
         .order("created_at", { ascending: false })
         .range(0, 9999)
@@ -285,22 +322,7 @@ export function createPlacesSupabaseAdapter(
       const places = (placeRows ?? []) as Record<string, unknown>[]
       const placeIds = places.map((p) => (p.id as string)).filter(Boolean)
 
-      const avatarByPlaceId = new Map<string, string>()
-      if (placeIds.length > 0) {
-        const { data: avatarRows } = await supabase
-          .from("asset_images")
-          .select("entity_id, url")
-          .eq("entity_type", "place")
-          .eq("role", "avatar")
-          .eq("variant", "sm")
-          .in("entity_id", placeIds)
-        for (const r of avatarRows ?? []) {
-          const row = r as Record<string, unknown>
-          const eid = row.entity_id ?? row.entityId
-          const url = row.url
-          if (eid && url) avatarByPlaceId.set(String(eid), String(url))
-        }
-      }
+      const avatarByPlaceId = await loadPlaceAvatarThumbs(supabase, placeIds)
 
       return mapPlaceRowsToPlaces(places, avatarByPlaceId)
     }),
@@ -339,7 +361,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error } = await supabase
         .from("places")
         .select(
-          `id, fiction_id, description, active, location_id, name, slug, locations(${LOCATION_EMBED_SELECT})`
+          `id, fiction_id, description, active, location_id, name, slug, shoot_environment, locations(${LOCATION_EMBED_SELECT})`
         )
         .eq("fiction_id", fictionId)
         .eq("status", "approved")
@@ -374,7 +396,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error } = await supabase
         .from("places")
         .select(
-          `id, fiction_id, description, active, location_id, name, slug, locations(${LOCATION_EMBED_SELECT})`
+          `id, fiction_id, description, active, location_id, name, slug, shoot_environment, locations(${LOCATION_EMBED_SELECT})`
         )
         .eq("fiction_id", fictionId)
         .order("created_at", { ascending: false })
@@ -407,7 +429,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error } = await supabase
         .from("places")
         .select(
-          `id, fiction_id, description, active, location_id, name, slug, locations!inner(${LOCATION_EMBED_SELECT})`
+          `id, fiction_id, description, active, location_id, name, slug, shoot_environment, locations!inner(${LOCATION_EMBED_SELECT})`
         )
         .eq("locations.city_id", cityId)
         .order("created_at", { ascending: false })
@@ -525,7 +547,7 @@ export function createPlacesSupabaseAdapter(
       const { data: row, error } = await supabase
         .from("places")
         .select(
-          `id, fiction_id, description, active, name, slug,
+          `id, fiction_id, description, active, name, slug, shoot_environment,
            location:locations!inner (
              ${LOCATION_EMBED_SELECT}
            )`
@@ -583,6 +605,7 @@ export function createPlacesSupabaseAdapter(
         sceneDescription: "",
         sceneQuote: undefined,
         visitTip: undefined,
+        shootEnvironment: optShootEnvironment(rowRec),
       }
     }),
 
@@ -592,7 +615,7 @@ export function createPlacesSupabaseAdapter(
       const { data: rows, error } = await supabase
         .from("places")
         .select(
-          `id, fiction_id, description, active, name, slug,
+          `id, fiction_id, description, active, name, slug, shoot_environment,
            location:locations!inner (
              ${LOCATION_EMBED_SELECT}
            )`
@@ -610,18 +633,7 @@ export function createPlacesSupabaseAdapter(
 
       const placeIds = (rows ?? []).map((r) => r.id as string)
       if (placeIds.length === 0) return []
-      const { data: avatarRows } = await supabase
-        .from("asset_images")
-        .select("entity_id, url")
-        .eq("entity_type", "place")
-        .eq("role", "avatar")
-        .eq("variant", "sm")
-        .in("entity_id", placeIds)
-
-      const avatarByPlaceId = new Map<string, string>()
-      for (const r of avatarRows ?? []) {
-        if (r.entity_id && r.url) avatarByPlaceId.set(r.entity_id as string, r.url as string)
-      }
+      const avatarByPlaceId = await loadPlaceAvatarThumbs(supabase, placeIds)
 
       return (rows ?? []).map((r) => {
         const rRec = r as Record<string, unknown>
@@ -652,6 +664,7 @@ export function createPlacesSupabaseAdapter(
           sceneDescription: "",
           sceneQuote: undefined,
           visitTip: undefined,
+          shootEnvironment: optShootEnvironment(rRec),
         }
       })
     },
@@ -662,7 +675,7 @@ export function createPlacesSupabaseAdapter(
         const { data: row, error } = await supabase
           .from("places")
           .select(
-            `id, fiction_id, description, active, name, slug,
+            `id, fiction_id, description, active, name, slug, shoot_environment,
              location:locations!inner (
                ${LOCATION_EMBED_SELECT}
              )`
@@ -730,6 +743,7 @@ export function createPlacesSupabaseAdapter(
           external_id: null,
           provider: "mapbox",
           is_landmark: !!data.isLandmark,
+          type: data.locationType?.trim() || null,
         })
         .select("id")
         .single()
@@ -761,6 +775,7 @@ export function createPlacesSupabaseAdapter(
           active: data.status !== "pending",
           status: data.status,
           created_by: data.created_by,
+          shoot_environment: data.shootEnvironment ?? null,
         })
         .select("id, slug")
         .single()
@@ -829,6 +844,7 @@ export function createPlacesSupabaseAdapter(
           fiction_id: data.fictionId,
           name: placeName,
           description: data.description.trim(),
+          shoot_environment: data.shootEnvironment ?? null,
         })
         .eq("id", placeId)
 

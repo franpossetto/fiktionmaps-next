@@ -18,6 +18,7 @@ import { createPlaceUseCase } from "@/src/places/application/create-place.usecas
 import { updatePlaceUseCase } from "@/src/places/application/update-place.usecase"
 import { deletePlaceUseCase } from "@/src/places/application/delete-place.usecase"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
+import { THUMB_UPLOAD_VARIANTS } from "@/lib/asset-images/variant-sizes"
 import {
   getAllPlacesCached,
   getCityPlacesCached,
@@ -34,6 +35,9 @@ import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place
 import { getFictionByIdCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { createContributionAction } from "@/src/contributions/infrastructure/next/contribution.actions"
 import { parsePlaceContributeFormData } from "@/src/places/domain/place-contribute.schemas"
+import { markHuntCandidatePostedUseCase } from "@/src/hunts/application/mark-hunt-candidate-posted.usecase"
+import { huntSourcesSupabaseAdapter } from "@/src/hunts/infrastructure/supabase/hunt-source.repository.impl"
+import { huntsSupabaseAdapter } from "@/src/hunts/infrastructure/supabase/hunt.repository.impl"
 import type {
   CreatePlaceResult,
   CreateContributorPlaceResult,
@@ -50,6 +54,15 @@ export type {
   UploadPlaceImageResult,
 } from "./place.actions.types"
 
+export async function getPlaceUrlAction(placeId: string): Promise<string | null> {
+  const place = await getPlaceLocationByIdCached(placeId)
+  if (!place) return null
+  const { getFictionByIdCached } = await import("@/src/fictions/infrastructure/next/fiction.queries")
+  const fiction = await getFictionByIdCached(place.fictionId)
+  if (!fiction) return null
+  return `/fictions/${fiction.slug}/places/${place.slug}`
+}
+
 const CREATE_PLACE_CONTRIBUTION = {
   type: "create_place" as const,
   entityType: "place" as const,
@@ -58,8 +71,13 @@ const CREATE_PLACE_CONTRIBUTION = {
 async function recordCreatePlaceContribution(
   placeId: string,
   logContext: string,
+  huntId?: string | null,
 ): Promise<boolean | undefined> {
-  const payload = { ...CREATE_PLACE_CONTRIBUTION, entityId: placeId }
+  const payload = {
+    ...CREATE_PLACE_CONTRIBUTION,
+    entityId: placeId,
+    ...(huntId ? { origin: "hunt" as const, externalId: huntId } : {}),
+  }
   try {
     const res = await createContributionAction(payload)
     if (!res.success) {
@@ -94,7 +112,7 @@ export async function uploadPlaceImageAction(
     entityType: "place",
     entityId: placeId,
     role: "avatar",
-    variants: ["sm", "lg"],
+    variants: THUMB_UPLOAD_VARIANTS,
     file,
     replace: true,
   })
@@ -258,6 +276,7 @@ export async function createContributorPlaceWithImageAction(
   const contributionAutoApproved = await recordCreatePlaceContribution(
     result.placeId,
     "createContributorPlaceWithImageAction",
+    parsed.huntId,
   )
 
   if (parsed.imageFile) {
@@ -267,7 +286,7 @@ export async function createContributorPlaceWithImageAction(
         entityType: "place",
         entityId: result.placeId,
         role: "avatar",
-        variants: ["sm", "lg"],
+        variants: THUMB_UPLOAD_VARIANTS,
         file: parsed.imageFile,
         replace: true,
       })
@@ -281,6 +300,30 @@ export async function createContributorPlaceWithImageAction(
   updateTag("contributions")
 
   const fiction = await getFictionByIdCached(parsed.data.fictionId)
+
+  if (parsed.huntId != null && parsed.placeIndex != null) {
+    try {
+      await markHuntCandidatePostedUseCase(
+        {
+          huntId: parsed.huntId,
+          placeIndex: parsed.placeIndex,
+          placeId: result.placeId,
+        },
+        user.id,
+        huntsSupabaseAdapter,
+        huntSourcesSupabaseAdapter,
+      )
+      revalidatePath("/contribute/hunt")
+      revalidatePath(`/contribute/hunt/${parsed.huntId}/review`)
+    } catch (err) {
+      console.error("[createContributorPlaceWithImageAction] markHuntCandidatePosted failed", {
+        huntId: parsed.huntId,
+        placeIndex: parsed.placeIndex,
+        placeId: result.placeId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
 
   const out: CreateContributorPlaceResult = {
     success: true,

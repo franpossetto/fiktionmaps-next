@@ -2,9 +2,10 @@
 
 import { useTranslations } from "next-intl"
 import { Link } from "@/i18n/navigation"
+import { Sparkles } from "lucide-react"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
 import { FictionContributeLayout } from "@/components/contribute/fiction/fiction-contribute-layout"
-import { ContributionsFeedSidebar } from "@/components/contributions/contributions-feed-sidebar"
+import { TopContributorsSection } from "@/components/contributions/top-contributors-section"
 import { CONTRIBUTION_FPP } from "@/src/contributions/domain/contribution.config"
 import type { TopContributorProfile } from "@/src/contributions/domain/contribution.entity"
 import { CONTRIBUTION_TYPES_CATALOG } from "@/lib/contribute/contribution-types-catalog"
@@ -26,18 +27,29 @@ function ProfileContributeHubLeftAside() {
 
 type ProfileContributeHubProps = {
   topContributors: TopContributorProfile[]
+  isContributor: boolean
+  isAIAvailable: boolean
 }
 
-export function ProfileContributeHub({ topContributors }: ProfileContributeHubProps) {
+export function ProfileContributeHub({ topContributors, isContributor, isAIAvailable }: ProfileContributeHubProps) {
   const t = useTranslations("Contribute.hub")
+  const tHunt = useTranslations("Contribute.huntWork")
   const tProfile = useTranslations("Profile")
+  const tContrib = useTranslations("Contributions")
 
   return (
     <FictionContributeLayout
       leftAside={<ProfileContributeHubLeftAside />}
       rightAside={
         <div className="w-full min-w-0 max-w-full pt-1">
-          <ContributionsFeedSidebar contributors={topContributors} />
+          <TopContributorsSection
+            contributors={topContributors}
+            title={tContrib("topContributorsTitle")}
+            emptyMessage={tContrib("topContributorsEmpty")}
+            initialLimit={6}
+            viewMoreLabel={tContrib("viewMoreContributors")}
+            nameFallback={tContrib("contributorNameFallback")}
+          />
         </div>
       }
     >
@@ -56,18 +68,35 @@ export function ProfileContributeHub({ topContributors }: ProfileContributeHubPr
           <p className="max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">{t("subtitle")}</p>
         </header>
 
+        {isContributor && isAIAvailable && (
+          <Link
+            href="/contribute/hunt"
+            className="mt-6 flex items-center gap-3 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 transition-colors hover:border-violet-500/50 hover:bg-violet-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/20 text-violet-700 dark:text-violet-300">
+              <Sparkles className="h-4 w-4" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-foreground">{tHunt("title")}</span>
+              <span className="block text-xs text-muted-foreground">{tHunt("subtitle")}</span>
+            </span>
+          </Link>
+        )}
+
         <ul
           className="mt-8 grid auto-rows-fr grid-cols-1 items-stretch gap-3 sm:grid-cols-2 sm:gap-4"
           aria-label={t("listAria")}
         >
-          {CONTRIBUTION_TYPES_CATALOG.map(({ type, icon: Icon, hasWizard, href }) => {
-            const label = t(`types.${type}.title`)
-            const description = t(`types.${type}.description`)
+          {CONTRIBUTION_TYPES_CATALOG.filter((e) => !e.aiRequired || isAIAvailable).map(({ id, type, icon: Icon, hasWizard, href, tag, requiresContributor }) => {
+            const key = id ?? type
+            const label = t(`types.${key}.title`)
+            const description = t(`types.${key}.description`)
             const fpp = CONTRIBUTION_FPP[type]
+            const isEnabled = hasWizard && (!requiresContributor || isContributor)
 
             const cardClass = cn(
               "relative block h-full w-full rounded-xl border px-3 py-3 pt-3.5 text-left transition-[border-color,box-shadow,background-color]",
-              hasWizard
+              isEnabled
                 ? "cursor-pointer border-border bg-card hover:border-foreground/45 hover:bg-muted/25 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 : "cursor-not-allowed border-border/40 bg-muted/30",
             )
@@ -75,13 +104,20 @@ export function ProfileContributeHub({ topContributors }: ProfileContributeHubPr
             const cardInner = (
               <>
                 <div
-                  className="absolute right-2 top-2 flex flex-col items-end leading-none"
+                  className="absolute right-2 top-2 flex flex-col items-end gap-1 leading-none"
                   aria-label={t("fppIfApproved", { count: fpp })}
                 >
+                  {tag && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-violet-500/15 px-1.5 py-1 dark:bg-violet-500/20">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-violet-700/90 dark:text-violet-400/90">
+                        {tag}
+                      </span>
+                    </span>
+                  )}
                   <span
                     className={cn(
                       "inline-flex items-center gap-1 rounded-md px-1.5 py-1",
-                      hasWizard
+                      isEnabled
                         ? "bg-emerald-500/15 dark:bg-emerald-500/20"
                         : "bg-muted/80",
                     )}
@@ -89,7 +125,7 @@ export function ProfileContributeHub({ topContributors }: ProfileContributeHubPr
                     <span
                       className={cn(
                         "text-base font-bold tabular-nums",
-                        hasWizard
+                        isEnabled
                           ? "text-emerald-600 dark:text-emerald-400"
                           : "text-muted-foreground/70",
                       )}
@@ -99,7 +135,7 @@ export function ProfileContributeHub({ topContributors }: ProfileContributeHubPr
                     <span
                       className={cn(
                         "text-[10px] font-semibold uppercase tracking-wider",
-                        hasWizard
+                        isEnabled
                           ? "text-emerald-700/90 dark:text-emerald-400/90"
                           : "text-muted-foreground/60",
                       )}
@@ -112,7 +148,7 @@ export function ProfileContributeHub({ topContributors }: ProfileContributeHubPr
                   <span
                     className={cn(
                       "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                      hasWizard ? "bg-muted/80 text-foreground" : "bg-muted/50 text-muted-foreground/50",
+                      isEnabled ? "bg-muted/80 text-foreground" : "bg-muted/50 text-muted-foreground/50",
                     )}
                   >
                     <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
@@ -121,7 +157,7 @@ export function ProfileContributeHub({ topContributors }: ProfileContributeHubPr
                     <p
                       className={cn(
                         "line-clamp-1 text-sm font-semibold leading-tight",
-                        hasWizard ? "text-foreground" : "text-muted-foreground/80",
+                        isEnabled ? "text-foreground" : "text-muted-foreground/80",
                       )}
                     >
                       {label}
@@ -129,7 +165,7 @@ export function ProfileContributeHub({ topContributors }: ProfileContributeHubPr
                     <p
                       className={cn(
                         "line-clamp-2 min-h-9 text-xs leading-snug",
-                        hasWizard ? "text-muted-foreground" : "text-muted-foreground/55",
+                        isEnabled ? "text-muted-foreground" : "text-muted-foreground/55",
                       )}
                     >
                       {description}
@@ -139,9 +175,9 @@ export function ProfileContributeHub({ topContributors }: ProfileContributeHubPr
               </>
             )
 
-            if (hasWizard && href) {
+            if (isEnabled && href) {
               return (
-                <li key={type} className="h-full min-h-0">
+                <li key={key} className="h-full min-h-0">
                   <Link href={href} className={cardClass}>
                     {cardInner}
                   </Link>
@@ -150,7 +186,7 @@ export function ProfileContributeHub({ topContributors }: ProfileContributeHubPr
             }
 
             return (
-              <li key={type} className="h-full min-h-0">
+              <li key={key} className="h-full min-h-0">
                 <div className={cardClass} aria-disabled="true">
                   {cardInner}
                 </div>

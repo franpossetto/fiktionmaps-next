@@ -11,8 +11,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useState, useMemo } from "react"
-import Image from "next/image"
-import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
+import { AssetThumbImage } from "@/components/ui/asset-thumb-image"
+import { fictionCoverThumbUrl } from "@/lib/asset-images/fiction-cover-thumb"
 
 interface FictionSelectorProps {
   availableFictions: FictionWithMedia[]
@@ -108,12 +108,15 @@ export function FictionSelector({
                 >
                   {/* Cover thumbnail */}
                   <div className="relative w-10 aspect-[2/3] shrink-0 overflow-hidden rounded-md border border-border">
-                    <Image
-                      src={fiction.coverImage?.trim() || DEFAULT_FICTION_COVER}
+                    <AssetThumbImage
+                      src={fictionCoverThumbUrl(fiction)}
                       alt={fiction.title}
-                      fill
-                      className="object-cover"
-                      sizes="40px"
+                      size={40}
+                      ensure={
+                        fiction.coverImageThumb?.trim()
+                          ? undefined
+                          : { entityType: "fiction", entityId: fiction.id, role: "cover" }
+                      }
                     />
                   </div>
 

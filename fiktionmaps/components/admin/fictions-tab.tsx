@@ -413,7 +413,8 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                             alt="Cover preview"
                             fill
                             className="object-cover"
-                            unoptimized
+                            sizes="140px"
+                            unoptimized={coverPreviewUrl.startsWith("blob:")}
                           />
                           <span className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end justify-center pb-2">
                             <span className="text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow">Change</span>

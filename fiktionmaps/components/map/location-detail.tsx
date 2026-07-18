@@ -2,6 +2,7 @@
 
 import { X, MapPin, Quote, Lightbulb, ArrowRight } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import { useTranslations } from "next-intl"
 import { Link } from "@/i18n/navigation"
 import type { Place } from "@/src/places/domain/place.entity"
@@ -9,6 +10,7 @@ import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import type { ContributorProfileWithDate } from "@/src/contributions/domain/contribution.entity"
 import { PlaceContributorsByline } from "@/components/fictions/place-contributors-byline"
+import { PlaceShootEnvironmentBadge } from "@/components/places/place-shoot-environment-badge"
 import { getPlaceContributorsAction } from "@/src/contributions/infrastructure/next/contribution.actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -53,6 +55,11 @@ export function LocationDetail({
   const [placeContributors, setPlaceContributors] = useState<ContributorProfileWithDate[]>([])
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLElement>(null)
+  const [portalReady, setPortalReady] = useState(false)
+
+  useEffect(() => {
+    setPortalReady(true)
+  }, [])
 
   useEffect(() => {
     const el = panelRef.current
@@ -142,6 +149,7 @@ export function LocationDetail({
   const heroSrc =
     placeDetail?.image?.trim() || place.image?.trim() || DEFAULT_FICTION_COVER
   const placeDescription = placeDetail?.description?.trim() || place.description?.trim()
+  const shootEnvironment = placeDetail?.shootEnvironment ?? place.shootEnvironment
   const fictionMeta = [fiction?.year, fiction?.genre, fiction?.author].filter(Boolean).join(" · ")
   const fictionCoverSrc =
     fiction?.coverImage?.trim() || fiction?.coverImageLarge?.trim() || "/placeholder.svg"
@@ -154,10 +162,10 @@ export function LocationDetail({
     closeButtonRef.current?.focus()
   }, [place.id])
 
-  return (
+  const panel = (
     <aside
       ref={panelRef}
-      className="pointer-events-auto absolute inset-y-0 right-0 z-[2000] flex w-full flex-col border-l border-border/70 bg-background shadow-xl md:w-[min(100%,480px)] lg:w-[min(100%,540px)] xl:w-[min(100%,580px)]"
+      className="pointer-events-auto fixed inset-y-0 right-0 z-[4900] flex w-full flex-col border-l border-border/70 bg-background shadow-xl md:w-[min(100%,480px)] lg:w-[min(100%,540px)] xl:w-[min(100%,580px)]"
       role="dialog"
       aria-modal="true"
       aria-label={t("locationDetailDialogTitle", {
@@ -184,6 +192,7 @@ export function LocationDetail({
                     </Badge>
                   )}
                   {fiction?.year && <span>{fiction.year}</span>}
+                  {shootEnvironment ? <PlaceShootEnvironmentBadge value={shootEnvironment} /> : null}
                 </div>
                 <button
                   ref={closeButtonRef}
@@ -426,4 +435,7 @@ export function LocationDetail({
         ) : null}
     </aside>
   )
+
+  if (!portalReady) return null
+  return createPortal(panel, document.body)
 }

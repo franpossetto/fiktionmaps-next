@@ -32,10 +32,13 @@ function parsePage(raw: string | undefined): number {
 }
 
 export default async function ContributionsStaffPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ locale: string }>
   searchParams: Promise<{ submitter?: string; status?: string; page?: string; kind?: string }>
 }) {
+  const { locale } = await params
   const { submitter: submitterParam, status: statusParam, page: pageParam, kind: kindParam } = await searchParams
   const submitter = submitterParam?.trim() ?? ""
   const statusTab = parseStatusTab(statusParam)
@@ -65,6 +68,7 @@ export default async function ContributionsStaffPage({
         canonicalPage > 1 ? canonicalPage : undefined,
         feedKind,
       ),
+      locale,
     })
   }
 

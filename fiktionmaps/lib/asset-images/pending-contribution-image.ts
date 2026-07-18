@@ -1,8 +1,15 @@
 import sharp from "sharp"
 import { createClient } from "@/lib/supabase/server"
-import { ASSET_IMAGES_BUCKET, VARIANT_SIZES, type ImageVariant } from "./variant-sizes"
+import {
+  ASSET_IMAGES_BUCKET,
+  THUMB_UPLOAD_VARIANTS,
+  VARIANT_SIZES,
+  VARIANT_WEBP_QUALITY,
+  type ImageVariant,
+} from "./variant-sizes"
 import type { ImageRole } from "./image-variant-service"
 import type { ContributionEntityType } from "@/src/contributions/domain/contribution.entity"
+import { ensureAssetImageXs } from "./ensure-xs-variant"
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 
@@ -19,7 +26,7 @@ export async function uploadPendingContributionImage(
   contributionId: string,
   role: PendingContributionImageRole,
   file: File | Buffer,
-  variants: readonly ImageVariant[] = ["sm", "lg"],
+  variants: readonly ImageVariant[] = THUMB_UPLOAD_VARIANTS,
 ): Promise<
   | { success: true; paths: Partial<Record<ImageVariant, string>>; previewUrl: string }
   | { success: false; error: string }
@@ -42,10 +49,13 @@ export async function uploadPendingContributionImage(
     const width = VARIANT_SIZES[variant]
     const webpBuffer = await sharp(buffer)
       .resize(width, null, { withoutEnlargement: true })
-      .webp({ quality: 85 })
+      .webp({ quality: VARIANT_WEBP_QUALITY[variant] })
       .toBuffer()
 
-    const storagePath = `${basePath}/${variant}_${version}.webp`
+    const storagePath =
+      variant === "xs"
+        ? `${basePath}/xs_${VARIANT_SIZES.xs}_${version}.webp`
+        : `${basePath}/${variant}_${version}.webp`
     const { error: uploadError } = await supabase.storage
       .from(ASSET_IMAGES_BUCKET)
       .upload(storagePath, webpBuffer, {
@@ -60,7 +70,7 @@ export async function uploadPendingContributionImage(
     paths[variant] = storagePath
   }
 
-  const lgPath = paths.lg ?? paths.sm
+  const lgPath = paths.lg ?? paths.sm ?? paths.xs
   if (!lgPath) {
     return { success: false, error: "Upload failed: missing preview variant" }
   }
@@ -75,9 +85,10 @@ export const uploadPendingPlaceContributionImage = uploadPendingContributionImag
 export async function removePendingContributionImagePaths(
   smPath: string | null | undefined,
   lgPath: string | null | undefined,
+  xsPath?: string | null | undefined,
 ): Promise<void> {
   await removePendingContributionStoragePaths(
-    [smPath, lgPath].filter((p): p is string => Boolean(p?.trim())),
+    [xsPath, smPath, lgPath].filter((p): p is string => Boolean(p?.trim())),
   )
 }
 
@@ -92,9 +103,10 @@ export async function promotePendingContributionPhotoToAssetImages(
   entityType: Extract<ContributionEntityType, "place" | "fiction">,
   entityId: string,
   role: PendingContributionImageRole,
-  paths: { sm?: string; lg?: string },
+  paths: { xs?: string; sm?: string; lg?: string },
 ): Promise<{ success: true } | { success: false; error: string }> {
   const pairs: { variant: ImageVariant; from: string }[] = []
+  if (paths.xs?.trim()) pairs.push({ variant: "xs", from: paths.xs })
   if (paths.sm?.trim()) pairs.push({ variant: "sm", from: paths.sm })
   if (paths.lg?.trim()) pairs.push({ variant: "lg", from: paths.lg })
   if (pairs.length === 0) {
@@ -131,7 +143,10 @@ export async function promotePendingContributionPhotoToAssetImages(
   const inserts: { entity_type: string; entity_id: string; role: string; variant: string; url: string }[] = []
 
   for (const { variant, from } of pairs) {
-    const dest = `${entityType}/${entityId}/${role}/${variant}_${version}.webp`
+    const dest =
+      variant === "xs"
+        ? `${entityType}/${entityId}/${role}/xs_${VARIANT_SIZES.xs}_${version}.webp`
+        : `${entityType}/${entityId}/${role}/${variant}_${version}.webp`
     const { error: copyErr } = await supabase.storage.from(ASSET_IMAGES_BUCKET).copy(from, dest)
     if (copyErr) {
       return { success: false, error: `Copy failed: ${copyErr.message}` }
@@ -154,8 +169,14 @@ export async function promotePendingContributionPhotoToAssetImages(
   }
 
   await removePendingContributionStoragePaths(
-    [paths.sm, paths.lg].filter((p): p is string => Boolean(p?.trim())),
+    [paths.xs, paths.sm, paths.lg].filter((p): p is string => Boolean(p?.trim())),
   )
+
+  // Legacy pending uploads may only have sm/lg — derive xs once on promote.
+  if (!paths.xs?.trim() && (paths.sm?.trim() || paths.lg?.trim())) {
+    await ensureAssetImageXs({ entityType, entityId, role })
+  }
+
   return { success: true }
 }
 

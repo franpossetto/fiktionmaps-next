@@ -51,7 +51,7 @@ interface UserProfileProps {
   initialHomes?: UserHome[]
 }
 
-const DEFAULT_AVATAR = "/logo-icon.png"
+const DEFAULT_AVATAR = ""
 
 const EMPTY_ARTICLES: ProfileArticlePreview[] = []
 

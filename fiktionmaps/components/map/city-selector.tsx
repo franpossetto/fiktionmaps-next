@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useState, useMemo, useEffect } from "react"
+import { prefetchCityMapData } from "@/lib/map/city-map-data-cache"
 import { getAllCitiesAction } from "@/src/cities/infrastructure/next/city.actions"
 
 interface CitySelectorProps {
@@ -106,6 +107,12 @@ export function CitySelector({
                   type="button"
                   title={rowDisabled ? cityWithoutPlacesHint : undefined}
                   disabled={rowDisabled}
+                  onPointerEnter={() => {
+                    if (!rowDisabled) prefetchCityMapData(city.id)
+                  }}
+                  onFocus={() => {
+                    if (!rowDisabled) prefetchCityMapData(city.id)
+                  }}
                   onClick={() => {
                     if (rowDisabled) return
                     if (hasPlaces) onCityChange(city)

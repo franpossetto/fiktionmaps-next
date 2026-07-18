@@ -15,10 +15,14 @@ const contributionTypeSchema = z.enum([
 
 const contributionEntityTypeSchema = z.enum(["fiction", "place", "scene"])
 
+const contributionOriginSchema = z.enum(["manual", "hunt"]).default("manual")
+
 export const createContributionSchema = z.object({
   type: contributionTypeSchema,
   entityType: contributionEntityTypeSchema,
   entityId: uuidSchema,
+  origin: contributionOriginSchema.optional(),
+  externalId: z.string().uuid().nullable().optional(),
 })
 
 export const approveContributionSchema = z.object({

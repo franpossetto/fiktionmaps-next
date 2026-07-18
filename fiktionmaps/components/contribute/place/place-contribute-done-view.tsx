@@ -16,6 +16,8 @@ export interface PlaceContributeDoneViewProps {
   placeName: string
   imageSrc: string | null
   placeHref: string
+  returnHref?: string
+  returnLabel?: string
   className?: string
 }
 
@@ -24,6 +26,8 @@ export function PlaceContributeDoneView({
   placeName,
   imageSrc,
   placeHref,
+  returnHref,
+  returnLabel,
   className,
 }: PlaceContributeDoneViewProps) {
   const t = useTranslations("Contribute.place")
@@ -71,7 +75,7 @@ export function PlaceContributeDoneView({
         variant={isApproved ? "outline" : "default"}
         className={cn("h-10 rounded-lg px-5 text-sm font-semibold", isApproved ? "mt-4 w-full max-w-[240px]" : "mt-6")}
       >
-        <Link href="/map">{t("backToMap")}</Link>
+        <Link href={returnHref ?? "/map"}>{returnLabel ?? t("backToMap")}</Link>
       </Button>
     </motion.div>
   )

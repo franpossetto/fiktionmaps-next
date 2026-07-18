@@ -203,6 +203,8 @@ export default async function FictionSlugPage({ params }: Props) {
         summaryText={sidebarSummary}
         rightAside={
           <FictionDetailRightRail
+            fictionId={fiction.id}
+            fictionTitle={fiction.title}
             fictionInterestTags={fictionInterestTags}
             contributors={fictionContributors}
             initialCities={fictionCitiesOrdered}
