@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { createPortal } from "react-dom"
-import { motion } from "framer-motion"
 import { useMap } from "react-map-gl/mapbox"
 import { MapContainer, MapMarker, useMapLoaded } from "@/lib/map"
 import type { Place } from "@/src/places/domain/place.entity"
@@ -11,8 +10,7 @@ import { Expand, Map, Minimize2, X } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useNavCollapsedStorage } from "@/lib/local-storage-service-hooks"
-
-const MINIMAP_SLOT_ID = "map-minimap-slot"
+import { MAP_MINIMAP_SLOT_ID } from "./map-slots"
 
 const SIZE_SMALL = { width: 200, height: 140 }
 const SIZE_EXPANDED = { width: 360, height: 280 }
@@ -55,56 +53,21 @@ function NavMapPins({
   if (!mapLoaded) return null
 
   return (
-    <motion.div
-      className="absolute inset-0 pointer-events-none [&>*]:pointer-events-auto"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
-    >
-      {places.map((loc, index) => (
+    <div className="absolute inset-0 pointer-events-none [&>*]:pointer-events-auto">
+      {places.map((loc) => (
         <MapMarker key={loc.id} position={{ lat: loc.location.lat, lng: loc.location.lng }}>
-          <motion.div
-            className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-sm"
-            title={loc.name}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{
-              type: "spring",
-              stiffness: 400,
-              damping: 22,
-              delay: 0.08 + index * 0.04,
-            }}
-          />
+          <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-sm" title={loc.name} />
         </MapMarker>
       ))}
       <MapMarker position={viewportCenter}>
-        <motion.div
+        <div
           className="h-3 w-3 rounded-full border-2 border-white bg-primary shadow-md"
           title="You are here"
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{
-            type: "spring",
-            stiffness: 400,
-            damping: 22,
-            delay: 0.2,
-          }}
         />
       </MapMarker>
-    </motion.div>
+    </div>
   )
 }
-
-export function NavMapSlot() {
-  return (
-    <div
-      id={MINIMAP_SLOT_ID}
-      className="pointer-events-none absolute bottom-4 right-4 z-[4800] hidden md:block [&>*]:pointer-events-auto"
-    />
-  )
-}
-
-export const NAV_MAP_SLOT_ID = MINIMAP_SLOT_ID
 
 interface NavMapProps {
   city: City
@@ -122,7 +85,7 @@ export function NavMap({ city, viewportCenter, places, onMinimapClick }: NavMapP
   const isVisible = !navCollapsed
 
   useEffect(() => {
-    const el = document.getElementById(MINIMAP_SLOT_ID)
+    const el = document.getElementById(MAP_MINIMAP_SLOT_ID)
     if (el) setContainer(el)
   }, [])
 
@@ -196,6 +159,7 @@ export function NavMap({ city, viewportCenter, places, onMinimapClick }: NavMapP
             maxZoom={14}
             interactive={true}
             controls={{ fullscreen: false }}
+            showBuildings3D={false}
             className="h-full w-full"
             onClick={handleMinimapClick}
           >

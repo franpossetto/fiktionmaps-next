@@ -1,3 +1,5 @@
+"use client"
+
 /**
  * Client-side cache + in-flight dedupe for map city payloads.
  * Lets city switches reuse data instantly and share work with hover prefetch.
@@ -7,6 +9,17 @@ import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import { getCityFictionsAction } from "@/src/cities/infrastructure/next/city.actions"
 import { getCityPlacesAction } from "@/src/places/infrastructure/next/place.actions"
+
+function isBenignFetchError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const message = error.message.toLowerCase()
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("networkerror") ||
+    message.includes("aborted") ||
+    error.name === "AbortError"
+  )
+}
 
 export type CityMapData = {
   fictions: FictionWithMedia[]
@@ -50,12 +63,14 @@ export function loadCityPlaces(cityId: string): Promise<Place[]> {
   const promise = getCityPlacesAction(cityId)
     .then((places) => {
       patchCache(cityId, { places })
-      placesInflight.delete(cityId)
       return places
     })
     .catch((error) => {
+      if (!isBenignFetchError(error)) console.warn("[loadCityPlaces]", cityId, error)
+      return [] as Place[]
+    })
+    .finally(() => {
       placesInflight.delete(cityId)
-      throw error
     })
   placesInflight.set(cityId, promise)
   return promise
@@ -70,12 +85,14 @@ export function loadCityFictions(cityId: string): Promise<FictionWithMedia[]> {
   const promise = getCityFictionsAction(cityId)
     .then((fictions) => {
       patchCache(cityId, { fictions })
-      fictionsInflight.delete(cityId)
       return fictions
     })
     .catch((error) => {
+      if (!isBenignFetchError(error)) console.warn("[loadCityFictions]", cityId, error)
+      return [] as FictionWithMedia[]
+    })
+    .finally(() => {
       fictionsInflight.delete(cityId)
-      throw error
     })
   fictionsInflight.set(cityId, promise)
   return promise
@@ -83,6 +100,6 @@ export function loadCityFictions(cityId: string): Promise<FictionWithMedia[]> {
 
 /** Warm cache on city-row hover so a click can paint from memory. */
 export function prefetchCityMapData(cityId: string): void {
-  void loadCityPlaces(cityId).catch(() => {})
-  void loadCityFictions(cityId).catch(() => {})
+  void loadCityPlaces(cityId)
+  void loadCityFictions(cityId)
 }

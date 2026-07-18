@@ -52,6 +52,8 @@ export interface MapContainerProps {
   onZoomChange?: (zoom: number) => void
   /** When false, skips the Mapbox tile loading overlay (e.g. main map uses its own bootstrap). Default true. */
   showLoadingOverlay?: boolean
+  /** When false, skips custom 3D building layer setup (useful for small overview maps). Default true. */
+  showBuildings3D?: boolean
   controls?: {
     fullscreen?: boolean
   }

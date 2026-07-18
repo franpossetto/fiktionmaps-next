@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  startTransition,
   useEffect,
   useState,
   useCallback,
@@ -10,6 +11,7 @@ import {
   type ReactNode,
 } from "react"
 import { createPortal } from "react-dom"
+import dynamic from "next/dynamic"
 import { motion } from "framer-motion"
 import { useMap } from "react-map-gl/mapbox"
 import {
@@ -30,7 +32,12 @@ import { ensureXsOnce } from "@/lib/asset-images/ensure-xs-client"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import { Map3DToggle } from "./map-3d-toggle"
-import { NavMap, NavMapSlot } from "./nav-map"
+import { MAP_3D_TOGGLE_SLOT_ID } from "./map-slots"
+
+const NavMap = dynamic(
+  () => import("./nav-map").then((m) => ({ default: m.NavMap })),
+  { ssr: false },
+)
 
 const FOCUS_ZOOM = 18
 
@@ -357,6 +364,7 @@ export function MapView({
   onBoundsChange,
 }: MapViewProps) {
   const [xsByPlaceId, setXsByPlaceId] = useState<Record<string, string>>({})
+  const [primaryMapLoaded, setPrimaryMapLoaded] = useState(false)
   const clusterItems = useMemo(() => toClusterItems(places, xsByPlaceId), [places, xsByPlaceId])
   const marker2dShape = useMapMarker2dShape()
   const markerLabelMode = useMapMarkerLabelMode()
@@ -368,6 +376,10 @@ export function MapView({
   )
 
   const effectiveZoom = is3D ? 18 : 14
+  const handleMapLoaded = useCallback(() => {
+    setPrimaryMapLoaded(true)
+    onMapLoaded?.()
+  }, [onMapLoaded])
 
   const [viewportCenter, setViewportCenter] = useState(() => ({
     lat: city.lat,
@@ -382,25 +394,54 @@ export function MapView({
 
   // Lazy xs backfill for place pin thumbs (pins previously never triggered ensure).
   useEffect(() => {
+    if (!primaryMapLoaded) return
     let cancelled = false
-    for (const place of places) {
+    const targets = places.filter((place) => {
       const src = place.image?.trim()
-      if (!src || src.startsWith("/")) continue
-      void ensureXsOnce({
-        entityType: "place",
-        entityId: place.id,
-        role: "avatar",
-      }).then((result) => {
-        if (cancelled || !result.success) return
-        setXsByPlaceId((prev) =>
-          prev[place.id] === result.url ? prev : { ...prev, [place.id]: result.url },
+      return Boolean(src && !src.startsWith("/") && !xsByPlaceId[place.id])
+    })
+    if (targets.length === 0) return
+
+    const backfill = async () => {
+      const resolved: Array<readonly [string, string]> = []
+      // Keep image generation traffic bounded and commit all URLs in one React update.
+      for (let i = 0; i < targets.length && !cancelled; i += 4) {
+        const batch = targets.slice(i, i + 4)
+        const results = await Promise.all(
+          batch.map(async (place) => {
+            const result = await ensureXsOnce({
+              entityType: "place",
+              entityId: place.id,
+              role: "avatar",
+            })
+            return result.success ? ([place.id, result.url] as const) : null
+          }),
         )
+        for (const result of results) {
+          if (result) resolved.push(result)
+        }
+      }
+      if (cancelled || resolved.length === 0) return
+      startTransition(() => {
+        setXsByPlaceId((prev) => {
+          const next = { ...prev }
+          let changed = false
+          for (const [placeId, url] of resolved) {
+            if (next[placeId] === url) continue
+            next[placeId] = url
+            changed = true
+          }
+          return changed ? next : prev
+        })
       })
     }
+
+    const idleId = window.requestIdleCallback(() => void backfill(), { timeout: 3000 })
     return () => {
       cancelled = true
+      window.cancelIdleCallback(idleId)
     }
-  }, [places])
+  }, [places, primaryMapLoaded, xsByPlaceId])
 
   return (
     <MapContainer
@@ -415,7 +456,7 @@ export function MapView({
       className="h-full w-full"
       onCenterChange={onCenterChange}
     >
-      <MapLoadReporter onLoaded={onMapLoaded} />
+      <MapLoadReporter onLoaded={handleMapLoaded} />
       <CityCameraController city={city} zoom={effectiveZoom} />
       <MapBoundsReporter cityId={city.id} onBoundsChange={onBoundsChange} />
       <MapFocusController
@@ -441,19 +482,11 @@ export function MapView({
           <Map3DTogglePortal is3D={is3D} onToggle={onToggle3D} cityId={city.id} />
         </>
       )}
-      <NavMapPortal city={city} viewportCenter={viewportCenter} places={places} />
+      {primaryMapLoaded && (
+        <NavMapPortal city={city} viewportCenter={viewportCenter} places={places} />
+      )}
     </MapContainer>
   )
-}
-
-const TOGGLE_SLOT_ID = "map-3d-toggle-slot"
-
-export function Map3DToggleSlot() {
-  return <div id={TOGGLE_SLOT_ID} />
-}
-
-export function MapMinimapSlot() {
-  return <NavMapSlot />
 }
 
 function NavMapPortal({
@@ -532,7 +565,7 @@ function Map3DTogglePortal({
   const [container, setContainer] = useState<HTMLElement | null>(null)
 
   useEffect(() => {
-    setContainer(document.getElementById(TOGGLE_SLOT_ID))
+    setContainer(document.getElementById(MAP_3D_TOGGLE_SLOT_ID))
   }, [])
 
   if (!container) return null

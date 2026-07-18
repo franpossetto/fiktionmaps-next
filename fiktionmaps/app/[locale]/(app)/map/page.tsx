@@ -1,15 +1,14 @@
 "use client"
 
 import { Suspense, useState, useCallback, useEffect, useMemo, useRef } from "react"
+import dynamic from "next/dynamic"
 import { useSearchParams } from "next/navigation"
 import { useTranslations } from "next-intl"
-import { usePathname, useRouter } from "@/i18n/navigation"
 import { Loader2 } from "lucide-react"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { MapFictionCitySearchEntry } from "@/src/places/domain/map-fiction-city-pair.entity"
-import { MapView, Map3DToggleSlot, MapMinimapSlot } from "@/components/map/map-view"
 import { MapProvider } from "@/lib/map"
 import {
   loadCityFictions,
@@ -18,6 +17,7 @@ import {
   getCachedCityPlaces,
   getCachedCityFictions,
 } from "@/lib/map/city-map-data-cache"
+import { replaceMapUrlSearch } from "@/lib/map/replace-map-url"
 import {
   buildMapQueryString,
   isAllFictionsSelected,
@@ -27,8 +27,28 @@ import {
 import { CitySelector } from "@/components/map/city-selector"
 import { FictionSelector } from "@/components/map/fiction-selector"
 import { MapFictionCitySearch } from "@/components/map/map-fiction-city-search"
-import { LocationDetail } from "@/components/map/location-detail"
+import { Map3DToggleSlot, MapMinimapSlot } from "@/components/map/map-slots"
 import { UserMenu } from "@/components/layout/user-menu"
+
+const MapView = dynamic(
+  () => import("@/components/map/map-view").then((m) => ({ default: m.MapView })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center bg-background">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden />
+      </div>
+    ),
+  },
+)
+
+const LocationDetail = dynamic(
+  () =>
+    import("@/components/map/location-detail").then((m) => ({
+      default: m.LocationDetail,
+    })),
+  { ssr: false },
+)
 // import { usePlaceSelectorCollapsedStorage } from "@/lib/local-storage-service-hooks"
 import { getAllCitiesAction } from "@/src/cities/infrastructure/next/city.actions"
 import {
@@ -99,10 +119,14 @@ function MapLoadingScreen({ message }: { message: string }) {
   )
 }
 
+function readMapUrlPreserve(): { place?: string | null; openSidebar?: string | null } {
+  if (typeof window === "undefined") return {}
+  const sp = new URLSearchParams(window.location.search)
+  return { place: sp.get("place"), openSidebar: sp.get("openSidebar") }
+}
+
 function MapPageInner() {
   const searchParams = useSearchParams()
-  const router = useRouter()
-  const pathname = usePathname()
   const tMap = useTranslations("Map")
   const fictionParam = searchParams.get("fiction")
   const initialCityId = searchParams.get("city")
@@ -426,13 +450,14 @@ function MapPageInner() {
       setFictionChipPreviews(null)
       setAvailableFictions([])
       setSelectedFictionIds([])
-      router.replace(`${pathname}?city=${encodeURIComponent(city.id)}`)
+      // history.replaceState — not router.replace — so in-flight server actions aren't aborted.
+      replaceMapUrlSearch(`city=${encodeURIComponent(city.id)}`)
       setBounds(null)
       setSelectedCity(city)
       setSelectedPlace(null)
       setFocusedPlaceId(null)
     },
-    [router, pathname, selectedCityId],
+    [selectedCityId],
   )
 
   const applyFictionSelection = useCallback(
@@ -442,16 +467,18 @@ function MapPageInner() {
       setSelectedFictionIds(next)
       setViewportPlaces(filterPlacesByFictionIds(cityPlacesRef.current, next))
       if (availableFictions.length > 0) {
-        const qs = buildMapQueryString(selectedCity.id, next, availableFictions, {
-          place: searchParams.get("place"),
-          openSidebar: searchParams.get("openSidebar"),
-        })
-        router.replace(`${pathname}?${qs}`)
+        const qs = buildMapQueryString(
+          selectedCity.id,
+          next,
+          availableFictions,
+          readMapUrlPreserve(),
+        )
+        replaceMapUrlSearch(qs)
       }
       setSelectedPlace(null)
       setFocusedPlaceId(null)
     },
-    [selectedCity, availableFictions, router, pathname, searchParams],
+    [selectedCity, availableFictions],
   )
 
   const handleApplySearchPair = useCallback(
@@ -495,9 +522,9 @@ function MapPageInner() {
       const params = new URLSearchParams()
       params.set("city", entry.cityId)
       params.set("fiction", entry.fictionId)
-      router.replace(`${pathname}?${params.toString()}`)
+      replaceMapUrlSearch(params.toString())
     },
-    [selectedCity?.id, selectedFictionIds, availableFictions, cities, router, pathname, applyFictionSelection],
+    [selectedCity?.id, selectedFictionIds, availableFictions, cities, applyFictionSelection],
   )
 
   const handleSelectCityFromSearch = useCallback(
@@ -510,13 +537,13 @@ function MapPageInner() {
       setSelectedFictionIds([])
       const city = cities.find((c) => c.id === cityId)
       if (!city) return
-      router.replace(`${pathname}?city=${encodeURIComponent(city.id)}`)
+      replaceMapUrlSearch(`city=${encodeURIComponent(city.id)}`)
       setBounds(null)
       setSelectedCity(city)
       setSelectedPlace(null)
       setFocusedPlaceId(null)
     },
-    [cities, router, pathname, selectedCityId],
+    [cities, selectedCityId],
   )
 
   const handleRemoveFiction = useCallback(
@@ -593,98 +620,98 @@ function MapPageInner() {
   //   setPlaceSelectorCollapsed,
   // ])
 
+  if (isBootstrapping) {
+    return <MapLoadingScreen message={loadingMessage} />
+  }
+
   return (
-    <MapProvider>
-      {isBootstrapping ? (
-        <MapLoadingScreen message={loadingMessage} />
-      ) : (
-        <div className="absolute inset-0 min-h-0 flex flex-col">
-          <header className="pointer-events-none absolute inset-x-0 top-0 z-[1000]">
-            <div className="relative flex w-full items-start justify-between gap-2 px-3 py-3 sm:px-6 sm:py-4 md:grid md:grid-cols-[1fr_minmax(280px,520px)_1fr] md:gap-4 lg:px-8">
-              <div className="pointer-events-auto flex min-w-0 items-center gap-2 md:justify-self-start">
-                <FictionSelector
-                  availableFictions={availableFictions}
-                  selectedFictionIds={selectedFictionIds}
-                  onToggleFiction={handleToggleFiction}
-                  open={fictionSelectorOpen}
-                  onOpenChange={setFictionSelectorOpen}
-                />
-              </div>
-
-              <div className="pointer-events-auto relative hidden w-full min-w-0 justify-self-center md:block">
-                <MapFictionCitySearch
-                  selectedCity={selectedCity}
-                  availableFictions={availableFictions}
-                  selectedFictionIds={selectedFictionIds}
-                  fictionChipPreviews={fictionChipPreviews}
-                  cityPlaces={cityPlaces}
-                  onSelectPair={handleApplySearchPair}
-                  onSelectCity={handleSelectCityFromSearch}
-                  onSelectPlace={handleLocationClick}
-                  onRemoveFiction={handleRemoveFiction}
-                  onRequestPickFiction={() => setFictionSelectorOpen(true)}
-                />
-              </div>
-
-              <div className="pointer-events-auto flex items-center gap-2 justify-self-end">
-                <Map3DToggleSlot />
-                <CitySelector
-                  cities={cities}
-                  selectedCity={selectedCity}
-                  onCityChange={handleCityChange}
-                  cityIdsWithPlaces={cityIdsWithPlaces}
-                  cityWithoutPlacesHint={tMap("cityWithoutPlaces")}
-                />
-                <div className="rounded-xl border border-border bg-background shadow-sm">
-                  <UserMenu />
-                </div>
-              </div>
-            </div>
-          </header>
-
-          <div className="relative z-0 flex-1 min-h-0 w-full">
-            <MapView
-              city={selectedCity}
-              places={viewportPlaces}
-              onLocationClick={handleLocationClick}
-              selectedLocationId={selectedPlace?.id}
-              focusLocationId={focusedPlaceId}
-              focusPaddingRight={detailPanelWidth}
-              is3D={is3D}
-              onToggle3D={setIs3D}
-              onBoundsChange={setBounds}
+    <div className="absolute inset-0 min-h-0 flex flex-col">
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-[1000]">
+        <div className="relative flex w-full items-start justify-between gap-2 px-3 py-3 sm:px-6 sm:py-4 md:grid md:grid-cols-[1fr_minmax(280px,520px)_1fr] md:gap-4 lg:px-8">
+          <div className="pointer-events-auto flex min-w-0 items-center gap-2 md:justify-self-start">
+            <FictionSelector
+              availableFictions={availableFictions}
+              selectedFictionIds={selectedFictionIds}
+              onToggleFiction={handleToggleFiction}
+              open={fictionSelectorOpen}
+              onOpenChange={setFictionSelectorOpen}
             />
           </div>
 
-          <MapMinimapSlot />
-
-          {/*
-          <ThumbnailCarousel
-            places={filteredPlaces}
-            selectedLocationId={focusedPlaceId ?? selectedPlace?.id}
-            onLocationClick={handleNavigateToPlace}
-            placeSelectorCollapsed={placeSelectorCollapsed}
-            setPlaceSelectorCollapsed={setPlaceSelectorCollapsed}
-          />
-          */}
-
-          {selectedPlace && (
-            <LocationDetail
-              place={selectedPlace}
-              fiction={availableFictions.find((f) => f.id === selectedPlace.fictionId)}
-              relatedPlaces={sidebarRelatedPlaces}
-              relatedFictions={availableFictions.filter((f) => f.id !== selectedPlace.fictionId)}
-              onClose={() => {
-                setSelectedPlace(null)
-                setDetailPanelWidth(0)
-              }}
-              onPanelWidthChange={setDetailPanelWidth}
-              onSelectRelatedPlace={handleLocationClick}
+          <div className="pointer-events-auto relative hidden w-full min-w-0 justify-self-center md:block">
+            <MapFictionCitySearch
+              selectedCity={selectedCity}
+              availableFictions={availableFictions}
+              selectedFictionIds={selectedFictionIds}
+              fictionChipPreviews={fictionChipPreviews}
+              cityPlaces={cityPlaces}
+              onSelectPair={handleApplySearchPair}
+              onSelectCity={handleSelectCityFromSearch}
+              onSelectPlace={handleLocationClick}
+              onRemoveFiction={handleRemoveFiction}
+              onRequestPickFiction={() => setFictionSelectorOpen(true)}
             />
-          )}
+          </div>
+
+          <div className="pointer-events-auto flex items-center gap-2 justify-self-end">
+            <Map3DToggleSlot />
+            <CitySelector
+              cities={cities}
+              selectedCity={selectedCity}
+              onCityChange={handleCityChange}
+              cityIdsWithPlaces={cityIdsWithPlaces}
+              cityWithoutPlacesHint={tMap("cityWithoutPlaces")}
+            />
+            <div className="rounded-xl border border-border bg-background shadow-sm">
+              <UserMenu />
+            </div>
+          </div>
         </div>
+      </header>
+
+      <div className="relative z-0 flex-1 min-h-0 w-full">
+        <MapProvider>
+          <MapView
+            city={selectedCity}
+            places={viewportPlaces}
+            onLocationClick={handleLocationClick}
+            selectedLocationId={selectedPlace?.id}
+            focusLocationId={focusedPlaceId}
+            focusPaddingRight={detailPanelWidth}
+            is3D={is3D}
+            onToggle3D={setIs3D}
+            onBoundsChange={setBounds}
+          />
+        </MapProvider>
+      </div>
+
+      <MapMinimapSlot />
+
+      {/*
+      <ThumbnailCarousel
+        places={filteredPlaces}
+        selectedLocationId={focusedPlaceId ?? selectedPlace?.id}
+        onLocationClick={handleNavigateToPlace}
+        placeSelectorCollapsed={placeSelectorCollapsed}
+        setPlaceSelectorCollapsed={setPlaceSelectorCollapsed}
+      />
+      */}
+
+      {selectedPlace && (
+        <LocationDetail
+          place={selectedPlace}
+          fiction={availableFictions.find((f) => f.id === selectedPlace.fictionId)}
+          relatedPlaces={sidebarRelatedPlaces}
+          relatedFictions={availableFictions.filter((f) => f.id !== selectedPlace.fictionId)}
+          onClose={() => {
+            setSelectedPlace(null)
+            setDetailPanelWidth(0)
+          }}
+          onPanelWidthChange={setDetailPanelWidth}
+          onSelectRelatedPlace={handleLocationClick}
+        />
       )}
-    </MapProvider>
+    </div>
   )
 }
 
