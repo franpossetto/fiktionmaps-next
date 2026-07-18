@@ -18,6 +18,7 @@ import { createPlaceUseCase } from "@/src/places/application/create-place.usecas
 import { updatePlaceUseCase } from "@/src/places/application/update-place.usecase"
 import { deletePlaceUseCase } from "@/src/places/application/delete-place.usecase"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
+import { THUMB_UPLOAD_VARIANTS } from "@/lib/asset-images/variant-sizes"
 import {
   getAllPlacesCached,
   getCityPlacesCached,
@@ -111,7 +112,7 @@ export async function uploadPlaceImageAction(
     entityType: "place",
     entityId: placeId,
     role: "avatar",
-    variants: ["sm", "lg"],
+    variants: THUMB_UPLOAD_VARIANTS,
     file,
     replace: true,
   })
@@ -285,7 +286,7 @@ export async function createContributorPlaceWithImageAction(
         entityType: "place",
         entityId: result.placeId,
         role: "avatar",
-        variants: ["sm", "lg"],
+        variants: THUMB_UPLOAD_VARIANTS,
         file: parsed.imageFile,
         replace: true,
       })

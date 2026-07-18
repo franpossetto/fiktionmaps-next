@@ -10,9 +10,9 @@ export type ResolveNavSearchScopeDeps = {
 
 function fictionCoverUrl(fiction: FictionWithMedia): string {
   return (
+    fiction.coverImageThumb?.trim() ||
     fiction.coverImage?.trim() ||
     fiction.coverImageLarge?.trim() ||
-    fiction.coverImage?.trim() ||
     DEFAULT_FICTION_COVER
   )
 }

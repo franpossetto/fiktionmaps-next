@@ -26,6 +26,7 @@ import {
   useMapMarkerHoverScaleMode,
   useMapMarkerLabelMode,
 } from "@/lib/theme-settings-context"
+import { ensureXsOnce } from "@/lib/asset-images/ensure-xs-client"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import { Map3DToggle } from "./map-3d-toggle"
@@ -45,6 +46,50 @@ interface MapViewProps {
   onToggle3D?: (is3D: boolean) => void
   onMapLoaded?: () => void
   onBoundsChange?: (bounds: { west: number; south: number; east: number; north: number }) => void
+}
+
+function CityCameraController({
+  city,
+  zoom,
+}: {
+  city: City
+  zoom: number
+}) {
+  const control = useMapControl()
+  const prevCityIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!control) return
+    if (prevCityIdRef.current === null) {
+      prevCityIdRef.current = city.id
+      return
+    }
+    if (prevCityIdRef.current === city.id) return
+    prevCityIdRef.current = city.id
+
+    let cancelled = false
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const tryJump = (attempt: number) => {
+      if (cancelled) return
+      // duration 0 = instant camera jump; keeps the Mapbox instance alive across cities.
+      const ok = control.flyTo({
+        center: { lat: city.lat, lng: city.lng },
+        zoom,
+        duration: 0,
+      })
+      if (ok) return
+      if (attempt < 8) {
+        timeoutId = setTimeout(() => tryJump(attempt + 1), 50)
+      }
+    }
+    tryJump(0)
+    return () => {
+      cancelled = true
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+    }
+  }, [city.id, city.lat, city.lng, zoom, control])
+
+  return null
 }
 
 function MapFocusController({
@@ -119,13 +164,19 @@ const PITCH_3D_THRESHOLD = 20
 
 type MapPinClusterItem = ClusterItem & { place: Place }
 
-function toClusterItems(places: Place[]): MapPinClusterItem[] {
-  return places.map((p) => ({
-    id: p.id,
-    position: { lat: p.location.lat, lng: p.location.lng },
-    imageUrl: p.image,
-    place: p,
-  }))
+function toClusterItems(
+  places: Place[],
+  xsByPlaceId: Record<string, string>,
+): MapPinClusterItem[] {
+  return places.map((p) => {
+    const image = xsByPlaceId[p.id] || p.image
+    return {
+      id: p.id,
+      position: { lat: p.location.lat, lng: p.location.lng },
+      imageUrl: image,
+      place: image === p.image ? p : { ...p, image },
+    }
+  })
 }
 
 function MapLoadReporter({ onLoaded }: { onLoaded?: () => void }) {
@@ -150,8 +201,10 @@ function boundsRoughlyEqual(
 }
 
 function MapBoundsReporter({
+  cityId,
   onBoundsChange,
 }: {
+  cityId: string
   onBoundsChange?: (bounds: { west: number; south: number; east: number; north: number }) => void
 }) {
   const maps = useMap()
@@ -160,7 +213,14 @@ function MapBoundsReporter({
   const lastBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(
     null,
   )
+  /** After a city jump, ignore programmatic moveend until the user pans/zooms. */
+  const awaitUserGestureRef = useRef(true)
   onBoundsChangeRef.current = onBoundsChange
+
+  useEffect(() => {
+    awaitUserGestureRef.current = true
+    lastBoundsRef.current = null
+  }, [cityId])
 
   useEffect(() => {
     if (!mapRef) return
@@ -191,12 +251,18 @@ function MapBoundsReporter({
       }
     }
 
-    report()
-    map.on("load", report)
-    map.on("moveend", report)
+    const onMoveEnd = (e: { originalEvent?: Event }) => {
+      if (awaitUserGestureRef.current) {
+        // Mapbox sets originalEvent only for user-driven gestures.
+        if (!e.originalEvent) return
+        awaitUserGestureRef.current = false
+      }
+      report()
+    }
+
+    map.on("moveend", onMoveEnd)
     return () => {
-      map.off("load", report)
-      map.off("moveend", report)
+      map.off("moveend", onMoveEnd)
     }
   }, [mapRef])
 
@@ -290,7 +356,8 @@ export function MapView({
   onMapLoaded,
   onBoundsChange,
 }: MapViewProps) {
-  const clusterItems = useMemo(() => toClusterItems(places), [places])
+  const [xsByPlaceId, setXsByPlaceId] = useState<Record<string, string>>({})
+  const clusterItems = useMemo(() => toClusterItems(places, xsByPlaceId), [places, xsByPlaceId])
   const marker2dShape = useMapMarker2dShape()
   const markerLabelMode = useMapMarkerLabelMode()
   const markerHoverScale = useMapMarkerHoverScaleMode()
@@ -313,10 +380,32 @@ export function MapView({
     setViewportCenter({ lat: city.lat, lng: city.lng })
   }, [city.id, city.lat, city.lng])
 
+  // Lazy xs backfill for place pin thumbs (pins previously never triggered ensure).
+  useEffect(() => {
+    let cancelled = false
+    for (const place of places) {
+      const src = place.image?.trim()
+      if (!src || src.startsWith("/")) continue
+      void ensureXsOnce({
+        entityType: "place",
+        entityId: place.id,
+        role: "avatar",
+      }).then((result) => {
+        if (cancelled || !result.success) return
+        setXsByPlaceId((prev) =>
+          prev[place.id] === result.url ? prev : { ...prev, [place.id]: result.url },
+        )
+      })
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [places])
+
   return (
     <MapContainer
       id="main"
-      mapKey={city.id}
+      mapKey="main-map"
       defaultCenter={{ lat: city.lat, lng: city.lng }}
       defaultZoom={effectiveZoom}
       minZoom={ZOOM_2D_MIN}
@@ -327,7 +416,8 @@ export function MapView({
       onCenterChange={onCenterChange}
     >
       <MapLoadReporter onLoaded={onMapLoaded} />
-      <MapBoundsReporter onBoundsChange={onBoundsChange} />
+      <CityCameraController city={city} zoom={effectiveZoom} />
+      <MapBoundsReporter cityId={city.id} onBoundsChange={onBoundsChange} />
       <MapFocusController
         cityId={city.id}
         places={places}

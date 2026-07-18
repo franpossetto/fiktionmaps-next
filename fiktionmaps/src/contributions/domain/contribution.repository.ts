@@ -27,7 +27,7 @@ import type {
 export type InsertContributionPendingImagesInput = {
   contributionId: string
   role: ContributionPendingImageRole
-  paths: { sm?: string; lg: string }
+  paths: { xs?: string; sm?: string; lg?: string }
 }
 
 /** @deprecated Use InsertContributionPendingImagesInput */

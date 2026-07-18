@@ -5,6 +5,7 @@ export type MapSearchCatalogFictionRef = {
   id: string
   title: string
   active: boolean
+  coverImageThumb?: string | null
   coverImage?: string | null
   coverImageLarge?: string | null
 }

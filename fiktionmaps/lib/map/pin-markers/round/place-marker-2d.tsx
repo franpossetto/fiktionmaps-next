@@ -61,7 +61,14 @@ export function PlaceMarker2dRound({
                 }`}
                 style={{ width: inner, height: inner }}
               >
-                <Image src={imageSrc} alt={label} fill className="object-cover" sizes="64px" />
+                <Image
+                  src={imageSrc}
+                  alt={label}
+                  fill
+                  className="object-cover"
+                  sizes="128px"
+                  quality={85}
+                />
                 {showStackBadge && (
                   <span className="absolute -right-0.5 -top-0.5 z-[2] flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-background bg-[#e8365d] px-1 text-[10px] font-bold text-white shadow-md">
                     {stackSize}

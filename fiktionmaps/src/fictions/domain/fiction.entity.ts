@@ -21,6 +21,8 @@ export interface Fiction {
 
 /** Fiction with asset_images (cover/banner URLs) joined. */
 export interface FictionWithMedia extends Fiction {
+  /** xs thumb when present; use for chips / dense lists. */
+  coverImageThumb?: string | null
   coverImage?: string | null
   coverImageLarge?: string | null
   bannerImage?: string | null

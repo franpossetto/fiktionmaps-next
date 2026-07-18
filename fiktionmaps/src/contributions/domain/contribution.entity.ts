@@ -11,7 +11,7 @@ export type ContributionPendingImageRole = "avatar" | "hero" | "cover" | "banner
 /** @deprecated Use ContributionPendingImageRole */
 export type PlaceContributionPendingImageRole = Extract<ContributionPendingImageRole, "avatar" | "hero">
 
-export type ContributionPendingImageVariant = "sm" | "lg"
+export type ContributionPendingImageVariant = "xs" | "sm" | "lg"
 
 export interface ContributionPendingImage {
   id: string

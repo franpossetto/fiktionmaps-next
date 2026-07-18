@@ -62,12 +62,12 @@ export async function submitFictionAddPhotoContributionUseCase(
       created.contributionId,
       FICTION_COVER_ASSET_ROLE,
       input.file,
-      ["sm", "lg"],
     )
     if (!uploaded.success) {
       return { success: false, error: uploaded.error }
     }
 
+    const xs = uploaded.paths.xs
     const sm = uploaded.paths.sm
     const lg = uploaded.paths.lg
     if (!sm || !lg) {
@@ -77,7 +77,7 @@ export async function submitFictionAddPhotoContributionUseCase(
     const linked = await contributionsRepo.insertPendingContributionImages({
       contributionId: created.contributionId,
       role: FICTION_COVER_ASSET_ROLE,
-      paths: { sm, lg },
+      paths: { xs, sm, lg },
     })
     if (!linked) {
       return { success: false, error: "Failed to save pending cover" }

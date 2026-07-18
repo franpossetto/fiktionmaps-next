@@ -43,7 +43,11 @@ export async function listMapSearchCatalogUseCase(
       fictionTitle: fiction.title,
       cityName: city.name,
       country: city.country,
-      coverImage: fiction.coverImage ?? fiction.coverImageLarge ?? null,
+      coverImage:
+        fiction.coverImageThumb?.trim() ||
+        fiction.coverImage?.trim() ||
+        fiction.coverImageLarge?.trim() ||
+        null,
     })
   }
 

@@ -188,7 +188,7 @@ export function NavMap({ city, viewportCenter, places, onMinimapClick }: NavMapP
         <div style={{ width: size.width, height: size.height }} className="transition-[width,height] duration-200">
           <MapContainer
             id="minimap"
-            mapKey={`minimap-${city.id}`}
+            mapKey="minimap"
             defaultCenter={{ lat: city.lat, lng: city.lng }}
             center={viewportCenter}
             defaultZoom={11}

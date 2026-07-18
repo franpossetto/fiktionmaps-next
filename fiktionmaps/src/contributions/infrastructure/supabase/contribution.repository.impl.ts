@@ -426,7 +426,7 @@ async function assetThumbByEntityIds(
     .select("entity_id, url, variant")
     .eq("entity_type", entityType)
     .eq("role", role)
-    .in("variant", ["sm", "lg"])
+    .in("variant", ["xs", "sm", "lg"])
     .in("entity_id", unique)
 
   if (error) {
@@ -434,6 +434,11 @@ async function assetThumbByEntityIds(
     return map
   }
 
+  for (const row of data ?? []) {
+    if (row.variant === "xs") {
+      map.set(row.entity_id, row.url)
+    }
+  }
   for (const row of data ?? []) {
     if (row.variant === "sm" && !map.has(row.entity_id)) {
       map.set(row.entity_id, row.url)
@@ -756,6 +761,14 @@ export function createContributionsSupabaseAdapter(
     async insertPendingContributionImages(input: InsertContributionPendingImagesInput): Promise<boolean> {
       const supabase = await getSupabase()
       const rows: Database["public"]["Tables"]["contribution_pending_images"]["Insert"][] = []
+      if (input.paths.xs?.trim()) {
+        rows.push({
+          contribution_id: input.contributionId,
+          role: input.role,
+          variant: "xs",
+          storage_path: input.paths.xs,
+        })
+      }
       if (input.paths.sm?.trim()) {
         rows.push({
           contribution_id: input.contributionId,
@@ -1307,6 +1320,7 @@ export function createContributionsSupabaseAdapter(
             return false
           }
           const promoted = await promotePendingContributionPhotoToAssetImages("place", entityId, "avatar", {
+            xs: avatar.xs,
             sm: avatar.sm,
             lg: avatar.lg,
           })
@@ -1325,6 +1339,7 @@ export function createContributionsSupabaseAdapter(
           }
           if (hasCover) {
             const coverPromoted = await promotePendingContributionPhotoToAssetImages("fiction", entityId, "cover", {
+              xs: cover!.xs,
               sm: cover!.sm!,
               lg: cover!.lg!,
             })

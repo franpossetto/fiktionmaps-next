@@ -17,6 +17,33 @@ import {
   type PlaceShootEnvironment,
 } from "@/src/places/domain/place-shoot-environment"
 
+/** Prefer xs over sm for place avatar thumbs. */
+async function loadPlaceAvatarThumbs(
+  supabase: SupabaseClient<Database>,
+  placeIds: string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  if (placeIds.length === 0) return map
+  const { data } = await supabase
+    .from("asset_images")
+    .select("entity_id, url, variant")
+    .eq("entity_type", "place")
+    .eq("role", "avatar")
+    .in("variant", ["xs", "sm"])
+    .in("entity_id", placeIds)
+  for (const r of data ?? []) {
+    if (r.variant === "xs" && r.entity_id && r.url) {
+      map.set(r.entity_id as string, r.url as string)
+    }
+  }
+  for (const r of data ?? []) {
+    if (r.variant === "sm" && r.entity_id && r.url && !map.has(r.entity_id as string)) {
+      map.set(r.entity_id as string, r.url as string)
+    }
+  }
+  return map
+}
+
 function str(row: Record<string, unknown>, snake: string, camel: string): string {
   const v = row[snake] ?? row[camel]
   return typeof v === "string" ? v : ""
@@ -295,22 +322,7 @@ export function createPlacesSupabaseAdapter(
       const places = (placeRows ?? []) as Record<string, unknown>[]
       const placeIds = places.map((p) => (p.id as string)).filter(Boolean)
 
-      const avatarByPlaceId = new Map<string, string>()
-      if (placeIds.length > 0) {
-        const { data: avatarRows } = await supabase
-          .from("asset_images")
-          .select("entity_id, url")
-          .eq("entity_type", "place")
-          .eq("role", "avatar")
-          .eq("variant", "sm")
-          .in("entity_id", placeIds)
-        for (const r of avatarRows ?? []) {
-          const row = r as Record<string, unknown>
-          const eid = row.entity_id ?? row.entityId
-          const url = row.url
-          if (eid && url) avatarByPlaceId.set(String(eid), String(url))
-        }
-      }
+      const avatarByPlaceId = await loadPlaceAvatarThumbs(supabase, placeIds)
 
       return mapPlaceRowsToPlaces(places, avatarByPlaceId)
     }),
@@ -621,18 +633,7 @@ export function createPlacesSupabaseAdapter(
 
       const placeIds = (rows ?? []).map((r) => r.id as string)
       if (placeIds.length === 0) return []
-      const { data: avatarRows } = await supabase
-        .from("asset_images")
-        .select("entity_id, url")
-        .eq("entity_type", "place")
-        .eq("role", "avatar")
-        .eq("variant", "sm")
-        .in("entity_id", placeIds)
-
-      const avatarByPlaceId = new Map<string, string>()
-      for (const r of avatarRows ?? []) {
-        if (r.entity_id && r.url) avatarByPlaceId.set(r.entity_id as string, r.url as string)
-      }
+      const avatarByPlaceId = await loadPlaceAvatarThumbs(supabase, placeIds)
 
       return (rows ?? []).map((r) => {
         const rRec = r as Record<string, unknown>

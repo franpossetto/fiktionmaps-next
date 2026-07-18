@@ -51,6 +51,7 @@ export async function submitPlaceAddPhotoContributionUseCase(
     return { success: false, error: uploaded.error }
   }
 
+  const xsPath = uploaded.paths.xs
   const smPath = uploaded.paths.sm
   const lgPath = uploaded.paths.lg
   if (!smPath || !lgPath) {
@@ -60,7 +61,7 @@ export async function submitPlaceAddPhotoContributionUseCase(
   const linked = await contributionsRepo.insertPendingContributionImages({
     contributionId: created.contributionId,
     role: PLACE_PHOTO_ASSET_ROLE,
-    paths: { sm: smPath, lg: lgPath },
+    paths: { xs: xsPath, sm: smPath, lg: lgPath },
   })
   if (!linked) {
     return { success: false, error: "Failed to save pending photo" }

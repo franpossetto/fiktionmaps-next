@@ -912,7 +912,7 @@ export type Database = {
           id: string
           contribution_id: string
           role: "avatar" | "hero" | "cover" | "banner"
-          variant: "sm" | "lg"
+          variant: "xs" | "sm" | "lg"
           storage_path: string
           created_at: string
         }
@@ -920,7 +920,7 @@ export type Database = {
           id?: string
           contribution_id: string
           role: "avatar" | "hero" | "cover" | "banner"
-          variant: "sm" | "lg"
+          variant: "xs" | "sm" | "lg"
           storage_path: string
           created_at?: string
         }
@@ -928,7 +928,7 @@ export type Database = {
           id?: string
           contribution_id?: string
           role?: "avatar" | "hero" | "cover" | "banner"
-          variant?: "sm" | "lg"
+          variant?: "xs" | "sm" | "lg"
           storage_path?: string
           created_at?: string
         }
