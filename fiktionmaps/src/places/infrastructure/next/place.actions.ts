@@ -34,6 +34,9 @@ import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place
 import { getFictionByIdCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { createContributionAction } from "@/src/contributions/infrastructure/next/contribution.actions"
 import { parsePlaceContributeFormData } from "@/src/places/domain/place-contribute.schemas"
+import { markHuntCandidatePostedUseCase } from "@/src/hunts/application/mark-hunt-candidate-posted.usecase"
+import { huntSourcesSupabaseAdapter } from "@/src/hunts/infrastructure/supabase/hunt-source.repository.impl"
+import { huntsSupabaseAdapter } from "@/src/hunts/infrastructure/supabase/hunt.repository.impl"
 import type {
   CreatePlaceResult,
   CreateContributorPlaceResult,
@@ -67,8 +70,13 @@ const CREATE_PLACE_CONTRIBUTION = {
 async function recordCreatePlaceContribution(
   placeId: string,
   logContext: string,
+  huntId?: string | null,
 ): Promise<boolean | undefined> {
-  const payload = { ...CREATE_PLACE_CONTRIBUTION, entityId: placeId }
+  const payload = {
+    ...CREATE_PLACE_CONTRIBUTION,
+    entityId: placeId,
+    ...(huntId ? { origin: "hunt" as const, externalId: huntId } : {}),
+  }
   try {
     const res = await createContributionAction(payload)
     if (!res.success) {
@@ -267,6 +275,7 @@ export async function createContributorPlaceWithImageAction(
   const contributionAutoApproved = await recordCreatePlaceContribution(
     result.placeId,
     "createContributorPlaceWithImageAction",
+    parsed.huntId,
   )
 
   if (parsed.imageFile) {
@@ -290,6 +299,30 @@ export async function createContributorPlaceWithImageAction(
   updateTag("contributions")
 
   const fiction = await getFictionByIdCached(parsed.data.fictionId)
+
+  if (parsed.huntId != null && parsed.placeIndex != null) {
+    try {
+      await markHuntCandidatePostedUseCase(
+        {
+          huntId: parsed.huntId,
+          placeIndex: parsed.placeIndex,
+          placeId: result.placeId,
+        },
+        user.id,
+        huntsSupabaseAdapter,
+        huntSourcesSupabaseAdapter,
+      )
+      revalidatePath("/contribute/hunt")
+      revalidatePath(`/contribute/hunt/${parsed.huntId}/review`)
+    } catch (err) {
+      console.error("[createContributorPlaceWithImageAction] markHuntCandidatePosted failed", {
+        huntId: parsed.huntId,
+        placeIndex: parsed.placeIndex,
+        placeId: result.placeId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
 
   const out: CreateContributorPlaceResult = {
     success: true,

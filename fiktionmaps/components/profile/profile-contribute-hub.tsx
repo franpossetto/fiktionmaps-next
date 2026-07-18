@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl"
 import { Link } from "@/i18n/navigation"
+import { Sparkles } from "lucide-react"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
 import { FictionContributeLayout } from "@/components/contribute/fiction/fiction-contribute-layout"
 import { TopContributorsSection } from "@/components/contributions/top-contributors-section"
@@ -32,6 +33,7 @@ type ProfileContributeHubProps = {
 
 export function ProfileContributeHub({ topContributors, isContributor, isAIAvailable }: ProfileContributeHubProps) {
   const t = useTranslations("Contribute.hub")
+  const tHunt = useTranslations("Contribute.huntWork")
   const tProfile = useTranslations("Profile")
   const tContrib = useTranslations("Contributions")
 
@@ -65,6 +67,21 @@ export function ProfileContributeHub({ topContributors, isContributor, isAIAvail
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{t("title")}</h1>
           <p className="max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">{t("subtitle")}</p>
         </header>
+
+        {isContributor && isAIAvailable && (
+          <Link
+            href="/contribute/hunt"
+            className="mt-6 flex items-center gap-3 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 transition-colors hover:border-violet-500/50 hover:bg-violet-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/20 text-violet-700 dark:text-violet-300">
+              <Sparkles className="h-4 w-4" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-foreground">{tHunt("title")}</span>
+              <span className="block text-xs text-muted-foreground">{tHunt("subtitle")}</span>
+            </span>
+          </Link>
+        )}
 
         <ul
           className="mt-8 grid auto-rows-fr grid-cols-1 items-stretch gap-3 sm:grid-cols-2 sm:gap-4"

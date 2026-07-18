@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
 import { useAuth } from "@/context/auth-context"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -12,14 +12,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { AuthModal } from "@/components/auth/auth-modal"
-import { LogOut, User, Settings, Shield, BookOpen, Map, Inbox, Plus } from "lucide-react"
+import { LogOut, User, Settings, Shield, BookOpen, Map, Inbox, Plus, Sparkles } from "lucide-react"
 import { Link } from "@/i18n/navigation"
 import { LocaleMenuSub } from "@/components/layout/locale-switcher"
+import { isHuntAvailableAction } from "@/src/hunts/infrastructure/next/hunt.actions"
 
 export function UserMenu() {
   const t = useTranslations("Nav")
-  const { user, isAdmin, isStaffModerator, logout } = useAuth()
+  const tHuntType = useTranslations("Contribute.hub.types.hunt_place")
+  const { user, isAdmin, isStaffModerator, isContributor, logout } = useAuth()
   const [authOpen, setAuthOpen] = useState(false)
+  const [huntAvailable, setHuntAvailable] = useState(false)
+
+  useEffect(() => {
+    if (!user || !isContributor) {
+      setHuntAvailable(false)
+      return
+    }
+    void isHuntAvailableAction().then(setHuntAvailable)
+  }, [user, isContributor])
 
   if (!user) {
     return (
@@ -89,6 +100,15 @@ export function UserMenu() {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
+          <Link href="/settings">
+            <Settings className="mr-2 h-4 w-4" />
+            {t("settings")}
+          </Link>
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
           <Link href="/profile">
             <User className="mr-2 h-4 w-4" />
             {t("profile")}
@@ -100,13 +120,6 @@ export function UserMenu() {
             {t("contribute")}
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
-          <Link href="/settings">
-            <Settings className="mr-2 h-4 w-4" />
-            {t("settings")}
-          </Link>
-        </DropdownMenuItem>
-        {(isStaffModerator || isAdmin) && <DropdownMenuSeparator />}
         {isStaffModerator && (
           <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
             <Link href="/contributions">
@@ -123,9 +136,21 @@ export function UserMenu() {
             </Link>
           </DropdownMenuItem>
         )}
+        {isContributor && huntAvailable && (
+          <DropdownMenuItem asChild className="text-foreground focus:bg-accent focus:text-accent-foreground">
+            <Link href="/contribute/hunt">
+              <Sparkles className="mr-2 h-4 w-4" />
+              {tHuntType("title")}
+            </Link>
+          </DropdownMenuItem>
+        )}
+
         <DropdownMenuSeparator />
+
         <LocaleMenuSub />
+
         <DropdownMenuSeparator />
+
         <DropdownMenuItem onClick={logout} className="text-foreground focus:bg-accent focus:text-accent-foreground">
           <LogOut className="mr-2 h-4 w-4" />
           {t("signOut")}

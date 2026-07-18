@@ -740,6 +740,8 @@ export function createContributionsSupabaseAdapter(
           type: input.type,
           entity_type: input.entityType,
           entity_id: input.entityId,
+          origin: input.origin ?? "manual",
+          external_id: input.externalId ?? null,
         })
         .select("id")
         .maybeSingle()

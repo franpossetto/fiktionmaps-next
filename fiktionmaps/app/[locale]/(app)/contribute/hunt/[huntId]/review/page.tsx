@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation"
 import { getHuntByIdCached } from "@/src/hunts/infrastructure/next/hunt.queries"
+import { getActiveFictionsCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { huntSourcesSupabaseAdapter } from "@/src/hunts/infrastructure/supabase/hunt-source.repository.impl"
 import { createFictionsSupabaseAdapter } from "@/src/fictions/infrastructure/supabase/fiction.repository.impl"
 import { createClient } from "@/lib/supabase/server"
@@ -24,7 +25,10 @@ export default async function HuntReviewRoute({ params }: Props) {
     notFound()
   }
 
-  const source = await huntSourcesSupabaseAdapter.getById(hunt.huntSourceId)
+  const [source, fictions] = await Promise.all([
+    huntSourcesSupabaseAdapter.getById(hunt.huntSourceId),
+    getActiveFictionsCached(),
+  ])
   if (!source) notFound()
 
   let fictionTitle = source.contextLabel ?? "Unknown"
@@ -37,8 +41,12 @@ export default async function HuntReviewRoute({ params }: Props) {
   return (
     <HuntReviewPage
       hunt={hunt}
+      sourceId={source.id}
+      fictionId={source.fictionId}
       fictionTitle={fictionTitle}
+      contextLabel={source.contextLabel}
       sourceUrl={source.sourceUrl}
+      fictions={fictions}
     />
   )
 }

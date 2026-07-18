@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import type { Hunt, HuntStatus, HuntPayload, HuntStats } from "@/src/hunts/domain/hunt.entity"
+import { normalizeHuntPayload } from "@/src/hunts/domain/hunt-place.helpers"
 import type {
   HuntsRepositoryPort,
   CreateHuntData,
@@ -22,7 +23,7 @@ function mapRow(row: {
   return {
     id: row.id,
     huntSourceId: row.hunt_source_id,
-    payload: (row.payload ?? { places: [] }) as HuntPayload,
+    payload: normalizeHuntPayload(row.payload ?? { places: [] }),
     status: row.status as HuntStatus,
     outcome: (row.outcome as Hunt["outcome"]) ?? null,
     hunterNote: row.hunter_note,
@@ -84,6 +85,18 @@ export async function createHunt(data: CreateHuntData): Promise<Hunt | null> {
   return mapRow(row)
 }
 
+export async function updateHuntPayload(id: string, payload: HuntPayload): Promise<boolean> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("hunts")
+    .update({
+      payload: payload as never,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+  return !error
+}
+
 export async function updateHuntPayloadAndStatus(
   id: string,
   payload: HuntPayload,
@@ -105,6 +118,23 @@ export async function updateHuntPayloadAndStatus(
   return !error
 }
 
+export async function updateHuntReviewDraft(
+  id: string,
+  payload: HuntPayload,
+  hunterNote?: string | null,
+): Promise<boolean> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("hunts")
+    .update({
+      payload: payload as never,
+      hunter_note: hunterNote ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+  return !error
+}
+
 export async function deleteHunt(id: string): Promise<boolean> {
   const supabase = await createClient()
   const { error } = await supabase.from("hunts").delete().eq("id", id)
@@ -117,5 +147,7 @@ export const huntsSupabaseAdapter: HuntsRepositoryPort = {
   listByCreatedBy: listHuntsByCreatedBy,
   create: createHunt,
   updatePayloadAndStatus: updateHuntPayloadAndStatus,
+  updatePayload: updateHuntPayload,
+  updateReviewDraft: updateHuntReviewDraft,
   delete: deleteHunt,
 }

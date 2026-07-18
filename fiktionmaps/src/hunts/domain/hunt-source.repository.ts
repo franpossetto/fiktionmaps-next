@@ -20,5 +20,6 @@ export interface HuntSourcesRepositoryPort {
   listByFictionId(fictionId: string): Promise<HuntSource[]>
   create(data: CreateHuntSourceData): Promise<HuntSource | null>
   updateScrape(id: string, scrapeStatus: HuntScrapeStatus, markdown: string | null, provider: string | null): Promise<boolean>
+  updateFictionId(id: string, fictionId: string): Promise<boolean>
   delete(id: string): Promise<boolean>
 }

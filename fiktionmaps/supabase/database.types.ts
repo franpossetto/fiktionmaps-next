@@ -365,6 +365,7 @@ export type Database = {
           created_by: string | null
           created_at: string
           updated_at: string
+          shoot_environment: "interior" | "exterior" | "interior_exterior" | null
         }
         Insert: {
           id?: string
@@ -378,6 +379,7 @@ export type Database = {
           created_by?: string | null
           created_at?: string
           updated_at?: string
+          shoot_environment?: "interior" | "exterior" | "interior_exterior" | null
         }
         Update: {
           id?: string
@@ -391,6 +393,7 @@ export type Database = {
           created_by?: string | null
           created_at?: string
           updated_at?: string
+          shoot_environment?: "interior" | "exterior" | "interior_exterior" | null
         }
         Relationships: [
           {
@@ -1125,6 +1128,7 @@ export type Database = {
     }
     Enums: {
       contribution_status: "pending" | "approved" | "rejected"
+      place_shoot_environment: "interior" | "exterior" | "interior_exterior"
       contribution_type:
         | "create_fiction"
         | "create_place"

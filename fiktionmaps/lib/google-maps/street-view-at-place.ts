@@ -3,6 +3,41 @@ import { STREET_VIEW_FOV_DEFAULT, streetViewFovToZoom } from "@/lib/google-maps/
 const STREET_VIEW_SEARCH_RADIUS_M = 150
 const OUTDOOR_SEARCH_RADII_M = [75, 120, 150, 200] as const
 
+/** Manually framed camera angle. When provided it overrides the auto-heading. */
+export interface StreetViewPovOverride {
+  heading: number
+  pitch: number
+  fov: number
+}
+
+/**
+ * Everything needed to recreate a Street View camera later: the pano's own
+ * position plus the applied camera angle. Structurally compatible with the
+ * `StreetViewReference` domain type used by place creation.
+ */
+export interface ResolvedStreetView {
+  panoId: string
+  latitude: number
+  longitude: number
+  heading: number
+  pitch: number
+  fov: number
+}
+
+function applyPovOrHeading(
+  panorama: google.maps.StreetViewPanorama,
+  headingTowardPlace: number,
+  pov?: StreetViewPovOverride | null,
+): void {
+  if (pov) {
+    panorama.setPov({ heading: pov.heading, pitch: pov.pitch })
+    panorama.setZoom(streetViewFovToZoom(pov.fov))
+    return
+  }
+  panorama.setPov({ heading: headingTowardPlace, pitch: 0 })
+  panorama.setZoom(streetViewFovToZoom(STREET_VIEW_FOV_DEFAULT))
+}
+
 /** Camera heading from panorama position toward the place coordinates. */
 export function bearingTowardPlace(
   fromLat: number,
@@ -24,16 +59,29 @@ function applyPanoramaAtData(
   data: google.maps.StreetViewPanoramaData,
   placeLatitude: number,
   placeLongitude: number,
-): void {
+  pov?: StreetViewPovOverride | null,
+): ResolvedStreetView | null {
   const pano = data.location?.pano
-  if (!pano) return
-
   const panoLatLng = data.location?.latLng
-  const heading = panoLatLng
-    ? bearingTowardPlace(panoLatLng.lat(), panoLatLng.lng(), placeLatitude, placeLongitude)
-    : 0
+  if (!pano || !panoLatLng) return null
 
-  applyPanoToPanorama(panorama, pano, heading)
+  const heading = bearingTowardPlace(
+    panoLatLng.lat(),
+    panoLatLng.lng(),
+    placeLatitude,
+    placeLongitude,
+  )
+
+  applyPanoToPanorama(panorama, pano, heading, pov)
+
+  return {
+    panoId: pano,
+    latitude: panoLatLng.lat(),
+    longitude: panoLatLng.lng(),
+    heading: pov ? pov.heading : heading,
+    pitch: pov ? pov.pitch : 0,
+    fov: pov ? pov.fov : STREET_VIEW_FOV_DEFAULT,
+  }
 }
 
 /** Fast path: apply a previously-resolved panoId without hitting the StreetView service. */
@@ -42,16 +90,16 @@ export function applyKnownPano(
   panoId: string,
   placeLatitude: number,
   placeLongitude: number,
+  pov?: StreetViewPovOverride | null,
 ): void {
   // The pano position isn't known up front, so the heading is computed once the pano
-  // loads and reports its actual location via pano_changed.
+  // loads and reports its actual location via pano_changed. A saved pov overrides it.
   google.maps.event.addListenerOnce(panorama, "pano_changed", () => {
     const panoLatLng = panorama.getPosition()
     const heading = panoLatLng
       ? bearingTowardPlace(panoLatLng.lat(), panoLatLng.lng(), placeLatitude, placeLongitude)
       : 0
-    panorama.setPov({ heading, pitch: 0 })
-    panorama.setZoom(streetViewFovToZoom(STREET_VIEW_FOV_DEFAULT))
+    applyPovOrHeading(panorama, heading, pov)
   })
 
   // setPano (not setPosition): a pano id targets that exact outdoor panorama. Using
@@ -64,12 +112,12 @@ function applyPanoToPanorama(
   panorama: google.maps.StreetViewPanorama,
   pano: string,
   heading: number,
+  pov?: StreetViewPovOverride | null,
 ): void {
   // setPano keeps the exact outdoor pano; the pov is (re)applied after it loads
   // because Google resets the pov to the pano default on pano_changed.
   google.maps.event.addListenerOnce(panorama, "pano_changed", () => {
-    panorama.setPov({ heading, pitch: 0 })
-    panorama.setZoom(streetViewFovToZoom(STREET_VIEW_FOV_DEFAULT))
+    applyPovOrHeading(panorama, heading, pov)
   })
   panorama.setPano(pano)
 }
@@ -113,7 +161,8 @@ export function positionOutdoorPanoramaAtPlace(
   panorama: google.maps.StreetViewPanorama,
   placeLatitude: number,
   placeLongitude: number,
-): Promise<string | null> {
+  pov?: StreetViewPovOverride | null,
+): Promise<ResolvedStreetView | null> {
   const service = new googleMaps.maps.StreetViewService()
   const target = { lat: placeLatitude, lng: placeLongitude }
   const officialOutdoorSources = [
@@ -125,8 +174,7 @@ export function positionOutdoorPanoramaAtPlace(
     for (const radius of OUTDOOR_SEARCH_RADII_M) {
       const data = await getPanorama(googleMaps, service, target, officialOutdoorSources, radius)
       if (data) {
-        applyPanoramaAtData(panorama, data, placeLatitude, placeLongitude)
-        return data.location?.pano ?? null
+        return applyPanoramaAtData(panorama, data, placeLatitude, placeLongitude, pov)
       }
     }
     return null

@@ -19,5 +19,11 @@ export interface HuntsRepositoryPort {
     stats: Partial<HuntStats>,
     hunterNote?: string | null,
   ): Promise<boolean>
+  updatePayload(id: string, payload: HuntPayload): Promise<boolean>
+  updateReviewDraft(
+    id: string,
+    payload: HuntPayload,
+    hunterNote?: string | null,
+  ): Promise<boolean>
   delete(id: string): Promise<boolean>
 }

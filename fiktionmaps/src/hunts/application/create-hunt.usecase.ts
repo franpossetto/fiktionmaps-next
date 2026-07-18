@@ -6,6 +6,7 @@ import type { LLMPort } from "@/lib/ai/llm.port"
 import type { HuntGeocodingPort } from "@/src/hunts/domain/geocoding.port"
 import type { Hunt } from "@/src/hunts/domain/hunt.entity"
 import type { HuntPlaceReviewed } from "@/src/hunts/domain/hunt.types"
+import { toReviewedPlace } from "@/src/hunts/domain/hunt-place.helpers"
 import { extractPlacesFromContent } from "./extract-places-from-html"
 import { enrichPlace } from "./enrich-place"
 import { geocodePlace } from "./geocode-place"
@@ -47,7 +48,7 @@ export async function createHuntUseCase(
     const enriched = await enrichPlace(place, llm)
     const geocoded = await geocodePlace(enriched, geocoder)
     const duplicate_of = findDuplicate(geocoded, existingPlaces)
-    places.push({ ...geocoded, duplicate_of })
+    places.push(toReviewedPlace({ ...geocoded, duplicate_of }))
   }
 
   const hunt = await huntsRepo.create({

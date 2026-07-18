@@ -47,6 +47,10 @@ function filterPlacesByFictionIds(places: Place[], fictionIds: string[]): Place[
   return places.filter((p) => allowed.has(p.fictionId))
 }
 
+function pickRandomCity(cities: City[]): City {
+  return cities[Math.floor(Math.random() * cities.length)]
+}
+
 function MapLoadingScreen({ message }: { message: string }) {
   return (
     <div className="flex min-h-full items-center justify-center bg-background">
@@ -131,8 +135,8 @@ function MapPageInner() {
   useEffect(() => {
     if (!selectedCity || cityIdsWithPlaces.length === 0 || cities.length === 0) return
     if (cityIdsWithPlaces.includes(selectedCity.id)) return
-    const withPlaces = cities.find((c) => cityIdsWithPlaces.includes(c.id))
-    if (withPlaces) setSelectedCity(withPlaces)
+    const citiesWithPlaces = cities.filter((c) => cityIdsWithPlaces.includes(c.id))
+    if (citiesWithPlaces.length > 0) setSelectedCity(pickRandomCity(citiesWithPlaces))
   }, [cityIdsWithPlaces, cities, selectedCity])
 
   useEffect(() => {
@@ -149,7 +153,7 @@ function MapPageInner() {
         const fromUrl = initialCityId
           ? citiesList.find((c) => c.id === initialCityId)
           : undefined
-        setSelectedCity(fromUrl ?? citiesList[0])
+        setSelectedCity(fromUrl ?? pickRandomCity(citiesList))
         setCitiesLoading(false)
       })
       .catch(() => {
@@ -172,7 +176,7 @@ function MapPageInner() {
       return
     }
 
-    if (!selectedCityId) setSelectedCity(cities[0])
+    if (!selectedCityId) setSelectedCity(pickRandomCity(cities))
   }, [cities, initialCityId, selectedCityId])
 
   useEffect(() => {
@@ -431,6 +435,9 @@ function MapPageInner() {
   const handleLocationClick = useCallback((place: Place) => {
     setSelectedPlace(place)
     setFocusedPlaceId(place.id)
+    setViewportPlaces((prev) =>
+      prev.some((p) => p.id === place.id) ? prev : [...prev, place],
+    )
   }, [])
 
   // const handleNavigateToPlace = useCallback((place: Place) => {
@@ -528,7 +535,7 @@ function MapPageInner() {
             </div>
           </header>
 
-          <div className="relative flex-1 min-h-0 w-full">
+          <div className="relative z-0 flex-1 min-h-0 w-full">
             <MapView
               city={selectedCity}
               places={viewportPlaces}

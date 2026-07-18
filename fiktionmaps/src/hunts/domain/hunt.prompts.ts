@@ -68,11 +68,12 @@ Tasks:
 4. "country": Sovereign country only (e.g. "United States", "France"). NEVER a state or province — fix "California" → "United States" with city "Los Angeles".
 5. "is_landmark": true ONLY for world-famous tourist landmarks (e.g. Eiffel Tower, Statue of Liberty). false for ordinary venues, streets, businesses, or filming locations that are not iconic on their own — default to false when unsure.
 6. "address_source": "knowledge" if you filled address from training data, "unknown" if address stays empty.
+7. "shoot_environment": Where scenes at this location were primarily filmed. Use "interior" for indoor sets, buildings, studios, or rooms; "exterior" for streets, parks, outdoor landmarks, or open-air shots; "interior_exterior" when both matter equally (e.g. a café with notable indoor and outdoor scenes). Use null if you cannot infer from the place name and context.
 
 "name" and "address" must remain separate — do not put the street in "name" or the venue name in "address".
 
 Reply ONLY with valid JSON:
-{ "name": "", "address": "", "city": "", "country": "", "is_landmark": false, "address_source": "knowledge|unknown" }`
+{ "name": "", "address": "", "city": "", "country": "", "is_landmark": false, "address_source": "knowledge|unknown", "shoot_environment": "interior|exterior|interior_exterior|null" }`
 }
 
 /**

@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "@/i18n/navigation"
-import type { HuntResult, HuntPlace } from "@/src/hunts/domain/hunt.types"
+import type { HuntResult, HuntPlaceReviewed } from "@/src/hunts/domain/hunt.types"
+import {
+  effectivePlace,
+  isCoordsOverridden,
+  setPlaceOverrides,
+  toReviewedPlace,
+} from "@/src/hunts/domain/hunt-place.helpers"
 import type { LatLng } from "@/lib/map/types"
 import { FictionContributeLayout } from "@/components/contribute/fiction/fiction-contribute-layout"
 import { ContributionWizardShell } from "@/components/contribute/contribution-wizard-shell"
@@ -17,10 +23,6 @@ import { HuntPlaceReviewDetail } from "./hunt-place-review-detail"
 import { Button } from "@/components/ui/button"
 import { Check } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-function coordsEqual(a: LatLng, b: LatLng): boolean {
-  return Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6
-}
 
 export function HuntConfirmPage() {
   const router = useRouter()
@@ -47,27 +49,32 @@ export function HuntConfirmPage() {
   }, [router])
 
   const places = result?.places ?? []
+  const reviewedPlaces = useMemo((): HuntPlaceReviewed[] => {
+    return places.map((p, i) => {
+      const reviewed = toReviewedPlace(p)
+      const adj = adjustments[i]
+      if (!adj) return reviewed
+      return setPlaceOverrides(reviewed, { lat: adj.lat, lng: adj.lng })
+    })
+  }, [places, adjustments])
   const total = places.length
   const isLastPlace = activeIndex >= total - 1
 
   const getCoords = useCallback(
-    (index: number, place: HuntPlace): LatLng | null => {
-      if (adjustments[index]) return adjustments[index]
+    (reviewed: HuntPlaceReviewed): LatLng | null => {
+      const place = effectivePlace(reviewed)
       if (place.lat != null && place.lng != null) return { lat: place.lat, lng: place.lng }
       return null
     },
-    [adjustments],
+    [],
   )
 
   const isCoordsAdjustedForIndex = useCallback(
     (index: number): boolean => {
-      const place = places[index]
-      if (!place) return false
-      const adjusted = adjustments[index]
-      if (!adjusted || place.lat == null || place.lng == null) return false
-      return !coordsEqual(adjusted, { lat: place.lat, lng: place.lng })
+      const reviewed = reviewedPlaces[index]
+      return reviewed ? isCoordsOverridden(reviewed) : false
     },
-    [adjustments, places],
+    [reviewedPlaces],
   )
 
   const approvedCount = useMemo(
@@ -158,18 +165,19 @@ export function HuntConfirmPage() {
     )
   }
 
-  const activePlace = places[activeIndex]
-  if (!activePlace) {
+  const activeReviewed = reviewedPlaces[activeIndex]
+  if (!activeReviewed) {
     router.replace("/contribute/hunt")
     return null
   }
 
-  const activeCoords = getCoords(activeIndex, activePlace)
+  const activePlace = effectivePlace(activeReviewed)
+  const activeCoords = getCoords(activeReviewed)
   const activeReviewStatus = reviewState[activeIndex] ?? "pending"
 
   const leftAside = (
     <HuntPlacesAside
-      places={places}
+      places={reviewedPlaces}
       activeIndex={activeIndex}
       reviewState={reviewState}
       coordsAdjusted={isCoordsAdjustedForIndex}
@@ -184,11 +192,11 @@ export function HuntConfirmPage() {
   const rightAside = (
     <HuntReviewCriteriaAside
       sourceUrl={result.source_url}
-      place={activePlace}
+      reviewed={activeReviewed}
       coords={activeCoords}
-      coordsAdjusted={isCoordsAdjustedForIndex(activeIndex)}
       reviewStatus={activeReviewStatus}
       onToggleApprove={handleToggleApprove}
+      reviewNote=""
       className="py-1"
     />
   )
@@ -213,7 +221,7 @@ export function HuntConfirmPage() {
         }}
       >
         <HuntPlacesMobileStrip
-          places={places}
+          places={reviewedPlaces}
           activeIndex={activeIndex}
           reviewState={reviewState}
           fictionTitle={fictionTitle}
@@ -228,8 +236,15 @@ export function HuntConfirmPage() {
           totalPlaces={total}
           coords={activeCoords}
           coordsAdjusted={isCoordsAdjustedForIndex(activeIndex)}
+          addressAdjusted={false}
+          nameAdjusted={false}
           onCoordsChange={(coords) => setAdjustments((prev) => ({ ...prev, [activeIndex]: coords }))}
           onCoordsReset={handleCoordsReset}
+          onAddressChange={() => {}}
+          onAddressReset={() => {}}
+          onFullAddressChange={() => {}}
+          onNameChange={() => {}}
+          onNameReset={() => {}}
         />
 
         <div className="min-[900px]:hidden border-t border-border/40 pt-3 mt-6">

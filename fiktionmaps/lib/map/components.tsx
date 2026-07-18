@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react"
 import { useMapEngine } from "./context"
+import { EnsureMapEngine } from "./ensure-map-engine"
 import { useMapColorScheme } from "@/hooks/use-map-color-scheme"
 import { useMapStyle } from "@/lib/theme-settings-context"
 import type {
@@ -14,7 +15,7 @@ import type {
   GeocodingAdapter,
 } from "./types"
 
-export function MapProvider({
+function MapProviderInner({
   children,
   libraries,
 }: {
@@ -24,6 +25,20 @@ export function MapProvider({
   const engine = useMapEngine()
   const Wrapper = engine.Wrapper
   return <Wrapper libraries={libraries}>{children}</Wrapper>
+}
+
+export function MapProvider({
+  children,
+  libraries,
+}: {
+  children: ReactNode
+  libraries?: string[]
+}) {
+  return (
+    <EnsureMapEngine>
+      <MapProviderInner libraries={libraries}>{children}</MapProviderInner>
+    </EnsureMapEngine>
+  )
 }
 
 export function MapContainer(props: MapContainerProps) {

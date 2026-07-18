@@ -11,6 +11,7 @@ export interface HuntStats {
   extracted: number
   approved: number
   skipped: number
+  posted?: number
   llm_provider: string
   llm_model: string
   geocoder: string

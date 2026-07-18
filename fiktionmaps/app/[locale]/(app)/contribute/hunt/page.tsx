@@ -1,12 +1,10 @@
 import dynamic from "next/dynamic"
 import { notFound } from "next/navigation"
-import { getActiveFictionsCached } from "@/src/fictions/infrastructure/next/fiction.queries"
-import { getMyHuntSourcesCached, getHuntsBySourceIdCached } from "@/src/hunts/infrastructure/next/hunt.queries"
+import { getMyHuntsWorkQueueCached } from "@/src/hunts/infrastructure/next/hunt.queries"
 import { isAIAvailable } from "@/lib/ai/get-llm-provider"
-import type { Hunt } from "@/src/hunts/domain/hunt.entity"
 
-const HuntSourceWizard = dynamic(
-  () => import("@/components/contribute/hunt/hunt-source-wizard").then((m) => m.HuntSourceWizard),
+const HuntWorkQueue = dynamic(
+  () => import("@/components/contribute/hunt/hunt-work-queue").then((m) => m.HuntWorkQueue),
   {
     loading: () => (
       <div className="h-72 animate-pulse rounded-xl border border-border bg-card" />
@@ -14,29 +12,10 @@ const HuntSourceWizard = dynamic(
   },
 )
 
-export default async function HuntPage() {
+export default async function HuntWorkPage() {
   if (!isAIAvailable()) notFound()
 
-  const [fictions, sources] = await Promise.all([
-    getActiveFictionsCached(),
-    getMyHuntSourcesCached(),
-  ])
+  const items = await getMyHuntsWorkQueueCached()
 
-  const huntsBySource: Record<string, Hunt[]> = {}
-  if (sources.length > 0) {
-    const huntArrays = await Promise.all(
-      sources.map((s) => getHuntsBySourceIdCached(s.id)),
-    )
-    sources.forEach((s, i) => {
-      huntsBySource[s.id] = huntArrays[i] ?? []
-    })
-  }
-
-  return (
-    <HuntSourceWizard
-      fictions={fictions}
-      sources={sources}
-      huntsBySource={huntsBySource}
-    />
-  )
+  return <HuntWorkQueue items={items} />
 }

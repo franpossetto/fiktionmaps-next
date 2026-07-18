@@ -16,6 +16,7 @@ import { StaffContributionReviewSection } from "@/components/contributions/staff
 import { StreetViewReferencePreview } from "@/components/places/street-view-reference-preview"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { PlaceShootEnvironmentBadge } from "@/components/places/place-shoot-environment-badge"
 
 function contributorLabel(c: PlaceContributionFeedItem["contributor"]): string {
   if (c.fullName?.trim()) return c.fullName.trim()
@@ -37,6 +38,7 @@ export async function StaffPlaceContributionDetail({
   contributorContext,
 }: StaffPlaceContributionDetailProps) {
   const t = await getTranslations("Contributions")
+  const tPlaces = await getTranslations("Places")
   const isAddPhoto = isPlaceAddPhotoContribution(item)
   const photoContext = isAddPhoto ? await getPlacePhotoContributeContextAction(item.entityId) : null
   const placeTitle = place?.name?.trim() || item.placeName?.trim() || t("feedCard_untitledPlace")
@@ -113,6 +115,16 @@ export async function StaffPlaceContributionDetail({
                   {place.location.address?.trim() || "—"}
                 </dd>
               </div>
+              {place.shootEnvironment ? (
+                <div className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-center sm:gap-4">
+                  <dt className="shrink-0 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground sm:w-36">
+                    {tPlaces("fieldShootEnvironment")}
+                  </dt>
+                  <dd className="sm:flex-1">
+                    <PlaceShootEnvironmentBadge value={place.shootEnvironment} />
+                  </dd>
+                </div>
+              ) : null}
             </>
           ) : (
             <div className="px-3 py-3">

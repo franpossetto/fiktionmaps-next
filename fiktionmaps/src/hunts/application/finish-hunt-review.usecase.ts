@@ -1,3 +1,4 @@
+import type { HuntSourcesRepositoryPort } from "@/src/hunts/domain/hunt-source.repository"
 import type { HuntsRepositoryPort } from "@/src/hunts/domain/hunt.repository"
 import type { Hunt } from "@/src/hunts/domain/hunt.entity"
 import type { HuntPlaceReviewed } from "@/src/hunts/domain/hunt.types"
@@ -12,10 +13,17 @@ export async function finishHuntReviewUseCase(
   input: FinishHuntReviewInput,
   userId: string,
   huntsRepo: HuntsRepositoryPort,
+  huntSourcesRepo: HuntSourcesRepositoryPort,
 ): Promise<Hunt> {
   const hunt = await huntsRepo.getById(input.huntId)
   if (!hunt) throw new Error("Hunt not found")
   if (hunt.createdBy !== userId) throw new Error("Forbidden")
+
+  const source = await huntSourcesRepo.getById(hunt.huntSourceId)
+  if (!source) throw new Error("Hunt source not found")
+  if (!source.fictionId) {
+    throw new Error("Assign a fiction to this hunt source before finishing")
+  }
 
   const approved = input.places.filter((p) => p.review_decision === "approved").length
   const skipped = input.places.filter(
@@ -30,6 +38,7 @@ export async function finishHuntReviewUseCase(
     extracted: input.places.length,
     approved,
     skipped,
+    posted: input.places.filter((p) => p.posted_place_id).length,
   }
 
   const ok = await huntsRepo.updatePayloadAndStatus(

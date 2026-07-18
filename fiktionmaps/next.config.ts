@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "10mb",
     },
+    optimizePackageImports: ["lucide-react", "framer-motion"],
   },
   typescript: {
     ignoreBuildErrors: false,

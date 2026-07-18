@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useMemo, useState, useTransition } from "react"
 import { useRouter } from "@/i18n/navigation"
+import { useTranslations } from "next-intl"
 import { CheckCircle2, ChevronDown, Clock, ExternalLink, Plus, XCircle } from "lucide-react"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { HuntSource } from "@/src/hunts/domain/hunt-source.entity"
@@ -26,27 +27,42 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { HuntSourceStepsAside } from "./hunt-source-steps-aside"
+import { HuntSectionNav } from "./hunt-section-nav"
 import { cn } from "@/lib/utils"
+import { normalizeHuntSourceUrl } from "@/src/hunts/domain/hunt-source.helpers"
 
 const INPUT =
   "h-11 w-full shrink-0 rounded-xl border border-border bg-card px-4 text-sm outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:ring-2 focus:ring-foreground/20 disabled:opacity-50"
 
 const TOTAL_STEPS = 2
 type Step = 1 | 2
-type FictionMode = "fiction" | "label"
+
+type HuntContext =
+  | { kind: "fiction"; fictionId: string }
+  | { kind: "label"; label: string }
+
+type ContextListItem =
+  | { kind: "fiction"; id: string; title: string }
+  | { kind: "label"; label: string; normalized: string }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function normalizeTitle(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ")
+}
 
 function formatRelative(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -302,13 +318,13 @@ function SourceTableRow({ source, recentHunts, onRefresh, onHunt }: SourceTableR
 // ---------------------------------------------------------------------------
 
 type AddSourcePopoverProps = {
-  fictionId: string | null
-  contextLabel: string
-  mode: FictionMode
+  context: HuntContext
+  existingSources: HuntSource[]
   onAdded: () => void
 }
 
-function AddSourcePopover({ fictionId, contextLabel, mode, onAdded }: AddSourcePopoverProps) {
+function AddSourcePopover({ context, existingSources, onAdded }: AddSourcePopoverProps) {
+  const tNew = useTranslations("Contribute.huntNew")
   const [open, setOpen] = useState(false)
   const [url, setUrl] = useState("")
   const [researchNote, setResearchNote] = useState("")
@@ -324,11 +340,21 @@ function AddSourcePopover({ fictionId, contextLabel, mode, onAdded }: AddSourceP
 
   async function handleSubmit() {
     setError(null)
+    const trimmedUrl = url.trim()
+    if (!trimmedUrl) return
+
+    const normalized = normalizeHuntSourceUrl(trimmedUrl)
+    const duplicate = existingSources.find((s) => s.sourceUrlNormalized === normalized)
+    if (duplicate) {
+      setError(tNew("urlAlreadyExists"))
+      return
+    }
+
     setLoading(true)
     try {
       const res = await addHuntSourceAction({
-        fictionId: mode === "fiction" ? fictionId : null,
-        contextLabel: mode === "label" ? contextLabel.trim() : null,
+        fictionId: context.kind === "fiction" ? context.fictionId : null,
+        contextLabel: context.kind === "label" ? context.label.trim() : null,
         sourceUrl: url.trim(),
         researchNote: researchNote.trim() || undefined,
       })
@@ -414,23 +440,131 @@ type HuntSourceWizardProps = {
 export function HuntSourceWizard({ fictions, sources, huntsBySource }: HuntSourceWizardProps) {
   const router = useRouter()
   const [step, setStep] = useState<Step>(1)
-  const [mode, setMode] = useState<FictionMode>("fiction")
-  const [fictionId, setFictionId] = useState<string | null>(null)
-  const [fictionSearch, setFictionSearch] = useState("")
-  const [contextLabel, setContextLabel] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedContext, setSelectedContext] = useState<HuntContext | null>(null)
+  const [labelConfirmOpen, setLabelConfirmOpen] = useState(false)
+  const [pendingLabel, setPendingLabel] = useState<string | null>(null)
 
-  const filtered = fictionSearch.trim()
-    ? fictions.filter((f) => f.title.toLowerCase().includes(fictionSearch.trim().toLowerCase()))
-    : fictions
+  const existingLabels = useMemo(() => {
+    const byNormalized = new Map<string, string>()
+    for (const source of sources) {
+      if (!source.contextLabel || source.fictionId) continue
+      const normalized = normalizeTitle(source.contextLabel)
+      if (!byNormalized.has(normalized)) {
+        byNormalized.set(normalized, source.contextLabel)
+      }
+    }
+    return Array.from(byNormalized.entries())
+      .map(([normalized, label]) => ({ normalized, label }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [sources])
 
-  const selectedFiction = fictions.find((f) => f.id === fictionId)
-  const step1Valid = mode === "label" ? contextLabel.trim().length > 0 : fictionId !== null
+  const query = searchQuery.trim()
+  const normalizedQuery = normalizeTitle(query)
 
-  const relevantSources = sources.filter((s) =>
-    mode === "fiction" ? s.fictionId === fictionId : s.contextLabel === contextLabel.trim(),
+  const filteredItems = useMemo((): ContextListItem[] => {
+    const q = query.toLowerCase()
+    const fictionItems: ContextListItem[] = (q
+      ? fictions.filter((f) => f.title.toLowerCase().includes(q))
+      : fictions
+    ).map((f) => ({ kind: "fiction", id: f.id, title: f.title }))
+
+    const labelItems: ContextListItem[] = (q
+      ? existingLabels.filter((l) => l.label.toLowerCase().includes(q))
+      : existingLabels
+    ).map((l) => ({ kind: "label", label: l.label, normalized: l.normalized }))
+
+    return [...fictionItems, ...labelItems].sort((a, b) => {
+      const titleA = a.kind === "fiction" ? a.title : a.label
+      const titleB = b.kind === "fiction" ? b.title : b.label
+      return titleA.localeCompare(titleB)
+    })
+  }, [fictions, existingLabels, query])
+
+  const exactFiction = useMemo(
+    () => fictions.find((f) => normalizeTitle(f.title) === normalizedQuery) ?? null,
+    [fictions, normalizedQuery],
   )
+  const exactLabel = useMemo(
+    () => existingLabels.find((l) => l.normalized === normalizedQuery) ?? null,
+    [existingLabels, normalizedQuery],
+  )
+  const hasFilteredResults = filteredItems.length > 0
 
-  const contextName = selectedFiction?.title ?? contextLabel.trim()
+  const step1Valid =
+    selectedContext !== null ||
+    exactFiction !== null ||
+    exactLabel !== null ||
+    (query.length > 0 && exactFiction === null && !hasFilteredResults)
+
+  const activeContext = selectedContext
+
+  const relevantSources = useMemo(() => {
+    if (!activeContext) return []
+    return sources.filter((s) => {
+      if (activeContext.kind === "fiction") return s.fictionId === activeContext.fictionId
+      return (
+        s.contextLabel !== null &&
+        normalizeTitle(s.contextLabel) === normalizeTitle(activeContext.label)
+      )
+    })
+  }, [sources, activeContext])
+
+  const contextName =
+    activeContext?.kind === "fiction"
+      ? (fictions.find((f) => f.id === activeContext.fictionId)?.title ?? "")
+      : (activeContext?.kind === "label" ? activeContext.label : "")
+
+  function handleSearchChange(value: string) {
+    setSearchQuery(value)
+    setSelectedContext(null)
+  }
+
+  function selectFiction(id: string) {
+    const fiction = fictions.find((f) => f.id === id)
+    if (!fiction) return
+    setSelectedContext({ kind: "fiction", fictionId: id })
+    setSearchQuery(fiction.title)
+  }
+
+  function selectLabel(label: string) {
+    setSelectedContext({ kind: "label", label })
+    setSearchQuery(label)
+  }
+
+  function handleStep1Next() {
+    if (selectedContext?.kind === "fiction" || exactFiction) {
+      setSelectedContext(
+        selectedContext ?? { kind: "fiction", fictionId: exactFiction!.id },
+      )
+      setStep(2)
+      return
+    }
+
+    if (selectedContext?.kind === "label") {
+      setStep(2)
+      return
+    }
+
+    if (exactLabel) {
+      setSelectedContext({ kind: "label", label: exactLabel.label })
+      setStep(2)
+      return
+    }
+
+    if (query.length > 0 && exactFiction === null) {
+      setPendingLabel(query)
+      setLabelConfirmOpen(true)
+    }
+  }
+
+  function confirmNewLabel() {
+    if (!pendingLabel?.trim()) return
+    setSelectedContext({ kind: "label", label: pendingLabel.trim() })
+    setPendingLabel(null)
+    setLabelConfirmOpen(false)
+    setStep(2)
+  }
 
   const stepTitles: Record<Step, string> = {
     1: "Fiction",
@@ -438,7 +572,7 @@ export function HuntSourceWizard({ fictions, sources, huntsBySource }: HuntSourc
   }
 
   const stepDescriptions: Record<Step, string> = {
-    1: "Select the fiction this source belongs to, or enter a temporary label for a title not yet in the database.",
+    1: "Search for a fiction in the database, pick an existing label, or create a new label if the title is not listed yet.",
     2: contextName ? `Sources for "${contextName}".` : "Sources for this fiction.",
   }
 
@@ -455,13 +589,15 @@ export function HuntSourceWizard({ fictions, sources, huntsBySource }: HuntSourc
           showBack: step > 1,
           onBack: () => setStep(1),
           isLastStep: false,
-          onNext: step === 1 ? () => { if (step1Valid) setStep(2) } : () => setStep(1),
+          onNext: step === 1 ? handleStep1Next : () => setStep(1),
           onSubmit: () => {},
           nextLabel: step === 1 ? "Next" : "Done",
           disabled: step === 1 ? !step1Valid : false,
           showTrailingArrow: step === 1,
         }}
       >
+        <HuntSectionNav />
+
         {step === 1 ? (
           <ContributeStepHeader
             title={stepTitles[step]}
@@ -481,98 +617,79 @@ export function HuntSourceWizard({ fictions, sources, huntsBySource }: HuntSourc
                 {stepDescriptions[step]}
               </p>
             </div>
-            <AddSourcePopover
-              fictionId={fictionId}
-              contextLabel={contextLabel}
-              mode={mode}
-              onAdded={() => router.refresh()}
-            />
+            {activeContext && (
+              <AddSourcePopover
+                context={activeContext}
+                existingSources={relevantSources}
+                onAdded={() => router.refresh()}
+              />
+            )}
           </div>
         )}
 
         {/* ── Step 1: fiction / label ── */}
         {step === 1 && (
-          <div className="flex flex-1 min-h-0 flex-col space-y-4">
-            <div className="flex shrink-0 gap-2">
-              <button
-                type="button"
-                onClick={() => setMode("fiction")}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                  mode === "fiction"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80",
-                )}
-              >
-                Existing fiction
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("label")}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                  mode === "label"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80",
-                )}
-              >
-                Context label
-              </button>
-            </div>
+          <div className="flex flex-1 min-h-0 flex-col gap-y-1.5">
+            <label className="shrink-0 block text-sm font-semibold leading-snug text-foreground">
+              Fiction or label<span className="ml-0.5 text-destructive">*</span>
+            </label>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search fiction or label…"
+              className={cn(INPUT, "shrink-0")}
+            />
+            <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto rounded-xl border border-border p-2">
+              {filteredItems.length === 0 ? (
+                <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  {query
+                    ? "No matches. Press Next to create a new label."
+                    : "No fictions or labels yet."}
+                </p>
+              ) : (
+                filteredItems.map((item) => {
+                  const isSelected =
+                    item.kind === "fiction"
+                      ? selectedContext?.kind === "fiction" &&
+                        selectedContext.fictionId === item.id
+                      : selectedContext?.kind === "label" &&
+                        normalizeTitle(selectedContext.label) === item.normalized
 
-            {mode === "fiction" ? (
-              <div className="flex flex-1 min-h-0 flex-col gap-y-1.5">
-                <label className="shrink-0 block text-sm font-semibold leading-snug text-foreground">
-                  Fiction<span className="ml-0.5 text-destructive">*</span>
-                </label>
-                <input
-                  type="search"
-                  value={fictionSearch}
-                  onChange={(e) => setFictionSearch(e.target.value)}
-                  placeholder="Search fiction…"
-                  className={cn(INPUT, "shrink-0")}
-                />
-                <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto rounded-xl border border-border p-2">
-                  {filtered.length === 0 ? (
-                    <p className="px-3 py-6 text-center text-sm text-muted-foreground">No fictions found</p>
-                  ) : (
-                    filtered.map((f) => (
-                      <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => setFictionId(f.id)}
-                        className={cn(
-                          "w-full rounded-lg px-4 py-2 text-left text-sm transition-colors",
-                          fictionId === f.id
-                            ? "bg-primary/10 font-medium text-foreground"
-                            : "text-muted-foreground hover:bg-muted/60",
-                        )}
+                  const title = item.kind === "fiction" ? item.title : item.label
+
+                  return (
+                    <button
+                      key={item.kind === "fiction" ? `fiction-${item.id}` : `label-${item.normalized}`}
+                      type="button"
+                      onClick={() =>
+                        item.kind === "fiction"
+                          ? selectFiction(item.id)
+                          : selectLabel(item.label)
+                      }
+                      className={cn(
+                        "flex w-full items-center gap-2 rounded-lg px-4 py-2 text-left text-sm transition-colors",
+                        isSelected
+                          ? "bg-primary/10 font-medium text-foreground"
+                          : "text-muted-foreground hover:bg-muted/60",
+                      )}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{title}</span>
+                      <Badge
+                        variant={item.kind === "fiction" ? "default" : "secondary"}
+                        className="shrink-0 px-2 py-0 text-[10px] font-medium"
                       >
-                        {f.title}
-                      </button>
-                    ))
-                  )}
-                </div>
-                {selectedFiction && (
-                  <p className="shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                    Selected: {selectedFiction.title}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <ContributeFieldWrapper
-                label="Context label"
-                hint="Temporary name for a fiction not yet in the database (e.g. 'Titanic')"
-                required
-              >
-                <input
-                  type="text"
-                  value={contextLabel}
-                  onChange={(e) => setContextLabel(e.target.value)}
-                  placeholder="e.g. Titanic"
-                  className={INPUT}
-                />
-              </ContributeFieldWrapper>
+                        {item.kind === "fiction" ? "Fiction" : "Label"}
+                      </Badge>
+                    </button>
+                  )
+                })
+              )}
+            </div>
+            {selectedContext && (
+              <p className="shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                Selected: {contextName}
+              </p>
             )}
           </div>
         )}
@@ -610,6 +727,43 @@ export function HuntSourceWizard({ fictions, sources, huntsBySource }: HuntSourc
           </div>
         )}
       </ContributionWizardShell>
+
+      <Dialog
+        open={labelConfirmOpen}
+        onOpenChange={(open) => {
+          setLabelConfirmOpen(open)
+          if (!open) setPendingLabel(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create context label</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            &ldquo;{pendingLabel}&rdquo; is not in the database yet. You will work under a temporary
+            label until this fiction is added. Sources and hunts will be grouped under this name.
+          </p>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => {
+                setLabelConfirmOpen(false)
+                setPendingLabel(null)
+              }}
+              className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmNewLabel}
+              className="rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              Create label
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </FictionContributeLayout>
   )
 }

@@ -1,9 +1,23 @@
 "use client"
 
 import { Check } from "lucide-react"
-import type { HuntPlace } from "@/src/hunts/domain/hunt.types"
+import { useTranslations } from "next-intl"
+import { Link } from "@/i18n/navigation"
+import type { HuntPlaceReviewed } from "@/src/hunts/domain/hunt.types"
+import {
+  effectivePlace,
+  isAddressOverridden,
+  isCoordsOverridden,
+  isNameOverridden,
+  isShootEnvironmentOverridden,
+} from "@/src/hunts/domain/hunt-place.helpers"
 import type { LatLng } from "@/lib/map/types"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import type { HuntReviewStatus } from "./hunt-places-aside"
+
+const NOTE_TEXTAREA =
+  "w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-60"
 
 function MetaField({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
@@ -18,39 +32,67 @@ function MetaField({ label, value, mono = false }: { label: string; value: strin
 
 export interface HuntReviewCriteriaAsideProps {
   sourceUrl: string
-  place: HuntPlace
+  reviewed: HuntPlaceReviewed
   coords: LatLng | null
-  coordsAdjusted: boolean
-  reviewStatus: "pending" | "approved"
+  reviewStatus: HuntReviewStatus
   onToggleApprove: () => void
+  reviewNote: string
+  onReviewNoteChange?: (note: string) => void
+  canEdit?: boolean
+  postulateHref?: string | null
   className?: string
 }
 
 export function HuntReviewCriteriaAside({
   sourceUrl,
-  place,
+  reviewed,
   coords,
-  coordsAdjusted,
   reviewStatus,
   onToggleApprove,
+  reviewNote,
+  onReviewNoteChange,
+  canEdit = true,
+  postulateHref = null,
   className,
 }: HuntReviewCriteriaAsideProps) {
+  const t = useTranslations("Contribute.huntReview")
+  const tPlaces = useTranslations("Places")
+  const place = effectivePlace(reviewed)
+  const extracted = reviewed.extracted
+  const coordsAdjusted = isCoordsOverridden(reviewed)
+  const addressAdjusted = isAddressOverridden(reviewed)
+  const nameAdjusted = isNameOverridden(reviewed)
+  const shootEnvironmentAdjusted = isShootEnvironmentOverridden(reviewed)
   const isApproved = reviewStatus === "approved"
+  const isPosted = reviewStatus === "posted"
+  const isSkipped = reviewStatus === "skipped"
   const isDuplicate = place.duplicate_of !== null
 
-  const addressLabel =
-    place.address_source === "geocoded"
-      ? "Address (geocoded)"
-      : place.address_source === "page"
-        ? "Address (from page)"
-        : "Address"
-
   const formattedLocation = [place.address, place.city, place.country].filter(Boolean).join(", ")
+  const sourceLocation = [extracted.address, extracted.city, extracted.country]
+    .filter(Boolean)
+    .join(", ")
+  const addressLabel = addressAdjusted ? "Address (edited)" : "Address"
+  const nameLabel = nameAdjusted ? "Name (edited)" : "Name"
+  const showSourceAddress = addressAdjusted && sourceLocation && sourceLocation !== formattedLocation
+  const shootEnvironmentLabel = place.shoot_environment
+    ? tPlaces(`shootEnvironment_${place.shoot_environment}`)
+    : "—"
 
   return (
     <aside className={cn("flex h-full min-h-0 w-full min-w-0 flex-col", className)}>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain">
-        <h2 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Summary</h2>
+        <div className="space-y-3">
+          <h2 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Summary</h2>
+          {postulateHref && (
+            <div className="space-y-1.5">
+              <Button asChild size="sm" className="w-full">
+                <Link href={postulateHref}>{t("postulateAction")}</Link>
+              </Button>
+              <p className="text-[10px] text-muted-foreground">{t("postulateHint")}</p>
+            </div>
+          )}
+        </div>
         <div className="space-y-3">
         <div className="space-y-0.5">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Page URL</p>
@@ -63,10 +105,20 @@ export function HuntReviewCriteriaAside({
             {sourceUrl}
           </a>
         </div>
-        <MetaField label="Name" value={place.name} />
+        <MetaField label={nameLabel} value={place.name} />
+        {nameAdjusted && extracted.name && extracted.name !== place.name && (
+          <MetaField label="Source name" value={extracted.name} />
+        )}
         <MetaField label={addressLabel} value={formattedLocation} />
-        <MetaField label="Confidence" value={place.confidence} />
-        <MetaField label="Landmark" value={place.is_landmark ? "Yes" : "No"} />
+        {showSourceAddress && (
+          <MetaField label="Source address" value={sourceLocation} />
+        )}
+        <MetaField label="Confidence" value={extracted.confidence} />
+        <MetaField label="Landmark" value={extracted.is_landmark ? "Yes" : "No"} />
+        <MetaField
+          label={shootEnvironmentAdjusted ? "Shoot environment (edited)" : tPlaces("fieldShootEnvironment")}
+          value={shootEnvironmentLabel}
+        />
         <MetaField
           label="Coordinates"
           value={coords != null ? `${coords.lat}, ${coords.lng}` : "—"}
@@ -78,32 +130,65 @@ export function HuntReviewCriteriaAside({
         )}
         </div>
 
-        <div className="border-t border-border/40 pt-3">
-          <button
-            type="button"
-            onClick={onToggleApprove}
-            aria-pressed={isApproved}
-            className={cn(
-              "inline-flex items-center gap-1.5 text-xs sm:text-sm transition-colors",
-              isApproved
-                ? "font-medium text-emerald-600 dark:text-emerald-400"
-                : "text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400",
-            )}
-          >
-            <span
-              className={cn(
-                "flex h-4 w-4 items-center justify-center rounded-sm border-2 transition-colors",
-                isApproved
-                  ? "border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-500"
-                  : "border-border bg-background",
-              )}
-              aria-hidden
-            >
-              {isApproved ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : null}
-            </span>
-            Approve
-          </button>
+        <div className="space-y-1.5 border-t border-border/40 pt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            {t("placeNoteLabel")}
+          </p>
+          {canEdit && onReviewNoteChange ? (
+            <>
+              <textarea
+                value={reviewNote}
+                onChange={(e) => onReviewNoteChange(e.target.value)}
+                placeholder={t("placeNotePlaceholder")}
+                rows={3}
+                maxLength={500}
+                className={NOTE_TEXTAREA}
+              />
+              <p className="text-[10px] text-muted-foreground">{t("placeNoteHint")}</p>
+            </>
+          ) : reviewNote.trim() ? (
+            <p className="text-xs leading-relaxed text-foreground">{reviewNote}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">—</p>
+          )}
         </div>
+
+        {canEdit && !isPosted && !isSkipped && (
+          <div className="border-t border-border/40 pt-3">
+            <button
+              type="button"
+              onClick={onToggleApprove}
+              aria-pressed={isApproved}
+              className={cn(
+                "inline-flex items-center gap-1.5 text-xs sm:text-sm transition-colors",
+                isApproved
+                  ? "font-medium text-emerald-600 dark:text-emerald-400"
+                  : "text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400",
+              )}
+            >
+              <span
+                className={cn(
+                  "flex h-4 w-4 items-center justify-center rounded-sm border-2 transition-colors",
+                  isApproved
+                    ? "border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-500"
+                    : "border-border bg-background",
+                )}
+                aria-hidden
+              >
+                {isApproved ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : null}
+              </span>
+              {t("approveAction")}
+            </button>
+          </div>
+        )}
+
+        {!canEdit && (isPosted || isSkipped) && (
+          <div className="border-t border-border/40 pt-3">
+            <p className="text-xs font-medium text-foreground">
+              {isPosted ? t("statusPosted") : t("statusSkipped")}
+            </p>
+          </div>
+        )}
       </div>
     </aside>
   )

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { Place } from "@/src/places/domain/place.entity"
+import type { PlaceShootEnvironment } from "@/src/places/domain/place-shoot-environment"
 import { FictionPlaceDetailView } from "@/components/fictions/fiction-place-detail-view"
 import { FictionContributePreviewSidebar } from "@/components/contribute/fiction/fiction-contribute-preview-sidebar"
 import { AppDetailRailsShell } from "@/components/layout/app-detail-rails-shell"
@@ -26,6 +27,7 @@ export interface PlaceContributePublicPreviewProps {
   cityId: string
   locationType: string
   isLandmark: boolean
+  shootEnvironment?: PlaceShootEnvironment | null
   imagePreviewUrl: string | null
   className?: string
 }
@@ -44,6 +46,7 @@ export function PlaceContributePublicPreview({
   cityId,
   locationType,
   isLandmark,
+  shootEnvironment,
   imagePreviewUrl,
   className,
 }: PlaceContributePublicPreviewProps) {
@@ -72,6 +75,7 @@ export function PlaceContributePublicPreview({
       videoUrl: "",
       description: description.trim(),
       sceneDescription: "",
+      shootEnvironment: shootEnvironment ?? null,
     }
   }, [
     address,
@@ -86,6 +90,7 @@ export function PlaceContributePublicPreview({
     locationType,
     longitude,
     placeName,
+    shootEnvironment,
   ])
 
   const fictionPathSlug = fiction.slug.trim()

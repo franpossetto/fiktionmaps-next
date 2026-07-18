@@ -8,18 +8,28 @@ import { scrapeHuntSourceUseCase } from "@/src/hunts/application/scrape-hunt-sou
 import { deleteHuntSourceUseCase } from "@/src/hunts/application/delete-hunt-source.usecase"
 import { createHuntUseCase } from "@/src/hunts/application/create-hunt.usecase"
 import { finishHuntReviewUseCase } from "@/src/hunts/application/finish-hunt-review.usecase"
+import { assignFictionToHuntSourceUseCase } from "@/src/hunts/application/assign-fiction-to-hunt-source.usecase"
+import { saveHuntReviewDraftUseCase } from "@/src/hunts/application/save-hunt-review-draft.usecase"
 import { previewHuntUseCase } from "@/src/hunts/application/preview-hunt.usecase"
 import { huntSourcesSupabaseAdapter } from "@/src/hunts/infrastructure/supabase/hunt-source.repository.impl"
 import { huntsSupabaseAdapter } from "@/src/hunts/infrastructure/supabase/hunt.repository.impl"
 import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
 import { createFictionsSupabaseAdapter } from "@/src/fictions/infrastructure/supabase/fiction.repository.impl"
-import { getLLMProvider } from "@/lib/ai/get-llm-provider"
+import { getLLMProvider, isAIAvailable } from "@/lib/ai/get-llm-provider"
 import { getGeocodingProvider } from "@/src/hunts/infrastructure/geocoding/get-geocoding-provider"
 import type { HuntResult } from "@/src/hunts/domain/hunt.types"
 import type { HuntSource } from "@/src/hunts/domain/hunt-source.entity"
 import type { Hunt } from "@/src/hunts/domain/hunt.entity"
 import type { HuntPlaceReviewed } from "@/src/hunts/domain/hunt.types"
 import { revalidatePath } from "next/cache"
+
+// ── Feature flag ─────────────────────────────────────────────────────────────
+
+export async function isHuntAvailableAction(): Promise<boolean> {
+  const auth = await requireContributor()
+  if ("error" in auth) return false
+  return isAIAvailable()
+}
 
 // ── Auth helper ──────────────────────────────────────────────────────────────
 
@@ -67,6 +77,7 @@ export async function addHuntSourceAction(input: unknown): Promise<AddHuntSource
       huntSourcesSupabaseAdapter,
     )
     revalidatePath("/contribute/hunt")
+    revalidatePath("/contribute/hunt/new")
     return { success: true, data: source }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "Failed to add source" }
@@ -86,6 +97,7 @@ export async function scrapeHuntSourceAction(sourceId: string): Promise<ScrapeHu
   try {
     await scrapeHuntSourceUseCase(sourceId, auth.userId, huntSourcesSupabaseAdapter)
     revalidatePath("/contribute/hunt")
+    revalidatePath("/contribute/hunt/new")
     return { success: true }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "Scrape failed" }
@@ -105,6 +117,7 @@ export async function deleteHuntSourceAction(sourceId: string): Promise<DeleteHu
   try {
     await deleteHuntSourceUseCase(sourceId, auth.userId, huntSourcesSupabaseAdapter)
     revalidatePath("/contribute/hunt")
+    revalidatePath("/contribute/hunt/new")
     return { success: true }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "Failed to delete source" }
@@ -137,9 +150,45 @@ export async function createHuntAction(sourceId: string): Promise<CreateHuntResu
       geocoder,
     )
     revalidatePath("/contribute/hunt")
+    revalidatePath("/contribute/hunt/new")
     return { success: true, data: hunt }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "Hunt failed" }
+  }
+}
+
+// ── Save hunt review draft (autosave during review) ───────────────────────────
+
+const saveHuntReviewDraftSchema = z.object({
+  huntId: z.string().uuid(),
+  places: z.array(z.unknown()),
+  hunterNote: z.string().max(1000).nullable().optional(),
+})
+
+type SaveHuntReviewDraftResult =
+  | { success: true }
+  | { success: false; error: string }
+
+export async function saveHuntReviewDraftAction(input: unknown): Promise<SaveHuntReviewDraftResult> {
+  const auth = await requireContributor()
+  if ("error" in auth) return { success: false, error: auth.error }
+
+  const parsed = saveHuntReviewDraftSchema.safeParse(input)
+  if (!parsed.success) return { success: false, error: parsed.error.errors[0]?.message ?? "Invalid input" }
+
+  try {
+    await saveHuntReviewDraftUseCase(
+      {
+        huntId: parsed.data.huntId,
+        places: parsed.data.places as HuntPlaceReviewed[],
+        hunterNote: parsed.data.hunterNote ?? null,
+      },
+      auth.userId,
+      huntsSupabaseAdapter,
+    )
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Failed to save draft" }
   }
 }
 
@@ -171,11 +220,52 @@ export async function finishHuntReviewAction(input: unknown): Promise<FinishHunt
       },
       auth.userId,
       huntsSupabaseAdapter,
+      huntSourcesSupabaseAdapter,
     )
     revalidatePath("/contribute/hunt")
+    revalidatePath("/contribute/hunt/new")
     return { success: true, data: hunt }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "Failed to finish review" }
+  }
+}
+
+// ── Assign fiction to hunt source ───────────────────────────────────────────
+
+const assignFictionToHuntSourceSchema = z.object({
+  sourceId: z.string().uuid(),
+  fictionId: z.string().uuid(),
+  huntId: z.string().uuid(),
+})
+
+type AssignFictionToHuntSourceResult =
+  | { success: true; data: { fictionTitle: string; places: HuntPlaceReviewed[] } }
+  | { success: false; error: string }
+
+export async function assignFictionToHuntSourceAction(
+  input: unknown,
+): Promise<AssignFictionToHuntSourceResult> {
+  const auth = await requireContributor()
+  if ("error" in auth) return { success: false, error: auth.error }
+
+  const parsed = assignFictionToHuntSourceSchema.safeParse(input)
+  if (!parsed.success) return { success: false, error: parsed.error.errors[0]?.message ?? "Invalid input" }
+
+  try {
+    const fictionsRepo = createFictionsSupabaseAdapter(createClient)
+    const result = await assignFictionToHuntSourceUseCase(
+      parsed.data,
+      auth.userId,
+      huntSourcesSupabaseAdapter,
+      huntsSupabaseAdapter,
+      placesRepo,
+      fictionsRepo,
+    )
+    revalidatePath("/contribute/hunt")
+    revalidatePath(`/contribute/hunt/${parsed.data.huntId}/review`)
+    return { success: true, data: result }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Failed to assign fiction" }
   }
 }
 

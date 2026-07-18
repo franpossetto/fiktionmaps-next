@@ -9,7 +9,9 @@ export async function extractPlacesFromContent(
 ): Promise<HuntPlace[]> {
   const prompt = buildExtractionPrompt(content, fictionTitle)
   const result = await llm.completeJSON(prompt)
-  const parsed = JSON.parse(result) as { places?: Omit<HuntPlace, "address_source" | "is_landmark" | "duplicate_of">[] }
+  const parsed = JSON.parse(result) as {
+    places?: Omit<HuntPlace, "address_source" | "is_landmark" | "duplicate_of" | "shoot_environment">[]
+  }
 
   return (parsed.places ?? []).map((p) => ({
     ...p,
@@ -18,5 +20,6 @@ export async function extractPlacesFromContent(
     lat: null,
     lng: null,
     duplicate_of: null,
+    shoot_environment: null,
   }))
 }

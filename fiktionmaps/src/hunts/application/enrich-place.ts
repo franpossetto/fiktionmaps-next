@@ -1,6 +1,7 @@
 import type { LLMPort } from "@/lib/ai/llm.port"
 import type { HuntPlace, HuntAddressSource } from "@/src/hunts/domain/hunt.types"
 import { buildEnrichmentPrompt } from "@/src/hunts/domain/hunt.prompts"
+import { parsePlaceShootEnvironment } from "@/src/places/domain/place-shoot-environment"
 
 type EnrichmentResult = {
   name: string
@@ -9,6 +10,7 @@ type EnrichmentResult = {
   country: string
   is_landmark: boolean
   address_source: HuntAddressSource
+  shoot_environment?: string | null
 }
 
 export async function enrichPlace(place: HuntPlace, llm: LLMPort): Promise<HuntPlace> {
@@ -31,5 +33,6 @@ export async function enrichPlace(place: HuntPlace, llm: LLMPort): Promise<HuntP
     country: enriched.country || place.country,
     is_landmark: enriched.is_landmark ?? false,
     address_source: hadPageAddress ? "page" : (enriched.address_source ?? "unknown"),
+    shoot_environment: parsePlaceShootEnvironment(enriched.shoot_environment),
   }
 }

@@ -1,4 +1,11 @@
-export { MapEngineProvider, useMapEngine, type MapEngine, type MapEngineType } from "./context"
+export {
+  MapEngineProvider,
+  useMapEngine,
+  useOptionalMapEngine,
+  type MapEngine,
+  type MapEngineType,
+} from "./context"
+export { EnsureMapEngine } from "./ensure-map-engine"
 export { useMapLoaded } from "./map-loaded-context"
 
 export {

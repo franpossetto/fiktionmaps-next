@@ -123,6 +123,18 @@ export async function updateHuntSourceScrape(
   return !error
 }
 
+export async function updateHuntSourceFictionId(id: string, fictionId: string): Promise<boolean> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("hunt_sources")
+    .update({
+      fiction_id: fictionId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+  return !error
+}
+
 export async function deleteHuntSource(id: string): Promise<boolean> {
   const supabase = await createClient()
   const { error } = await supabase.from("hunt_sources").delete().eq("id", id)
@@ -135,5 +147,6 @@ export const huntSourcesSupabaseAdapter: HuntSourcesRepositoryPort = {
   listByFictionId: listHuntSourcesByFictionId,
   create: createHuntSource,
   updateScrape: updateHuntSourceScrape,
+  updateFictionId: updateHuntSourceFictionId,
   delete: deleteHuntSource,
 }

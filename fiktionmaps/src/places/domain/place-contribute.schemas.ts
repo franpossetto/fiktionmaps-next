@@ -1,6 +1,10 @@
 import { z } from "zod"
 import { latitudeSchema, longitudeSchema, uuidSchema } from "@/lib/validation/primitives"
 import { streetViewReferenceSchema } from "@/src/locations/domain/location-view-reference.schemas"
+import {
+  parsePlaceShootEnvironment,
+  placeShootEnvironmentSchema,
+} from "@/src/places/domain/place-shoot-environment"
 
 export const placeContributeDraftSchema = z.object({
   fictionId: uuidSchema,
@@ -13,6 +17,7 @@ export const placeContributeDraftSchema = z.object({
   description: z.string().trim().min(1),
   isLandmark: z.boolean().optional().default(false),
   locationType: z.string().nullable().optional(),
+  shootEnvironment: placeShootEnvironmentSchema.nullable().optional(),
   streetViewReference: streetViewReferenceSchema.nullable().optional(),
 })
 
@@ -33,6 +38,8 @@ export function parsePlaceContributeFormData(formData: FormData): {
   success: true
   data: PlaceContributeDraft
   imageFile: File | null
+  huntId: string | null
+  placeIndex: number | null
 } | {
   success: false
   error: string
@@ -48,6 +55,7 @@ export function parsePlaceContributeFormData(formData: FormData): {
     description: String(formData.get("description") ?? ""),
     isLandmark: formData.get("isLandmark") === "true",
     locationType: String(formData.get("locationType") ?? "") || null,
+    shootEnvironment: parsePlaceShootEnvironment(formData.get("shootEnvironment")),
     streetViewReference: parseStreetViewReferenceField(formData.get("streetViewReference")),
   }
   const parsed = placeContributeDraftSchema.safeParse(raw)
@@ -57,5 +65,16 @@ export function parsePlaceContributeFormData(formData: FormData): {
   }
   const imageRaw = formData.get("imageFile")
   const imageFile = imageRaw instanceof File && imageRaw.size > 0 ? imageRaw : null
-  return { success: true, data: parsed.data, imageFile }
+
+  const huntIdRaw = String(formData.get("huntId") ?? "").trim()
+  const huntId = uuidSchema.safeParse(huntIdRaw).success ? huntIdRaw : null
+  const placeIndexRaw = formData.get("placeIndex")
+  const placeIndexParsed =
+    placeIndexRaw != null && String(placeIndexRaw).trim() !== ""
+      ? Number.parseInt(String(placeIndexRaw), 10)
+      : Number.NaN
+  const placeIndex =
+    Number.isFinite(placeIndexParsed) && placeIndexParsed >= 0 ? placeIndexParsed : null
+
+  return { success: true, data: parsed.data, imageFile, huntId, placeIndex }
 }
