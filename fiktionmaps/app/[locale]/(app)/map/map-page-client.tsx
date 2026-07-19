@@ -242,8 +242,9 @@ function MapPageInner({ initial }: { initial: MapPageInitialData }) {
   // and depending on both caused B→A→B bounce.
   useEffect(() => {
     if (cities.length === 0) return
-    const fromUrl = initialCityId
-      ? cities.find((c) => c.id === initialCityId)
+    const slugFromUrl = initialCityId?.trim().toLowerCase()
+    const fromUrl = slugFromUrl
+      ? cities.find((c) => c.slug === slugFromUrl)
       : undefined
 
     if (fromUrl) {
@@ -469,7 +470,7 @@ function MapPageInner({ initial }: { initial: MapPageInitialData }) {
       setAvailableFictions([])
       setSelectedFictionIds([])
       // history.replaceState — not router.replace — so in-flight server actions aren't aborted.
-      replaceMapUrlSearch(`city=${encodeURIComponent(city.id)}`)
+      replaceMapUrlSearch(`city=${encodeURIComponent(city.slug)}`)
       setBounds(null)
       setSelectedCity(city)
       setSelectedPlace(null)
@@ -486,7 +487,7 @@ function MapPageInner({ initial }: { initial: MapPageInitialData }) {
       setViewportPlaces(filterPlacesByFictionIds(cityPlacesRef.current, next))
       if (availableFictions.length > 0) {
         const qs = buildMapQueryString(
-          selectedCity.id,
+          selectedCity.slug,
           next,
           availableFictions,
           readMapUrlPreserve(),
@@ -530,15 +531,15 @@ function MapPageInner({ initial }: { initial: MapPageInitialData }) {
       setAvailableFictions([])
 
       const city = cities.find((c) => c.id === entry.cityId)
-      if (city) {
-        setBounds(null)
-        setSelectedCity(city)
-        setSelectedPlace(null)
-        setFocusedPlaceId(null)
-      }
+      if (!city) return
+
+      setBounds(null)
+      setSelectedCity(city)
+      setSelectedPlace(null)
+      setFocusedPlaceId(null)
 
       const params = new URLSearchParams()
-      params.set("city", entry.cityId)
+      params.set("city", city.slug)
       params.set("fiction", entry.fictionId)
       replaceMapUrlSearch(params.toString())
     },
@@ -555,7 +556,7 @@ function MapPageInner({ initial }: { initial: MapPageInitialData }) {
       setSelectedFictionIds([])
       const city = cities.find((c) => c.id === cityId)
       if (!city) return
-      replaceMapUrlSearch(`city=${encodeURIComponent(city.id)}`)
+      replaceMapUrlSearch(`city=${encodeURIComponent(city.slug)}`)
       setBounds(null)
       setSelectedCity(city)
       setSelectedPlace(null)

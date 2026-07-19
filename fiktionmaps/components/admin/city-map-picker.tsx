@@ -31,7 +31,13 @@ export interface CityMapPickerProps {
   zoom: number
   onCenterChange: (lat: number, lng: number) => void
   onZoomChange: (zoom: number) => void
-  onCitySelect?: (lat: number, lng: number, name: string, country: string) => void
+  onCitySelect?: (
+    lat: number,
+    lng: number,
+    name: string,
+    country: string,
+    region?: string,
+  ) => void
   /** Called when the user clears the search input */
   onClear?: () => void
   showSearch?: boolean
@@ -98,7 +104,13 @@ function CitySearch({
   onError,
   onClear,
 }: {
-  onSelect: (lat: number, lng: number, name: string, country: string) => void
+  onSelect: (
+    lat: number,
+    lng: number,
+    name: string,
+    country: string,
+    region?: string,
+  ) => void
   onError?: (message: string) => void
   onClear?: () => void
 }) {
@@ -149,23 +161,25 @@ function CitySearch({
     [onError, searchCities, onClear],
   )
 
-  const parseNameAndCountry = useCallback((feature: MapboxPlaceFeature) => {
+  const parseNameCountryRegion = useCallback((feature: MapboxPlaceFeature) => {
     const name = feature.text || feature.place_name?.split(",")[0]?.trim() || ""
     const countryContext = feature.context?.find((c) => c.id.startsWith("country."))
+    const regionContext = feature.context?.find((c) => c.id.startsWith("region."))
     const country = countryContext?.text || feature.place_name?.split(",").pop()?.trim() || ""
-    return { name, country }
+    const region = regionContext?.text?.trim() || undefined
+    return { name, country, region }
   }, [])
 
   const handleSelect = useCallback(
     (feature: MapboxPlaceFeature) => {
       const [lng, lat] = feature.center
-      const { name, country } = parseNameAndCountry(feature)
-      onSelect(lat, lng, name, country)
+      const { name, country, region } = parseNameCountryRegion(feature)
+      onSelect(lat, lng, name, country, region)
       setValue(feature.place_name)
       setPredictions([])
       onError?.("")
     },
-    [onSelect, onError, parseNameAndCountry],
+    [onSelect, onError, parseNameCountryRegion],
   )
 
   const handleGeocode = useCallback(async () => {
@@ -323,7 +337,7 @@ export function CityMapPicker({
   )
 
   const handleCitySelect = useCallback(
-    (lat: number, lng: number, name: string, country: string) => {
+    (lat: number, lng: number, name: string, country: string, region?: string) => {
       if (spinRef.current) {
         // Globe is spinning — stop it, set zoom state before unblocking CityMapSync
         spinRef.current = false
@@ -337,7 +351,7 @@ export function CityMapPicker({
         // onZoomEnd on the map will call onZoomChange(12) once the animation completes
       }
       onCenterChange(lat, lng)
-      onCitySelect?.(lat, lng, name, country)
+      onCitySelect?.(lat, lng, name, country, region)
       onError?.("")
     },
     [onCenterChange, onCitySelect, onError, onZoomChange],

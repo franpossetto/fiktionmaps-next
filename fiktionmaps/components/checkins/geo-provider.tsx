@@ -59,6 +59,8 @@ const CITY_CHANGE_THRESHOLD_M = 5_000
 interface MapboxCityResult {
   name: string
   country: string
+  /** Region/state from Mapbox context — slug disambiguation only, not persisted. */
+  region?: string
   lat: number
   lng: number
 }
@@ -83,12 +85,13 @@ async function reverseGeocodeCity(
     const [fLng, fLat] = feature.center as [number, number]
     const name =
       feature.text || feature.place_name?.split(",")[0]?.trim() || ""
-    const countryCtx = (
-      feature.context as Array<{ id: string; text: string }> | undefined
-    )?.find((c: { id: string }) => c.id.startsWith("country."))
+    const context = feature.context as Array<{ id: string; text: string }> | undefined
+    const countryCtx = context?.find((c) => c.id.startsWith("country."))
+    const regionCtx = context?.find((c) => c.id.startsWith("region."))
     const country =
       countryCtx?.text || feature.place_name?.split(",").pop()?.trim() || ""
-    return { name, country, lat: fLat, lng: fLng }
+    const region = regionCtx?.text?.trim() || undefined
+    return { name, country, region, lat: fLat, lng: fLng }
   } catch {
     return null
   }
@@ -100,6 +103,7 @@ async function resolveCity(
   const result = await findOrCreateCityAction({
     name: mapboxCity.name,
     country: mapboxCity.country,
+    region: mapboxCity.region,
     lat: mapboxCity.lat,
     lng: mapboxCity.lng,
     zoom: 12,

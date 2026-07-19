@@ -166,7 +166,7 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
 
   function hrefForHit(hit: SearchHit): string {
     if (hit.kind === "city") {
-      return mode === "article" ? `/cities/${hit.city.id}` : `/map?city=${hit.city.id}`
+      return mode === "article" ? `/cities/${hit.city.slug}` : `/map?city=${hit.city.slug}`
     }
     return hrefForFiction(hit.fiction)
   }
@@ -257,7 +257,7 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
       if (mode === "map") {
         if (rouletteCityPool.length === 0) return
         const pick = rouletteCityPool[Math.floor(Math.random() * rouletteCityPool.length)]
-        navigate(`/map?city=${encodeURIComponent(pick.id)}`)
+        navigate(`/map?city=${encodeURIComponent(pick.slug)}`)
         return
       }
 
@@ -555,7 +555,7 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
                 <button
                   key={city.id}
                   type="button"
-                  onClick={() => { setNoPlacesModal(null); navigate(`/map?city=${city.id}`) }}
+                  onClick={() => { setNoPlacesModal(null); navigate(`/map?city=${city.slug}`) }}
                   className="flex items-center gap-3 rounded-xl border border-border/60 bg-background px-3 py-2.5 text-left transition-colors hover:bg-accent"
                 >
                   <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />

@@ -4,7 +4,7 @@ import { revalidatePath, updateTag } from "next/cache"
 import { zodErrorMessage } from "@/lib/validation/http"
 import { uuidSchema } from "@/lib/validation/primitives"
 import { supabaseRepositoryAdapter as citiesRepo } from "@/src/cities/infrastructure/supabase/city.repository.impl"
-import { parseCityFormData } from "@/src/cities/domain/city.schemas"
+import { parseCityFormData, parseCityUpdateFormData } from "@/src/cities/domain/city.schemas"
 import { createCityUseCase } from "@/src/cities/application/create-city.usecase"
 import { updateCityUseCase } from "@/src/cities/application/update-city.usecase"
 import { deleteCityUseCase } from "@/src/cities/application/delete-city.usecase"
@@ -49,13 +49,14 @@ export async function createCityAction(formData: FormData): Promise<CreateCityRe
 }
 
 export async function updateCityAction(id: string, formData: FormData): Promise<UpdateCityResult> {
-  const parsed = parseCityFormData(formData)
+  const parsed = parseCityUpdateFormData(formData)
   if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
 
   const city = await updateCityUseCase(id, parsed.data, citiesRepo)
   if (!city) return { success: false, error: "Failed to update city" }
   revalidatePath("/admin")
   revalidatePath(`/admin/city/${id}`)
+  if (city.slug) revalidatePath(`/cities/${city.slug}`)
   updateTag("cities")
   return { success: true, city }
 }

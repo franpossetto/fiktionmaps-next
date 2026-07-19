@@ -221,7 +221,7 @@ export function AppTopNavbar() {
   }
 
   function goToCity(city: City) {
-    router.push(`/cities/${city.id}`)
+    router.push(`/cities/${city.slug}`)
     setIsFocused(false)
     setSearch("")
   }

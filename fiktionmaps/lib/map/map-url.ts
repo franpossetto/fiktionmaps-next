@@ -29,13 +29,13 @@ export function isAllFictionsSelected(
 
 /** Builds map query string; omits `fiction` when all fictions in the city are selected. */
 export function buildMapQueryString(
-  cityId: string,
+  citySlug: string,
   fictionIds: string[],
   available: FictionWithMedia[],
   preserve?: { place?: string | null; openSidebar?: string | null },
 ): string {
   const params = new URLSearchParams()
-  params.set("city", cityId)
+  params.set("city", citySlug)
   if (fictionIds.length === 0) {
     params.set("fiction", MAP_FICTION_NONE)
   } else if (!isAllFictionsSelected(fictionIds, available)) {

@@ -27,6 +27,8 @@ import { MapProvider, MapContainer } from "@/lib/map"
 interface CityFormData {
   name: string
   country: string
+  /** Mapbox region for slug candidates only (not stored). */
+  region: string
   lat: string
   lng: string
   zoom: string
@@ -49,6 +51,7 @@ export function CitiesTab({ initialCities, onOpenCity, viewMode = "cards" }: Cit
   const [formData, setFormData] = useState<CityFormData>(() => ({
     name: "",
     country: "",
+    region: "",
     lat: "48.8566",
     lng: "2.3522",
     zoom: "10",
@@ -69,6 +72,7 @@ export function CitiesTab({ initialCities, onOpenCity, viewMode = "cards" }: Cit
     setFormData({
       name: "",
       country: "",
+      region: "",
       lat: String(defaultCenter.lat),
       lng: String(defaultCenter.lng),
       zoom: "10",
@@ -108,6 +112,7 @@ export function CitiesTab({ initialCities, onOpenCity, viewMode = "cards" }: Cit
     const fd = new FormData()
     fd.set("name", formData.name.trim())
     fd.set("country", formData.country.trim())
+    if (formData.region.trim()) fd.set("region", formData.region.trim())
     fd.set("lat", formData.lat)
     fd.set("lng", formData.lng)
     fd.set("zoom", formData.zoom)
@@ -206,10 +211,10 @@ export function CitiesTab({ initialCities, onOpenCity, viewMode = "cards" }: Cit
                   setFormData((prev) => ({ ...prev, lat: String(lat), lng: String(lng) }))
                 }
                 onZoomChange={(zoom) => setFormData((prev) => ({ ...prev, zoom: String(zoom) }))}
-                onCitySelect={(_, __, name, country) =>
-                  setFormData((prev) => ({ ...prev, name, country }))
+                onCitySelect={(_, __, name, country, region) =>
+                  setFormData((prev) => ({ ...prev, name, country, region: region ?? "" }))
                 }
-                onClear={() => setFormData((prev) => ({ ...prev, name: "", country: "" }))}
+                onClear={() => setFormData((prev) => ({ ...prev, name: "", country: "", region: "" }))}
                 cityName={formData.name}
                 cityCountry={formData.country}
                 introMode
@@ -380,6 +385,7 @@ export function CitiesTab({ initialCities, onOpenCity, viewMode = "cards" }: Cit
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-foreground truncate text-base">{city.name}</h3>
                       <p className="text-xs text-muted-foreground mt-1">{city.country}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 font-mono">/{city.slug}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {city.lat.toFixed(4)}, {city.lng.toFixed(4)} · zoom {city.zoom}
                       </p>
@@ -429,6 +435,7 @@ export function CitiesTab({ initialCities, onOpenCity, viewMode = "cards" }: Cit
               <tr className="border-b border-border bg-muted/40">
                 <th className="text-xs font-semibold uppercase text-muted-foreground py-3 px-4 text-left">Name</th>
                 <th className="text-xs font-semibold uppercase text-muted-foreground py-3 px-4 text-left">Country</th>
+                <th className="text-xs font-semibold uppercase text-muted-foreground py-3 px-4 text-left">Slug</th>
                 <th className="text-xs font-semibold uppercase text-muted-foreground py-3 px-4 text-left">Lat</th>
                 <th className="text-xs font-semibold uppercase text-muted-foreground py-3 px-4 text-left">Lng</th>
                 <th className="text-xs font-semibold uppercase text-muted-foreground py-3 px-4 text-left">Zoom</th>
@@ -452,6 +459,7 @@ export function CitiesTab({ initialCities, onOpenCity, viewMode = "cards" }: Cit
                 >
                   <td className="py-3 px-4 text-left font-medium text-foreground">{city.name}</td>
                   <td className="py-3 px-4 text-left text-sm text-muted-foreground">{city.country}</td>
+                  <td className="py-3 px-4 text-left font-mono text-sm text-muted-foreground">{city.slug}</td>
                   <td className="py-3 px-4 text-left text-sm text-muted-foreground">{city.lat.toFixed(4)}</td>
                   <td className="py-3 px-4 text-left text-sm text-muted-foreground">{city.lng.toFixed(4)}</td>
                   <td className="py-3 px-4 text-left text-sm text-muted-foreground">{city.zoom}</td>

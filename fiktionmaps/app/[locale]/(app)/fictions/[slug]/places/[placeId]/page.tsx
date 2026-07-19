@@ -98,7 +98,7 @@ export default async function FictionPlaceUnderSlugPage({ params }: Props) {
     place: place.id,
     openSidebar: "1",
   })
-  if (city) baseMapParams.set("city", city.id)
+  if (city) baseMapParams.set("city", city.slug)
   const exploreMapHref = `/map?${baseMapParams.toString()}`
 
   return (

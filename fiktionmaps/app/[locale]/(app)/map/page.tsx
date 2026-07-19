@@ -4,7 +4,6 @@ import {
   getCityPlacesCached,
   listCityIdsWithPlacesCached,
 } from "@/src/places/infrastructure/next/place.queries"
-import { isUuidString } from "@/lib/validation/primitives"
 import type { City } from "@/src/cities/domain/city.entity"
 import { MapPageClient, type MapPageInitialData } from "./map-page-client"
 
@@ -18,8 +17,9 @@ function pickInitialCity(
   cityFromUrl: string | undefined,
 ): City | null {
   if (cities.length === 0) return null
-  if (cityFromUrl && isUuidString(cityFromUrl)) {
-    const fromUrl = cities.find((c) => c.id === cityFromUrl)
+  if (cityFromUrl?.trim()) {
+    const slug = cityFromUrl.trim().toLowerCase()
+    const fromUrl = cities.find((c) => c.slug === slug)
     if (fromUrl) return fromUrl
   }
   const withPlaces = cities.filter((c) => cityIdsWithPlaces.includes(c.id))

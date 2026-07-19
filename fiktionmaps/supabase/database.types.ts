@@ -185,6 +185,7 @@ export type Database = {
           id: string
           name: string
           country: string
+          slug: string
           lat: number
           lng: number
           zoom: number
@@ -196,6 +197,7 @@ export type Database = {
           id?: string
           name: string
           country: string
+          slug: string
           lat: number
           lng: number
           zoom: number
@@ -207,6 +209,7 @@ export type Database = {
           id?: string
           name?: string
           country?: string
+          slug?: string
           lat?: number
           lng?: number
           zoom?: number
