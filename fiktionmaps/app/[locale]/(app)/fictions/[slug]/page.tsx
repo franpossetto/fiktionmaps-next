@@ -1,22 +1,23 @@
 import type { Metadata } from "next"
+import { Suspense } from "react"
 import { notFound } from "next/navigation"
 import { getTranslations } from "next-intl/server"
 import {
   getFictionBySlugCached,
-  getFictionCitiesCached,
-  getFictionDetailRecommendations,
   getFictionInterestsCached,
 } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { getInterestCatalogCached } from "@/src/interests/infrastructure/next/interest.queries"
 import { getFictionLikeCountsCached } from "@/src/fiction-likes/infrastructure/next/fiction-likes.queries"
-import {
-  getFictionPlacesCached,
-  getPlaceCountsByFictionIdsCached,
-} from "@/src/places/infrastructure/next/place.queries"
+import { getFictionPlacesCached } from "@/src/places/infrastructure/next/place.queries"
+import { getAllCitiesCached } from "@/src/cities/infrastructure/next/city.queries"
 import { getFictionContributorsCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { getCurrentUserHasLikedFiction } from "@/src/users/infrastructure/next/user.queries"
 import { getSiteUrl } from "@/lib/site"
 import { FictionDetail } from "@/components/fictions/fiction-detail"
+import {
+  FictionDetailRecommendations,
+  FictionDetailRecommendationsFallback,
+} from "@/components/fictions/fiction-detail-recommendations"
 import { FictionDetailRightRail } from "@/components/fictions/fiction-detail-right-rail"
 import { FictionSlugDetailShell } from "@/components/fictions/fiction-slug-detail-shell"
 import { getFictionSidebarSummaryText } from "@/lib/fictions/get-fiction-sidebar-summary-text"
@@ -152,21 +153,24 @@ export default async function FictionSlugPage({ params }: Props) {
 
   const [
     initialPlaces,
-    initialCities,
+    allCities,
     likeCounts,
-    initialLiked,
     fictionInterestIds,
     interestCatalog,
     fictionContributors,
+    sidebarSummary,
+    initialLiked,
   ] = await Promise.all([
     getFictionPlacesCached(fiction.id),
-    getFictionCitiesCached(fiction.id),
+    getAllCitiesCached(),
     getFictionLikeCountsCached([fiction.id]),
-    getCurrentUserHasLikedFiction(fiction.id),
     getFictionInterestsCached(fiction.id),
     getInterestCatalogCached(locale),
     getFictionContributorsCached(fiction.id),
+    getFictionSidebarSummaryText(fiction, locale),
+    getCurrentUserHasLikedFiction(fiction.id),
   ])
+
   const labelByInterestId = new Map(interestCatalog.map((i) => [i.id, i.label]))
   const fictionInterestTags = fictionInterestIds.flatMap((id) => {
     const label = labelByInterestId.get(id)
@@ -174,20 +178,12 @@ export default async function FictionSlugPage({ params }: Props) {
   })
   const initialLikeCount = likeCounts[fiction.id] ?? 0
 
-  const { fictions: fictionRecommendations, reason: fictionRecommendationReason } =
-    await getFictionDetailRecommendations({
-      fictionId: fiction.id,
-      interestIds: fictionInterestIds,
-      places: initialPlaces,
-    })
-  const fictionRecommendationIds = fictionRecommendations.map((f) => f.id)
-  const fictionRecommendationPlaceCounts =
-    fictionRecommendationIds.length > 0
-      ? await getPlaceCountsByFictionIdsCached(fictionRecommendationIds)
-      : {}
+  const cityIdsFromPlaces = new Set(
+    initialPlaces.map((p) => p.location.cityId).filter(Boolean),
+  )
+  const citiesForFiction = allCities.filter((c) => cityIdsFromPlaces.has(c.id))
+  const fictionCitiesOrdered = orderCitiesForFictionDetail(initialPlaces, citiesForFiction)
 
-  const fictionCitiesOrdered = orderCitiesForFictionDetail(initialPlaces, initialCities)
-  const sidebarSummary = await getFictionSidebarSummaryText(fiction, locale)
   return (
     <>
       <script
@@ -218,9 +214,15 @@ export default async function FictionSlugPage({ params }: Props) {
           initialLikeCount={initialLikeCount}
           initialLiked={initialLiked}
           fictionInterestTags={fictionInterestTags}
-          fictionRecommendations={fictionRecommendations}
-          fictionRecommendationReason={fictionRecommendationReason}
-          fictionRecommendationPlaceCounts={fictionRecommendationPlaceCounts}
+          recommendationsSlot={
+            <Suspense fallback={<FictionDetailRecommendationsFallback />}>
+              <FictionDetailRecommendations
+                fictionId={fiction.id}
+                interestIds={fictionInterestIds}
+                places={initialPlaces}
+              />
+            </Suspense>
+          }
         />
       </FictionSlugDetailShell>
     </>

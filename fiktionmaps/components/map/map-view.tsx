@@ -1,7 +1,6 @@
 "use client"
 
 import {
-  startTransition,
   useEffect,
   useState,
   useCallback,
@@ -28,7 +27,6 @@ import {
   useMapMarkerHoverScaleMode,
   useMapMarkerLabelMode,
 } from "@/lib/theme-settings-context"
-import { ensureXsOnce } from "@/lib/asset-images/ensure-xs-client"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import { Map3DToggle } from "./map-3d-toggle"
@@ -171,19 +169,14 @@ const PITCH_3D_THRESHOLD = 20
 
 type MapPinClusterItem = ClusterItem & { place: Place }
 
-function toClusterItems(
-  places: Place[],
-  xsByPlaceId: Record<string, string>,
-): MapPinClusterItem[] {
-  return places.map((p) => {
-    const image = xsByPlaceId[p.id] || p.image
-    return {
-      id: p.id,
-      position: { lat: p.location.lat, lng: p.location.lng },
-      imageUrl: image,
-      place: image === p.image ? p : { ...p, image },
-    }
-  })
+/** Pin thumbs come from place.image (server prefers xs → sm). No client ensureXs. */
+function toClusterItems(places: Place[]): MapPinClusterItem[] {
+  return places.map((p) => ({
+    id: p.id,
+    position: { lat: p.location.lat, lng: p.location.lng },
+    imageUrl: p.image,
+    place: p,
+  }))
 }
 
 function MapLoadReporter({ onLoaded }: { onLoaded?: () => void }) {
@@ -363,9 +356,10 @@ export function MapView({
   onMapLoaded,
   onBoundsChange,
 }: MapViewProps) {
-  const [xsByPlaceId, setXsByPlaceId] = useState<Record<string, string>>({})
   const [primaryMapLoaded, setPrimaryMapLoaded] = useState(false)
-  const clusterItems = useMemo(() => toClusterItems(places, xsByPlaceId), [places, xsByPlaceId])
+  /** Defer second Mapbox (minimap) until browser idle after primary load. */
+  const [minimapReady, setMinimapReady] = useState(false)
+  const clusterItems = useMemo(() => toClusterItems(places), [places])
   const marker2dShape = useMapMarker2dShape()
   const markerLabelMode = useMapMarkerLabelMode()
   const markerHoverScale = useMapMarkerHoverScaleMode()
@@ -381,6 +375,31 @@ export function MapView({
     onMapLoaded?.()
   }, [onMapLoaded])
 
+  useEffect(() => {
+    if (!primaryMapLoaded) {
+      setMinimapReady(false)
+      return
+    }
+    let cancelled = false
+    let idleId: number | undefined
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const enable = () => {
+      if (!cancelled) setMinimapReady(true)
+    }
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(enable, { timeout: 2500 })
+    } else {
+      timeoutId = setTimeout(enable, 1500)
+    }
+    return () => {
+      cancelled = true
+      if (idleId != null && typeof window !== "undefined" && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId)
+      }
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+    }
+  }, [primaryMapLoaded])
+
   const [viewportCenter, setViewportCenter] = useState(() => ({
     lat: city.lat,
     lng: city.lng,
@@ -391,57 +410,6 @@ export function MapView({
   useEffect(() => {
     setViewportCenter({ lat: city.lat, lng: city.lng })
   }, [city.id, city.lat, city.lng])
-
-  // Lazy xs backfill for place pin thumbs (pins previously never triggered ensure).
-  useEffect(() => {
-    if (!primaryMapLoaded) return
-    let cancelled = false
-    const targets = places.filter((place) => {
-      const src = place.image?.trim()
-      return Boolean(src && !src.startsWith("/") && !xsByPlaceId[place.id])
-    })
-    if (targets.length === 0) return
-
-    const backfill = async () => {
-      const resolved: Array<readonly [string, string]> = []
-      // Keep image generation traffic bounded and commit all URLs in one React update.
-      for (let i = 0; i < targets.length && !cancelled; i += 4) {
-        const batch = targets.slice(i, i + 4)
-        const results = await Promise.all(
-          batch.map(async (place) => {
-            const result = await ensureXsOnce({
-              entityType: "place",
-              entityId: place.id,
-              role: "avatar",
-            })
-            return result.success ? ([place.id, result.url] as const) : null
-          }),
-        )
-        for (const result of results) {
-          if (result) resolved.push(result)
-        }
-      }
-      if (cancelled || resolved.length === 0) return
-      startTransition(() => {
-        setXsByPlaceId((prev) => {
-          const next = { ...prev }
-          let changed = false
-          for (const [placeId, url] of resolved) {
-            if (next[placeId] === url) continue
-            next[placeId] = url
-            changed = true
-          }
-          return changed ? next : prev
-        })
-      })
-    }
-
-    const idleId = window.requestIdleCallback(() => void backfill(), { timeout: 3000 })
-    return () => {
-      cancelled = true
-      window.cancelIdleCallback(idleId)
-    }
-  }, [places, primaryMapLoaded, xsByPlaceId])
 
   return (
     <MapContainer
@@ -482,7 +450,7 @@ export function MapView({
           <Map3DTogglePortal is3D={is3D} onToggle={onToggle3D} cityId={city.id} />
         </>
       )}
-      {primaryMapLoaded && (
+      {minimapReady && (
         <NavMapPortal city={city} viewportCenter={viewportCenter} places={places} />
       )}
     </MapContainer>

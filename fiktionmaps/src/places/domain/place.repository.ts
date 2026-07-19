@@ -18,6 +18,8 @@ export interface PlacesRepositoryPort {
   listAllPlaces(): Promise<Place[]>
   getCountsByFictionIds(fictionIds: string[]): Promise<Record<string, number>>
   getById(placeId: string, avatarVariant?: "sm" | "lg"): Promise<Place | null>
+  /** Batch fetch by place ids (order not guaranteed). */
+  getByIds(placeIds: string[], avatarVariant?: "sm" | "lg"): Promise<Place[]>
   getByFictionIdAndSlug(fictionId: string, slug: string, avatarVariant?: "sm" | "lg"): Promise<Place | null>
   listSlugsByFictionId(fictionId: string): Promise<string[]>
   getByFictionId(fictionId: string): Promise<Place[]>

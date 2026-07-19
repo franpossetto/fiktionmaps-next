@@ -139,7 +139,7 @@ async function removeVideoObjectIfAny(supabase: SupabaseLike, videoUrl: string |
 }
 
 async function fetchSceneById(
-  supabase: SupabaseLike,
+  supabase: SupabaseLike | AnonSupabase,
   id: string
 ): Promise<Scene | null> {
   const { data, error } = await supabase.from("scenes").select(sceneSelect).eq("id", id).maybeSingle()
@@ -151,6 +151,43 @@ async function fetchSceneById(
   const scene = mapRow(data as SceneRowWithPlace)
   const enriched = await attachThumbnailsToScenes(supabase, [scene])
   return enriched[0] ?? null
+}
+
+async function listScenesWithClient(
+  supabase: SupabaseLike | AnonSupabase,
+  filters: SceneListFilters,
+): Promise<Scene[]> {
+  let placeIdsForLocation: string[] | null = null
+  if (filters.locationId) {
+    const { data: placeRows, error: pe } = await supabase
+      .from("places")
+      .select("id")
+      .eq("location_id", filters.locationId)
+    if (pe) {
+      console.error("[scenes repo] list places:", pe.message)
+      return []
+    }
+    placeIdsForLocation = (placeRows ?? []).map((p) => p.id)
+    if (placeIdsForLocation.length === 0) return []
+  }
+
+  let q = supabase.from("scenes").select(sceneSelect)
+
+  if (filters.fictionId) q = q.eq("fiction_id", filters.fictionId)
+  if (filters.placeId) q = q.eq("place_id", filters.placeId)
+  if (placeIdsForLocation) q = q.in("place_id", placeIdsForLocation)
+  if (filters.active !== undefined) q = q.eq("active", filters.active)
+
+  const { data, error } = await q
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true })
+
+  if (error) {
+    console.error("[scenes repo] list:", error.message)
+    return []
+  }
+  const mapped = (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
+  return attachThumbnailsToScenes(supabase, mapped)
 }
 
 type LocFromJoin = {
@@ -371,38 +408,7 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
 
   async list(filters: SceneListFilters): Promise<Scene[]> {
     const supabase = await createClient()
-
-    let placeIdsForLocation: string[] | null = null
-    if (filters.locationId) {
-      const { data: placeRows, error: pe } = await supabase
-        .from("places")
-        .select("id")
-        .eq("location_id", filters.locationId)
-      if (pe) {
-        console.error("[scenes repo] list places:", pe.message)
-        return []
-      }
-      placeIdsForLocation = (placeRows ?? []).map((p) => p.id)
-      if (placeIdsForLocation.length === 0) return []
-    }
-
-    let q = supabase.from("scenes").select(sceneSelect)
-
-    if (filters.fictionId) q = q.eq("fiction_id", filters.fictionId)
-    if (filters.placeId) q = q.eq("place_id", filters.placeId)
-    if (placeIdsForLocation) q = q.in("place_id", placeIdsForLocation)
-    if (filters.active !== undefined) q = q.eq("active", filters.active)
-
-    const { data, error } = await q
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true })
-
-    if (error) {
-      console.error("[scenes repo] list:", error.message)
-      return []
-    }
-    const mapped = (data as SceneRowWithPlace[] | null)?.map(mapRow) ?? []
-    return attachThumbnailsToScenes(supabase, mapped)
+    return listScenesWithClient(supabase, filters)
   },
 
   async create(data: CreateSceneData, createdBy: string | null, status: SceneRowStatus): Promise<Scene | null> {
@@ -750,5 +756,18 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
     } catch {
       return []
     }
+  },
+}
+
+/**
+ * Public/anonymous reads — safe inside `unstable_cache`.
+ * Mutations and staff/creator pending reads stay on `scenesSupabaseAdapter` (cookie client).
+ */
+export const scenesRepoPublic: Pick<ScenesRepositoryPort, "getById" | "list"> = {
+  async getById(id: string): Promise<Scene | null> {
+    return fetchSceneById(createAnonymousClient(), id)
+  },
+  async list(filters: SceneListFilters): Promise<Scene[]> {
+    return listScenesWithClient(createAnonymousClient(), filters)
   },
 }

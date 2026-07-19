@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { createPortal } from "react-dom"
-import { useMap } from "react-map-gl/mapbox"
-import { MapContainer, MapMarker, useMapLoaded } from "@/lib/map"
+import dynamic from "next/dynamic"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import { Expand, Map, Minimize2, X } from "lucide-react"
@@ -15,59 +14,11 @@ import { MAP_MINIMAP_SLOT_ID } from "./map-slots"
 const SIZE_SMALL = { width: 200, height: 140 }
 const SIZE_EXPANDED = { width: 360, height: 280 }
 
-function NavMapResizeTrigger() {
-  const mapRef = useMap()?.current
-
-  useEffect(() => {
-    if (!mapRef) return
-    const map = mapRef.getMap()
-    const container = map.getContainer()
-    if (!container) return
-
-    const resize = () => {
-      try {
-        map.resize()
-      } catch {
-        // map not ready
-      }
-    }
-
-    resize()
-    const observer = new ResizeObserver(() => resize())
-    observer.observe(container)
-    return () => observer.disconnect()
-  }, [mapRef])
-
-  return null
-}
-
-function NavMapPins({
-  places,
-  viewportCenter,
-}: {
-  places: Place[]
-  viewportCenter: { lat: number; lng: number }
-}) {
-  const mapLoaded = useMapLoaded()
-
-  if (!mapLoaded) return null
-
-  return (
-    <div className="absolute inset-0 pointer-events-none [&>*]:pointer-events-auto">
-      {places.map((loc) => (
-        <MapMarker key={loc.id} position={{ lat: loc.location.lat, lng: loc.location.lng }}>
-          <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-sm" title={loc.name} />
-        </MapMarker>
-      ))}
-      <MapMarker position={viewportCenter}>
-        <div
-          className="h-3 w-3 rounded-full border-2 border-white bg-primary shadow-md"
-          title="You are here"
-        />
-      </MapMarker>
-    </div>
-  )
-}
+/** Second Mapbox instance only when the minimap is visible. */
+const NavMapCanvas = dynamic(
+  () => import("./nav-map-canvas").then((m) => ({ default: m.NavMapCanvas })),
+  { ssr: false },
+)
 
 interface NavMapProps {
   city: City
@@ -148,25 +99,14 @@ export function NavMap({ city, viewportCenter, places, onMinimapClick }: NavMapP
             "0 4px 6px -1px rgba(0,0,0,0.2), 0 10px 24px -4px rgba(0,0,0,0.35), 0 20px 48px -8px rgba(0,0,0,0.4)",
         }}
       >
-        <div style={{ width: size.width, height: size.height }} className="transition-[width,height] duration-200">
-          <MapContainer
-            id="minimap"
-            mapKey="minimap"
-            defaultCenter={{ lat: city.lat, lng: city.lng }}
-            center={viewportCenter}
-            defaultZoom={11}
-            minZoom={10}
-            maxZoom={14}
-            interactive={true}
-            controls={{ fullscreen: false }}
-            showBuildings3D={false}
-            className="h-full w-full"
-            onClick={handleMinimapClick}
-          >
-            <NavMapResizeTrigger />
-            <NavMapPins places={places} viewportCenter={viewportCenter} />
-          </MapContainer>
-        </div>
+        <NavMapCanvas
+          city={city}
+          viewportCenter={viewportCenter}
+          places={places}
+          width={size.width}
+          height={size.height}
+          onMinimapClick={handleMinimapClick}
+        />
       </div>
     </div>,
     container,

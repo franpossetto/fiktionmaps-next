@@ -371,23 +371,7 @@ export function createPlacesSupabaseAdapter(
       if (error || !placeRows) return []
       const places = placeRows as Record<string, unknown>[]
       const placeIds = places.map((p) => p.id as string).filter(Boolean)
-
-      const avatarByPlaceId = new Map<string, string>()
-      if (placeIds.length > 0) {
-        const { data: avatarRows } = await supabase
-          .from("asset_images")
-          .select("entity_id, url")
-          .eq("entity_type", "place")
-          .eq("role", "avatar")
-          .eq("variant", "sm")
-          .in("entity_id", placeIds)
-        for (const r of avatarRows ?? []) {
-          const row = r as Record<string, unknown>
-          const eid = row.entity_id ?? row.entityId
-          const url = row.url
-          if (eid && url) avatarByPlaceId.set(String(eid), String(url))
-        }
-      }
+      const avatarByPlaceId = await loadPlaceAvatarThumbs(supabase, placeIds)
       return mapPlaceRowsToPlaces(places, avatarByPlaceId)
     }),
 
@@ -404,23 +388,7 @@ export function createPlacesSupabaseAdapter(
       if (error || !placeRows) return []
       const places = placeRows as Record<string, unknown>[]
       const placeIds = places.map((p) => p.id as string).filter(Boolean)
-
-      const avatarByPlaceId = new Map<string, string>()
-      if (placeIds.length > 0) {
-        const { data: avatarRows } = await supabase
-          .from("asset_images")
-          .select("entity_id, url")
-          .eq("entity_type", "place")
-          .eq("role", "avatar")
-          .eq("variant", "sm")
-          .in("entity_id", placeIds)
-        for (const r of avatarRows ?? []) {
-          const row = r as Record<string, unknown>
-          const eid = row.entity_id ?? row.entityId
-          const url = row.url
-          if (eid && url) avatarByPlaceId.set(String(eid), String(url))
-        }
-      }
+      const avatarByPlaceId = await loadPlaceAvatarThumbs(supabase, placeIds)
       return mapPlaceRowsToPlaces(places, avatarByPlaceId)
     }),
 
@@ -437,23 +405,7 @@ export function createPlacesSupabaseAdapter(
       if (error || !placeRows) return []
       const places = placeRows as Record<string, unknown>[]
       const placeIds = places.map((p) => p.id as string).filter(Boolean)
-
-      const avatarByPlaceId = new Map<string, string>()
-      if (placeIds.length > 0) {
-        const { data: avatarRows } = await supabase
-          .from("asset_images")
-          .select("entity_id, url")
-          .eq("entity_type", "place")
-          .eq("role", "avatar")
-          .eq("variant", "sm")
-          .in("entity_id", placeIds)
-        for (const r of avatarRows ?? []) {
-          const row = r as Record<string, unknown>
-          const eid = row.entity_id ?? row.entityId
-          const url = row.url
-          if (eid && url) avatarByPlaceId.set(String(eid), String(url))
-        }
-      }
+      const avatarByPlaceId = await loadPlaceAvatarThumbs(supabase, placeIds)
       return mapPlaceRowsToPlaces(places, avatarByPlaceId)
     }),
 
@@ -572,9 +524,14 @@ export function createPlacesSupabaseAdapter(
         return url || null
       }
 
-      let imageUrl = await fetchAvatarUrl(avatarVariant)
-      if (!imageUrl && avatarVariant === "lg") {
-        imageUrl = await fetchAvatarUrl("sm")
+      let imageUrl: string | null = null
+      if (avatarVariant === "sm") {
+        // Map / list thumbs: prefer xs, fall back to sm.
+        const thumbs = await loadPlaceAvatarThumbs(supabase, [placeId])
+        imageUrl = thumbs.get(placeId) ?? null
+      } else {
+        imageUrl = await fetchAvatarUrl("lg")
+        if (!imageUrl) imageUrl = await fetchAvatarUrl("sm")
       }
 
       const pid = row.id as string
@@ -607,6 +564,86 @@ export function createPlacesSupabaseAdapter(
         visitTip: undefined,
         shootEnvironment: optShootEnvironment(rowRec),
       }
+    }),
+
+    getByIds: cache(async (placeIds: string[], avatarVariant: "sm" | "lg" = "sm"): Promise<Place[]> => {
+      const uniqueIds = [...new Set(placeIds.filter(Boolean))]
+      if (uniqueIds.length === 0) return []
+
+      const supabase = await getSupabase()
+      const { data: rows, error } = await supabase
+        .from("places")
+        .select(
+          `id, fiction_id, description, active, name, slug, shoot_environment,
+           location:locations!inner (
+             ${LOCATION_EMBED_SELECT}
+           )`
+        )
+        .in("id", uniqueIds)
+
+      if (error) {
+        console.error("[places repo] getByIds:", error.message)
+        return []
+      }
+      if (!rows?.length) return []
+
+      let avatarByPlaceId = new Map<string, string>()
+      if (avatarVariant === "sm") {
+        avatarByPlaceId = await loadPlaceAvatarThumbs(
+          supabase,
+          rows.map((r) => r.id as string),
+        )
+      } else {
+        const ids = rows.map((r) => r.id as string)
+        const { data: avatarRows } = await supabase
+          .from("asset_images")
+          .select("entity_id, url, variant")
+          .eq("entity_type", "place")
+          .eq("role", "avatar")
+          .in("variant", ["lg", "sm"])
+          .in("entity_id", ids)
+        for (const r of avatarRows ?? []) {
+          if (r.variant === "lg" && r.entity_id && r.url) {
+            avatarByPlaceId.set(r.entity_id as string, r.url as string)
+          }
+        }
+        for (const r of avatarRows ?? []) {
+          if (r.variant === "sm" && r.entity_id && r.url && !avatarByPlaceId.has(r.entity_id as string)) {
+            avatarByPlaceId.set(r.entity_id as string, r.url as string)
+          }
+        }
+      }
+
+      return (rows as Record<string, unknown>[]).map((row) => {
+        const loc = parseLocationEmbedFromPlaceRow(row)
+        const pid = row.id as string
+        const placeName = str(row, "name", "name") || "Place"
+        const placeSlug = str(row, "slug", "slug") || pid
+        return {
+          id: pid,
+          placeId: pid,
+          name: placeName,
+          slug: placeSlug,
+          fictionId: row.fiction_id as string,
+          location: {
+            name: loc ? str(loc, "name", "name") || "Unknown place" : "Unknown place",
+            address: loc ? str(loc, "formatted_address", "formattedAddress") : "",
+            lat: loc ? num(loc, "latitude", "latitude") : 0,
+            lng: loc ? num(loc, "longitude", "longitude") : 0,
+            cityId: loc ? str(loc, "city_id", "cityId") : "",
+            locationType: loc ? optStr(loc, "type", "type") : null,
+            isLandmark: loc ? Boolean(loc.is_landmark ?? loc.isLandmark) : false,
+            streetViewReference: loc ? parseStreetViewReferenceFromLocationEmbed(loc) : null,
+          },
+          image: avatarByPlaceId.get(pid) ?? "/placeholder.svg",
+          videoUrl: "",
+          description: (row.description as string | null) ?? "",
+          sceneDescription: "",
+          sceneQuote: undefined,
+          visitTip: undefined,
+          shootEnvironment: optShootEnvironment(row),
+        }
+      })
     }),
 
     async getByBboxAndFictionIds(fictionIds: string[], bbox: MapBbox): Promise<Place[]> {
@@ -682,9 +719,15 @@ export function createPlacesSupabaseAdapter(
           )
           .eq("fiction_id", fictionId)
           .eq("slug", slug.trim())
+          .eq("active", true)
+          .eq("status", "approved")
           .maybeSingle()
 
-        if (error || !row) return null
+        if (error || !row) {
+          if (error) console.error("[places repo] getByFictionIdAndSlug:", error.message)
+          return null
+        }
+        // Reuse getById for avatar variants (single code path; avoids a second geo join).
         return port.getById(row.id as string, avatarVariant)
       },
     ),

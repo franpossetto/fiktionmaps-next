@@ -5,13 +5,31 @@ import {
   signInAction,
   signUpAction,
   signOutAction,
-  getAuthenticatedUserAction,
+  getSessionBootstrapAction,
 } from "@/lib/actions/auth/auth.actions"
 import {
   getCurrentUserProfileAction,
   completeOnboardingAction,
+  type ProfileWithOnboarding,
 } from "@/src/users/infrastructure/next/user.actions"
+import type { AuthUser } from "@/lib/auth/auth.types"
 import { isStaffUserRole, isContributorUserRole } from "@/src/users/domain/user.roles"
+
+/** Module-level dedupe so React Strict Mode remount doesn't double-fetch session. */
+let sessionBootstrapInflight: Promise<{
+  user: AuthUser | null
+  profile: ProfileWithOnboarding | null
+  error: string | null
+}> | null = null
+
+function loadSessionBootstrap() {
+  if (!sessionBootstrapInflight) {
+    sessionBootstrapInflight = getSessionBootstrapAction().finally(() => {
+      sessionBootstrapInflight = null
+    })
+  }
+  return sessionBootstrapInflight
+}
 
 export interface User {
   id: string
@@ -78,21 +96,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false
     async function init() {
-      const authResult = await getAuthenticatedUserAction()
+      const bootstrap = await loadSessionBootstrap()
       if (cancelled) return
-      if (authResult.data) {
-        setUser(authUserToUser(authResult.data))
-        const profileResult = await getCurrentUserProfileAction()
-        if (cancelled) return
-        setNeedsOnboarding(profileResult.data ? !profileResult.data.onboardingCompleted : true)
-        const admin = profileResult.data?.role === "admin"
-        setIsAdmin(admin)
-        const staff = profileResult.data ? isStaffUserRole(profileResult.data.role) : false
-        setIsStaffModerator(staff)
-        const contributor = profileResult.data ? isContributorUserRole(profileResult.data.role) : false
-        setIsContributor(contributor)
+      if (bootstrap.user) {
+        setUser(authUserToUser(bootstrap.user))
+        const profile = bootstrap.profile
+        setNeedsOnboarding(profile ? !profile.onboardingCompleted : true)
+        const admin = profile?.role === "admin"
+        setIsAdmin(Boolean(admin))
+        setIsStaffModerator(profile ? isStaffUserRole(profile.role) : false)
+        setIsContributor(profile ? isContributorUserRole(profile.role) : false)
         if (process.env.NODE_ENV === "development") {
-          console.info("[auth] profile role → isAdmin", profileResult.data?.role, admin)
+          console.info("[auth] profile role → isAdmin", profile?.role, admin)
         }
       } else {
         setIsAdmin(false)

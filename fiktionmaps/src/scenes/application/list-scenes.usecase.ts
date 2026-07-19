@@ -3,7 +3,7 @@ import type { Scene } from "@/src/scenes/domain/scene.entity"
 
 export async function listScenesUseCase(
   filters: SceneListFilters,
-  repo: ScenesRepositoryPort,
+  repo: Pick<ScenesRepositoryPort, "list">,
 ): Promise<Scene[]> {
   return repo.list(filters)
 }

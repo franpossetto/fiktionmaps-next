@@ -2,7 +2,7 @@ import { isUuidString } from "@/lib/validation/primitives"
 import type { PlacesRepositoryPort } from "@/src/places/domain/place.repository"
 import type { Place } from "@/src/places/domain/place.entity"
 
-/** Public fiction place URL segment: slug or legacy place UUID (no redirect). */
+/** Public fiction place URL segment: slug or legacy place UUID (no redirect). Active + approved only. */
 export async function resolvePlaceForFictionPathUseCase(
   fictionId: string,
   segment: string,
@@ -11,9 +11,16 @@ export async function resolvePlaceForFictionPathUseCase(
 ): Promise<Place | null> {
   const raw = segment.trim()
   if (!raw) return null
-  const place = isUuidString(raw)
-    ? await repo.getById(raw, avatarVariant)
-    : await repo.getByFictionIdAndSlug(fictionId, raw, avatarVariant)
+
+  if (isUuidString(raw)) {
+    const ok = await repo.isApprovedActivePlace(raw)
+    if (!ok) return null
+    const place = await repo.getById(raw, avatarVariant)
+    if (!place || place.fictionId !== fictionId) return null
+    return place
+  }
+
+  const place = await repo.getByFictionIdAndSlug(fictionId, raw, avatarVariant)
   if (!place || place.fictionId !== fictionId) return null
   return place
 }

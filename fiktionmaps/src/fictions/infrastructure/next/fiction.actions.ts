@@ -311,6 +311,22 @@ export async function uploadFictionImageAction(
 }
 
 export async function updateFictionAction(id: string, formData: FormData): Promise<UpdateFictionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: "Unauthorized" }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  if (!isStaffModerator) return { success: false, error: "Unauthorized" }
+
+  if (!uuidSchema.safeParse(id).success) return { success: false, error: "Invalid fictionId" }
+
   const parsed = parseUpdateFictionFormData(formData)
   if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
 
@@ -416,6 +432,22 @@ export async function createContributorFictionWithImagesAction(formData: FormDat
 }
 
 export async function deleteFictionAction(id: string): Promise<DeleteFictionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: "Unauthorized" }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  if (!isStaffModerator) return { success: false, error: "Unauthorized" }
+
+  if (!uuidSchema.safeParse(id).success) return { success: false, error: "Invalid fictionId" }
+
   const ok = await deleteFictionUseCase(id, fictionsRepo)
   if (!ok) return { success: false, error: "Failed to delete fiction" }
   revalidatePath("/admin")
@@ -425,6 +457,22 @@ export async function deleteFictionAction(id: string): Promise<DeleteFictionResu
 }
 
 export async function setFictionActiveAction(id: string, active: boolean): Promise<SetFictionActiveResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: "Unauthorized" }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  if (!isStaffModerator) return { success: false, error: "Unauthorized" }
+
+  if (!uuidSchema.safeParse(id).success) return { success: false, error: "Invalid fictionId" }
+
   const fiction = await updateFictionUseCase(id, { active }, fictionsRepo)
   if (!fiction) return { success: false, error: "Failed to update fiction" }
   revalidatePath("/admin")

@@ -3,12 +3,12 @@ import { notFound } from "next/navigation"
 import { getTranslations } from "next-intl/server"
 import { getFictionBySlugCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { getPlaceLocationByIdCached } from "@/src/places/infrastructure/next/place.queries"
-import { getSceneByIdUncached, getScenesForFiction, getScenesForCityCached } from "@/src/scenes/infrastructure/next/scene.queries"
+import { getSceneByIdCached } from "@/src/scenes/infrastructure/next/scene.queries"
+import { getSceneWatchBundleUseCase } from "@/src/scenes/application/get-scene-watch-bundle.usecase"
 import { getSiteUrl } from "@/lib/site"
-import type { Place } from "@/src/places/domain/place.entity"
 import { FictionSceneWatchClient } from "@/components/fictions/fiction-scene-watch-client"
 import { FictionSlugDetailShell } from "@/components/fictions/fiction-slug-detail-shell"
-import { SceneUpNextAside } from "@/components/scenes/scene-up-next-aside"
+import { SceneUpNextDeferred } from "@/components/scenes/scene-up-next-deferred"
 import { getFictionSidebarSummaryText } from "@/lib/fictions/get-fiction-sidebar-summary-text"
 
 type Props = {
@@ -21,17 +21,11 @@ function mapLocaleToOpenGraph(locale: string): string {
   return locale
 }
 
-async function loadRelatedPlaces(fictionScenes: { placeId: string }[], primaryPlaceId: string): Promise<Place[]> {
-  const placeIds = [...new Set([...fictionScenes.map((s) => s.placeId), primaryPlaceId])]
-  const places = await Promise.all(placeIds.map((id) => getPlaceLocationByIdCached(id)))
-  return places.filter((p): p is Place => p != null)
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug, sceneId, locale } = await params
   const siteUrl = getSiteUrl()
   const fiction = await getFictionBySlugCached(slug.trim())
-  const scene = fiction ? await getSceneByIdUncached(sceneId) : null
+  const scene = fiction ? await getSceneByIdCached(sceneId) : null
   const tMeta = await getTranslations({ locale, namespace: "Metadata" })
   if (!fiction?.active || !scene || scene.fictionId !== fiction.id) {
     return {
@@ -77,50 +71,42 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function FictionSceneUnderSlugPage({ params }: Props) {
   const { slug, sceneId, locale } = await params
-  const fiction = await getFictionBySlugCached(slug.trim())
-  if (!fiction?.active) notFound()
 
-  const scene = await getSceneByIdUncached(sceneId)
-  if (!scene || scene.fictionId !== fiction.id) notFound()
+  const bundle = await getSceneWatchBundleUseCase(
+    { fictionSlug: slug, sceneId },
+    {
+      getFictionBySlug: getFictionBySlugCached,
+      getSceneById: getSceneByIdCached,
+      getPlaceById: getPlaceLocationByIdCached,
+    },
+  )
+  if (!bundle) notFound()
 
-  const location = await getPlaceLocationByIdCached(scene.placeId)
-  if (!location || location.fictionId !== fiction.id) notFound()
-
-  const cityId = location.location.cityId
-
-  const [fictionScenes, sidebarSummary, cityData] = await Promise.all([
-    getScenesForFiction(fiction.id),
-    getFictionSidebarSummaryText(fiction, locale),
-    getScenesForCityCached(cityId),
-  ])
-
-  const relatedPlaces = await loadRelatedPlaces(fictionScenes, scene.placeId)
-  const currentWatchScene = fictionScenes.find((s) => s.id === sceneId) ?? scene
+  const { fiction, scene, place } = bundle
+  const cityId = place.location.cityId
   const canonicalSlug = fiction.slug.trim()
-
-  const cityScenes = cityData.scenes.filter((s) => s.fictionId !== fiction.id)
+  const sidebarSummary = await getFictionSidebarSummaryText(fiction, locale)
 
   return (
     <FictionSlugDetailShell
       fiction={fiction}
       summaryText={sidebarSummary}
       rightAside={
-        <SceneUpNextAside
+        <SceneUpNextDeferred
+          fictionId={fiction.id}
           fictionPathSlug={canonicalSlug}
           currentSceneId={sceneId}
-          scenes={fictionScenes}
-          relatedPlaces={relatedPlaces}
-          cityScenes={cityScenes}
-          cityFictionSlugs={cityData.fictionSlugById}
+          primaryPlaceId={scene.placeId}
+          cityId={cityId}
         />
       }
     >
       <FictionSceneWatchClient
         fiction={fiction}
         fictionPathSlug={canonicalSlug}
-        currentWatchScene={currentWatchScene}
-        placeName={location.name}
-        placeSlug={location.slug}
+        currentWatchScene={scene}
+        placeName={place.name}
+        placeSlug={place.slug}
       />
     </FictionSlugDetailShell>
   )

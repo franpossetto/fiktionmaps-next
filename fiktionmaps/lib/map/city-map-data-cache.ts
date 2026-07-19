@@ -54,6 +54,11 @@ export function getCachedCityFictions(cityId: string): FictionWithMedia[] | null
   return cache.get(cityId)?.fictions ?? null
 }
 
+/** Seed from RSC so the map client skips the first places/fictions round-trips. */
+export function seedCityMapData(cityId: string, data: CityMapData): void {
+  patchCache(cityId, data)
+}
+
 export function loadCityPlaces(cityId: string): Promise<Place[]> {
   const cached = getCachedCityPlaces(cityId)
   if (cached) return Promise.resolve(cached)

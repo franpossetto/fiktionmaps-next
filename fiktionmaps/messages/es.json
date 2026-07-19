@@ -402,6 +402,8 @@
     "shootEnvironment_interior_exterior": "Interior y exterior"
   },
   "Map": {
+    "openMapSearch": "Buscar ficciones, ciudades o lugares",
+    "mapSearchDialogTitle": "Buscar en el mapa",
     "searchCities": "Buscar ciudades...",
     "searchFictions": "Buscar ficciones...",
     "searchFictionInCity": "Buscar una ficción en una ciudad…",

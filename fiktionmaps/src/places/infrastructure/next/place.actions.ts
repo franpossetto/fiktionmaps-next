@@ -29,6 +29,10 @@ import {
   listMapSearchCatalogCached,
   listPlacesInBboxForFictionIds,
 } from "./place.queries"
+import { getMapLocationPanelUseCase } from "@/src/places/application/get-map-location-panel.usecase"
+import type { MapLocationPanel } from "@/src/places/application/get-map-location-panel.usecase"
+import { getScenesForPlace } from "@/src/scenes/infrastructure/next/scene.queries"
+import { getPlaceContributorsWithDatesCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import type { MapSearchCatalog } from "@/src/places/domain/map-search-catalog.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
@@ -139,6 +143,18 @@ export async function getPlaceLocationDetailAction(placeId: string): Promise<Pla
   return getPlaceLocationByIdDetailCached(placeId)
 }
 
+/** Map sidebar: detail + scenes + contributors in one round-trip (uuid-validated). */
+export async function getMapLocationPanelAction(placeId: string): Promise<MapLocationPanel> {
+  if (!uuidSchema.safeParse(placeId).success) {
+    return { place: null, scenes: [], contributors: [] }
+  }
+  return getMapLocationPanelUseCase(placeId, {
+    getPlaceDetail: getPlaceLocationByIdDetailCached,
+    listActiveScenesForPlace: getScenesForPlace,
+    getContributors: getPlaceContributorsWithDatesCached,
+  })
+}
+
 export async function getFictionPlacesAction(fictionId: string): Promise<Place[]> {
   if (!uuidSchema.safeParse(fictionId).success) return []
   return getFictionPlacesCached(fictionId)
@@ -212,6 +228,22 @@ export async function createPlaceAction(data: CreatePlaceData): Promise<CreatePl
 }
 
 export async function updatePlaceAction(placeId: string, data: UpdatePlaceData): Promise<UpdatePlaceResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: "Unauthorized" }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  if (!isStaffModerator) return { success: false, error: "Unauthorized" }
+
+  if (!uuidSchema.safeParse(placeId).success) return { success: false, error: "Invalid placeId" }
+
   const ok = await updatePlaceUseCase(placeId, data, placesRepo)
   if (!ok) return { success: false, error: "Place not found or update failed" }
   updateTag("places")
@@ -219,6 +251,22 @@ export async function updatePlaceAction(placeId: string, data: UpdatePlaceData):
 }
 
 export async function deletePlaceAction(placeId: string): Promise<DeletePlaceResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: "Unauthorized" }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  if (!isStaffModerator) return { success: false, error: "Unauthorized" }
+
+  if (!uuidSchema.safeParse(placeId).success) return { success: false, error: "Invalid placeId" }
+
   const ok = await deletePlaceUseCase(placeId, placesRepo)
   if (!ok) return { success: false, error: "Place not found or delete failed" }
   updateTag("places")

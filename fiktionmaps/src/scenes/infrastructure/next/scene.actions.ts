@@ -91,6 +91,13 @@ export async function updateSceneAction(sceneId: string, body: unknown): Promise
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { success: false, error: "Unauthorized" }
 
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  if (!isStaffModerator) return { success: false, error: "Unauthorized" }
+
   if (!uuidSchema.safeParse(sceneId).success) return { success: false, error: "Invalid sceneId" }
 
   const parsed = patchSceneBodySchema.safeParse(body)
@@ -113,6 +120,13 @@ export async function deleteSceneAction(sceneId: string): Promise<DeleteSceneRes
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { success: false, error: "Unauthorized" }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  if (!isStaffModerator) return { success: false, error: "Unauthorized" }
 
   if (!uuidSchema.safeParse(sceneId).success) return { success: false, error: "Invalid sceneId" }
 
