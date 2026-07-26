@@ -8,6 +8,8 @@ export type UpdateCityRepoInput = Omit<UpdateCityData, "slug"> & { slug?: string
 
 export interface CitiesRepositoryPort {
   getAll(): Promise<City[]>
+  /** Total cities in the catalog. */
+  countAll(): Promise<number>
   getById(id: string): Promise<City | null>
   getBySlug(slug: string): Promise<City | null>
   findByNameAndCountry(name: string, country: string): Promise<City | null>

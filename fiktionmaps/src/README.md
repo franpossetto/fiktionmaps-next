@@ -51,5 +51,5 @@ src/<feature>/
 
 ## Further reading
 
-- [docs/architecture-modules.md](../docs/architecture-modules.md) — full reference, checklist, anti-patterns
+- [docs/reference/architecture.md](../docs/reference/architecture.md) — full reference, checklist, anti-patterns
 - `.cursor/rules/fiktionmaps-architecture.mdc` — enforced rule for agents

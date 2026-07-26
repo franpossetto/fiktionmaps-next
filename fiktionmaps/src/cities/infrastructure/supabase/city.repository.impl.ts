@@ -41,6 +41,18 @@ export function createCitiesSupabaseAdapter(
       return (data ?? []).map(mapCity)
     }),
 
+    countAll: cache(async (): Promise<number> => {
+      const supabase = await getSupabase()
+      const { count, error } = await supabase
+        .from("cities")
+        .select("*", { count: "exact", head: true })
+      if (error) {
+        console.error("[cities repo] countAll:", error.message)
+        return 0
+      }
+      return count ?? 0
+    }),
+
     getById: cache(async (id: string): Promise<City | null> => {
       const supabase = await getSupabase()
       const { data, error } = await supabase

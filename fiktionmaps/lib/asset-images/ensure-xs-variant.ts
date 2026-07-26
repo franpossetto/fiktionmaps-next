@@ -78,19 +78,27 @@ export async function ensureAssetImageXs(options: {
 
   const { data: sourceRows } = await readClient
     .from("asset_images")
-    .select("variant, url")
+    .select("variant, url, focus_x, focus_y")
     .eq("entity_type", entityType)
     .eq("entity_id", entityId)
     .eq("role", role)
     .in("variant", ["sm", "lg"])
 
-  const rows = (sourceRows ?? []) as { variant: string; url: string }[]
-  const sm = rows.find((r) => r.variant === "sm")?.url?.trim()
-  const lg = rows.find((r) => r.variant === "lg")?.url?.trim()
-  const sourceUrl = sm || lg
+  const rows = (sourceRows ?? []) as {
+    variant: string
+    url: string
+    focus_x?: number | null
+    focus_y?: number | null
+  }[]
+  const smRow = rows.find((r) => r.variant === "sm")
+  const lgRow = rows.find((r) => r.variant === "lg")
+  const sourceRow = smRow || lgRow
+  const sourceUrl = sourceRow?.url?.trim()
   if (!sourceUrl) {
     return { success: false, error: "No source variant (sm/lg) to derive xs" }
   }
+  const focusX = sourceRow?.focus_x ?? 50
+  const focusY = sourceRow?.focus_y ?? 50
 
   const sourcePath = storagePathFromPublicUrl(sourceUrl)
   if (!sourcePath) {
@@ -140,6 +148,8 @@ export async function ensureAssetImageXs(options: {
       role,
       variant: "xs",
       url,
+      focus_x: focusX,
+      focus_y: focusY,
     },
     { onConflict: "entity_type,entity_id,role,variant" },
   )

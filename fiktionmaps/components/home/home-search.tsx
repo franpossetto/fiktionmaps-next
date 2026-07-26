@@ -45,6 +45,8 @@ interface HomeSearchProps {
   fictions: FictionWithMedia[]
   placeCounts: Record<string, number>
   cityIdsWithPlaces: string[]
+  /** fictionId → city slug with places (for map-mode deep links). */
+  fictionMapCitySlugs: Record<string, string>
   locale: string
 }
 
@@ -52,7 +54,14 @@ const NO_PLACES_SUGGESTIONS = 3
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, locale }: HomeSearchProps) {
+export function HomeSearch({
+  cities,
+  fictions,
+  placeCounts,
+  cityIdsWithPlaces,
+  fictionMapCitySlugs,
+  locale,
+}: HomeSearchProps) {
   const router = useRouter()
   const t = useTranslations("Home")
   const tFictions = useTranslations("Fictions")
@@ -160,7 +169,13 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
   }
 
   function hrefForFiction(fiction: FictionWithMedia): string {
-    if (mode === "map") return `/map?fiction=${fiction.id}`
+    if (mode === "map") {
+      const citySlug = fictionMapCitySlugs[fiction.id]
+      if (citySlug) {
+        return `/map?fiction=${encodeURIComponent(fiction.id)}&city=${encodeURIComponent(citySlug)}`
+      }
+      return `/map?fiction=${encodeURIComponent(fiction.id)}`
+    }
     return `/fictions/${fiction.slug ?? fiction.id}`
   }
 

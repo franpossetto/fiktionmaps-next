@@ -25,6 +25,11 @@ interface CitySelectorProps {
   cityIdsWithPlaces?: string[]
   /** Accessible label for rows without places (title / aria). */
   cityWithoutPlacesHint?: string
+  /** Override trigger button text (e.g. "Select city" in world mode). */
+  buttonLabel?: string
+  /** Controlled open state (optional). */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export function CitySelector({
@@ -33,9 +38,14 @@ export function CitySelector({
   onCityChange,
   cityIdsWithPlaces,
   cityWithoutPlacesHint,
+  buttonLabel,
+  open: openProp,
+  onOpenChange,
 }: CitySelectorProps) {
   const [cities, setCities] = useState<City[]>(citiesProp ?? [])
-  const [open, setOpen] = useState(false)
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const open = openProp ?? uncontrolledOpen
+  const setOpen = onOpenChange ?? setUncontrolledOpen
   const [search, setSearch] = useState("")
 
   useEffect(() => {
@@ -75,11 +85,11 @@ export function CitySelector({
           className="gap-2 border-chrome-border bg-chrome/90 text-foreground backdrop-blur-md hover:bg-chrome-hover"
         >
           <MapPin className="h-4 w-4 text-primary" />
-          <span>{selectedCity.name}</span>
+          <span>{buttonLabel ?? selectedCity.name}</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
-        <DialogTitle className="sr-only">Select city</DialogTitle>
+        <DialogTitle className="sr-only">{buttonLabel ?? "Select city"}</DialogTitle>
         {/* Search header */}
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" />

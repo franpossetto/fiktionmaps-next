@@ -57,85 +57,87 @@ export function ContributorsPage({ contributors, page, totalPages, totalCount, p
   const hasNext = page < totalPages
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6">
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("pageTitle")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t("pageSubtitle")}
-            {totalCount > 0 && (
-              <span className="ml-1.5 tabular-nums text-muted-foreground/60">· {totalCount.toLocaleString()}</span>
-            )}
-          </p>
+    <main className="px-6 py-8 sm:px-8 lg:px-10">
+      <div className="mx-auto w-full max-w-[920px]">
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("pageTitle")}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t("pageSubtitle")}
+              {totalCount > 0 && (
+                <span className="ml-1.5 tabular-nums text-muted-foreground/60">· {totalCount.toLocaleString()}</span>
+              )}
+            </p>
+          </div>
+          <Button asChild size="sm" className="shrink-0 gap-1.5">
+            <Link href="/profile/contribute">
+              <Plus className="h-4 w-4" aria-hidden />
+              {t("addContribution")}
+            </Link>
+          </Button>
         </div>
-        <Button asChild size="sm" className="shrink-0 gap-1.5">
-          <Link href="/profile/contribute">
-            <Plus className="h-4 w-4" aria-hidden />
-            {t("addContribution")}
-          </Link>
-        </Button>
+
+        {contributors.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("emptyState")}</p>
+        ) : (
+          <>
+            <ul className="space-y-1">
+              {contributors.map((contributor, index) => {
+                const rank = globalOffset + index + 1
+                const name = displayName(contributor, fallback)
+                const initial = name.charAt(0).toUpperCase()
+                return (
+                  <li
+                    key={contributor.id}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-accent/50"
+                  >
+                    <RankBadge rank={rank} />
+                    <UserAvatar avatarId={contributor.avatarUrl} fallback={initial} className="h-9 w-9 shrink-0" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-foreground">{name}</span>
+                    </span>
+                    <span className="shrink-0 tabular-nums text-sm text-muted-foreground">
+                      <span className="font-semibold text-foreground">{contributor.fppTotal.toLocaleString()}</span>
+                      {" "}
+                      <span className="text-xs uppercase tracking-wide">{t("fppLabel")}</span>
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+
+            {totalPages > 1 && (
+              <div className="mt-8 flex items-center justify-between gap-4">
+                {hasPrev ? (
+                  <Link
+                    href={{ pathname: "/contributors", query: { page: page - 1 } }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-background px-3 py-2 text-sm font-medium text-foreground/80 shadow-sm transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <ChevronLeft className="h-4 w-4" aria-hidden />
+                    {t("prevPage")}
+                  </Link>
+                ) : (
+                  <span />
+                )}
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {page} / {totalPages}
+                </span>
+                {hasNext ? (
+                  <Link
+                    href={{ pathname: "/contributors", query: { page: page + 1 } }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-background px-3 py-2 text-sm font-medium text-foreground/80 shadow-sm transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    {t("nextPage")}
+                    <ChevronRight className="h-4 w-4" aria-hidden />
+                  </Link>
+                ) : (
+                  <span />
+                )}
+              </div>
+            )}
+          </>
+        )}
       </div>
-
-      {contributors.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("emptyState")}</p>
-      ) : (
-        <>
-          <ul className="space-y-1">
-            {contributors.map((contributor, index) => {
-              const rank = globalOffset + index + 1
-              const name = displayName(contributor, fallback)
-              const initial = name.charAt(0).toUpperCase()
-              return (
-                <li
-                  key={contributor.id}
-                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-accent/50"
-                >
-                  <RankBadge rank={rank} />
-                  <UserAvatar avatarId={contributor.avatarUrl} fallback={initial} className="h-9 w-9 shrink-0" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-foreground">{name}</span>
-                  </span>
-                  <span className="shrink-0 tabular-nums text-sm text-muted-foreground">
-                    <span className="font-semibold text-foreground">{contributor.fppTotal.toLocaleString()}</span>
-                    {" "}
-                    <span className="text-xs uppercase tracking-wide">{t("fppLabel")}</span>
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-
-          {totalPages > 1 && (
-            <div className="mt-8 flex items-center justify-between gap-4">
-              {hasPrev ? (
-                <Link
-                  href={{ pathname: "/contributors", query: { page: page - 1 } }}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-background px-3 py-2 text-sm font-medium text-foreground/80 shadow-sm transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  <ChevronLeft className="h-4 w-4" aria-hidden />
-                  {t("prevPage")}
-                </Link>
-              ) : (
-                <span />
-              )}
-              <span className="text-sm tabular-nums text-muted-foreground">
-                {page} / {totalPages}
-              </span>
-              {hasNext ? (
-                <Link
-                  href={{ pathname: "/contributors", query: { page: page + 1 } }}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-background px-3 py-2 text-sm font-medium text-foreground/80 shadow-sm transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  {t("nextPage")}
-                  <ChevronRight className="h-4 w-4" aria-hidden />
-                </Link>
-              ) : (
-                <span />
-              )}
-            </div>
-          )}
-        </>
-      )}
-    </div>
+    </main>
   )
 }

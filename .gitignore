@@ -39,6 +39,8 @@ yarn-error.log*
 .agents
 .claude
 skills-lock.json
+!ARCHITECTURE.md
+!fiktionmaps/docs/reference/architecture.md
 
 # vercel
 .vercel

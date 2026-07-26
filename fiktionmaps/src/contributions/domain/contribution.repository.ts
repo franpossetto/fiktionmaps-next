@@ -28,6 +28,7 @@ export type InsertContributionPendingImagesInput = {
   contributionId: string
   role: ContributionPendingImageRole
   paths: { xs?: string; sm?: string; lg?: string }
+  focus?: { x: number; y: number }
 }
 
 /** @deprecated Use InsertContributionPendingImagesInput */

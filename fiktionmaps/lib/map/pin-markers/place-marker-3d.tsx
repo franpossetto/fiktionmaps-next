@@ -16,6 +16,7 @@ const pin3dPingRingClass = "border border-black/30 dark:border-white/30"
 /** Single 3D map pin style (no v1 variant). */
 export function PlaceMarker3d({
   imageSrc,
+  imageFocus,
   label,
   labelMode,
   hoverScaleMode,
@@ -75,6 +76,9 @@ export function PlaceMarker3d({
               alt={label}
               fill
               className="object-cover"
+              style={{
+                objectPosition: `${imageFocus?.x ?? 50}% ${imageFocus?.y ?? 50}%`,
+              }}
               sizes="128px"
               quality={85}
             />

@@ -19,6 +19,8 @@ export interface ContributionPendingImage {
   role: ContributionPendingImageRole
   variant: ContributionPendingImageVariant
   storagePath: string
+  focusX: number
+  focusY: number
   createdAt: string
 }
 

@@ -26,6 +26,8 @@ export interface FictionWithMedia extends Fiction {
   coverImage?: string | null
   coverImageLarge?: string | null
   bannerImage?: string | null
+  coverFocus?: { x: number; y: number } | null
+  bannerFocus?: { x: number; y: number } | null
 }
 
 /** Staff read model: includes linked catalog ids (`fiction_external_ids`). */

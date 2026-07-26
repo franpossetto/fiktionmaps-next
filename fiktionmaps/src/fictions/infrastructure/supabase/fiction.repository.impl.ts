@@ -63,7 +63,7 @@ async function loadAllFictionsWithImages(
   const ids = fictionsData.map((f) => f.id)
   const { data: imagesData } = await supabase
     .from("asset_images")
-    .select("entity_id, role, variant, url")
+    .select("entity_id, role, variant, url, focus_x, focus_y")
     .eq("entity_type", "fiction")
     .in("entity_id", ids)
 
@@ -95,7 +95,7 @@ async function loadFictionsByIdsWithImages(
   const fictionIds = fictionsData.map((f) => f.id)
   const { data: imagesData } = await supabase
     .from("asset_images")
-    .select("entity_id, role, variant, url")
+    .select("entity_id, role, variant, url, focus_x, focus_y")
     .eq("entity_type", "fiction")
     .in("entity_id", fictionIds)
 
@@ -134,7 +134,7 @@ export function createFictionsSupabaseAdapter(
 
       const { data: imagesData } = await supabase
         .from("asset_images")
-        .select("entity_id, role, variant, url")
+        .select("entity_id, role, variant, url, focus_x, focus_y")
         .eq("entity_type", "fiction")
         .eq("entity_id", id)
 
@@ -152,7 +152,7 @@ export function createFictionsSupabaseAdapter(
 
       const { data: imagesData } = await supabase
         .from("asset_images")
-        .select("entity_id, role, variant, url")
+        .select("entity_id, role, variant, url, focus_x, focus_y")
         .eq("entity_type", "fiction")
         .eq("entity_id", fictionData.id)
 
@@ -209,7 +209,7 @@ export function createFictionsSupabaseAdapter(
       const ids = fictionsData.map((f) => f.id)
       const { data: imagesData } = await supabase
         .from("asset_images")
-        .select("entity_id, role, variant, url")
+        .select("entity_id, role, variant, url, focus_x, focus_y")
         .eq("entity_type", "fiction")
         .in("entity_id", ids)
 
@@ -238,6 +238,20 @@ export function createFictionsSupabaseAdapter(
       }
       return Boolean(data?.id)
     },
+
+    countApprovedActive: cache(async (): Promise<number> => {
+      const supabase = await getSupabase()
+      const { count, error } = await supabase
+        .from("fictions")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "approved")
+        .eq("active", true)
+      if (error) {
+        console.error("[fictions repo] countApprovedActive:", error.message)
+        return 0
+      }
+      return count ?? 0
+    }),
 
     async create(data: CreateFictionData): Promise<FictionWithMedia | null> {
       const supabase = await getSupabase()
@@ -271,7 +285,7 @@ export function createFictionsSupabaseAdapter(
       if (error || !data) return null
       const { data: imagesData } = await supabase
         .from("asset_images")
-        .select("entity_id, role, variant, url")
+        .select("entity_id, role, variant, url, focus_x, focus_y")
         .eq("entity_type", "fiction")
         .eq("entity_id", id)
       return mapAssetImagesToFiction(data, (imagesData ?? []) as AssetImageRow[])

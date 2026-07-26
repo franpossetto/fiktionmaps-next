@@ -1,8 +1,13 @@
 "use client"
 
-import { useRef } from "react"
+import { useRef, useState } from "react"
 import { DragDropZone } from "./drag-drop-zone"
 import { Button } from "@/components/ui/button"
+import { ImageFocusPicker } from "@/components/ui/image-focus-picker"
+import {
+  DEFAULT_IMAGE_FOCUS,
+  type ImageFocus,
+} from "@/lib/asset-images/image-focus"
 
 interface LocationImageCropperProps {
   file?: File
@@ -14,6 +19,8 @@ interface LocationImageCropperProps {
   onAccept?: (dataUrl: string) => void
   onRemove: () => void
   aspect?: number
+  focus?: ImageFocus | null
+  onFocusChange?: (focus: ImageFocus) => void
 }
 
 export function LocationImageCropper({
@@ -22,9 +29,13 @@ export function LocationImageCropper({
   onFileChange,
   onRemove,
   aspect = 3 / 2,
+  focus,
+  onFocusChange,
 }: LocationImageCropperProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const displayUrl = previewUrl ?? null
+  const [localFocus, setLocalFocus] = useState(focus ?? DEFAULT_IMAGE_FOCUS)
+  const currentFocus = focus ?? localFocus
 
   if (!file && !displayUrl) {
     return (
@@ -40,18 +51,17 @@ export function LocationImageCropper({
 
   return (
     <div className="space-y-3 w-full">
-      <div
-        className="w-full overflow-hidden rounded-md border border-border bg-muted/30"
-        style={{ aspectRatio: aspect }}
-      >
-        {displayUrl && (
-          <img
-            src={displayUrl}
-            alt="Place preview"
-            className="h-full w-full object-cover object-center"
-          />
-        )}
-      </div>
+      {displayUrl ? (
+        <ImageFocusPicker
+          src={displayUrl}
+          aspectRatio={`${aspect}`}
+          focus={currentFocus}
+          onFocusChange={(next) => {
+            setLocalFocus(next)
+            onFocusChange?.(next)
+          }}
+        />
+      ) : null}
       <div className="flex items-center gap-2">
         <Button
           type="button"

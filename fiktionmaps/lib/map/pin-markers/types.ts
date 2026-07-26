@@ -14,6 +14,8 @@ export type PlaceMarker2dState = {
 
 export type PlaceMarker2dProps = PlaceMarker2dState & {
   imageSrc: string
+  /** Focal point percent for object-position. */
+  imageFocus?: { x: number; y: number } | null
   label: string
   labelMode?: MapMarkerLabelMode
   hoverScaleMode?: MapMarkerHoverScaleMode

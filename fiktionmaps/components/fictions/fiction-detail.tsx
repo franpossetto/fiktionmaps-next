@@ -55,10 +55,18 @@ export async function FictionDetail({
     fiction.coverImageLarge?.trim() ||
     fiction.coverImage?.trim() ||
     DEFAULT_FICTION_COVER
+  const heroFocus = fiction.bannerImage?.trim()
+    ? fiction.bannerFocus
+    : fiction.coverFocus
+  const heroObjectPosition = `${heroFocus?.x ?? 50}% ${heroFocus?.y ?? 50}%`
 
-  const firstCityId = initialCities[0]?.id ?? initialPlaces[0]?.location.cityId
-  const exploreMapHref = firstCityId
-    ? `/map?fiction=${encodeURIComponent(fiction.id)}&city=${encodeURIComponent(firstCityId)}`
+  const firstCity =
+    initialCities[0] ??
+    (initialPlaces[0]?.location.cityId
+      ? cityById.get(initialPlaces[0].location.cityId)
+      : undefined)
+  const exploreMapHref = firstCity
+    ? `/map?fiction=${encodeURIComponent(fiction.id)}&city=${encodeURIComponent(firstCity.slug)}`
     : `/map?fiction=${encodeURIComponent(fiction.id)}`
 
   const cityNamesForHeadline = initialCities.map((c) => c.name)
@@ -131,6 +139,7 @@ export async function FictionDetail({
                 alt={fiction.title}
                 fill
                 className="object-cover"
+                style={{ objectPosition: heroObjectPosition }}
                 sizes="(max-width: 1024px) 100vw, 920px"
                 priority
               />
@@ -196,6 +205,9 @@ export async function FictionDetail({
                               alt={location.name}
                               fill
                               className="object-cover"
+                              style={{
+                                objectPosition: `${location.imageFocus?.x ?? 50}% ${location.imageFocus?.y ?? 50}%`,
+                              }}
                               sizes="96px"
                             />
                           </div>

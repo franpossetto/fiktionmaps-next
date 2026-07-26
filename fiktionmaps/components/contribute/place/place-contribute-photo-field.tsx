@@ -1,17 +1,27 @@
 "use client"
 
 import { useRef } from "react"
-import Image from "next/image"
 import { useTranslations } from "next-intl"
 import { ImageIcon, Loader2, X } from "lucide-react"
+import {
+  DEFAULT_IMAGE_FOCUS,
+  type ImageFocus,
+} from "@/lib/asset-images/image-focus"
+import { ImageFocusPicker } from "@/components/ui/image-focus-picker"
 import { cn } from "@/lib/utils"
 
 export type ContributePhotoFieldLayout = "place-hero" | "fiction-cover" | "fiction-banner"
 
-const LAYOUT_ASPECT: Record<ContributePhotoFieldLayout, string> = {
+const LAYOUT_ASPECT_CLASS: Record<ContributePhotoFieldLayout, string> = {
   "place-hero": "aspect-[21/9]",
   "fiction-cover": "aspect-[2/3] max-w-[336px]",
   "fiction-banner": "aspect-[21/9] max-w-3xl",
+}
+
+const LAYOUT_ASPECT_RATIO: Record<ContributePhotoFieldLayout, string> = {
+  "place-hero": "21 / 9",
+  "fiction-cover": "2 / 3",
+  "fiction-banner": "21 / 9",
 }
 
 export interface PlaceContributePhotoFieldProps {
@@ -25,6 +35,8 @@ export interface PlaceContributePhotoFieldProps {
   aspectHint?: string
   /** Fills parent width (e.g. side-by-side current vs new image). */
   inline?: boolean
+  focus?: ImageFocus | null
+  onFocusChange?: (focus: ImageFocus) => void
 }
 
 export function PlaceContributePhotoField({
@@ -36,14 +48,17 @@ export function PlaceContributePhotoField({
   layout = "place-hero",
   aspectHint,
   inline = false,
+  focus,
+  onFocusChange,
 }: PlaceContributePhotoFieldProps) {
   const t = useTranslations("Contribute.place")
   const inputRef = useRef<HTMLInputElement>(null)
   const aspectClass = cn(
-    LAYOUT_ASPECT[layout],
+    LAYOUT_ASPECT_CLASS[layout],
     inline && (layout === "fiction-cover" || layout === "fiction-banner") && "max-w-none",
   )
   const hint = aspectHint ?? t("photoAspectHint")
+  const currentFocus = focus ?? DEFAULT_IMAGE_FOCUS
 
   return (
     <div className={cn("w-full space-y-3", className)}>
@@ -66,40 +81,40 @@ export function PlaceContributePhotoField({
         )}
       >
         {previewUrl ? (
-          <div className={cn("relative w-full overflow-hidden rounded-xl border border-border bg-muted/30", aspectClass)}>
-            <Image
+          <div className={cn("relative w-full", aspectClass.includes("max-w") && !inline && layout === "fiction-cover" && "max-w-[336px]", layout === "fiction-banner" && !inline && "max-w-3xl")}>
+            <ImageFocusPicker
               src={previewUrl}
               alt={t("photoPreviewAlt")}
-              fill
-              className="object-cover pointer-events-none select-none"
-              unoptimized
+              aspectRatio={LAYOUT_ASPECT_RATIO[layout]}
+              focus={currentFocus}
+              disabled={inspecting || !onFocusChange}
+              onFocusChange={(next) => onFocusChange?.(next)}
+              className={cn(inline && "max-w-none")}
             />
-            <button
-              type="button"
-              disabled={inspecting}
-              onClick={() => inputRef.current?.click()}
-              className="absolute inset-0 z-[1] rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={t("photoChange")}
-            />
-            <span className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] bg-gradient-to-t from-black/55 via-black/15 to-transparent px-2 pb-2 pt-12 text-center">
-              <span className="text-xs font-medium text-white drop-shadow-sm">{t("photoChange")}</span>
-            </span>
-            <button
-              type="button"
-              disabled={inspecting}
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                onClear()
-                if (inputRef.current) inputRef.current.value = ""
-              }}
-              className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-destructive/15 hover:text-destructive focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-              aria-label={t("photoRemoveAria")}
-            >
-              <X className="h-4 w-4 shrink-0" strokeWidth={2.25} />
-            </button>
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                disabled={inspecting}
+                onClick={() => inputRef.current?.click()}
+                className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              >
+                {t("photoChange")}
+              </button>
+              <button
+                type="button"
+                disabled={inspecting}
+                onClick={() => {
+                  onClear()
+                  if (inputRef.current) inputRef.current.value = ""
+                }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background text-foreground transition-colors hover:bg-destructive/15 hover:text-destructive focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                aria-label={t("photoRemoveAria")}
+              >
+                <X className="h-4 w-4 shrink-0" strokeWidth={2.25} />
+              </button>
+            </div>
             {inspecting ? (
-              <div className="absolute inset-0 z-[3] flex items-center justify-center bg-background/50 backdrop-blur-[1px]">
+              <div className="absolute inset-0 z-[3] flex items-center justify-center rounded-xl bg-background/50 backdrop-blur-[1px]">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden />
               </div>
             ) : null}

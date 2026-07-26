@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 export interface ContributionReviewActionsProps {
   contributionId: string
   /** Called after a successful approve or reject (before router.refresh). */
-  onResolved?: () => void
+  onResolved?: (status: "approved" | "rejected") => void
   className?: string
 }
 
@@ -40,7 +40,7 @@ export function ContributionReviewActions({
         return
       }
       toast({ title: t("staffReview_approvedToast") })
-      onResolved?.()
+      onResolved?.("approved")
       router.refresh()
     } finally {
       setBusy(false)
@@ -65,7 +65,7 @@ export function ContributionReviewActions({
       }
       toast({ title: t("staffReview_rejectedToast") })
       setRejecting(false)
-      onResolved?.()
+      onResolved?.("rejected")
       router.refresh()
     } finally {
       setBusy(false)

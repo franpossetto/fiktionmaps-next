@@ -11,6 +11,10 @@ export type CreateContributorPlaceResult =
       placeSlug: string
       fictionId: string
       fictionSlug: string
+      cityId: string
+      citySlug: string
+      /** City already has ≥1 approved+active place (public on the map). */
+      cityHasPublicPlaces: boolean
       contributionAutoApproved?: boolean
     }
   | { success: false; error: string }

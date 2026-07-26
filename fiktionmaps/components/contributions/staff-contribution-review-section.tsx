@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
 import { ContributionReviewActions } from "@/components/contributions/contribution-review-actions"
 import { contributionTypeMessageKey } from "@/components/contributions/contribution-type-label"
@@ -19,8 +20,13 @@ function ResolvedReviewChoice({ status }: { status: "approved" | "rejected" }) {
   if (status === "approved") {
     return (
       <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="default" tabIndex={-1} className="pointer-events-none">
-          {t("staffReview_approve")}
+        <Button
+          type="button"
+          size="sm"
+          tabIndex={-1}
+          className="pointer-events-none border-0 bg-teal-600 text-white hover:bg-teal-600 dark:bg-teal-500 dark:hover:bg-teal-500"
+        >
+          {t("staffReview_accepted")}
         </Button>
         <Button type="button" size="sm" variant="outline" disabled>
           {t("staffReview_reject")}
@@ -35,7 +41,7 @@ function ResolvedReviewChoice({ status }: { status: "approved" | "rejected" }) {
         {t("staffReview_approve")}
       </Button>
       <Button type="button" size="sm" variant="destructive" tabIndex={-1} className="pointer-events-none">
-        {t("staffReview_reject")}
+        {t("staffReview_rejected")}
       </Button>
     </div>
   )
@@ -47,6 +53,11 @@ export function StaffContributionReviewSection({
   contributionType,
 }: StaffContributionReviewSectionProps) {
   const t = useTranslations("Contributions")
+  const [reviewStatus, setReviewStatus] = useState(status)
+
+  useEffect(() => {
+    setReviewStatus(status)
+  }, [status])
 
   return (
     <section className="border-t border-border/60 py-10">
@@ -58,10 +69,13 @@ export function StaffContributionReviewSection({
       </p>
 
       <div className="mt-6">
-        {status === "pending" ? (
-          <ContributionReviewActions contributionId={contributionId} />
+        {reviewStatus === "pending" ? (
+          <ContributionReviewActions
+            contributionId={contributionId}
+            onResolved={(next) => setReviewStatus(next)}
+          />
         ) : (
-          <ResolvedReviewChoice status={status} />
+          <ResolvedReviewChoice status={reviewStatus} />
         )}
       </div>
     </section>

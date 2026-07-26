@@ -360,6 +360,8 @@ function mapPendingImageRow(row: ContributionPendingImageRow): ContributionPendi
     role: row.role,
     variant: row.variant,
     storagePath: row.storage_path,
+    focusX: row.focus_x ?? 50,
+    focusY: row.focus_y ?? 50,
     createdAt: row.created_at,
   }
 }
@@ -760,6 +762,8 @@ export function createContributionsSupabaseAdapter(
 
     async insertPendingContributionImages(input: InsertContributionPendingImagesInput): Promise<boolean> {
       const supabase = await getSupabase()
+      const focusX = input.focus?.x ?? 50
+      const focusY = input.focus?.y ?? 50
       const rows: Database["public"]["Tables"]["contribution_pending_images"]["Insert"][] = []
       if (input.paths.xs?.trim()) {
         rows.push({
@@ -767,6 +771,8 @@ export function createContributionsSupabaseAdapter(
           role: input.role,
           variant: "xs",
           storage_path: input.paths.xs,
+          focus_x: focusX,
+          focus_y: focusY,
         })
       }
       if (input.paths.sm?.trim()) {
@@ -775,6 +781,8 @@ export function createContributionsSupabaseAdapter(
           role: input.role,
           variant: "sm",
           storage_path: input.paths.sm,
+          focus_x: focusX,
+          focus_y: focusY,
         })
       }
       if (input.paths.lg?.trim()) {
@@ -783,6 +791,8 @@ export function createContributionsSupabaseAdapter(
           role: input.role,
           variant: "lg",
           storage_path: input.paths.lg,
+          focus_x: focusX,
+          focus_y: focusY,
         })
       }
       if (rows.length === 0) return false
@@ -1319,11 +1329,19 @@ export function createContributionsSupabaseAdapter(
             console.error("[contributions repo] approve add_photo place missing avatar variants")
             return false
           }
-          const promoted = await promotePendingContributionPhotoToAssetImages("place", entityId, "avatar", {
-            xs: avatar.xs,
-            sm: avatar.sm,
-            lg: avatar.lg,
-          })
+          const pendingRows = pendingMap.get(input.id) ?? []
+          const focusRow = pendingRows.find((r) => r.role === "avatar")
+          const promoted = await promotePendingContributionPhotoToAssetImages(
+            "place",
+            entityId,
+            "avatar",
+            {
+              xs: avatar.xs,
+              sm: avatar.sm,
+              lg: avatar.lg,
+            },
+            { x: focusRow?.focusX ?? 50, y: focusRow?.focusY ?? 50 },
+          )
           if (!promoted.success) {
             console.error("[contributions repo] approve add_photo promote:", promoted.error)
             return false
@@ -1337,21 +1355,36 @@ export function createContributionsSupabaseAdapter(
             console.error("[contributions repo] approve add_photo fiction missing pending images")
             return false
           }
+          const pendingRows = pendingMap.get(input.id) ?? []
           if (hasCover) {
-            const coverPromoted = await promotePendingContributionPhotoToAssetImages("fiction", entityId, "cover", {
-              xs: cover!.xs,
-              sm: cover!.sm!,
-              lg: cover!.lg!,
-            })
+            const focusRow = pendingRows.find((r) => r.role === "cover")
+            const coverPromoted = await promotePendingContributionPhotoToAssetImages(
+              "fiction",
+              entityId,
+              "cover",
+              {
+                xs: cover!.xs,
+                sm: cover!.sm!,
+                lg: cover!.lg!,
+              },
+              { x: focusRow?.focusX ?? 50, y: focusRow?.focusY ?? 50 },
+            )
             if (!coverPromoted.success) {
               console.error("[contributions repo] approve add_photo promote cover:", coverPromoted.error)
               return false
             }
           }
           if (hasBanner) {
-            const bannerPromoted = await promotePendingContributionPhotoToAssetImages("fiction", entityId, "banner", {
-              lg: banner!.lg!,
-            })
+            const focusRow = pendingRows.find((r) => r.role === "banner")
+            const bannerPromoted = await promotePendingContributionPhotoToAssetImages(
+              "fiction",
+              entityId,
+              "banner",
+              {
+                lg: banner!.lg!,
+              },
+              { x: focusRow?.focusX ?? 50, y: focusRow?.focusY ?? 50 },
+            )
             if (!bannerPromoted.success) {
               console.error("[contributions repo] approve add_photo promote banner:", bannerPromoted.error)
               return false

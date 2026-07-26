@@ -41,6 +41,7 @@ import {
 import { parseFictionAppRoute } from "@/lib/navigation/parse-fiction-app-route"
 import type { NavSearchScope } from "@/src/fictions/domain/nav-search-scope"
 import { resolvePlaceForFictionPathCached } from "@/src/places/infrastructure/next/place.queries"
+import { parseImageFocusFromFormData } from "@/lib/asset-images/image-focus"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
 import { THUMB_UPLOAD_VARIANTS } from "@/lib/asset-images/variant-sizes"
 import {
@@ -238,6 +239,7 @@ async function createFictionWithImagesFromParsed(
         variants: THUMB_UPLOAD_VARIANTS,
         file: coverFile,
         replace: true,
+        focus: parseImageFocusFromFormData(formData, "cover"),
       })
     }
   }
@@ -251,6 +253,7 @@ async function createFictionWithImagesFromParsed(
         variants: ["lg"],
         file: bannerFile,
         replace: true,
+        focus: parseImageFocusFromFormData(formData, "banner"),
       })
     }
   }
@@ -293,7 +296,15 @@ export async function uploadFictionImageAction(
   if (validationError) return { success: false, error: validationError }
 
   const variants = role === "cover" ? THUMB_UPLOAD_VARIANTS : (["lg"] as const)
-  const result = await uploadEntityImage({ entityType: "fiction", entityId: fictionId, role, variants, file, replace: true })
+  const result = await uploadEntityImage({
+    entityType: "fiction",
+    entityId: fictionId,
+    role,
+    variants,
+    file,
+    replace: true,
+    focus: parseImageFocusFromFormData(formData),
+  })
 
   if (!result.success) return result
 

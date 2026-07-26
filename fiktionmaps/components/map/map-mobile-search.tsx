@@ -19,6 +19,7 @@ import type { MapFictionCitySearchEntry } from "@/src/places/domain/map-fiction-
 
 type MapMobileSearchProps = {
   selectedCity: City
+  browseMode?: import("@/lib/map/world-map").MapBrowseMode
   availableFictions: FictionWithMedia[]
   selectedFictionIds: string[]
   fictionChipPreviews?: MapFictionChipPreview[] | null

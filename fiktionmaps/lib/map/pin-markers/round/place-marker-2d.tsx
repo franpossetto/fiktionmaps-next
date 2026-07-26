@@ -17,6 +17,7 @@ import { PinMarkerRoot } from "../motion"
 /** Round 2D pin with conic ring (settings: marker2dShape = round). */
 export function PlaceMarker2dRound({
   imageSrc,
+  imageFocus,
   label,
   labelMode,
   hoverScaleMode,
@@ -66,6 +67,9 @@ export function PlaceMarker2dRound({
                   alt={label}
                   fill
                   className="object-cover"
+                  style={{
+                    objectPosition: `${imageFocus?.x ?? 50}% ${imageFocus?.y ?? 50}%`,
+                  }}
                   sizes="128px"
                   quality={85}
                 />

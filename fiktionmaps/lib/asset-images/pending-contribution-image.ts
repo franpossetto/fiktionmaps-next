@@ -1,6 +1,11 @@
 import sharp from "sharp"
 import { createClient } from "@/lib/supabase/server"
 import {
+  DEFAULT_IMAGE_FOCUS,
+  normalizeImageFocus,
+  type ImageFocus,
+} from "./image-focus"
+import {
   ASSET_IMAGES_BUCKET,
   THUMB_UPLOAD_VARIANTS,
   VARIANT_SIZES,
@@ -104,6 +109,7 @@ export async function promotePendingContributionPhotoToAssetImages(
   entityId: string,
   role: PendingContributionImageRole,
   paths: { xs?: string; sm?: string; lg?: string },
+  focus: ImageFocus = DEFAULT_IMAGE_FOCUS,
 ): Promise<{ success: true } | { success: false; error: string }> {
   const pairs: { variant: ImageVariant; from: string }[] = []
   if (paths.xs?.trim()) pairs.push({ variant: "xs", from: paths.xs })
@@ -113,6 +119,7 @@ export async function promotePendingContributionPhotoToAssetImages(
     return { success: false, error: "No paths to promote" }
   }
 
+  const normalizedFocus = normalizeImageFocus(focus.x, focus.y)
   const supabase = await createClient()
   const version = Date.now()
 
@@ -140,7 +147,15 @@ export async function promotePendingContributionPhotoToAssetImages(
     }
   }
 
-  const inserts: { entity_type: string; entity_id: string; role: string; variant: string; url: string }[] = []
+  const inserts: {
+    entity_type: string
+    entity_id: string
+    role: string
+    variant: string
+    url: string
+    focus_x: number
+    focus_y: number
+  }[] = []
 
   for (const { variant, from } of pairs) {
     const dest =
@@ -158,6 +173,8 @@ export async function promotePendingContributionPhotoToAssetImages(
       role,
       variant,
       url: urlData.publicUrl,
+      focus_x: normalizedFocus.x,
+      focus_y: normalizedFocus.y,
     })
   }
 

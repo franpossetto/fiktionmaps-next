@@ -21,10 +21,10 @@ We make **three changes**:
 
 ## Current state (reminder)
 
-- **Upload**: [lib/asset-images/image-variant-service.ts](fiktionmaps/lib/asset-images/image-variant-service.ts) generates WebP (sm 300 / lg 800 / xl 1200), uploads to Supabase Storage, persists URLs in `asset_images`. It does not send `cacheControl`.
-- **Data**: [lib/app-services.ts](fiktionmaps/lib/app-services.ts) exposes `getAllFictions` etc. with no cache; each Server Component request hits Supabase again.
-- **UI**: [fiction.repository.adapter.ts](fiktionmaps/src/fictions/fiction.repository.adapter.ts) maps to `coverImage` (sm), `coverImageLarge` (lg), `bannerImage` (lg). [next.config.ts](fiktionmaps/next.config.ts) has `images: { unoptimized: true }`.
-- **Hero**: In [fiction-detail.tsx](fiktionmaps/components/fictions/fiction-detail.tsx) we sometimes use `coverImage` for the hero when `coverImageLarge` is available.
+- **Upload**: [lib/asset-images/image-variant-service.ts](../../lib/asset-images/image-variant-service.ts) generates WebP (sm 300 / lg 800 / xl 1200), uploads to Supabase Storage, persists URLs in `asset_images`. It does not send `cacheControl`.
+- **Data**: legacy `lib/app-services.ts` exposes `getAllFictions` etc. with no cache; each Server Component request hits Supabase again.
+- **UI**: legacy `src/fictions/fiction.repository.adapter.ts` maps to `coverImage` (sm), `coverImageLarge` (lg), `bannerImage` (lg). [next.config.ts](../../next.config.ts) has `images: { unoptimized: true }`.
+- **Hero**: In [fiction-detail.tsx](../../components/fictions/fiction-detail.tsx) we sometimes use `coverImage` for the hero when `coverImageLarge` is available.
 
 ---
 

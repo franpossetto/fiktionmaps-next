@@ -17,6 +17,7 @@ import {
 import { createPlaceUseCase } from "@/src/places/application/create-place.usecase"
 import { updatePlaceUseCase } from "@/src/places/application/update-place.usecase"
 import { deletePlaceUseCase } from "@/src/places/application/delete-place.usecase"
+import { parseImageFocusFromFormData } from "@/lib/asset-images/image-focus"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
 import { THUMB_UPLOAD_VARIANTS } from "@/lib/asset-images/variant-sizes"
 import {
@@ -28,15 +29,25 @@ import {
   listCityIdsWithPlacesCached,
   listMapSearchCatalogCached,
   listPlacesInBboxForFictionIds,
+  listMapPlacesInBboxCached,
+  listMapClustersInBboxCached,
 } from "./place.queries"
 import { getMapLocationPanelUseCase } from "@/src/places/application/get-map-location-panel.usecase"
 import type { MapLocationPanel } from "@/src/places/application/get-map-location-panel.usecase"
 import { getScenesForPlace } from "@/src/scenes/infrastructure/next/scene.queries"
 import { getPlaceContributorsWithDatesCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import type { MapSearchCatalog } from "@/src/places/domain/map-search-catalog.entity"
+import type { MapCluster } from "@/src/places/domain/map-cluster.entity"
 import type { Place } from "@/src/places/domain/place.entity"
+import {
+  WORLD_MAX_CLUSTERS,
+  WORLD_MAX_PLACES,
+} from "@/lib/map/world-map"
 import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
 import { getFictionByIdCached } from "@/src/fictions/infrastructure/next/fiction.queries"
+import { getCityByIdUseCase } from "@/src/cities/application/get-city-by-id.usecase"
+import { cityHasPublicPlacesUseCase } from "@/src/cities/application/city-has-public-places.usecase"
+import { supabaseRepositoryAdapter as citiesRepo } from "@/src/cities/infrastructure/supabase/city.repository.impl"
 import { createContributionAction } from "@/src/contributions/infrastructure/next/contribution.actions"
 import { parsePlaceContributeFormData } from "@/src/places/domain/place-contribute.schemas"
 import { markHuntCandidatePostedUseCase } from "@/src/hunts/application/mark-hunt-candidate-posted.usecase"
@@ -119,6 +130,7 @@ export async function uploadPlaceImageAction(
     variants: THUMB_UPLOAD_VARIANTS,
     file,
     replace: true,
+    focus: parseImageFocusFromFormData(formData),
   })
 
   if (!result.success) return result
@@ -184,6 +196,29 @@ export async function getPlacesInBboxAction(fictionIds: string[], bbox: MapBbox)
   const { west, south, east, north } = bbox
   if (![west, south, east, north].every((n) => Number.isFinite(n))) return []
   return listPlacesInBboxForFictionIds(fictionIds, bbox)
+}
+
+/** Free-world detail zoom: places in viewport (optional fiction filter, hard cap). */
+export async function getMapPlacesInBboxAction(
+  bbox: MapBbox,
+  fictionIds?: string[] | null,
+  limit: number = WORLD_MAX_PLACES,
+): Promise<Place[]> {
+  const { west, south, east, north } = bbox
+  if (![west, south, east, north].every((n) => Number.isFinite(n))) return []
+  return listMapPlacesInBboxCached(bbox, fictionIds, limit)
+}
+
+/** Free-world low zoom: server grid clusters. */
+export async function getMapClustersInBboxAction(
+  bbox: MapBbox,
+  zoom: number,
+  fictionIds?: string[] | null,
+  maxClusters: number = WORLD_MAX_CLUSTERS,
+): Promise<MapCluster[]> {
+  const { west, south, east, north } = bbox
+  if (![west, south, east, north, zoom].every((n) => Number.isFinite(n))) return []
+  return listMapClustersInBboxCached(bbox, zoom, fictionIds, maxClusters)
 }
 
 /** City IDs that have at least one place (map city picker: disable others). */
@@ -313,6 +348,7 @@ export async function createContributorPlaceWithImageAction(
       description: parsed.data.description,
       isLandmark: parsed.data.isLandmark,
       locationType: parsed.data.locationType ?? null,
+      shootEnvironment: parsed.data.shootEnvironment ?? null,
       streetViewReference: parsed.data.streetViewReference ?? null,
       status,
       created_by,
@@ -337,6 +373,7 @@ export async function createContributorPlaceWithImageAction(
         variants: THUMB_UPLOAD_VARIANTS,
         file: parsed.imageFile,
         replace: true,
+        focus: parseImageFocusFromFormData(formData),
       })
     }
   }
@@ -347,7 +384,11 @@ export async function createContributorPlaceWithImageAction(
   updateTag(`place-${result.placeId}`)
   updateTag("contributions")
 
-  const fiction = await getFictionByIdCached(parsed.data.fictionId)
+  const [fiction, city, cityHasPublicPlaces] = await Promise.all([
+    getFictionByIdCached(parsed.data.fictionId),
+    getCityByIdUseCase(parsed.data.cityId, citiesRepo),
+    cityHasPublicPlacesUseCase(parsed.data.cityId, citiesRepo),
+  ])
 
   if (parsed.huntId != null && parsed.placeIndex != null) {
     try {
@@ -379,6 +420,9 @@ export async function createContributorPlaceWithImageAction(
     placeSlug: result.slug,
     fictionId: parsed.data.fictionId,
     fictionSlug: fiction?.slug ?? "",
+    cityId: parsed.data.cityId,
+    citySlug: city?.slug ?? "",
+    cityHasPublicPlaces,
   }
   if (typeof contributionAutoApproved === "boolean") {
     return { ...out, contributionAutoApproved }

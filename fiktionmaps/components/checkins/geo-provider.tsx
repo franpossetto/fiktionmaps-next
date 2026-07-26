@@ -130,6 +130,10 @@ export function GeoProvider({ children }: { children: ReactNode }) {
   // Hydrated from DB; gates the prompt so we never show it when the
   // user's most recent city check-in already matches the detected city.
   const lastCheckinCityIdRef = useRef<string | null>(null)
+  // City we've already prompted for (confirmed or dismissed). Prevents
+  // re-asking on every GPS jitter/re-resolve as long as the city itself
+  // hasn't changed — only a genuine change of city should trigger a new ask.
+  const lastPromptedCityIdRef = useRef<string | null>(null)
   const watchIdRef = useRef<number | null>(null)
   // Mirrors the latest pending check-in so the confirm callback stays stable
   // and the long-lived geolocation closure can read fresh coords too.
@@ -169,6 +173,7 @@ export function GeoProvider({ children }: { children: ReactNode }) {
     )
     if (res.data) {
       lastCheckinCityIdRef.current = res.data.cityId
+      lastPromptedCityIdRef.current = res.data.cityId
     }
     setPendingCityCheckin(null)
   }, [])
@@ -176,6 +181,7 @@ export function GeoProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) {
       lastCheckinCityIdRef.current = null
+      lastPromptedCityIdRef.current = null
       return
     }
     let cancelled = false
@@ -185,6 +191,7 @@ export function GeoProvider({ children }: { children: ReactNode }) {
         const res = await getLastCityCheckinAction()
         if (cancelled) return
         lastCheckinCityIdRef.current = res.data?.cityId ?? null
+        lastPromptedCityIdRef.current = res.data?.cityId ?? null
       })()
     }, 1_500)
     return () => {
@@ -233,7 +240,14 @@ export function GeoProvider({ children }: { children: ReactNode }) {
             detectedCityRef.current = resolved
             setDetectedCity(resolved)
 
-            if (lastCheckinCityIdRef.current !== resolved.id) {
+            // Only ask again when the city actually changed — not on every
+            // GPS re-resolve for a city we already asked about (confirmed
+            // or dismissed).
+            if (
+              lastCheckinCityIdRef.current !== resolved.id &&
+              lastPromptedCityIdRef.current !== resolved.id
+            ) {
+              lastPromptedCityIdRef.current = resolved.id
               setPendingCityCheckin(resolved)
             }
           } finally {

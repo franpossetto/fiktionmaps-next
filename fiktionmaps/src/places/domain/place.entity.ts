@@ -9,6 +9,8 @@ export interface Place {
   fictionId: string
   location: Location
   image: string
+  /** Focal point for `image` (avatar role). Defaults to center when omitted. */
+  imageFocus?: { x: number; y: number } | null
   videoUrl: string
   description: string
   sceneDescription: string

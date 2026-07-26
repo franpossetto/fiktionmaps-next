@@ -17,6 +17,7 @@ import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import { prefetchCityMapData } from "@/lib/map/city-map-data-cache"
 import { resolveMapBarSearchMode } from "@/lib/map/map-search-mode"
 import { isAllFictionsSelected } from "@/lib/map/map-url"
+import { MAP_MODE_CITY, MAP_MODE_WORLD, type MapBrowseMode } from "@/lib/map/world-map"
 import { cn } from "@/lib/utils"
 import { getMapSearchCatalogAction } from "@/src/places/infrastructure/next/place.actions"
 import type { City } from "@/src/cities/domain/city.entity"
@@ -100,6 +101,8 @@ type MapSearchHit =
 
 type MapFictionCitySearchProps = {
   selectedCity: City
+  /** When world, scope chip shows Free World and fiction chips are hidden. */
+  browseMode?: MapBrowseMode
   availableFictions: FictionWithMedia[]
   selectedFictionIds: string[]
   fictionChipPreviews?: MapFictionChipPreview[] | null
@@ -267,6 +270,7 @@ function renderFictionChipItem(
 
 export function MapFictionCitySearch({
   selectedCity,
+  browseMode = MAP_MODE_CITY,
   availableFictions,
   selectedFictionIds,
   fictionChipPreviews,
@@ -280,6 +284,7 @@ export function MapFictionCitySearch({
 }: MapFictionCitySearchProps) {
   const tMap = useTranslations("Map")
   const tCommon = useTranslations("Common")
+  const isWorld = browseMode === MAP_MODE_WORLD
   const [search, setSearch] = useState("")
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [activeSearchFictionId, setActiveSearchFictionId] = useState<string | null>(null)
@@ -296,11 +301,14 @@ export function MapFictionCitySearch({
     selectedFictionIds,
     availableFictions,
   )
-  const scopeFictionId =
-    activeSearchFictionId ?? (searchMode === "scoped" ? singleFictionId : null)
+  const scopeFictionId = isWorld
+    ? null
+    : (activeSearchFictionId ?? (searchMode === "scoped" ? singleFictionId : null))
 
   const isPlaceOnlySearch = Boolean(
-    scopeFictionId && (activeSearchFictionId != null || searchMode === "scoped"),
+    !isWorld &&
+      scopeFictionId &&
+      (activeSearchFictionId != null || searchMode === "scoped"),
   )
 
   const scopedPlaces = useMemo(() => {
@@ -339,7 +347,7 @@ export function MapFictionCitySearch({
     })
   }, [selectedFictionIds, allSelected, availableFictions, previewById])
 
-  const showFictionChips = selectedFictionIds.length > 0
+  const showFictionChips = !isWorld && selectedFictionIds.length > 0
 
   const scopedFictionTitle = useMemo(() => {
     if (!scopeFictionId) return null
@@ -352,7 +360,7 @@ export function MapFictionCitySearch({
   }, [scopeFictionId, availableFictions, fictionChipPreviews])
 
   const activeChipInBar = useMemo(() => {
-    if (!activeSearchFictionId) return null
+    if (isWorld || !activeSearchFictionId) return null
     for (const item of fictionChipItems) {
       if (item.kind === "fiction" && item.fiction.id === activeSearchFictionId) {
         return {
@@ -373,9 +381,10 @@ export function MapFictionCitySearch({
       }
     }
     return null
-  }, [activeSearchFictionId, fictionChipItems])
+  }, [isWorld, activeSearchFictionId, fictionChipItems])
 
   const placeholder = useMemo(() => {
+    if (isWorld) return tMap("searchFictionOrCityWorld")
     if (isPlaceOnlySearch && scopedFictionTitle) {
       return tMap("searchPlacesInFiction", { fiction: scopedFictionTitle })
     }
@@ -383,11 +392,12 @@ export function MapFictionCitySearch({
       return tMap("searchAnotherFiction")
     }
     return tMap("searchFictionOrCity")
-  }, [isPlaceOnlySearch, scopedFictionTitle, searchMode, allSelected, tMap])
+  }, [isWorld, isPlaceOnlySearch, scopedFictionTitle, searchMode, allSelected, tMap])
 
   const searchHits = useMemo((): MapSearchHit[] => {
     const q = query.toLowerCase()
-    if (!q || searchMode === "pick-fiction") return []
+    if (!q) return []
+    if (!isWorld && searchMode === "pick-fiction") return []
 
     if (isPlaceOnlySearch) {
       return scopedPlaces
@@ -420,7 +430,7 @@ export function MapFictionCitySearch({
       .map((entry) => ({ kind: "fiction-city" as const, entry }))
 
     return [...cityHits, ...pairHits]
-  }, [pairs, cities, query, searchMode, isPlaceOnlySearch, scopedPlaces])
+  }, [pairs, cities, query, searchMode, isPlaceOnlySearch, scopedPlaces, isWorld])
 
   async function ensureCatalogLoaded() {
     if (loaded) return
@@ -443,7 +453,7 @@ export function MapFictionCitySearch({
   }
 
   function openSearch() {
-    if (searchMode === "pick-fiction") {
+    if (!isWorld && searchMode === "pick-fiction") {
       onRequestPickFiction()
       return
     }
@@ -495,38 +505,51 @@ export function MapFictionCitySearch({
     closeSearch()
   }
 
+  // World mode: keep the field open so Free World doesn't feel like a locked chip.
+  const searchExpanded = isWorld || isSearchOpen
+
   useEffect(() => {
-    if (!isSearchOpen) return
+    if (!isWorld) return
+    setIsSearchOpen(true)
+    void ensureCatalogLoaded()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when entering world
+  }, [isWorld])
+
+  useEffect(() => {
+    if (!searchExpanded) return
+    if (isWorld) return
     const id = requestAnimationFrame(() => inputRef.current?.focus())
     return () => cancelAnimationFrame(id)
-  }, [isSearchOpen])
+  }, [searchExpanded, isWorld])
 
-  const showDropdown = isSearchOpen && query.length > 0
+  const showDropdown = searchExpanded && query.length > 0
 
   return (
     <div
       ref={rootRef}
       className={cn("relative w-full", className)}
       onBlur={(event) => {
-        if (!isSearchOpen) return
+        if (!isSearchOpen || isWorld) return
         if (!rootRef.current?.contains(event.relatedTarget as Node | null)) {
           closeSearch()
         }
       }}
     >
       <div className={MAP_BAR_CLASS}>
-        <SearchScopeChip chip={{ label: selectedCity.name }} />
+        <SearchScopeChip
+          chip={{ label: isWorld ? tMap("freeWorldScope") : selectedCity.name }}
+        />
 
         <div className="relative flex min-w-0 flex-1 items-center overflow-hidden">
           <div
             className={cn(
               "flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pr-0.5 transition-[flex,opacity,max-width] duration-200 ease-out",
               "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-              isSearchOpen
+              searchExpanded
                 ? "pointer-events-none max-w-0 min-w-0 flex-[0_0_0px] opacity-0"
                 : "opacity-100",
             )}
-            aria-hidden={isSearchOpen}
+            aria-hidden={searchExpanded}
           >
             {showFictionChips
               ? fictionChipItems.map((item) =>
@@ -543,11 +566,11 @@ export function MapFictionCitySearch({
           <div
             className={cn(
               "flex min-w-0 items-center gap-2 overflow-hidden transition-[flex,opacity,max-width] duration-200 ease-out",
-              isSearchOpen
+              searchExpanded
                 ? "flex-1 opacity-100"
                 : "pointer-events-none max-w-0 min-w-0 flex-[0_0_0px] opacity-0",
             )}
-            aria-hidden={!isSearchOpen}
+            aria-hidden={!searchExpanded}
           >
             {activeChipInBar ? (
               <FictionMapChip
@@ -567,20 +590,38 @@ export function MapFictionCitySearch({
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onFocus={() => {
+                if (isWorld) void ensureCatalogLoaded()
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
                   e.preventDefault()
+                  if (isWorld) {
+                    setSearch("")
+                    return
+                  }
                   closeSearch()
                 }
               }}
               placeholder={placeholder}
-              tabIndex={isSearchOpen ? 0 : -1}
+              tabIndex={searchExpanded ? 0 : -1}
               className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             />
           </div>
         </div>
 
-        {isSearchOpen ? (
+        {isWorld ? (
+          search.trim() ? (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
+              aria-label={tMap("closeFictionSearch")}
+            >
+              <X className="h-4 w-4" strokeWidth={2.5} />
+            </button>
+          ) : null
+        ) : isSearchOpen ? (
           <button
             type="button"
             onClick={closeSearch}

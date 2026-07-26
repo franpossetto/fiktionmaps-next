@@ -227,6 +227,8 @@ export type Database = {
           role: string
           variant: string
           url: string
+          focus_x: number
+          focus_y: number
           created_at: string
         }
         Insert: {
@@ -236,6 +238,8 @@ export type Database = {
           role: string
           variant: string
           url: string
+          focus_x?: number
+          focus_y?: number
           created_at?: string
         }
         Update: {
@@ -245,6 +249,8 @@ export type Database = {
           role?: string
           variant?: string
           url?: string
+          focus_x?: number
+          focus_y?: number
           created_at?: string
         }
         Relationships: []
@@ -917,6 +923,8 @@ export type Database = {
           role: "avatar" | "hero" | "cover" | "banner"
           variant: "xs" | "sm" | "lg"
           storage_path: string
+          focus_x: number
+          focus_y: number
           created_at: string
         }
         Insert: {
@@ -925,6 +933,8 @@ export type Database = {
           role: "avatar" | "hero" | "cover" | "banner"
           variant: "xs" | "sm" | "lg"
           storage_path: string
+          focus_x?: number
+          focus_y?: number
           created_at?: string
         }
         Update: {
@@ -933,6 +943,8 @@ export type Database = {
           role?: "avatar" | "hero" | "cover" | "banner"
           variant?: "xs" | "sm" | "lg"
           storage_path?: string
+          focus_x?: number
+          focus_y?: number
           created_at?: string
         }
         Relationships: [
@@ -1127,6 +1139,28 @@ export type Database = {
       check_username_available: {
         Args: { p_username: string }
         Returns: boolean
+      }
+      map_place_clusters: {
+        Args: {
+          p_west: number
+          p_south: number
+          p_east: number
+          p_north: number
+          p_grid_deg: number
+          p_fiction_ids?: string[] | null
+          p_max_clusters?: number
+        }
+        Returns: {
+          cluster_id: string
+          lat: number
+          lng: number
+          place_count: number
+          dominant_city_id: string | null
+          dominant_share: number
+          city_count: number
+          fiction_total: number
+          top_fiction_ids: string[]
+        }[]
       }
     }
     Enums: {

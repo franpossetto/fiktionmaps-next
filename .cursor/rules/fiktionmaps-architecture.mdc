@@ -5,6 +5,8 @@ alwaysApply: true
 
 # Arquitectura (obligatorio)
 
+Referencia completa: `fiktionmaps/docs/reference/architecture.md`.
+
 ## Flujo fijo por operación de negocio
 
 1. **domain/** — Puerto: interfaz `*.repository.ts` (y entidades, Zod de dominio en `*.schemas.ts`).

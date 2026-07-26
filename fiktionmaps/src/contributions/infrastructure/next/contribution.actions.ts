@@ -13,6 +13,7 @@ import { createContributionUseCase } from "@/src/contributions/application/creat
 import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/ensure-user-is-moderator.usecase"
 import { getContributionByIdUseCase } from "@/src/contributions/application/get-contribution-by-id.usecase"
 import { rejectContributionUseCase } from "@/src/contributions/application/reject-contribution.usecase"
+import { parseImageFocusFromFormData } from "@/lib/asset-images/image-focus"
 import { submitPlaceAddPhotoContributionUseCase } from "@/src/contributions/application/submit-place-add-photo-contribution.usecase"
 import { submitFictionAddPhotoContributionUseCase } from "@/src/contributions/application/submit-fiction-add-photo-contribution.usecase"
 import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
@@ -152,6 +153,7 @@ export async function submitPlaceAddPhotoContributionAction(
       placeId: parsed.data.placeId,
       imageFile: file,
       autoApprove,
+      focus: parseImageFocusFromFormData(formData),
     },
     contributionsRepo,
     placesRepo,
@@ -211,6 +213,7 @@ export async function submitFictionAddPhotoContributionAction(
       targetRole: parsed.data.targetRole,
       file: photoFile,
       autoApprove,
+      focus: parseImageFocusFromFormData(formData),
     },
     contributionsRepo,
     fictionsRepo,

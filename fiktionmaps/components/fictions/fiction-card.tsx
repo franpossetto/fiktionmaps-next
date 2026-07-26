@@ -53,6 +53,9 @@ export function FictionCard({
           alt={fiction.title}
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{
+            objectPosition: `${fiction.coverFocus?.x ?? 50}% ${fiction.coverFocus?.y ?? 50}%`,
+          }}
           sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
           onError={() => setCoverError(true)}
         />

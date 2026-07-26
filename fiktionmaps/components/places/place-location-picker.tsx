@@ -203,6 +203,9 @@ export const LOCATION_TYPE_OPTIONS = [
   { value: "monument", label: "Monument" },
   { value: "museum", label: "Museum" },
   { value: "landmark", label: "Landmark" },
+  { value: "house", label: "House" },
+  { value: "theater", label: "Theater" },
+  { value: "cinema", label: "Cinema" },
   { value: "other", label: "Other" },
 ] as const
 

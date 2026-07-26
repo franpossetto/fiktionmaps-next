@@ -286,7 +286,7 @@ CREATE INDEX idx_hunts_created_by ON public.hunts(created_by);
 src/hunts/application/preview-hunt.usecase.ts
 src/hunts/domain/hunt.types.ts
 components/contribute/hunt/
-docs/wizard-ia.md
+docs/plans/hunt-wizard-ia.md
 ```
 
 ---

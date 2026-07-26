@@ -13,12 +13,24 @@ import { listActivePlacesForSitemapUseCase } from "@/src/places/application/list
 import { getFictionPlacesUseCase } from "@/src/places/application/get-fiction-places.usecase"
 import { getCityPlacesUseCase } from "@/src/places/application/get-city-places.usecase"
 import { getPlacesInBboxUseCase } from "@/src/places/application/get-places-in-bbox.usecase"
+import { listMapClustersInBboxUseCase } from "@/src/places/application/list-map-clusters-in-bbox.usecase"
+import { listMapPlacesInBboxUseCase } from "@/src/places/application/list-map-places-in-bbox.usecase"
 import { listCityIdsWithPlacesUseCase } from "@/src/places/application/list-city-ids-with-places.usecase"
 import { listMapSearchCatalogUseCase } from "@/src/places/application/list-map-search-catalog.usecase"
 import { getActiveFictionsCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { getAllCitiesCached } from "@/src/cities/infrastructure/next/city.queries"
 import type { MapSearchCatalog } from "@/src/places/domain/map-search-catalog.entity"
+import type { MapCluster } from "@/src/places/domain/map-cluster.entity"
 import type { Place } from "@/src/places/domain/place.entity"
+import {
+  fictionIdsCacheKey,
+  gridDegForZoom,
+  normalizeMapClusters,
+  roundBbox,
+  splitBboxAntimeridian,
+  WORLD_MAX_CLUSTERS,
+  WORLD_MAX_PLACES,
+} from "@/lib/map/world-map"
 import { CacheKeys } from "@/src/shared/infrastructure/next/cache.keys"
 import { CacheConfig } from "@/src/shared/infrastructure/next/cache.config"
 
@@ -169,4 +181,111 @@ export async function listPlacesInBboxForFictionIds(
     CacheKeys.place(`bbox:${fictionKey}:${bboxKey}`),
     { ...CacheConfig.short, tags: ["places"] },
   )()
+}
+
+function normalizeFictionIds(raw: string[] | null | undefined): string[] | null {
+  if (!raw?.length) return null
+  const ids = raw.filter(isUuidString)
+  return ids.length > 0 ? ids : null
+}
+
+/** Free-world place pins (detail zoom). Merges antimeridian splits; hard-capped. */
+export async function listMapPlacesInBboxCached(
+  bbox: MapBbox,
+  rawFictionIds?: string[] | null,
+  limit: number = WORLD_MAX_PLACES,
+): Promise<Place[]> {
+  const fictionIds = normalizeFictionIds(rawFictionIds)
+  const parts = splitBboxAntimeridian(bbox)
+  const capped = Math.max(1, Math.min(limit, WORLD_MAX_PLACES))
+  const fictionKey = fictionIdsCacheKey(fictionIds)
+
+  const fetchPart = (part: MapBbox) => {
+    const rounded = roundBbox(part, 3)
+    const bboxKey = [rounded.west, rounded.south, rounded.east, rounded.north].join(",")
+    return unstable_cache(
+      () =>
+        listMapPlacesInBboxUseCase(
+          { bbox: part, fictionIds, limit: capped },
+          anonRepo,
+        ),
+      CacheKeys.place(`world-places:${fictionKey}:${bboxKey}:${capped}`),
+      { ...CacheConfig.short, tags: ["places"] },
+    )()
+  }
+
+  if (parts.length === 1) return fetchPart(parts[0])
+
+  const chunks = await Promise.all(parts.map(fetchPart))
+  const seen = new Set<string>()
+  const out: Place[] = []
+  for (const chunk of chunks) {
+    for (const p of chunk) {
+      if (seen.has(p.id)) continue
+      seen.add(p.id)
+      out.push(p)
+      if (out.length >= capped) return out
+    }
+  }
+  return out
+}
+
+/** Free-world server clusters (low zoom). */
+export async function listMapClustersInBboxCached(
+  bbox: MapBbox,
+  zoom: number,
+  rawFictionIds?: string[] | null,
+  maxClusters: number = WORLD_MAX_CLUSTERS,
+): Promise<MapCluster[]> {
+  const fictionIds = normalizeFictionIds(rawFictionIds)
+  const gridDeg = gridDegForZoom(zoom)
+  const parts = splitBboxAntimeridian(bbox)
+  const capped = Math.max(1, Math.min(maxClusters, WORLD_MAX_CLUSTERS))
+  const fictionKey = fictionIdsCacheKey(fictionIds)
+  const zBand = Math.floor(zoom)
+
+  const fetchPart = (part: MapBbox) => {
+    const rounded = roundBbox(part, 2)
+    const bboxKey = [rounded.west, rounded.south, rounded.east, rounded.north].join(",")
+    return unstable_cache(
+      () =>
+        listMapClustersInBboxUseCase(
+          { bbox: part, gridDeg, fictionIds, maxClusters: capped },
+          anonRepo,
+        ),
+      // v4: fictionCovers dropped from the hot path (no consumer yet) — counts-only aggregates.
+      CacheKeys.place(`world-clusters:v4:${fictionKey}:${bboxKey}:${gridDeg}:${capped}:z${zBand}`),
+      { ...CacheConfig.medium, tags: ["places"] },
+    )()
+  }
+
+  if (parts.length === 1) return normalizeMapClusters(await fetchPart(parts[0]))
+
+  const chunks = await Promise.all(parts.map(fetchPart))
+  const byId = new Map<string, MapCluster>()
+  for (const chunk of chunks) {
+    for (const c of normalizeMapClusters(chunk)) {
+      const prev = byId.get(c.id)
+      if (!prev) {
+        byId.set(c.id, c)
+        continue
+      }
+      const total = prev.count + c.count
+      const keep = c.count >= prev.count ? c : prev
+      byId.set(c.id, {
+        ...keep,
+        count: total,
+        cityCount: Math.max(prev.cityCount, c.cityCount),
+        fictionTotal: Math.max(prev.fictionTotal, c.fictionTotal),
+        lat: (prev.lat * prev.count + c.lat * c.count) / total,
+        lng: (prev.lng * prev.count + c.lng * c.count) / total,
+        fictionCovers: keep.fictionCovers ?? [],
+      })
+    }
+  }
+  return normalizeMapClusters(
+    [...byId.values()]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, capped),
+  )
 }
