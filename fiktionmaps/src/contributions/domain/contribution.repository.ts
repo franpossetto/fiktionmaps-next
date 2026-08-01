@@ -10,6 +10,7 @@ import type {
   FictionContributorScopeEntry,
   FictionScopeContributorContributionItem,
   PlaceContributionFeedItem,
+  ProfileContributionItem,
   StaffCreateContributionsFeedPageInput,
   StaffCreateContributionsFeedPageResult,
   StaffFictionContributionsFeedPageInput,
@@ -34,9 +35,24 @@ export type InsertContributionPendingImagesInput = {
 /** @deprecated Use InsertContributionPendingImagesInput */
 export type InsertContributionPendingPlaceImagesInput = InsertContributionPendingImagesInput
 
+export type InsertContributionPendingScenePlaceInput = {
+  contributionId: string
+  placeId: string
+  startSecond?: number | null
+  endSecond?: number | null
+}
+
+export type ContributionPendingScenePlace = {
+  contributionId: string
+  placeId: string
+  startSecond: number | null
+  endSecond: number | null
+}
+
 export interface ContributionsRepositoryPort {
   create(input: CreateContributionInput): Promise<{ contributionId: string } | null>
   insertPendingContributionImages(input: InsertContributionPendingImagesInput): Promise<boolean>
+  insertPendingScenePlace(input: InsertContributionPendingScenePlaceInput): Promise<boolean>
   countPendingAddPhotoByFiction(fictionId: string): Promise<number>
   countPendingAddPhotoByFictionAndRole(
     fictionId: string,
@@ -45,8 +61,12 @@ export interface ContributionsRepositoryPort {
   listPendingImagesByContributionId(contributionId: string): Promise<ContributionPendingImage[]>
   deletePendingImagesByContributionId(contributionId: string): Promise<string[]>
   countPendingAddPhotoByPlace(placeId: string): Promise<number>
+  /** Pending add_place_to_scene rows for the same scene + place pair. */
+  countPendingAddPlaceToScene(sceneId: string, placeId: string): Promise<number>
   getById(id: string): Promise<Contribution | null>
   getByUser(userId: string): Promise<Contribution[]>
+  /** Contributions for the profile page with entity / parent labels resolved. */
+  listProfileContributionsByUser(userId: string): Promise<ProfileContributionItem[]>
   countByUser(userId: string): Promise<number>
   /** Distinct fictions (direct + via places) and places with approved contributions. */
   countApprovedFictionAndPlaceScopesByUser(userId: string): Promise<ContributorEntityScopeCounts>

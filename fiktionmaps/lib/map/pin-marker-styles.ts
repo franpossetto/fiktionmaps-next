@@ -4,6 +4,13 @@ import { getPin2dHoverInnerPx } from "@/lib/map/pin-marker-hover-scale"
 /** Shared map pin chrome (2D places, clusters, 3D). */
 export const pinStrokeBorderClass = "border-2 border-black dark:border-white"
 
+/**
+ * Safari often ignores overflow+radius under Mapbox transforms / ancestor filters
+ * until a hover repaint; clip-path forces a circular image mask.
+ */
+export const pinRoundImageClipClass =
+  "overflow-hidden rounded-full [clip-path:circle(50%)]"
+
 export const pinConicRingClass =
   "bg-[conic-gradient(from_0deg,#000000,transparent,#000000)] dark:bg-[conic-gradient(from_0deg,#ffffff,transparent,#ffffff)]"
 

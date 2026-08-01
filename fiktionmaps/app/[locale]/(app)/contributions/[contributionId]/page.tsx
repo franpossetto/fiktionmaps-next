@@ -5,8 +5,10 @@ import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
 import { FictionContributeLayout } from "@/components/contribute/fiction/fiction-contribute-layout"
 import { StaffContributionDetail } from "@/components/contributions/staff-contribution-detail"
 import { StaffPlaceContributionDetail } from "@/components/contributions/staff-place-contribution-detail"
+import { StaffSceneContributionDetail } from "@/components/contributions/staff-scene-contribution-detail"
 import { StaffContributionReviewRightAside } from "@/components/contributions/staff-contribution-review-right-aside"
 import { StaffPlaceContributionReviewRightAside } from "@/components/contributions/staff-place-contribution-review-right-aside"
+import { StaffSceneContributionReviewRightAside } from "@/components/contributions/staff-scene-contribution-review-right-aside"
 import { ContributionsRightRail } from "@/components/contributions/contributions-right-rail"
 import {
   getContributorModerationContextForStaffSession,
@@ -14,10 +16,13 @@ import {
 } from "@/src/contributions/infrastructure/next/contribution.queries"
 import {
   isFictionAddPhotoContribution,
+  isFictionContributionFeedItem,
   isPlaceContributionFeedItem,
+  isSceneContributionFeedItem,
 } from "@/src/contributions/domain/contribution.entity"
 import { getFictionByIdForStaffSession } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { getPlaceLocationByIdForStaffSession } from "@/src/places/infrastructure/next/place.queries"
+import { getSceneByIdUncached } from "@/src/scenes/infrastructure/next/scene.queries"
 import { getProfileForStaffSession } from "@/src/users/infrastructure/next/user.queries"
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -93,6 +98,45 @@ export default async function StaffContributionPage({ params }: Props) {
       </FictionContributeLayout>
     )
   }
+
+  if (isSceneContributionFeedItem(item)) {
+    const [scene, contributorContext, moderatorWho] = await Promise.all([
+      getSceneByIdUncached(item.entityId),
+      getContributorModerationContextForStaffSession(item.userId),
+      resolveModeratorWho(item),
+    ])
+
+    const workTitle =
+      scene?.title?.trim() || item.sceneTitle?.trim() || tContrib("feedCard_untitledScene")
+
+    const reviewRail = (
+      <StaffSceneContributionReviewRightAside item={item} moderatorWho={moderatorWho} />
+    )
+
+    return (
+      <FictionContributeLayout
+        leftAside={null}
+        rightAside={<ContributionsRightRail variant="detail" reviewRail={reviewRail} />}
+      >
+        <div className="w-full min-w-0 px-4 pb-8 pt-0 sm:px-5">
+          <div className="mb-6">
+            <PageBreadcrumb
+              ariaLabel={tMeta("breadcrumbNavAriaLabel")}
+              className="min-w-0"
+              items={[
+                { label: tContrib("title"), href: "/contributions?kind=scene" },
+                { label: workTitle },
+              ]}
+            />
+          </div>
+          <div className="border-b border-border/60 pb-8 min-[900px]:hidden">{reviewRail}</div>
+          <StaffSceneContributionDetail item={item} scene={scene} contributorContext={contributorContext} />
+        </div>
+      </FictionContributeLayout>
+    )
+  }
+
+  if (!isFictionContributionFeedItem(item)) notFound()
 
   const [fiction, contributorContext, moderatorWho] = await Promise.all([
     getFictionByIdForStaffSession(item.entityId),

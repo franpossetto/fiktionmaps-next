@@ -7,11 +7,10 @@ function parseNullableNumber(v: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-/** POST /api/scenes JSON body */
+/** createSceneAction body. A scene is created with zero places; link them via linkScenePlaceAction. */
 export const createSceneBodySchema = z
   .object({
     fictionId: z.string().trim().uuid(),
-    placeId: z.string().trim().uuid(),
     title: z.string().trim().min(1),
     description: z.string().trim().min(1),
     quote: z.unknown().optional(),
@@ -21,6 +20,7 @@ export const createSceneBodySchema = z
     episode: z.unknown().optional(),
     episodeTitle: z.unknown().optional(),
     videoUrl: z.unknown().optional(),
+    previewUrl: z.unknown().optional(),
     sortOrder: z.unknown().optional(),
     active: z.unknown().optional(),
   })
@@ -34,7 +34,6 @@ export const createSceneBodySchema = z
 
     return {
       fictionId: body.fictionId,
-      placeId: body.placeId,
       title: body.title,
       description: body.description,
       quote: body.quote != null ? String(body.quote) : null,
@@ -43,6 +42,7 @@ export const createSceneBodySchema = z
       episode: parseNullableNumber(body.episode),
       episodeTitle: body.episodeTitle != null ? String(body.episodeTitle) : null,
       videoUrl: body.videoUrl != null ? String(body.videoUrl) : null,
+      previewUrl: body.previewUrl != null ? String(body.previewUrl) : null,
       sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : 0,
       active: body.active === false ? false : true,
     }
@@ -64,11 +64,10 @@ const optionalUuidFromBody = z.preprocess(
   z.string().uuid().optional()
 )
 
-/** PATCH /api/scenes/[id] JSON body */
+/** updateSceneAction body. Scene updates never touch place links (use linkScenePlaceAction). */
 export const patchSceneBodySchema = z
   .object({
     fictionId: optionalUuidFromBody,
-    placeId: optionalUuidFromBody,
     title: z.unknown().optional(),
     description: z.unknown().optional(),
     quote: z.unknown().optional(),
@@ -78,13 +77,13 @@ export const patchSceneBodySchema = z
     episode: z.unknown().optional(),
     episodeTitle: z.unknown().optional(),
     videoUrl: z.unknown().optional(),
+    previewUrl: z.unknown().optional(),
     sortOrder: z.unknown().optional(),
     active: z.unknown().optional(),
   })
   .transform((body): UpdateSceneData => {
     const payload: UpdateSceneData = {}
     if (body.fictionId !== undefined) payload.fictionId = body.fictionId
-    if (body.placeId !== undefined) payload.placeId = body.placeId
     if (body.title !== undefined) payload.title = String(body.title).trim()
     if (body.description !== undefined) payload.description = String(body.description).trim()
     if (body.quote !== undefined) payload.quote = body.quote === null ? null : String(body.quote)
@@ -100,6 +99,8 @@ export const patchSceneBodySchema = z
       payload.episodeTitle = body.episodeTitle === null ? null : String(body.episodeTitle)
     if (body.videoUrl !== undefined)
       payload.videoUrl = body.videoUrl === null ? null : String(body.videoUrl)
+    if (body.previewUrl !== undefined)
+      payload.previewUrl = body.previewUrl === null ? null : String(body.previewUrl)
     if (body.sortOrder !== undefined) payload.sortOrder = Number(body.sortOrder)
     if (body.active !== undefined) payload.active = Boolean(body.active)
     return payload
@@ -112,3 +113,35 @@ export const patchSceneBodySchema = z
       ctx.addIssue({ code: "custom", message: "Invalid episode", path: ["episode"] })
     }
   })
+
+/** linkScenePlaceAction body. Links one place to a scene; `sortOrder` is assigned server-side. */
+export const linkScenePlaceBodySchema = z
+  .object({
+    sceneId: z.string().trim().uuid(),
+    placeId: z.string().trim().uuid(),
+    startSecond: z.unknown().optional(),
+    endSecond: z.unknown().optional(),
+  })
+  .transform((body) => ({
+    sceneId: body.sceneId,
+    placeId: body.placeId,
+    startSecond: parseNullableNumber(body.startSecond),
+    endSecond: parseNullableNumber(body.endSecond),
+  }))
+  .superRefine((payload, ctx) => {
+    if (payload.startSecond != null && payload.startSecond < 0) {
+      ctx.addIssue({ code: "custom", message: "Invalid startSecond", path: ["startSecond"] })
+    }
+    if (payload.endSecond != null && payload.endSecond < 0) {
+      ctx.addIssue({ code: "custom", message: "Invalid endSecond", path: ["endSecond"] })
+    }
+    if (
+      payload.startSecond != null &&
+      payload.endSecond != null &&
+      payload.endSecond < payload.startSecond
+    ) {
+      ctx.addIssue({ code: "custom", message: "endSecond must be >= startSecond", path: ["endSecond"] })
+    }
+  })
+
+export type LinkScenePlaceData = z.infer<typeof linkScenePlaceBodySchema>

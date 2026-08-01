@@ -5,6 +5,7 @@ import { Link } from "@/i18n/navigation"
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { publicUserProfilePath } from "@/lib/users/public-profile-path"
 import type { TopContributorProfile } from "@/src/contributions/domain/contribution.entity"
 
 interface ContributorsPageProps {
@@ -92,10 +93,32 @@ export function ContributorsPage({ contributors, page, totalPages, totalCount, p
                     className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-accent/50"
                   >
                     <RankBadge rank={rank} />
-                    <UserAvatar avatarId={contributor.avatarUrl} fallback={initial} className="h-9 w-9 shrink-0" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-foreground">{name}</span>
-                    </span>
+                    {contributor.username?.trim() ? (
+                      <Link
+                        href={publicUserProfilePath(contributor.username)}
+                        className="flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <UserAvatar
+                          avatarId={contributor.avatarUrl}
+                          fallback={initial}
+                          className="h-9 w-9 shrink-0"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-foreground">{name}</span>
+                        </span>
+                      </Link>
+                    ) : (
+                      <>
+                        <UserAvatar
+                          avatarId={contributor.avatarUrl}
+                          fallback={initial}
+                          className="h-9 w-9 shrink-0"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-foreground">{name}</span>
+                        </span>
+                      </>
+                    )}
                     <span className="shrink-0 tabular-nums text-sm text-muted-foreground">
                       <span className="font-semibold text-foreground">{contributor.fppTotal.toLocaleString()}</span>
                       {" "}

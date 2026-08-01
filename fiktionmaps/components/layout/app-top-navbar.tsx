@@ -18,6 +18,7 @@ import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { NavSearchScope } from "@/src/fictions/domain/nav-search-scope"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
+import { sceneIncludesPlace } from "@/src/scenes/domain/scene.helpers"
 import type { City } from "@/src/cities/domain/city.entity"
 import { publicFictionPlacePath, publicFictionScenePath } from "@/lib/fictions/public-fiction-paths"
 
@@ -172,7 +173,7 @@ export function AppTopNavbar() {
       }
       const scenePool =
         scope.kind === "place"
-          ? scenes.filter((s) => s.placeId === scope.placeId)
+          ? scenes.filter((s) => sceneIncludesPlace(s, scope.placeId))
           : scenes
       for (const scene of scenePool) {
         const title = scene.title.toLowerCase()

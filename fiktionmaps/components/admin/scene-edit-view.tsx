@@ -7,29 +7,14 @@ import { ArrowLeft, CheckCircle2, Loader2, RefreshCw } from "lucide-react"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
-import { createClient } from "@/lib/supabase/client"
-import { ASSET_VIDEOS_BUCKET } from "@/lib/asset-videos/asset-videos-bucket"
+import { primaryScenePlace } from "@/src/scenes/domain/scene.helpers"
+import { uploadSceneVideoPair } from "@/lib/asset-videos/upload-scene-videos"
+import { SCENE_VIDEO_MAX_BYTES } from "@/components/contribute/scene/scene-contribute-video-schema"
 import { buildTimecodeLabel, parseTimecodeLabel, type TimecodeParts } from "@/lib/scenes/scene-timecode"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
 import { SceneTimecodeInput } from "./scene-timecode-input"
 import { updateSceneAction } from "@/src/scenes/infrastructure/next/scene.actions"
-
-function sanitizeFileName(name: string) {
-  return name.replace(/[^a-zA-Z0-9._-]/g, "_")
-}
-
-async function uploadSceneVideoToBucket(file: File): Promise<string> {
-  const supabase = createClient()
-  const path = `scenes/${crypto.randomUUID()}/${sanitizeFileName(file.name)}`
-  const { error } = await supabase.storage.from(ASSET_VIDEOS_BUCKET).upload(path, file, {
-    contentType: file.type || "video/mp4",
-    upsert: false,
-  })
-  if (error) throw new Error(error.message)
-  const { data } = supabase.storage.from(ASSET_VIDEOS_BUCKET).getPublicUrl(path)
-  return data.publicUrl
-}
 
 interface SceneFormData {
   title: string
@@ -42,6 +27,8 @@ interface SceneFormData {
   episode: string
   episodeTitle: string
   videoFile: File | null
+  processedVideoFile: File | null
+  processedPreviewFile: File | null
 }
 
 function sceneToForm(scene: Scene): SceneFormData {
@@ -49,13 +36,15 @@ function sceneToForm(scene: Scene): SceneFormData {
     title: scene.title,
     description: scene.description,
     fictionId: scene.fictionId,
-    placeId: scene.placeId,
+    placeId: primaryScenePlace(scene)?.placeId ?? "",
     timecode: parseTimecodeLabel(scene.timestamp),
     quote: scene.quote ?? "",
     season: scene.season != null ? String(scene.season) : "",
     episode: scene.episode != null ? String(scene.episode) : "",
     episodeTitle: scene.episodeTitle ?? "",
     videoFile: null,
+    processedVideoFile: null,
+    processedPreviewFile: null,
   }
 }
 
@@ -75,17 +64,21 @@ export function SceneEditView({ initialScene, fictions: initialFictions = [], pl
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pendingVideoPreviewUrl, setPendingVideoPreviewUrl] = useState<string | null>(null)
+  const [videoProcessing, setVideoProcessing] = useState(false)
+  const [videoProcessingPercent, setVideoProcessingPercent] = useState<number | null>(null)
   const videoFileInputRef = useRef<HTMLInputElement>(null)
+  const processGenRef = useRef(0)
 
   useEffect(() => {
-    if (!formData.videoFile) {
+    const file = formData.processedVideoFile ?? formData.videoFile
+    if (!file) {
       setPendingVideoPreviewUrl(null)
       return
     }
-    const url = URL.createObjectURL(formData.videoFile)
+    const url = URL.createObjectURL(file)
     setPendingVideoPreviewUrl(url)
     return () => URL.revokeObjectURL(url)
-  }, [formData.videoFile])
+  }, [formData.processedVideoFile, formData.videoFile])
 
   const selectedFiction = useMemo(
     () => fictions.find((f) => f.id === formData.fictionId),
@@ -104,20 +97,80 @@ export function SceneEditView({ initialScene, fictions: initialFictions = [], pl
     if (!formData.title.trim()) newErrors.title = "Scene title is required"
     if (!formData.description.trim()) newErrors.description = "Description is required"
     if (!formData.fictionId) newErrors.fictionId = "Fiction is required"
-    if (!formData.placeId) newErrors.placeId = "Place is required"
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
+  }
+
+  const handleVideoPick = (f: File | null) => {
+    if (!f) return
+    if (f.size > SCENE_VIDEO_MAX_BYTES) {
+      setError(t("videoTooLarge"))
+      return
+    }
+    setError(null)
+    const gen = ++processGenRef.current
+    setFormData((prev) => ({
+      ...prev,
+      videoFile: f,
+      processedVideoFile: null,
+      processedPreviewFile: null,
+    }))
+    setVideoProcessing(true)
+    setVideoProcessingPercent(0)
+
+    void (async () => {
+      try {
+        const { processSceneVideoClient } = await import("@/lib/video/client-video-processor")
+        const result = await processSceneVideoClient(f, (p) => {
+          if (processGenRef.current !== gen) return
+          setVideoProcessingPercent(p.percent)
+        })
+        if (processGenRef.current !== gen) return
+        setFormData((prev) => ({
+          ...prev,
+          processedVideoFile: result.videoFile,
+          processedPreviewFile: result.previewFile,
+        }))
+      } catch (err) {
+        if (processGenRef.current !== gen) return
+        setFormData((prev) => ({
+          ...prev,
+          videoFile: null,
+          processedVideoFile: null,
+          processedPreviewFile: null,
+        }))
+        setError(err instanceof Error ? err.message : "Video compression failed")
+      } finally {
+        if (processGenRef.current === gen) {
+          setVideoProcessing(false)
+          setVideoProcessingPercent(null)
+        }
+      }
+    })()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateForm()) return
+    if (videoProcessing) {
+      setError("Wait for video compression to finish")
+      return
+    }
     setSaving(true)
     setError(null)
     try {
       let videoUrl: string | null = null
+      let previewUrl: string | null = null
       if (formData.videoFile) {
-        videoUrl = await uploadSceneVideoToBucket(formData.videoFile)
+        if (!formData.processedVideoFile || !formData.processedPreviewFile) {
+          throw new Error("Video is still processing or failed. Pick the file again.")
+        }
+        const uploaded = await uploadSceneVideoPair({
+          video: formData.processedVideoFile,
+          preview: formData.processedPreviewFile,
+        })
+        videoUrl = uploaded.videoUrl
+        previewUrl = uploaded.previewUrl
       }
 
       const season = formData.season.trim() ? parseInt(formData.season, 10) : null
@@ -137,7 +190,6 @@ export function SceneEditView({ initialScene, fictions: initialFictions = [], pl
 
       const basePayload = {
         fictionId: formData.fictionId,
-        placeId: formData.placeId,
         title: formData.title.trim(),
         description: formData.description.trim(),
         quote: formData.quote.trim() || null,
@@ -149,7 +201,9 @@ export function SceneEditView({ initialScene, fictions: initialFictions = [], pl
 
       const result = await updateSceneAction(initialScene.id, {
         ...basePayload,
-        ...(videoUrl ? { videoUrl } : {}),
+        ...(videoUrl
+          ? { videoUrl, previewUrl }
+          : {}),
       })
 
       if (!result.success) {
@@ -241,25 +295,25 @@ export function SceneEditView({ initialScene, fictions: initialFictions = [], pl
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0] ?? null
-                    const max = 100 * 1024 * 1024
-                    if (f && f.size > max) {
-                      setError(t("videoTooLarge"))
-                      e.target.value = ""
-                      return
-                    }
-                    setError(null)
-                    setFormData((prev) => ({ ...prev, videoFile: f }))
                     e.target.value = ""
+                    if (f) handleVideoPick(f)
                   }}
                 />
                 <Button
                   type="button"
                   variant="outline"
                   className="w-full gap-2 sm:w-auto"
+                  disabled={videoProcessing}
                   onClick={() => videoFileInputRef.current?.click()}
                 >
-                  <RefreshCw className="h-4 w-4 shrink-0" />
-                  {t("replaceVideo")}
+                  {videoProcessing ? (
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 shrink-0" />
+                  )}
+                  {videoProcessing
+                    ? `Compressing…${videoProcessingPercent != null ? ` ${videoProcessingPercent}%` : ""}`
+                    : t("replaceVideo")}
                 </Button>
               </div>
             </div>
@@ -339,7 +393,7 @@ export function SceneEditView({ initialScene, fictions: initialFictions = [], pl
         <div className="flex gap-3 pt-2">
           <Button
             type="submit"
-            disabled={saving}
+            disabled={saving || videoProcessing}
             className="flex-1 gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

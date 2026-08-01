@@ -1,9 +1,8 @@
-import { cache } from "react"
-import { createClient } from "@/lib/supabase/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/supabase/database.types"
 import type { UserHome, CreateHomeData, UpdateHomeData } from "@/src/homes/domain/home.entity"
 import type { HomesRepositoryPort } from "@/src/homes/domain/home.repository"
+import { createClient } from "@/lib/supabase/server"
 
 function toUserHome(row: {
   id: string
@@ -27,7 +26,7 @@ export function createHomesSupabaseAdapter(
   getSupabase: () => Promise<SupabaseClient<Database>>
 ): HomesRepositoryPort {
   return {
-    getByUserId: cache(async (userId: string): Promise<UserHome[]> => {
+    async getByUserId(userId: string): Promise<UserHome[]> {
       const supabase = await getSupabase()
       const { data, error } = await supabase
         .from("user_homes")
@@ -36,7 +35,7 @@ export function createHomesSupabaseAdapter(
         .order("date_from", { ascending: false })
       if (error || !data) return []
       return data.map(toUserHome)
-    }),
+    },
 
     async create(userId: string, dto: CreateHomeData): Promise<UserHome | null> {
       const supabase = await getSupabase()
@@ -50,7 +49,10 @@ export function createHomesSupabaseAdapter(
         })
         .select()
         .single()
-      if (error || !data) return null
+      if (error || !data) {
+        console.error("[homes.create]", error?.message ?? "no data")
+        return null
+      }
       return toUserHome(data)
     },
 

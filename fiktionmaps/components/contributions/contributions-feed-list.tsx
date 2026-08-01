@@ -1,9 +1,11 @@
 import { getTranslations } from "next-intl/server"
 import Image from "next/image"
+import { Clapperboard } from "lucide-react"
 import { Link } from "@/i18n/navigation"
 import {
   getPendingPathsForRole,
   isPlaceContributionFeedItem,
+  isSceneContributionFeedItem,
   isFictionAddPhotoContribution,
   type StaffCreateContributionFeedItem,
   type StaffContributionsFeedKind,
@@ -31,57 +33,65 @@ function statusBadgeClass(status: StaffCreateContributionFeedItem["status"]): st
   }
 }
 
+/** Per-kind message key suffix: fiction has none, place/scene have their own set, "all" only has one for the base (untabbed) state. */
+function feedKindSuffix(feedKind: StaffContributionsFeedKind): "" | "Place" | "Scene" {
+  if (feedKind === "place") return "Place"
+  if (feedKind === "scene") return "Scene"
+  return ""
+}
+
 function emptyMessageKeys(
   feedKind: StaffContributionsFeedKind,
   submitterFiltered: boolean,
   statusTab: ContributionsFeedTab,
 ): { title: string; body: string } {
-  const isPlace = feedKind === "place"
+  const suffix = feedKindSuffix(feedKind)
   if (submitterFiltered && statusTab === "pending") {
     return {
-      title: isPlace ? "feedEmptyFilteredPendingPlaceTitle" : "feedEmptyFilteredPendingTitle",
-      body: isPlace ? "feedEmptyFilteredPendingPlace" : "feedEmptyFilteredPending",
+      title: `feedEmptyFilteredPending${suffix}Title`,
+      body: `feedEmptyFilteredPending${suffix}`,
     }
   }
   if (submitterFiltered && statusTab === "approved") {
     return {
-      title: isPlace ? "feedEmptyFilteredApprovedPlaceTitle" : "feedEmptyFilteredApprovedTitle",
-      body: isPlace ? "feedEmptyFilteredApprovedPlace" : "feedEmptyFilteredApproved",
+      title: `feedEmptyFilteredApproved${suffix}Title`,
+      body: `feedEmptyFilteredApproved${suffix}`,
     }
   }
   if (submitterFiltered && statusTab === "rejected") {
     return {
-      title: isPlace ? "feedEmptyFilteredRejectedPlaceTitle" : "feedEmptyFilteredRejectedTitle",
-      body: isPlace ? "feedEmptyFilteredRejectedPlace" : "feedEmptyFilteredRejected",
+      title: `feedEmptyFilteredRejected${suffix}Title`,
+      body: `feedEmptyFilteredRejected${suffix}`,
     }
   }
   if (submitterFiltered) {
     return {
-      title: isPlace ? "feedEmptyFilteredPlaceTitle" : "feedEmptyFilteredTitle",
-      body: isPlace ? "feedEmptyFilteredPlace" : "feedEmptyFiltered",
+      title: `feedEmptyFiltered${suffix}Title`,
+      body: `feedEmptyFiltered${suffix}`,
     }
   }
   if (statusTab === "pending") {
     return {
-      title: isPlace ? "feedEmptyTabPendingPlaceTitle" : "feedEmptyTabPendingTitle",
-      body: isPlace ? "feedEmptyTabPendingPlace" : "feedEmptyTabPending",
+      title: `feedEmptyTabPending${suffix}Title`,
+      body: `feedEmptyTabPending${suffix}`,
     }
   }
   if (statusTab === "approved") {
     return {
-      title: isPlace ? "feedEmptyTabApprovedPlaceTitle" : "feedEmptyTabApprovedTitle",
-      body: isPlace ? "feedEmptyTabApprovedPlace" : "feedEmptyTabApproved",
+      title: `feedEmptyTabApproved${suffix}Title`,
+      body: `feedEmptyTabApproved${suffix}`,
     }
   }
   if (statusTab === "rejected") {
     return {
-      title: isPlace ? "feedEmptyTabRejectedPlaceTitle" : "feedEmptyTabRejectedTitle",
-      body: isPlace ? "feedEmptyTabRejectedPlace" : "feedEmptyTabRejected",
+      title: `feedEmptyTabRejected${suffix}Title`,
+      body: `feedEmptyTabRejected${suffix}`,
     }
   }
+  const baseSuffix = feedKind === "all" ? "All" : suffix
   return {
-    title: isPlace ? "feedEmptyPlaceTitle" : feedKind === "all" ? "feedEmptyAllTitle" : "feedEmptyTitle",
-    body: isPlace ? "feedEmptyPlace" : feedKind === "all" ? "feedEmptyAll" : "feedEmpty",
+    title: `feedEmpty${baseSuffix}Title`,
+    body: `feedEmpty${baseSuffix}`,
   }
 }
 
@@ -115,20 +125,44 @@ export async function ContributionsFeedList({
     <ul className="pt-1">
       {items.map((item, idx) => {
         const isPlace = isPlaceContributionFeedItem(item)
+        const isScene = isSceneContributionFeedItem(item)
         const title = isPlace
           ? item.placeName?.trim() || t("feedCard_untitledPlace")
-          : item.fictionTitle?.trim() || t("feedCard_untitledFiction")
-        const fictionProposedLg = !isPlace
+          : isScene
+            ? item.sceneTitle?.trim() || t("feedCard_untitledScene")
+            : item.fictionTitle?.trim() || t("feedCard_untitledFiction")
+        const fictionProposedLg = !isPlace && !isScene
           ? getPendingPathsForRole(item.pendingImagesByRole, "cover")?.lg
           : null
         const fictionProposed =
-          isFictionAddPhotoContribution(item) && fictionProposedLg
+          !isScene && isFictionAddPhotoContribution(item) && fictionProposedLg
             ? publicAssetImageUrl(fictionProposedLg)
             : null
         const coverSrc = isPlace
           ? item.placeAvatarUrl?.trim() || DEFAULT_FICTION_COVER
-          : fictionProposed || item.fictionCoverUrl?.trim() || DEFAULT_FICTION_COVER
-        const subtitle = isPlace && item.fictionTitle?.trim() ? item.fictionTitle.trim() : null
+          : isScene
+            ? null
+            : fictionProposed || item.fictionCoverUrl?.trim() || DEFAULT_FICTION_COVER
+        const sceneVideoSrc = isScene
+          ? item.scenePreviewUrl?.trim() || item.sceneVideoUrl?.trim() || null
+          : null
+        const subtitle = isScene
+          ? [
+              item.fictionTitle?.trim(),
+              item.type === "add_place_to_scene"
+                ? item.proposedPlaces
+                    .map((p) => p.name?.trim())
+                    .filter(Boolean)
+                    .join(" → ") || null
+                : item.placeNames.length > 0
+                  ? item.placeNames.join(", ")
+                  : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || null
+          : isPlace && item.fictionTitle?.trim()
+            ? item.fictionTitle.trim()
+            : null
 
         return (
           <li key={item.id} className={cn("border-t border-border/60", idx === 0 && "border-t-0")}>
@@ -144,16 +178,33 @@ export async function ContributionsFeedList({
               <div
                 className={cn(
                   "relative h-14 w-14 shrink-0 overflow-hidden border border-border bg-muted sm:h-16 sm:w-16",
-                  isPlace ? "rounded-lg" : "rounded-full",
+                  isPlace ? "rounded-lg" : isScene ? "rounded-lg" : "rounded-full",
                 )}
               >
-                <Image
-                  src={coverSrc}
-                  alt={title}
-                  fill
-                  className="object-cover object-center transition-opacity duration-300 group-hover:opacity-95"
-                  sizes="(max-width:640px) 56px, 64px"
-                />
+                {isScene ? (
+                  sceneVideoSrc ? (
+                    <video
+                      src={sceneVideoSrc}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
+                      aria-hidden
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                      <Clapperboard className="h-6 w-6 opacity-60" aria-hidden />
+                    </div>
+                  )
+                ) : (
+                  <Image
+                    src={coverSrc ?? DEFAULT_FICTION_COVER}
+                    alt={title}
+                    fill
+                    className="object-cover object-center transition-opacity duration-300 group-hover:opacity-95"
+                    sizes="(max-width:640px) 56px, 64px"
+                  />
+                )}
               </div>
 
               <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">

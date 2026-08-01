@@ -61,6 +61,8 @@ interface AuthContextType {
   signup: (email: string, password: string, name: string) => Promise<void>
   logout: () => void
   completeOnboarding: (prefs: UserPreferences) => Promise<void>
+  /** Keep session preferences in sync after profile photo upload. */
+  setAvatarPreference: (avatarUrl: string) => void
 }
 
 function authUserToUser(
@@ -190,6 +192,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  const setAvatarPreference = useCallback((avatarUrl: string) => {
+    setPreferences((current) =>
+      current
+        ? { ...current, avatar: avatarUrl }
+        : {
+            genres: [],
+            fictions: [],
+            interests: [],
+            cities: [],
+            avatar: avatarUrl,
+          }
+    )
+    setUser((current) => (current ? { ...current, avatar: avatarUrl } : current))
+  }, [])
+
   return (
     <AuthContext.Provider
       value={{
@@ -205,6 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signup,
         logout,
         completeOnboarding,
+        setAvatarPreference,
       }}
     >
       {children}

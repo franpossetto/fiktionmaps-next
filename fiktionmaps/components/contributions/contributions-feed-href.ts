@@ -5,7 +5,7 @@ export type ContributionsFeedTab = "all" | "pending" | "approved" | "rejected"
 
 export function parseContributionsFeedKind(raw: string | undefined): StaffContributionsFeedKind {
   const s = raw?.trim().toLowerCase() ?? ""
-  if (s === "place" || s === "all") return s
+  if (s === "place" || s === "scene" || s === "all") return s
   return "fiction"
 }
 

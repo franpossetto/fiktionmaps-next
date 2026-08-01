@@ -6,7 +6,7 @@ import { getSessionUserId } from "@/lib/auth/auth.service"
 import { createClient } from "@/lib/supabase/server"
 import { createHomesSupabaseAdapter } from "@/src/homes/infrastructure/supabase/home.repository.impl"
 import { addHomeUseCase } from "@/src/homes/application/add-home.usecase"
-import { getHomesByUserIdCached } from "./home.queries"
+import { getHomesByUserId } from "./home.queries"
 import type { UserHome, CreateHomeData } from "@/src/homes/domain/home.entity"
 
 function getRepo() {
@@ -21,7 +21,7 @@ async function fetchUserHomesAction(): Promise<HomesResult<UserHome[]>> {
   try {
     const userId = await getSessionUserId()
     if (!userId) return { data: [], error: null }
-    const homes = await getHomesByUserIdCached(userId)
+    const homes = await getHomesByUserId(userId)
     return { data: homes, error: null }
   } catch (e) {
     return {
@@ -30,8 +30,14 @@ async function fetchUserHomesAction(): Promise<HomesResult<UserHome[]>> {
     }
   }
 }
+
 /** Request-scoped dedupe for profile homes reads. */
 export const getUserHomesAction = cache(fetchUserHomesAction)
+
+/** Same as getUserHomesAction but without React cache — for client refetch after mutations. */
+export async function listMyHomesAction(): Promise<HomesResult<UserHome[]>> {
+  return fetchUserHomesAction()
+}
 
 export async function addHomeAction(data: CreateHomeData): Promise<HomesResult<UserHome>> {
   try {

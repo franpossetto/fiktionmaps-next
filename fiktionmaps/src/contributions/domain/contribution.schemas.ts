@@ -6,6 +6,7 @@ const contributionTypeSchema = z.enum([
   "create_place",
   "add_scene",
   "add_photo",
+  "add_place_to_scene",
   "enrich_entity",
   "correct_data",
   "mark_inaccessible",
@@ -57,3 +58,12 @@ export const submitFictionAddPhotoContributionSchema = z.object({
 })
 
 export type SubmitFictionAddPhotoContributionData = z.infer<typeof submitFictionAddPhotoContributionSchema>
+
+export const submitAddPlaceToSceneContributionSchema = z.object({
+  sceneId: uuidSchema,
+  placeIds: z.array(uuidSchema).min(1),
+})
+
+export type SubmitAddPlaceToSceneContributionData = z.infer<
+  typeof submitAddPlaceToSceneContributionSchema
+>

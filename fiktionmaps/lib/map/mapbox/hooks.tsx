@@ -46,12 +46,11 @@ export function useMapboxMapControl(id?: string): MapControl | null {
           return false
         }
       },
-      fitBounds(points: LatLng[], padding = 64) {
+      fitBounds(points: LatLng[], padding = 64, maxZoom = 17) {
         try {
           if (points.length === 0) return
           if (points.length === 1) {
-            map.panTo([points[0].lng, points[0].lat])
-            if (map.getZoom() < 13) map.setZoom(13)
+            map.jumpTo({ center: [points[0].lng, points[0].lat], zoom: Math.min(15, maxZoom) })
             return
           }
 
@@ -65,7 +64,7 @@ export function useMapboxMapControl(id?: string): MapControl | null {
           }
 
           const bounds: LngLatBoundsLike = [[minLng, minLat], [maxLng, maxLat]]
-          map.fitBounds(bounds, { padding })
+          map.fitBounds(bounds, { padding, maxZoom, duration: 0 })
         } catch { /* map not ready */ }
       },
       setTilt(tilt: number) {

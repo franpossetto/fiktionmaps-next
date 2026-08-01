@@ -3,6 +3,7 @@
 import { SceneWatchView } from "@/components/scenes/scene-watch-view"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import type { Place } from "@/src/places/domain/place.entity"
 
 export interface FictionSceneWatchClientProps {
   fiction: FictionWithMedia
@@ -10,6 +11,7 @@ export interface FictionSceneWatchClientProps {
   currentWatchScene: Scene
   placeName?: string
   placeSlug?: string
+  places?: Place[]
 }
 
 export function FictionSceneWatchClient({
@@ -18,6 +20,7 @@ export function FictionSceneWatchClient({
   currentWatchScene,
   placeName,
   placeSlug,
+  places = [],
 }: FictionSceneWatchClientProps) {
   const isTvSeries = fiction.type === "tv-series"
 
@@ -29,6 +32,7 @@ export function FictionSceneWatchClient({
       isTvSeries={isTvSeries}
       placeName={placeName}
       placeSlug={placeSlug}
+      places={places}
       useShellMainScroll
     />
   )

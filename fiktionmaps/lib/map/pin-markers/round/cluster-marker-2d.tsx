@@ -6,6 +6,7 @@ import {
   pin2dPointerColorClass,
   pin2dPointerSizeClass,
   pinConicRingClass,
+  pinRoundImageClipClass,
   pinStrokeBorderClass,
 } from "@/lib/map/pin-marker-styles"
 import { Pin2dMarkerColumn } from "../pin-2d-marker-column"
@@ -46,11 +47,15 @@ export function ClusterMarker2dRound({
               }`}
             />
             <div
-              className={`relative overflow-hidden rounded-full ${pinStrokeBorderClass}`}
+              className={`relative ${pinRoundImageClipClass} ${pinStrokeBorderClass}`}
               style={{ width: bubbleInner, height: bubbleInner }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+              <img
+                src={imageUrl}
+                alt=""
+                className="h-full w-full rounded-full object-cover"
+              />
               <div
                 className="pointer-events-none absolute inset-0 rounded-full"
                 style={{

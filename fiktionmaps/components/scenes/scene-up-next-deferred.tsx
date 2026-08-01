@@ -4,6 +4,7 @@ import {
   getScenesForFictionCached,
 } from "@/src/scenes/infrastructure/next/scene.queries"
 import { getPlaceLocationsByIdsCached } from "@/src/places/infrastructure/next/place.queries"
+import { scenePlaceIds } from "@/src/scenes/domain/scene.helpers"
 import { SceneUpNextAside } from "@/components/scenes/scene-up-next-aside"
 
 function SceneUpNextFallback() {
@@ -35,7 +36,7 @@ async function SceneUpNextLoader({
     cityId ? getScenesForCityCached(cityId) : Promise.resolve({ scenes: [], fictionSlugById: {} }),
   ])
 
-  const placeIds = [...new Set([...fictionScenes.map((s) => s.placeId), primaryPlaceId])]
+  const placeIds = [...new Set([...fictionScenes.flatMap(scenePlaceIds), primaryPlaceId])]
   const relatedPlaces = await getPlaceLocationsByIdsCached(placeIds)
   const cityScenes = cityData.scenes.filter((s) => s.fictionId !== fictionId)
 

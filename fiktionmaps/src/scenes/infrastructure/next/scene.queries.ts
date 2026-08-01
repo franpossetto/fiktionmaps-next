@@ -9,6 +9,7 @@ import { getCitiesWithScenesUseCase } from "@/src/scenes/application/get-cities-
 import { getCityFictionsWithScenesUseCase } from "@/src/scenes/application/get-city-fictions-with-scenes.usecase"
 import { getSceneCountsByFictionIdsUseCase } from "@/src/scenes/application/get-scene-counts-by-fiction-ids.usecase"
 import { listScenesUseCase } from "@/src/scenes/application/list-scenes.usecase"
+import { listFictionScenesForContributeUseCase } from "@/src/scenes/application/list-fiction-scenes-for-contribute.usecase"
 import { CacheKeys } from "@/src/shared/infrastructure/next/cache.keys"
 import { CacheConfig } from "@/src/shared/infrastructure/next/cache.config"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
@@ -87,6 +88,15 @@ export function getScenesForFictionCached(fictionId: string): Promise<Scene[]> {
   return unstable_cache(
     () => listScenesUseCase({ fictionId, active: true }, scenesRepoPublic),
     CacheKeys.scene(`fiction:${fictionId}`),
+    { ...CacheConfig.medium, tags: ["scenes", `fiction-${fictionId}`] },
+  )()
+}
+
+/** Lightweight approved scenes for contribute scene pickers. */
+export function getFictionScenesForContributeCached(fictionId: string): Promise<Scene[]> {
+  return unstable_cache(
+    () => listFictionScenesForContributeUseCase(fictionId, scenesRepoPublic),
+    CacheKeys.scene(`fiction-contribute:${fictionId}`),
     { ...CacheConfig.medium, tags: ["scenes", `fiction-${fictionId}`] },
   )()
 }

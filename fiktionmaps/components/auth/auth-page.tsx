@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 import { useAuth } from "@/context/auth-context"
 import { useRouter } from "@/i18n/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ArrowDown, ArrowLeft } from "lucide-react"
 import { LocaleSwitcher } from "@/components/layout/locale-switcher"
+import { createClient } from "@/lib/supabase/client"
 
 type AuthView = "login" | "signup" | "forgot-password"
 
@@ -74,6 +75,7 @@ function Field({
 export function AuthPage() {
   const t = useTranslations("Auth")
   const tCommon = useTranslations("Common")
+  const locale = useLocale()
   const { login, signup, isLoading, user, needsOnboarding } = useAuth()
   const router = useRouter()
   const [view, setView] = useState<AuthView>("login")
@@ -82,6 +84,7 @@ export function AuthPage() {
   const [name, setName] = useState("")
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [isResetting, setIsResetting] = useState(false)
 
   useEffect(() => {
     if (user && needsOnboarding) {
@@ -113,9 +116,30 @@ export function AuthPage() {
         }
         await signup(email, password, name)
       } else {
-        await new Promise((r) => setTimeout(r, 900))
-        setSuccess(t("resetLinkSent"))
-        setTimeout(() => { setView("login"); resetForm() }, 2500)
+        setIsResetting(true)
+        try {
+          // Browser client so PKCE verifier + redirect host match the same device.
+          // Land on update-password (not callback): default emails put tokens in the
+          // URL hash, which a Route Handler cannot see and would strip on redirect.
+          const supabase = createClient()
+          const redirectTo = `${window.location.origin}/${locale}/auth/update-password`
+          const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+            email.trim(),
+            { redirectTo },
+          )
+          if (resetError) {
+            // eslint-disable-next-line no-console
+            console.error("[auth] resetPasswordForEmail:", resetError.message)
+          }
+          // Always show the same success copy (anti-enumeration).
+          setSuccess(t("resetLinkSent"))
+          setTimeout(() => {
+            setView("login")
+            resetForm()
+          }, 2500)
+        } finally {
+          setIsResetting(false)
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : tCommon("error"))
@@ -164,7 +188,7 @@ export function AuthPage() {
                   placeholder={t("emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={isLoading}
+                  disabled={isLoading || isResetting}
                   required
                   className={authFieldClass}
                 />
@@ -173,10 +197,10 @@ export function AuthPage() {
               {success && <p className="text-sm text-sky-300">{success}</p>}
               <Button
                 type="submit"
-                disabled={isLoading || !email}
+                disabled={isLoading || isResetting || !email}
                 className={authSecondaryButtonClass}
               >
-                {isLoading ? tCommon("sending") : t("sendResetLink")}
+                {isLoading || isResetting ? tCommon("sending") : t("sendResetLink")}
               </Button>
             </form>
             <LocaleSwitcher />

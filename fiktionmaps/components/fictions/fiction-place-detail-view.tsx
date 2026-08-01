@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react"
-import { ChevronRight, Compass } from "lucide-react"
+import { Compass } from "lucide-react"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import { Link } from "@/i18n/navigation"
 import { useTranslations } from "next-intl"
@@ -15,6 +15,7 @@ import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import type { ContributorProfileWithDate } from "@/src/contributions/domain/contribution.entity"
+import { FictionDetailSectionHeading } from "@/components/fictions/fiction-detail-section-heading"
 import { PlaceContributorsByline } from "@/components/fictions/place-contributors-byline"
 import { PlaceShootEnvironmentBadge } from "@/components/places/place-shoot-environment-badge"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
@@ -147,16 +148,10 @@ export function FictionPlaceDetailView({
     scenesSlot ??
     (
       <section className="space-y-5">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="h-7 w-1 rounded-full bg-yellow-500" aria-hidden />
-            <h2 className="text-3xl font-semibold tracking-tight text-foreground">
-              {t("placeDetailScenesHeading")}
-            </h2>
-            <span className="text-base font-medium text-muted-foreground">{scenes.length}</span>
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          </div>
-        </div>
+        <FictionDetailSectionHeading
+          title={t("placeDetailScenesHeading")}
+          count={scenes.length}
+        />
 
         {scenes.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("placeDetailNoScenes")}</p>
@@ -297,36 +292,31 @@ export function FictionPlaceDetailView({
 
           {showDirectionsSection ? (
             <section className="space-y-4 border-b border-border/60 pb-10" aria-labelledby="place-directions-heading">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <span className="h-7 w-1 shrink-0 rounded-full bg-yellow-500" aria-hidden />
-                  <h2
-                    id="place-directions-heading"
-                    className="text-3xl font-semibold tracking-tight text-foreground"
-                  >
-                    {t("placeDetailDirectionsHeading")}
-                  </h2>
-                </div>
-                {previewMode ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled
-                    className="pointer-events-none h-9 shrink-0 border-border bg-background px-3 text-sm opacity-80 shadow-none"
-                  >
-                    <Compass className="h-4 w-4" />
-                    <span>{t("placeDetailGoToMap")}</span>
-                  </Button>
-                ) : (
-                  <Button asChild size="sm" variant="outline" className="h-9 shrink-0 border-border bg-background px-3 text-sm shadow-none">
-                    <Link href={exploreMapHref}>
+              <FictionDetailSectionHeading
+                id="place-directions-heading"
+                title={t("placeDetailDirectionsHeading")}
+                trailing={
+                  previewMode ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled
+                      className="pointer-events-none h-9 shrink-0 border-border bg-background px-3 text-sm opacity-80 shadow-none"
+                    >
                       <Compass className="h-4 w-4" />
                       <span>{t("placeDetailGoToMap")}</span>
-                    </Link>
-                  </Button>
-                )}
-              </div>
+                    </Button>
+                  ) : (
+                    <Button asChild size="sm" variant="outline" className="h-9 shrink-0 border-border bg-background px-3 text-sm shadow-none">
+                      <Link href={exploreMapHref}>
+                        <Compass className="h-4 w-4" />
+                        <span>{t("placeDetailGoToMap")}</span>
+                      </Link>
+                    </Button>
+                  )
+                }
+              />
               {coordsOk ? (
                 <LazyFictionPlaceDirectionsMap
                   mapInstanceId={`fiction-place-directions-${place.id}`}

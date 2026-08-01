@@ -4,12 +4,17 @@ import { createAnonymousClient, createClient } from "@/lib/supabase/server"
 import { getSessionUserId } from "@/lib/auth/auth.service"
 import { createUsersSupabaseAdapter } from "@/src/users/infrastructure/supabase/user.repository.impl"
 import { getProfileUseCase } from "@/src/users/application/get-profile.usecase"
+import { getProfileByUsernameUseCase } from "@/src/users/application/get-profile-by-username.usecase"
 import { getProfilesPageUseCase } from "@/src/users/application/get-profiles-page.usecase"
 import { isUserAdminUseCase } from "@/src/users/application/is-user-admin.usecase"
 import { isUserStaffUseCase } from "@/src/users/application/is-user-staff.usecase"
 import { isUserContributorUseCase } from "@/src/users/application/is-user-contributor.usecase"
 import type { Profile } from "@/src/users/domain/user.entity"
 import type { ProfilesPage } from "@/src/users/domain/user.views"
+import {
+  mapProfileToUserProfile,
+  type ProfileWithOnboarding,
+} from "@/src/users/infrastructure/next/user.mappers"
 import { createFictionLikesSupabaseAdapter } from "@/src/fiction-likes/infrastructure/supabase/fiction-likes.repository.impl"
 import { getUserFictionLikesUseCase } from "@/src/fiction-likes/application/get-user-fiction-likes.usecase"
 import { CacheConfig } from "@/src/shared/infrastructure/next/cache.config"
@@ -40,6 +45,20 @@ export async function getProfileForStaffSession(userId: string): Promise<Profile
   if (!staff) return null
   return getProfileUseCase(userId, usersRepo)
 }
+
+/**
+ * Profile by username for logged-in viewers (middleware also gates `/u/*`).
+ * Request-scoped; uses the session client so RLS applies.
+ */
+export const getProfileByUsernameForSession = cache(
+  async (username: string): Promise<ProfileWithOnboarding | null> => {
+    const sessionUserId = await getSessionUserId()
+    if (!sessionUserId) return null
+    const profile = await getProfileByUsernameUseCase(username, usersRepo)
+    if (!profile) return null
+    return mapProfileToUserProfile(profile)
+  },
+)
 
 export type { ProfilesPage } from "@/src/users/domain/user.views"
 

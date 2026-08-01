@@ -80,7 +80,7 @@ export interface MapControl {
   panTo(position: LatLng): void
   setZoom(zoom: number): void
   getZoom(): number | undefined
-  fitBounds(points: LatLng[], padding?: number): void
+  fitBounds(points: LatLng[], padding?: number, maxZoom?: number): void
   /** Animate map to center and optional zoom. Returns false if the map was not ready. */
   flyTo(options: MapFlyToOptions): boolean
   setTilt?(tilt: number): void

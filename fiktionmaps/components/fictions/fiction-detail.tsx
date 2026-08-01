@@ -1,11 +1,12 @@
 import Image from "next/image"
-import { ChevronRight, Compass, MapPin } from "lucide-react"
+import { Compass, MapPin } from "lucide-react"
 import { getFormatter, getTranslations } from "next-intl/server"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import { Link } from "@/i18n/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { FictionDetailPlacesEmpty } from "@/components/fictions/fiction-detail-places-empty"
+import { FictionDetailSectionHeading } from "@/components/fictions/fiction-detail-section-heading"
 import { FictionInterestTags, type FictionInterestTagItem } from "@/components/fictions/fiction-interest-tags"
 import { FictionDetailLikeButton } from "@/components/fictions/fiction-detail-like-button"
 import { FictionDetailPlaceLikeButton } from "@/components/fictions/fiction-detail-place-like-button"
@@ -168,20 +169,14 @@ export async function FictionDetail({
           </header>
 
           <section className="space-y-5">
-            <div>
-              <div className="flex items-center gap-3">
-                <span className="h-7 w-1 rounded-full bg-yellow-500" aria-hidden />
-                <h2 className="text-3xl font-semibold tracking-tight text-foreground">{t("filmingLocationsHeading")}</h2>
-                <span className="text-base font-medium text-muted-foreground">{locationRows.length}</span>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <p className="mt-1.5 text-base text-muted-foreground">
-                {t("placesAcrossCities", {
-                  placeCount: locationRows.length,
-                  cityCount: initialCities.length,
-                })}
-              </p>
-            </div>
+            <FictionDetailSectionHeading
+              title={t("filmingLocationsHeading")}
+              count={locationRows.length}
+              description={t("placesAcrossCities", {
+                placeCount: locationRows.length,
+                cityCount: initialCities.length,
+              })}
+            />
 
             {locationRows.length === 0 ? (
               <FictionDetailPlacesEmpty />

@@ -19,6 +19,8 @@ type PlacePhotoPlacePickerProps = {
   placeId: string
   onSelect: (place: Place) => void
   error?: string
+  /** Place ids already linked to the target scene (or otherwise unavailable). */
+  excludePlaceIds?: string[]
 }
 
 export function PlacePhotoPlacePicker({
@@ -27,6 +29,7 @@ export function PlacePhotoPlacePicker({
   placeId,
   onSelect,
   error,
+  excludePlaceIds,
 }: PlacePhotoPlacePickerProps) {
   const t = useTranslations("Contribute.photo")
   const [placeSearch, setPlaceSearch] = useState("")
@@ -49,14 +52,16 @@ export function PlacePhotoPlacePicker({
   }, [fictionId])
 
   const filteredPlaces = useMemo(() => {
+    const excluded = new Set(excludePlaceIds ?? [])
+    const available = excluded.size === 0 ? places : places.filter((p) => !excluded.has(p.id))
     const q = placeSearch.trim().toLowerCase()
-    if (!q) return places
-    return places.filter((p) => {
+    if (!q) return available
+    return available.filter((p) => {
       const name = p.name.toLowerCase()
       const loc = p.location.name.toLowerCase()
       return name.includes(q) || loc.includes(q)
     })
-  }, [placeSearch, places])
+  }, [excludePlaceIds, placeSearch, places])
 
   return (
     <div className="space-y-5">

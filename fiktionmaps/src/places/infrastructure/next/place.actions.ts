@@ -9,7 +9,6 @@ import { resolveEntityContributionInsertDefaults } from "@/src/contributions/app
 import { uuidSchema } from "@/lib/validation/primitives"
 import type { MapBbox } from "@/lib/validation/map-query"
 import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
-import { listApprovedFictionPlacesUseCase } from "@/src/places/application/list-approved-fiction-places.usecase"
 import {
   getPlacePhotoContributeContextUseCase,
   type PlacePhotoContributeContext,
@@ -172,10 +171,10 @@ export async function getFictionPlacesAction(fictionId: string): Promise<Place[]
   return getFictionPlacesCached(fictionId)
 }
 
-/** Approved active places for contribute photo wizard (fiction-scoped list). */
+/** Approved active places for contribute wizards (fiction-scoped, anon cache). */
 export async function getApprovedFictionPlacesForContributeAction(fictionId: string): Promise<Place[]> {
   if (!uuidSchema.safeParse(fictionId).success) return []
-  return listApprovedFictionPlacesUseCase(fictionId, placesRepo)
+  return getFictionPlacesCached(fictionId)
 }
 
 export type { PlacePhotoContributeContext } from "@/src/places/application/get-place-photo-contribute-context.usecase"

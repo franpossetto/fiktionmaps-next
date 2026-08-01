@@ -7,8 +7,14 @@ import { useThemeSettings } from "@/lib/theme-settings-context"
 import type { ThemeBase, StyleVariant, TimeOfDay } from "@/lib/theme-settings"
 import type { ThemeSettings } from "@/lib/theme-settings"
 import { Button } from "@/components/ui/button"
-import { AppDetailRailsShell } from "@/components/layout/app-detail-rails-shell"
+import { FictionContributeLayout } from "@/components/contribute/fiction/fiction-contribute-layout"
+import {
+  getCurrentUserProfileAction,
+  type ProfileWithOnboarding,
+} from "@/src/users/infrastructure/next/user.actions"
 import { SettingsNav } from "./settings-nav"
+import { SettingsUserHeader } from "./settings-user-header"
+import { SettingsPermissionAside } from "./settings-permission-aside"
 import {
   SETTINGS_SECTION_IDS,
   type SettingsNavItem,
@@ -28,6 +34,7 @@ export function SettingsPage() {
   const { settings, applyAndSave, timeOfDay } = useThemeSettings()
   const [pending, setPending] = useState<ThemeSettings>(settings)
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("appearance")
+  const [profile, setProfile] = useState<ProfileWithOnboarding | null>(null)
 
   const navItems = useMemo<SettingsNavItem[]>(
     () =>
@@ -83,6 +90,17 @@ export function SettingsPage() {
     }
   }, [navItems, activeSection])
 
+  useEffect(() => {
+    let cancelled = false
+    getCurrentUserProfileAction().then((result) => {
+      if (cancelled || !result.data) return
+      setProfile(result.data)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const handleSave = () => {
     applyAndSave(pending)
     router.back()
@@ -125,20 +143,42 @@ export function SettingsPage() {
     timeOfDayLabels,
   }
 
+  const username = profile?.username?.trim() || ""
+  const userHeader =
+    username.length > 0 ? (
+      <SettingsUserHeader
+        username={username}
+        fullName={profile?.fullName}
+        avatar={profile?.avatar}
+        avatarFocus={profile?.avatarFocus ?? null}
+      />
+    ) : null
+
+  const permissionAside = (
+    <SettingsPermissionAside role={profile?.role ?? "user"} />
+  )
+
+  const navAside = (
+    <div className="mx-auto w-full max-w-full space-y-5 pt-1">
+      {userHeader}
+      <SettingsNav
+        items={navItems}
+        activeId={activeSection}
+        onSelect={setActiveSection}
+      />
+    </div>
+  )
+
   return (
-    <AppDetailRailsShell
-      leftAside={
-        <div className="sticky top-0 py-10 pr-3">
-          <SettingsNav
-            items={navItems}
-            activeId={activeSection}
-            onSelect={setActiveSection}
-          />
-        </div>
+    <FictionContributeLayout
+      leftAside={navAside}
+      rightAside={
+        <div className="w-full min-w-0 max-w-full space-y-5 pt-1">{permissionAside}</div>
       }
     >
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="shrink-0 border-b border-border/50 bg-background px-4 py-3 @[1200px]/rails:hidden">
+      <div className="w-full min-w-0 px-4 pb-10 sm:px-5">
+        <div className="mb-6 space-y-4 min-[900px]:hidden">
+          {userHeader}
           <SettingsNav
             items={navItems}
             activeId={activeSection}
@@ -147,24 +187,26 @@ export function SettingsPage() {
           />
         </div>
 
-        <div className="mx-auto w-full max-w-3xl flex-1 px-6 py-8 sm:px-8 lg:px-10">
-          <div className="mb-8 flex items-center justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                {t(`sections.${activeSection}.title`)}
-              </h1>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {t(`sections.${activeSection}.description`)}
-              </p>
-            </div>
+        <div className="mb-8 flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
+              {t(`sections.${activeSection}.title`)}
+            </h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {t(`sections.${activeSection}.description`)}
+            </p>
+          </div>
+          {activeSection !== "account" ? (
             <Button onClick={handleSave} size="sm">
               {t("saveChanges")}
             </Button>
-          </div>
-
-          <SettingsSectionPanel {...panelProps} />
+          ) : null}
         </div>
+
+        <SettingsSectionPanel {...panelProps} />
+
+        <div className="mt-8 min-[900px]:hidden">{permissionAside}</div>
       </div>
-    </AppDetailRailsShell>
+    </FictionContributeLayout>
   )
 }

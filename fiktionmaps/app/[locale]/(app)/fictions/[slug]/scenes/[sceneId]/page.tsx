@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { getTranslations } from "next-intl/server"
 import { getFictionBySlugCached } from "@/src/fictions/infrastructure/next/fiction.queries"
-import { getPlaceLocationByIdCached } from "@/src/places/infrastructure/next/place.queries"
+import { getPlaceLocationsByIdsCached } from "@/src/places/infrastructure/next/place.queries"
 import { getSceneByIdCached } from "@/src/scenes/infrastructure/next/scene.queries"
 import { getSceneWatchBundleUseCase } from "@/src/scenes/application/get-scene-watch-bundle.usecase"
 import { getSiteUrl } from "@/lib/site"
@@ -77,12 +77,12 @@ export default async function FictionSceneUnderSlugPage({ params }: Props) {
     {
       getFictionBySlug: getFictionBySlugCached,
       getSceneById: getSceneByIdCached,
-      getPlaceById: getPlaceLocationByIdCached,
+      getPlacesByIds: getPlaceLocationsByIdsCached,
     },
   )
   if (!bundle) notFound()
 
-  const { fiction, scene, place } = bundle
+  const { fiction, scene, place, places } = bundle
   const cityId = place.location.cityId
   const canonicalSlug = fiction.slug.trim()
   const sidebarSummary = await getFictionSidebarSummaryText(fiction, locale)
@@ -96,7 +96,7 @@ export default async function FictionSceneUnderSlugPage({ params }: Props) {
           fictionId={fiction.id}
           fictionPathSlug={canonicalSlug}
           currentSceneId={sceneId}
-          primaryPlaceId={scene.placeId}
+          primaryPlaceId={bundle.place.id}
           cityId={cityId}
         />
       }
@@ -107,6 +107,7 @@ export default async function FictionSceneUnderSlugPage({ params }: Props) {
         currentWatchScene={scene}
         placeName={place.name}
         placeSlug={place.slug}
+        places={places}
       />
     </FictionSlugDetailShell>
   )

@@ -168,6 +168,10 @@ function optShootEnvironment(row: Record<string, unknown>): PlaceShootEnvironmen
 const LOCATION_EMBED_SELECT =
   "id, name, formatted_address, latitude, longitude, city_id, is_landmark, type, location_view_references(provider, camera_latitude, camera_longitude, heading, pitch, fov, external_pano_id)"
 
+/** List/picker embeds: geo only — skip street-view join (detail pages keep full embed). */
+const LOCATION_LIST_EMBED_SELECT =
+  "id, name, formatted_address, latitude, longitude, city_id, is_landmark, type"
+
 /** Embed column may appear as `location`, `locations`, object or single-element array. */
 function parseLocationEmbedFromPlaceRow(row: Record<string, unknown>): Record<string, unknown> | null {
   const rawLoc = row.location ?? row.locations
@@ -393,7 +397,7 @@ export function createPlacesSupabaseAdapter(
       const { data: placeRows, error } = await supabase
         .from("places")
         .select(
-          `id, fiction_id, description, active, location_id, name, slug, shoot_environment, locations(${LOCATION_EMBED_SELECT})`
+          `id, fiction_id, description, active, location_id, name, slug, shoot_environment, locations(${LOCATION_LIST_EMBED_SELECT})`
         )
         .eq("fiction_id", fictionId)
         .eq("status", "approved")

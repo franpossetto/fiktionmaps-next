@@ -11,50 +11,23 @@ import { createUsersSupabaseAdapter } from "@/src/users/infrastructure/supabase/
 import { createFictionLikesSupabaseAdapter } from "@/src/fiction-likes/infrastructure/supabase/fiction-likes.repository.impl"
 import { createUserInterestsSupabaseAdapter } from "@/src/user-interests/infrastructure/supabase/user-interests.repository.impl"
 import { completeOnboardingUseCase } from "@/src/users/application/complete-onboarding.usecase"
+import { updateProfileAvatarUseCase } from "@/src/users/application/update-profile-avatar.usecase"
+import { updateProfilePersonalInfoUseCase } from "@/src/users/application/update-profile-personal-info.usecase"
+import type { UpdatePersonalInfoData } from "@/src/users/domain/user.dtos"
 import { getUserFictionLikesUseCase } from "@/src/fiction-likes/application/get-user-fiction-likes.usecase"
 import { toggleFictionLikeUseCase } from "@/src/fiction-likes/application/toggle-fiction-like.usecase"
 import { getUserInterestIdsUseCase } from "@/src/user-interests/application/get-user-interest-ids.usecase"
 import { setUserInterestsUseCase } from "@/src/user-interests/application/set-user-interests.usecase"
 import { getProfileUseCase } from "@/src/users/application/get-profile.usecase"
-import type { UserProfile } from "@/src/users/domain/user.views"
-import type { UserRole } from "@/src/users/domain/user.dtos"
-import type { Profile } from "@/src/users/domain/user.entity"
+import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
+import { parseImageFocusFromFormData } from "@/lib/asset-images/image-focus"
+import { updateAssetImageFocusUseCase } from "@/src/asset-images/application/update-asset-image-focus.usecase"
+import {
+  mapProfileToUserProfile,
+  type ProfileWithOnboarding,
+} from "@/src/users/infrastructure/next/user.mappers"
 
-export type ProfileWithOnboarding = UserProfile & {
-  onboardingCompleted: boolean
-  role: UserRole
-  gender?: string
-  phone?: string
-  dateOfBirth?: string
-}
-
-/**
- * Maps Supabase public.profiles row to the UI UserProfile shape.
- * Use when the profile page is driven by Supabase auth + profiles table.
- */
-function profileToUserProfile(p: Profile): ProfileWithOnboarding {
-  return {
-    id: p.id,
-    username: p.username?.trim() || "",
-    avatar: p.avatar_url || "",
-    bio: p.bio || "",
-    interests: [],
-    joinedDate: p.created_at,
-    visitedLocations: [],
-    checkIns: [],
-    favoriteLocations: [],
-    stats: {
-      totalVisits: 0,
-      locationsExplored: 0,
-      frictionsConnected: 0,
-    },
-    onboardingCompleted: p.onboarding_completed,
-    role: p.role,
-    gender: p.gender ?? undefined,
-    phone: p.phone ?? undefined,
-    dateOfBirth: p.date_of_birth ?? undefined,
-  }
-}
+export type { ProfileWithOnboarding }
 
 export type GetCurrentProfileResult =
   | { data: ProfileWithOnboarding; error: null }
@@ -78,7 +51,7 @@ async function fetchCurrentUserProfileAction(): Promise<GetCurrentProfileResult>
       console.info("[getCurrentUserProfileAction] role", profile.role, "userId", userId)
     }
     return {
-      data: profileToUserProfile(profile),
+      data: mapProfileToUserProfile(profile),
       error: null,
     }
   } catch (e) {
@@ -146,6 +119,137 @@ export async function completeOnboardingAction(prefs: {
     return {
       data: null,
       error: e instanceof Error ? e.message : "Failed to complete onboarding",
+    }
+  }
+}
+
+export type UpdateMyProfileAvatarResult =
+  | { success: true; avatarUrl: string; focus: { x: number; y: number } }
+  | { success: false; error: string }
+
+/** Upload own profile photo to asset-images and persist public URL on profiles.avatar_url. */
+export async function updateMyProfileAvatarAction(
+  formData: FormData
+): Promise<UpdateMyProfileAvatarResult> {
+  try {
+    const userId = await getSessionUserId()
+    if (!userId) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const file = formData.get("file")
+    if (!(file instanceof File) || file.size <= 0) {
+      return { success: false, error: "No image file provided" }
+    }
+
+    const validationError = validateImageFile(file)
+    if (validationError) {
+      return { success: false, error: validationError }
+    }
+
+    const focus = parseImageFocusFromFormData(formData)
+
+    // lg (800px) for the large profile aside; xs/sm for chips/lists.
+    const upload = await uploadEntityImage({
+      entityType: "profile",
+      entityId: userId,
+      role: "avatar",
+      variants: ["xs", "sm", "lg"],
+      file,
+      replace: true,
+      focus,
+    })
+    if (!upload.success) {
+      return { success: false, error: upload.error }
+    }
+
+    const avatarUrl =
+      upload.urls.lg?.trim() || upload.urls.sm?.trim() || upload.urls.xs?.trim()
+    if (!avatarUrl) {
+      return { success: false, error: "Upload succeeded but no URL was returned" }
+    }
+
+    const updated = await updateProfileAvatarUseCase(
+      userId,
+      avatarUrl,
+      createUsersSupabaseAdapter(createClient)
+    )
+    if (!updated) {
+      return { success: false, error: "Failed to update profile" }
+    }
+
+    updateTag(`user-profile-${userId}`)
+    return { success: true, avatarUrl, focus }
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to update profile photo",
+    }
+  }
+}
+
+export type UpdateMyProfileAvatarFocusResult =
+  | { success: true; focus: { x: number; y: number } }
+  | { success: false; error: string }
+
+/** Reposition own profile photo without re-uploading. */
+export async function updateMyProfileAvatarFocusAction(input: {
+  focusX: number
+  focusY: number
+}): Promise<UpdateMyProfileAvatarFocusResult> {
+  try {
+    const userId = await getSessionUserId()
+    if (!userId) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const result = await updateAssetImageFocusUseCase({
+      entityType: "profile",
+      entityId: userId,
+      role: "avatar",
+      focus: { x: input.focusX, y: input.focusY },
+    })
+    if (!result.success) return result
+
+    updateTag(`user-profile-${userId}`)
+    return result
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to update photo position",
+    }
+  }
+}
+
+export type UpdateMyProfilePersonalInfoResult =
+  | { success: true; profile: ProfileWithOnboarding }
+  | { success: false; error: string }
+
+/** Update own personal info (bio, name, gender, phone, DOB). Username/email are not accepted. */
+export async function updateMyProfilePersonalInfoAction(
+  input: UpdatePersonalInfoData
+): Promise<UpdateMyProfilePersonalInfoResult> {
+  try {
+    const userId = await getSessionUserId()
+    if (!userId) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const updated = await updateProfilePersonalInfoUseCase(
+      userId,
+      input,
+      createUsersSupabaseAdapter(createClient)
+    )
+    if (!updated) {
+      return { success: false, error: "Failed to update profile" }
+    }
+
+    updateTag(`user-profile-${userId}`)
+    return { success: true, profile: mapProfileToUserProfile(updated) }
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Failed to update profile",
     }
   }
 }

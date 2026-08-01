@@ -1,8 +1,8 @@
-import { ChevronRight } from "lucide-react"
 import { getTranslations } from "next-intl/server"
 import { Link } from "@/i18n/navigation"
 import { cn } from "@/lib/utils"
 import { ScenePreviewThumb } from "@/components/scenes/scene-preview-thumb"
+import { FictionDetailSectionHeading } from "@/components/fictions/fiction-detail-section-heading"
 import { PlaceContributorsByline } from "@/components/fictions/place-contributors-byline"
 import { publicFictionScenePath } from "@/lib/fictions/public-fiction-paths"
 import { getScenesForPlaceCached } from "@/src/scenes/infrastructure/next/scene.queries"
@@ -32,16 +32,10 @@ export async function PlaceDetailScenes({
 
   return (
     <section className="space-y-5">
-      <div>
-        <div className="flex items-center gap-3">
-          <span className="h-7 w-1 rounded-full bg-yellow-500" aria-hidden />
-          <h2 className="text-3xl font-semibold tracking-tight text-foreground">
-            {t("placeDetailScenesHeading")}
-          </h2>
-          <span className="text-base font-medium text-muted-foreground">{scenes.length}</span>
-          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-        </div>
-      </div>
+      <FictionDetailSectionHeading
+        title={t("placeDetailScenesHeading")}
+        count={scenes.length}
+      />
 
       {scenes.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("placeDetailNoScenes")}</p>

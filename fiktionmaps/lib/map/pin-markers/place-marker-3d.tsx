@@ -3,7 +3,11 @@
 import Image from "next/image"
 import { motion } from "framer-motion"
 import { getPinHoverMotionScale } from "@/lib/map/pin-marker-hover-scale"
-import { pinConicRingClass, pinStrokeBorderClass } from "@/lib/map/pin-marker-styles"
+import {
+  pinConicRingClass,
+  pinRoundImageClipClass,
+  pinStrokeBorderClass,
+} from "@/lib/map/pin-marker-styles"
 import { PinMarkerLabel } from "./pin-marker-label"
 import { shouldShowPinLabel } from "./should-show-pin-label"
 import type { PlaceMarker2dProps } from "./types"
@@ -62,7 +66,7 @@ export function PlaceMarker3d({
             className={`absolute inset-0 rounded-full ${pinConicRingClass} ${active ? "pin3d-spin opacity-100" : "opacity-60"}`}
           />
           <div
-            className={`relative overflow-hidden rounded-full ${pinStrokeBorderClass} ${
+            className={`relative ${pinRoundImageClipClass} ${pinStrokeBorderClass} ${
               isSelected ? "ring-2 ring-black/20 dark:ring-white/30" : ""
             }`}
             style={{
@@ -75,18 +79,13 @@ export function PlaceMarker3d({
               src={imageSrc}
               alt={label}
               fill
-              className="object-cover"
+              className="rounded-full object-cover"
               style={{
                 objectPosition: `${imageFocus?.x ?? 50}% ${imageFocus?.y ?? 50}%`,
               }}
               sizes="128px"
               quality={85}
             />
-            {showStackBadge && (
-              <span className="absolute -right-0.5 -top-0.5 z-[2] flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-background bg-[#e8365d] px-1 text-[10px] font-bold text-white shadow-md">
-                {stackSize}
-              </span>
-            )}
             <div
               className="absolute inset-0 rounded-full"
               style={{
@@ -94,6 +93,11 @@ export function PlaceMarker3d({
               }}
             />
           </div>
+          {showStackBadge && (
+            <span className="absolute -right-0.5 -top-0.5 z-[2] flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-background bg-[#e8365d] px-1 text-[10px] font-bold text-white shadow-md">
+              {stackSize}
+            </span>
+          )}
         </div>
         <div
           className={`w-0.5 ${pin3dStemClass}`}

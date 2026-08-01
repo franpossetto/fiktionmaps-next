@@ -15,6 +15,7 @@ export interface ContributionsFeedKindTabBarProps {
   navAriaLabel: string
   labelFiction: string
   labelPlace: string
+  labelScene: string
   labelAll: string
 }
 
@@ -25,11 +26,13 @@ export function ContributionsFeedKindTabBar({
   navAriaLabel,
   labelFiction,
   labelPlace,
+  labelScene,
   labelAll,
 }: ContributionsFeedKindTabBarProps) {
   const kinds: { value: StaffContributionsFeedKind; label: string }[] = [
     { value: "fiction", label: labelFiction },
     { value: "place", label: labelPlace },
+    { value: "scene", label: labelScene },
     { value: "all", label: labelAll },
   ]
 
