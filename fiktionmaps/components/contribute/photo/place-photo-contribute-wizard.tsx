@@ -80,6 +80,7 @@ export function PlacePhotoContributeWizard({ initialFictions }: PlacePhotoContri
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [photoInspecting, setPhotoInspecting] = useState(false)
   const [photoDims, setPhotoDims] = useState<{ width: number; height: number } | null>(null)
+  const [photoFocus, setPhotoFocus] = useState({ x: 50, y: 50 })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [doneVariant, setDoneVariant] = useState<"pending" | "approved" | null>(null)
@@ -172,6 +173,7 @@ export function PlacePhotoContributeWizard({ initialFictions }: PlacePhotoContri
   function clearPhoto() {
     setImageFile(null)
     setPhotoDims(null)
+    setPhotoFocus({ x: 50, y: 50 })
     if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl)
     setPreviewUrl(null)
   }
@@ -183,6 +185,8 @@ export function PlacePhotoContributeWizard({ initialFictions }: PlacePhotoContri
       const fd = new FormData()
       fd.set("placeId", placeId)
       fd.set("imageFile", imageFile)
+      fd.set("focusX", String(photoFocus.x))
+      fd.set("focusY", String(photoFocus.y))
       const res = await submitPlaceAddPhotoContributionAction(fd)
       if (!res.success) {
         setErrors({ submit: res.error })
@@ -308,6 +312,8 @@ export function PlacePhotoContributeWizard({ initialFictions }: PlacePhotoContri
                   inspecting={photoInspecting}
                   onPickFile={(file) => void handlePhotoFile(file)}
                   onClear={clearPhoto}
+                  focus={photoFocus}
+                  onFocusChange={setPhotoFocus}
                 />
                 {errors.image ? <p className="text-center text-sm text-destructive">{errors.image}</p> : null}
                 <p className="text-center text-xs leading-relaxed text-muted-foreground">{tPlace("photoAspectHint")}</p>

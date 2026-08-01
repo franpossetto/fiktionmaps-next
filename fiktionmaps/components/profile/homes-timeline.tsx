@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { MapPin } from "lucide-react"
+import { MapPin, Plus } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 import { PlacesSidebarRow, SidebarCard } from "./profile-sidebar-sections"
@@ -29,7 +29,7 @@ export function HomeCityPreview({ className }: { className?: string }) {
 export function HomesTimeline() {
   const t = useTranslations("Homes")
   const tProfile = useTranslations("Profile")
-  const { homes, cityMap, loading, error: fetchError } = useHomes()
+  const { homes, cityMap, loading, error: fetchError, openHomePicker } = useHomes()
 
   const currentHome = useMemo(() => homes.find((h) => !h.dateTo), [homes])
   const currentCity = currentHome ? cityMap.get(currentHome.cityId) : null
@@ -45,19 +45,39 @@ export function HomesTimeline() {
   }
 
   return (
-    <SidebarCard title={tProfile("sidebarHome")}>
+    <SidebarCard
+      title={tProfile("sidebarHome")}
+      ctaLabel={currentHome && !fetchError ? t("changeHome") : undefined}
+      onCtaClick={currentHome && !fetchError ? openHomePicker : undefined}
+    >
       {fetchError ? (
         <p className="px-3 py-3 text-sm text-destructive">{fetchError}</p>
-      ) : homes.length === 0 ? (
-        <p className="px-3 py-3 text-sm text-muted-foreground">{t("noHomes")}</p>
-      ) : !currentHome ? (
-        <p className="px-3 py-3 text-sm text-muted-foreground">{t("noCurrent")}</p>
+      ) : currentHome ? (
+        <button
+          type="button"
+          onClick={openHomePicker}
+          className="block w-full text-left transition-colors hover:bg-muted/30"
+        >
+          <PlacesSidebarRow
+            title={cityName}
+            subtitle={countryLine || null}
+            leading={<HomeCityPreview className="h-full w-full" />}
+          />
+        </button>
       ) : (
-        <PlacesSidebarRow
-          title={cityName}
-          subtitle={countryLine || null}
-          leading={<HomeCityPreview className="h-full w-full" />}
-        />
+        <button
+          type="button"
+          onClick={openHomePicker}
+          className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/30"
+        >
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed border-border/70 bg-muted/40">
+            <Plus className="h-4 w-4 text-muted-foreground" aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-foreground">{t("addHome")}</p>
+            <p className="truncate text-xs text-muted-foreground">{t("addHomeHint")}</p>
+          </div>
+        </button>
       )}
     </SidebarCard>
   )

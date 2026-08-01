@@ -59,6 +59,8 @@ const CITY_CHANGE_THRESHOLD_M = 5_000
 interface MapboxCityResult {
   name: string
   country: string
+  /** Region/state from Mapbox context — slug disambiguation only, not persisted. */
+  region?: string
   lat: number
   lng: number
 }
@@ -83,12 +85,13 @@ async function reverseGeocodeCity(
     const [fLng, fLat] = feature.center as [number, number]
     const name =
       feature.text || feature.place_name?.split(",")[0]?.trim() || ""
-    const countryCtx = (
-      feature.context as Array<{ id: string; text: string }> | undefined
-    )?.find((c: { id: string }) => c.id.startsWith("country."))
+    const context = feature.context as Array<{ id: string; text: string }> | undefined
+    const countryCtx = context?.find((c) => c.id.startsWith("country."))
+    const regionCtx = context?.find((c) => c.id.startsWith("region."))
     const country =
       countryCtx?.text || feature.place_name?.split(",").pop()?.trim() || ""
-    return { name, country, lat: fLat, lng: fLng }
+    const region = regionCtx?.text?.trim() || undefined
+    return { name, country, region, lat: fLat, lng: fLng }
   } catch {
     return null
   }
@@ -100,6 +103,7 @@ async function resolveCity(
   const result = await findOrCreateCityAction({
     name: mapboxCity.name,
     country: mapboxCity.country,
+    region: mapboxCity.region,
     lat: mapboxCity.lat,
     lng: mapboxCity.lng,
     zoom: 12,
@@ -126,12 +130,20 @@ export function GeoProvider({ children }: { children: ReactNode }) {
   // Hydrated from DB; gates the prompt so we never show it when the
   // user's most recent city check-in already matches the detected city.
   const lastCheckinCityIdRef = useRef<string | null>(null)
+  // City we've already prompted for (confirmed or dismissed). Prevents
+  // re-asking on every GPS jitter/re-resolve as long as the city itself
+  // hasn't changed — only a genuine change of city should trigger a new ask.
+  const lastPromptedCityIdRef = useRef<string | null>(null)
   const watchIdRef = useRef<number | null>(null)
   // Mirrors the latest pending check-in so the confirm callback stays stable
   // and the long-lived geolocation closure can read fresh coords too.
   const pendingRef = useRef<DetectedCity | null>(null)
   const latRef = useRef<number | null>(null)
   const lngRef = useRef<number | null>(null)
+  /** Fresh city for the long-lived watchPosition closure (avoids stale null). */
+  const detectedCityRef = useRef<DetectedCity | null>(null)
+  /** In-flight reverse+resolve so rapid GPS ticks don't double-fetch. */
+  const resolveInflightRef = useRef(false)
 
   useEffect(() => {
     pendingRef.current = pendingCityCheckin
@@ -141,6 +153,10 @@ export function GeoProvider({ children }: { children: ReactNode }) {
     latRef.current = lat
     lngRef.current = lng
   }, [lat, lng])
+
+  useEffect(() => {
+    detectedCityRef.current = detectedCity
+  }, [detectedCity])
 
   const dismissCityCheckin = useCallback(() => {
     setPendingCityCheckin(null)
@@ -157,6 +173,7 @@ export function GeoProvider({ children }: { children: ReactNode }) {
     )
     if (res.data) {
       lastCheckinCityIdRef.current = res.data.cityId
+      lastPromptedCityIdRef.current = res.data.cityId
     }
     setPendingCityCheckin(null)
   }, [])
@@ -164,16 +181,22 @@ export function GeoProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) {
       lastCheckinCityIdRef.current = null
+      lastPromptedCityIdRef.current = null
       return
     }
     let cancelled = false
-    ;(async () => {
-      const res = await getLastCityCheckinAction()
-      if (cancelled) return
-      lastCheckinCityIdRef.current = res.data?.cityId ?? null
-    })()
+    // Same defer as watchPosition — keep map first-paint free of check-in traffic.
+    const id = window.setTimeout(() => {
+      void (async () => {
+        const res = await getLastCityCheckinAction()
+        if (cancelled) return
+        lastCheckinCityIdRef.current = res.data?.cityId ?? null
+        lastPromptedCityIdRef.current = res.data?.cityId ?? null
+      })()
+    }, 1_500)
     return () => {
       cancelled = true
+      window.clearTimeout(id)
     }
   }, [user])
 
@@ -184,50 +207,69 @@ export function GeoProvider({ children }: { children: ReactNode }) {
 
     setIsWatching(true)
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const newLat = pos.coords.latitude
-        const newLng = pos.coords.longitude
-        setLat(newLat)
-        setLng(newLng)
-        setError(null)
+    // Defer geolocation until after first paint so map/auth boot isn't competing.
+    const startId = window.setTimeout(() => {
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        async (pos) => {
+          const newLat = pos.coords.latitude
+          const newLng = pos.coords.longitude
+          setLat(newLat)
+          setLng(newLng)
+          setError(null)
 
-        if (detectedCity) {
-          const dist = haversineDistance(
-            newLat,
-            newLng,
-            detectedCity.lat,
-            detectedCity.lng,
-          )
-          if (dist < CITY_CHANGE_THRESHOLD_M) return
-        }
+          const currentCity = detectedCityRef.current
+          if (currentCity) {
+            const dist = haversineDistance(
+              newLat,
+              newLng,
+              currentCity.lat,
+              currentCity.lng,
+            )
+            if (dist < CITY_CHANGE_THRESHOLD_M) return
+          }
 
-        const mapboxCity = await reverseGeocodeCity(newLat, newLng)
-        if (!mapboxCity) return
+          if (resolveInflightRef.current) return
+          resolveInflightRef.current = true
+          try {
+            const mapboxCity = await reverseGeocodeCity(newLat, newLng)
+            if (!mapboxCity) return
 
-        const resolved = await resolveCity(mapboxCity)
-        if (!resolved) return
+            const resolved = await resolveCity(mapboxCity)
+            if (!resolved) return
 
-        setDetectedCity(resolved)
+            detectedCityRef.current = resolved
+            setDetectedCity(resolved)
 
-        if (lastCheckinCityIdRef.current !== resolved.id) {
-          setPendingCityCheckin(resolved)
-        }
-      },
-      (err) => {
-        setError(err.message)
-        setIsWatching(false)
-      },
-      { enableHighAccuracy: false, timeout: 15_000, maximumAge: 60_000 },
-    )
+            // Only ask again when the city actually changed — not on every
+            // GPS re-resolve for a city we already asked about (confirmed
+            // or dismissed).
+            if (
+              lastCheckinCityIdRef.current !== resolved.id &&
+              lastPromptedCityIdRef.current !== resolved.id
+            ) {
+              lastPromptedCityIdRef.current = resolved.id
+              setPendingCityCheckin(resolved)
+            }
+          } finally {
+            resolveInflightRef.current = false
+          }
+        },
+        (err) => {
+          setError(err.message)
+          setIsWatching(false)
+        },
+        { enableHighAccuracy: false, timeout: 15_000, maximumAge: 60_000 },
+      )
+    }, 1_500)
 
     return () => {
+      window.clearTimeout(startId)
       if (watchIdRef.current != null) {
         navigator.geolocation.clearWatch(watchIdRef.current)
+        watchIdRef.current = null
       }
       setIsWatching(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
   return (

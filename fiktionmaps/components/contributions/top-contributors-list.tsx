@@ -4,6 +4,8 @@ import { useState } from "react"
 import type { TopContributorsModalContext } from "@/src/contributions/domain/contribution.entity"
 import { FictionContributorContributionsDialog } from "@/components/fictions/fiction-contributor-contributions-dialog"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { Link } from "@/i18n/navigation"
+import { publicUserProfilePath } from "@/lib/users/public-profile-path"
 import { cn } from "@/lib/utils"
 
 export type ContributorRanked = {
@@ -54,6 +56,9 @@ export function TopContributorsList({
         {displayed.map((contributor) => {
           const label = displayName(contributor, nameFallback)
           const initial = label.charAt(0).toUpperCase()
+          const profileHref = contributor.username?.trim()
+            ? publicUserProfilePath(contributor.username)
+            : null
           const rowContent = (
             <>
               <UserAvatar avatarId={contributor.avatarUrl} fallback={initial} className="h-8 w-8 shrink-0" />
@@ -66,26 +71,42 @@ export function TopContributorsList({
             </>
           )
 
-          if (!isClickable) {
+          if (isClickable) {
             return (
-              <li key={contributor.id} className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                {rowContent}
+              <li key={contributor.id}>
+                <button
+                  type="button"
+                  onClick={() => openContributor(contributor)}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-md text-left text-sm text-muted-foreground transition-colors",
+                    "hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  )}
+                >
+                  {rowContent}
+                </button>
+              </li>
+            )
+          }
+
+          if (profileHref) {
+            return (
+              <li key={contributor.id}>
+                <Link
+                  href={profileHref}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-md text-sm text-muted-foreground transition-colors",
+                    "hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  )}
+                >
+                  {rowContent}
+                </Link>
               </li>
             )
           }
 
           return (
-            <li key={contributor.id}>
-              <button
-                type="button"
-                onClick={() => openContributor(contributor)}
-                className={cn(
-                  "flex w-full items-center gap-2.5 rounded-md text-left text-sm text-muted-foreground transition-colors",
-                  "hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                )}
-              >
-                {rowContent}
-              </button>
+            <li key={contributor.id} className="flex items-center gap-2.5 text-sm text-muted-foreground">
+              {rowContent}
             </li>
           )
         })}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef, useEffect } from "react"
+import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Map as ReactMapGL, FullscreenControl } from "react-map-gl/mapbox"
 import "mapbox-gl/dist/mapbox-gl.css"
@@ -73,6 +73,21 @@ export function MapboxContainer({
     mapRef.current.setCenter([controlledCenter.lng, controlledCenter.lat])
   }, [controlledCenter?.lat, controlledCenter?.lng])
 
+  /**
+   * Apply zoom limits via the Mapbox GL API — never as ReactMapGL props.
+   * Passing minZoom/maxZoom as props makes @vis.gl/react-mapbox re-wrap
+   * map.transform in ProxyTransform on settings updates; `_calcMatrices` then
+   * recurses through nested proxies → Maximum call stack size exceeded.
+   * See visgl/react-map-gl#2535.
+   *
+   * useLayoutEffect so city entry flyTo(14) isn’t clamped by a stale world maxZoom.
+   */
+  useLayoutEffect(() => {
+    if (!mapLoaded || !mapRef.current) return
+    if (minZoom != null) mapRef.current.setMinZoom(minZoom)
+    if (maxZoom != null) mapRef.current.setMaxZoom(maxZoom)
+  }, [mapLoaded, minZoom, maxZoom])
+
   /* 4 map styles: day, dawn, dusk, night — 1:1 with env vars (DAWN_URL→dawn, DUSK_URL→dusk) */
   const style = mapStyle
     ? mapStyle === "day"
@@ -96,8 +111,6 @@ export function MapboxContainer({
           latitude: defaultCenter.lat,
           zoom: defaultZoom,
         }}
-        minZoom={minZoom}
-        maxZoom={maxZoom}
         mapStyle={style}
         mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
         interactive={interactive}

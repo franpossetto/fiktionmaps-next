@@ -7,13 +7,24 @@ import type { UsersRepositoryPort } from "@/src/users/domain/user.repository"
 import type { UpdateProfileData } from "@/src/users/domain/user.dtos"
 import type { ProfilesPage } from "@/src/users/domain/user.views"
 import { parseProfileRole, type UserRole } from "@/src/users/domain/user.dtos"
+import { normalizeImageFocus } from "@/lib/asset-images/image-focus"
 
-function mapProfileRow(row: Tables<"profiles">): Profile {
+function mapProfileRow(
+  row: Tables<"profiles">,
+  focus?: { focus_x: number | null; focus_y: number | null } | null
+): Profile {
   const role: UserRole = parseProfileRole(row.role)
+  const hasFocus = focus && (focus.focus_x != null || focus.focus_y != null)
+  const normalized = hasFocus
+    ? normalizeImageFocus(focus.focus_x, focus.focus_y)
+    : null
   return {
     id: row.id,
     username: row.username,
+    full_name: row.full_name,
     avatar_url: row.avatar_url,
+    avatar_focus_x: normalized?.x ?? null,
+    avatar_focus_y: normalized?.y ?? null,
     bio: row.bio,
     gender: row.gender,
     phone: row.phone,
@@ -24,6 +35,23 @@ function mapProfileRow(row: Tables<"profiles">): Profile {
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
+}
+
+async function fetchProfileAvatarFocus(
+  supabase: SupabaseClient<Database>,
+  userId: string
+): Promise<{ focus_x: number | null; focus_y: number | null } | null> {
+  const { data, error } = await supabase
+    .from("asset_images")
+    .select("focus_x, focus_y")
+    .eq("entity_type", "profile")
+    .eq("entity_id", userId)
+    .eq("role", "avatar")
+    .limit(1)
+    .maybeSingle()
+
+  if (error || !data) return null
+  return data
 }
 
 export function createUsersSupabaseAdapter(
@@ -39,7 +67,26 @@ export function createUsersSupabaseAdapter(
         .single()
 
       if (error || !data) return null
-      return mapProfileRow(data)
+      const focus = await fetchProfileAvatarFocus(supabase, userId)
+      return mapProfileRow(data, focus)
+    }),
+
+    getProfileByUsername: cache(async (username: string): Promise<Profile | null> => {
+      const supabase = await getSupabase()
+      const trimmed = username.trim()
+      if (!trimmed) return null
+
+      // Unique index is LOWER(TRIM(username)); escape ILIKE wildcards for exact match.
+      const escaped = trimmed.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_")
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .ilike("username", escaped)
+        .maybeSingle()
+
+      if (error || !data) return null
+      const focus = await fetchProfileAvatarFocus(supabase, data.id)
+      return mapProfileRow(data, focus)
     }),
 
     async updateProfile(
@@ -55,7 +102,8 @@ export function createUsersSupabaseAdapter(
         .single()
 
       if (error || !data) return null
-      return mapProfileRow(data)
+      const focus = await fetchProfileAvatarFocus(supabase, userId)
+      return mapProfileRow(data, focus)
     },
 
     listProfilesPage: cache(async (page: number, pageSize: number): Promise<ProfilesPage> => {

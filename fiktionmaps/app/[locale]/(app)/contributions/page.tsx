@@ -93,6 +93,7 @@ export default async function ContributionsStaffPage({
           navAriaLabel={t("feedKindNavAria")}
           labelFiction={t("feedKind_fiction")}
           labelPlace={t("feedKind_place")}
+          labelScene={t("feedKind_scene")}
           labelAll={t("feedKind_all")}
         />
         <ContributionsFeedTabBar

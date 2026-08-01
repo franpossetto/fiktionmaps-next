@@ -17,6 +17,7 @@ import { PinMarkerRoot } from "../motion"
 /** Square 2D pin (settings: marker2dShape = square). */
 export function PlaceMarker2dSquare({
   imageSrc,
+  imageFocus,
   label,
   labelMode,
   hoverScaleMode,
@@ -69,6 +70,9 @@ export function PlaceMarker2dSquare({
                 alt={label}
                 fill
                 className="object-cover"
+                style={{
+                  objectPosition: `${imageFocus?.x ?? 50}% ${imageFocus?.y ?? 50}%`,
+                }}
                 sizes="128px"
                 quality={85}
               />

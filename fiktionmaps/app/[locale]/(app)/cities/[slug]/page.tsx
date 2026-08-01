@@ -1,7 +1,11 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { getTranslations } from "next-intl/server"
-import { getCityByIdCached, getCityFictionsCached } from "@/src/cities/infrastructure/next/city.queries"
+import {
+  cityHasPublicPlacesCached,
+  getCityBySlugCached,
+  getCityFictionsCached,
+} from "@/src/cities/infrastructure/next/city.queries"
 import { getPlaceCountsByFictionIdsCached } from "@/src/places/infrastructure/next/place.queries"
 import { getFictionContributorsCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { mergeFictionContributorRankedProfiles } from "@/src/contributions/application/get-fiction-contributors.usecase"
@@ -10,7 +14,7 @@ import { CityDetail } from "@/components/cities/city-detail"
 import { CityDetailRightRail } from "@/components/cities/city-detail-right-rail"
 
 type Props = {
-  params: Promise<{ locale: string; cityId: string }>
+  params: Promise<{ locale: string; slug: string }>
 }
 
 function mapLocaleToOpenGraph(locale: string): string {
@@ -20,9 +24,9 @@ function mapLocaleToOpenGraph(locale: string): string {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { cityId, locale } = await params
+  const { slug, locale } = await params
   const siteUrl = getSiteUrl()
-  const city = await getCityByIdCached(cityId)
+  const city = await getCityBySlugCached(slug)
   const tMeta = await getTranslations({ locale, namespace: "Metadata" })
 
   if (!city) {
@@ -32,9 +36,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   }
 
+  const hasPublicPlaces = await cityHasPublicPlacesCached(city.id)
   const title = tMeta("cityDetailTitle", { city: city.name })
   const description = tMeta("cityDetailDescription", { city: city.name })
-  const canonical = `${siteUrl}/${locale}/cities/${city.id}`
+  const canonical = `${siteUrl}/${locale}/cities/${city.slug}`
 
   return {
     title,
@@ -42,11 +47,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: {
       canonical,
       languages: {
-        en: `${siteUrl}/en/cities/${city.id}`,
-        es: `${siteUrl}/es/cities/${city.id}`,
+        en: `${siteUrl}/en/cities/${city.slug}`,
+        es: `${siteUrl}/es/cities/${city.slug}`,
       },
     },
-    robots: { index: true, follow: true },
+    robots: hasPublicPlaces
+      ? { index: true, follow: true }
+      : { index: false, follow: true },
     openGraph: {
       title,
       description,
@@ -63,8 +70,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function CityDetailPage({ params }: Props) {
-  const { cityId } = await params
-  const city = await getCityByIdCached(cityId)
+  const { slug } = await params
+  const city = await getCityBySlugCached(slug)
   if (!city) notFound()
 
   const fictions = await getCityFictionsCached(city.id)
@@ -80,7 +87,7 @@ export default async function CityDetailPage({ params }: Props) {
 
   const contributors = mergeFictionContributorRankedProfiles(contributorsPerFiction)
 
-  const exploreMapHref = `/map?city=${encodeURIComponent(city.id)}`
+  const exploreMapHref = `/map?city=${encodeURIComponent(city.slug)}`
 
   return (
     <CityDetail

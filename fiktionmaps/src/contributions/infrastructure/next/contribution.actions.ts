@@ -13,8 +13,11 @@ import { createContributionUseCase } from "@/src/contributions/application/creat
 import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/ensure-user-is-moderator.usecase"
 import { getContributionByIdUseCase } from "@/src/contributions/application/get-contribution-by-id.usecase"
 import { rejectContributionUseCase } from "@/src/contributions/application/reject-contribution.usecase"
+import { getPlaceByIdUseCase } from "@/src/places/application/get-place-by-id.usecase"
+import { parseImageFocusFromFormData } from "@/lib/asset-images/image-focus"
 import { submitPlaceAddPhotoContributionUseCase } from "@/src/contributions/application/submit-place-add-photo-contribution.usecase"
 import { submitFictionAddPhotoContributionUseCase } from "@/src/contributions/application/submit-fiction-add-photo-contribution.usecase"
+import { submitAddPlaceToSceneContributionUseCase } from "@/src/contributions/application/submit-add-place-to-scene-contribution.usecase"
 import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
 import type { ContributionEntityType } from "@/src/contributions/domain/contribution.entity"
 import {
@@ -23,9 +26,11 @@ import {
   rejectContributionSchema,
   submitPlaceAddPhotoContributionSchema,
   submitFictionAddPhotoContributionSchema,
+  submitAddPlaceToSceneContributionSchema,
 } from "@/src/contributions/domain/contribution.schemas"
 import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
 import { supabaseRepositoryAdapter as fictionsRepo } from "@/src/fictions/infrastructure/supabase/fiction.repository.impl"
+import { scenesSupabaseAdapter as scenesRepo } from "@/src/scenes/infrastructure/supabase/scene.repository.impl"
 import { supabaseRepositoryAdapter as contributionsRepo } from "@/src/contributions/infrastructure/supabase/contribution.repository.impl"
 import { profilesReaderSupabaseAdapter } from "@/src/contributions/infrastructure/supabase/profiles-reader.supabase"
 import type {
@@ -59,7 +64,7 @@ async function revalidateContributionEntityTags(entityType: ContributionEntityTy
     case "place": {
       updateTag("places")
       updateTag(`place-${entityId}`)
-      const place = await placesRepo.getById(entityId)
+      const place = await getPlaceByIdUseCase(entityId, placesRepo)
       if (place?.fictionId) {
         updateTag("fictions")
         updateTag(`fiction-${place.fictionId}`)
@@ -152,6 +157,7 @@ export async function submitPlaceAddPhotoContributionAction(
       placeId: parsed.data.placeId,
       imageFile: file,
       autoApprove,
+      focus: parseImageFocusFromFormData(formData),
     },
     contributionsRepo,
     placesRepo,
@@ -211,6 +217,7 @@ export async function submitFictionAddPhotoContributionAction(
       targetRole: parsed.data.targetRole,
       file: photoFile,
       autoApprove,
+      focus: parseImageFocusFromFormData(formData),
     },
     contributionsRepo,
     fictionsRepo,
@@ -223,6 +230,80 @@ export async function submitFictionAddPhotoContributionAction(
   updateTag("contributions")
   updateTag("fictions")
   updateTag(`fiction-${parsed.data.fictionId}`)
+  if (result.autoApproved) updateTag("profiles")
+
+  return result
+}
+
+export type SubmitAddPlaceToSceneContributionResult =
+  | { success: true; contributionIds: string[]; autoApproved: boolean }
+  | { success: false; error: string }
+
+export async function submitAddPlaceToSceneContributionAction(
+  formData: FormData,
+): Promise<SubmitAddPlaceToSceneContributionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const sceneId = formData.get("sceneId")
+  const placeIdsRaw = formData.get("placeIds")
+  let placeIds: string[] = []
+  if (typeof placeIdsRaw === "string" && placeIdsRaw.trim()) {
+    try {
+      const parsedJson = JSON.parse(placeIdsRaw) as unknown
+      if (Array.isArray(parsedJson)) {
+        placeIds = parsedJson.filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+      }
+    } catch {
+      placeIds = []
+    }
+  }
+  if (placeIds.length === 0) {
+    const legacy = formData.get("placeId")
+    if (typeof legacy === "string" && legacy.trim()) placeIds = [legacy.trim()]
+  }
+
+  const parsed = submitAddPlaceToSceneContributionSchema.safeParse({
+    sceneId: typeof sceneId === "string" ? sceneId : "",
+    placeIds,
+  })
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+
+  const autoApprove = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+
+  const result = await submitAddPlaceToSceneContributionUseCase(
+    {
+      userId: user.id,
+      sceneId: parsed.data.sceneId,
+      placeIds: parsed.data.placeIds,
+      autoApprove,
+    },
+    {
+      contributionsRepo,
+      scenesRepo,
+      placesRepo,
+    },
+  )
+
+  if (!result.success) return result
+
+  revalidatePath("/contributions")
+  revalidatePath("/profile/contribute")
+  updateTag("contributions")
+  updateTag("scenes")
+  updateTag(`scene-${parsed.data.sceneId}`)
+  updateTag("places")
+  for (const placeId of parsed.data.placeIds) updateTag(`place-${placeId}`)
   if (result.autoApproved) updateTag("profiles")
 
   return result

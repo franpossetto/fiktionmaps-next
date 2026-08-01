@@ -1,6 +1,11 @@
 import { cache } from "react"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { ContributionPendingImageRow, ContributionRow, Database } from "@/supabase/database.types"
+import type {
+  ContributionPendingImageRow,
+  ContributionPendingScenePlaceRow,
+  ContributionRow,
+  Database,
+} from "@/supabase/database.types"
 import { createClient } from "@/lib/supabase/server"
 import {
   CONTRIBUTION_FPP,
@@ -17,6 +22,8 @@ import type {
   FictionContributorScopeEntry,
   FictionScopeContributorContributionItem,
   PlaceContributionFeedItem,
+  ProfileContributionItem,
+  SceneContributionFeedItem,
   StaffContributionsFeedKind,
   StaffCreateContributionFeedItem,
   StaffCreateContributionsFeedPageResult,
@@ -24,8 +31,11 @@ import type {
   StaffFictionContributionsFeedStatusTab,
   TopContributorProfile,
 } from "@/src/contributions/domain/contribution.entity"
-import type { ContributionsRepositoryPort } from "@/src/contributions/domain/contribution.repository"
-import type { InsertContributionPendingImagesInput } from "@/src/contributions/domain/contribution.repository"
+import type {
+  ContributionsRepositoryPort,
+  InsertContributionPendingImagesInput,
+  InsertContributionPendingScenePlaceInput,
+} from "@/src/contributions/domain/contribution.repository"
 import type {
   ApproveContributionInput,
   CreateContributionInput,
@@ -57,7 +67,7 @@ function mapRow(row: ContributionRow): Contribution {
 }
 
 function isCreateContributionType(type: ContributionType): boolean {
-  return type === "create_fiction" || type === "create_place"
+  return type === "create_fiction" || type === "create_place" || type === "add_scene"
 }
 
 type ProfileEmbed = {
@@ -228,6 +238,30 @@ async function listApprovedContributionDetailRowsForUserOnPlaceIds(
   return ((data ?? []) as ApprovedContributionDetailRow[]).map(mapApprovedContributionDetailRow)
 }
 
+async function listApprovedContributionDetailRowsForUserOnSceneIds(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  sceneIds: string[],
+): Promise<Omit<FictionScopeContributorContributionItem, "entityLabel">[]> {
+  if (sceneIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from("contributions")
+    .select(APPROVED_CONTRIBUTION_DETAIL_SELECT)
+    .eq("user_id", userId)
+    .eq("status", "approved")
+    .eq("entity_type", "scene")
+    .in("entity_id", sceneIds)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("[contributions repo] listApprovedContributionDetailRowsForUserOnSceneIds:", error.message)
+    return []
+  }
+
+  return ((data ?? []) as ApprovedContributionDetailRow[]).map(mapApprovedContributionDetailRow)
+}
+
 async function listPlaceIdsForFictionIds(
   supabase: SupabaseClient<Database>,
   fictionIds: string[],
@@ -244,37 +278,70 @@ async function listPlaceIdsForFictionIds(
   return (data ?? []).map((row) => row.id).filter(Boolean)
 }
 
+async function listSceneIdsForFictionIds(
+  supabase: SupabaseClient<Database>,
+  fictionIds: string[],
+): Promise<string[]> {
+  if (fictionIds.length === 0) return []
+
+  const { data, error } = await supabase.from("scenes").select("id").in("fiction_id", fictionIds)
+
+  if (error) {
+    console.error("[contributions repo] listSceneIdsForFictionIds:", error.message)
+    return []
+  }
+
+  return (data ?? []).map((row) => row.id).filter(Boolean)
+}
+
 async function listApprovedContributionsForUserInFictionScopeInternal(
   supabase: SupabaseClient<Database>,
   fictionId: string,
   userId: string,
 ): Promise<FictionScopeContributorContributionItem[]> {
-  const placeIds = await listPlaceIdsForFictionIds(supabase, [fictionId])
-  const [fictionRows, placeRows, fictionResult, placesResult] = await Promise.all([
+  const [placeIds, sceneIds] = await Promise.all([
+    listPlaceIdsForFictionIds(supabase, [fictionId]),
+    listSceneIdsForFictionIds(supabase, [fictionId]),
+  ])
+  const [fictionRows, placeRows, sceneRows, fictionResult, placesResult, scenesResult] = await Promise.all([
     listApprovedContributionDetailRowsForUserOnEntity(supabase, userId, "fiction", fictionId),
     listApprovedContributionDetailRowsForUserOnPlaceIds(supabase, userId, placeIds),
+    sceneIds.length > 0
+      ? listApprovedContributionDetailRowsForUserOnSceneIds(supabase, userId, sceneIds).then((rows) => rows.map(r => ({ ...r, entityType: "scene" as ContributionEntityType })))
+      : Promise.resolve([]),
     supabase.from("fictions").select("title").eq("id", fictionId).maybeSingle(),
     placeIds.length > 0
       ? supabase.from("places").select("id, name").in("id", placeIds)
+      : Promise.resolve({ data: [], error: null }),
+    sceneIds.length > 0
+      ? supabase.from("scenes").select("id, title").in("id", sceneIds)
       : Promise.resolve({ data: [], error: null }),
   ])
 
   if (placesResult.error) {
     console.error("[contributions repo] listApprovedContributionsForUserInFictionScope places:", placesResult.error.message)
   }
+  if (scenesResult.error) {
+    console.error("[contributions repo] listApprovedContributionsForUserInFictionScope scenes:", scenesResult.error.message)
+  }
 
   const fictionTitle = fictionResult.data?.title?.trim() || null
   const placeNameById = new Map(
     (placesResult.data ?? []).map((place) => [place.id, place.name?.trim() || null] as const),
   )
+  const sceneTitleById = new Map(
+    (scenesResult.data ?? []).map((scene) => [scene.id, scene.title?.trim() || null] as const),
+  )
 
-  return [...fictionRows, ...placeRows]
+  return [...fictionRows, ...placeRows, ...sceneRows]
     .map((row) => ({
       ...row,
       entityLabel:
         row.entityType === "place"
           ? placeNameById.get(row.entityId) ?? null
-          : fictionTitle,
+          : row.entityType === "scene"
+            ? sceneTitleById.get(row.entityId) ?? null
+            : fictionTitle,
     }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
@@ -353,6 +420,58 @@ function mapPlaceFeedItem(
   }
 }
 
+function mapSceneFeedItem(
+  row: ContributionRow,
+  profiles: ProfileEmbed | ProfileEmbed[] | null,
+): SceneContributionFeedItem | null {
+  const raw = profiles
+  const prof = Array.isArray(raw) ? raw[0] : raw
+  if (!prof?.id) return null
+  return {
+    ...mapRow(row),
+    contributor: {
+      id: prof.id,
+      username: prof.username,
+      fullName: prof.full_name,
+      avatarUrl: prof.avatar_url,
+    },
+    sceneTitle: null,
+    sceneVideoUrl: null,
+    scenePreviewUrl: null,
+    fictionId: null,
+    fictionTitle: null,
+    placeNames: [],
+    proposedPlaces: [],
+  }
+}
+
+async function listPendingScenePlacesForContributionIds(
+  supabase: SupabaseClient<Database>,
+  contributionIds: string[],
+): Promise<Map<string, ContributionPendingScenePlaceRow[]>> {
+  const unique = [...new Set(contributionIds)].filter(Boolean)
+  const map = new Map<string, ContributionPendingScenePlaceRow[]>()
+  if (unique.length === 0) return map
+
+  const { data, error } = await supabase
+    .from("contribution_pending_scene_places")
+    .select("*")
+    .in("contribution_id", unique)
+    .order("created_at", { ascending: true })
+
+  if (error) {
+    console.error("[contributions repo] listPendingScenePlacesForContributionIds:", error.message)
+    return map
+  }
+
+  for (const row of (data ?? []) as ContributionPendingScenePlaceRow[]) {
+    const list = map.get(row.contribution_id) ?? []
+    list.push(row)
+    map.set(row.contribution_id, list)
+  }
+  return map
+}
+
 function mapPendingImageRow(row: ContributionPendingImageRow): ContributionPendingImage {
   return {
     id: row.id,
@@ -360,6 +479,8 @@ function mapPendingImageRow(row: ContributionPendingImageRow): ContributionPendi
     role: row.role,
     variant: row.variant,
     storagePath: row.storage_path,
+    focusX: row.focus_x ?? 50,
+    focusY: row.focus_y ?? 50,
     createdAt: row.created_at,
   }
 }
@@ -408,6 +529,69 @@ async function placeMetaByIds(
   for (const row of data ?? []) {
     m.set(row.id, { name: row.name, fictionId: row.fiction_id })
   }
+  return m
+}
+
+type SceneMeta = {
+  title: string | null
+  videoUrl: string | null
+  previewUrl: string | null
+  fictionId: string | null
+  placeNames: string[]
+}
+
+async function sceneMetaByIds(
+  supabase: SupabaseClient<Database>,
+  sceneIds: string[],
+): Promise<Map<string, SceneMeta>> {
+  const unique = [...new Set(sceneIds)].filter(Boolean)
+  if (unique.length === 0) return new Map()
+
+  const { data, error } = await supabase
+    .from("scenes")
+    .select("id, title, video_url, preview_url, fiction_id")
+    .in("id", unique)
+
+  if (error) {
+    console.error("[contributions repo] sceneMetaByIds scenes:", error.message)
+    return new Map()
+  }
+
+  const m = new Map<string, SceneMeta>()
+  for (const row of data ?? []) {
+    m.set(row.id, {
+      title: row.title,
+      videoUrl: row.video_url,
+      previewUrl: row.preview_url,
+      fictionId: row.fiction_id,
+      placeNames: [],
+    })
+  }
+
+  const { data: linkRows, error: linkError } = await supabase
+    .from("scene_places")
+    .select("scene_id, sort_order, places ( name )")
+    .in("scene_id", unique)
+    .order("sort_order", { ascending: true })
+
+  if (linkError) {
+    console.error("[contributions repo] sceneMetaByIds scene_places:", linkError.message)
+    return m
+  }
+
+  type SceneLinkRow = {
+    scene_id: string
+    places: { name: string | null } | { name: string | null }[] | null
+  }
+  for (const row of (linkRows ?? []) as SceneLinkRow[]) {
+    const meta = m.get(row.scene_id)
+    if (!meta) continue
+    const placeRaw = row.places
+    const placeObj = Array.isArray(placeRaw) ? placeRaw[0] : placeRaw
+    const name = placeObj?.name?.trim()
+    if (name) meta.placeNames.push(name)
+  }
+
   return m
 }
 
@@ -475,6 +659,52 @@ async function fictionTitlesByIds(supabase: SupabaseClient<Database>, fictionIds
   return m
 }
 
+async function enrichContributionsWithEntityLabels(
+  supabase: SupabaseClient<Database>,
+  rows: Contribution[],
+): Promise<ProfileContributionItem[]> {
+  if (rows.length === 0) return []
+
+  const fictionIds = rows.filter((r) => r.entityType === "fiction").map((r) => r.entityId)
+  const placeIds = rows.filter((r) => r.entityType === "place").map((r) => r.entityId)
+  const sceneIds = rows.filter((r) => r.entityType === "scene").map((r) => r.entityId)
+
+  const [placeMeta, sceneMeta] = await Promise.all([
+    placeMetaByIds(supabase, placeIds),
+    sceneMetaByIds(supabase, sceneIds),
+  ])
+
+  const parentFictionIds = [
+    ...[...placeMeta.values()].map((p) => p.fictionId),
+    ...[...sceneMeta.values()].map((s) => s.fictionId).filter((id): id is string => !!id),
+  ]
+  const fictionTitles = await fictionTitlesByIds(supabase, [...fictionIds, ...parentFictionIds])
+
+  return rows.map((row) => {
+    if (row.entityType === "fiction") {
+      return {
+        ...row,
+        entityLabel: fictionTitles.get(row.entityId)?.trim() || null,
+        parentLabel: null,
+      }
+    }
+    if (row.entityType === "place") {
+      const meta = placeMeta.get(row.entityId)
+      return {
+        ...row,
+        entityLabel: meta?.name?.trim() || null,
+        parentLabel: meta?.fictionId ? fictionTitles.get(meta.fictionId)?.trim() || null : null,
+      }
+    }
+    const meta = sceneMeta.get(row.entityId)
+    return {
+      ...row,
+      entityLabel: meta?.title?.trim() || null,
+      parentLabel: meta?.fictionId ? fictionTitles.get(meta.fictionId)?.trim() || null : null,
+    }
+  })
+}
+
 async function enrichFictionFeedItem(
   supabase: SupabaseClient<Database>,
   base: FictionContributionFeedItem,
@@ -519,6 +749,46 @@ async function enrichPlaceFeedItem(
     fictionId: fid,
     fictionTitle: fid ? (fictionTitles.get(fid) ?? null) : null,
     pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
+  }
+}
+
+async function enrichSceneFeedItem(
+  supabase: SupabaseClient<Database>,
+  base: SceneContributionFeedItem,
+): Promise<SceneContributionFeedItem> {
+  const meta = await sceneMetaByIds(supabase, [base.entityId])
+  const sceneMeta = meta.get(base.entityId)
+  const fid = sceneMeta?.fictionId ?? null
+  const fictionTitles = fid ? await fictionTitlesByIds(supabase, [fid]) : new Map<string, string>()
+
+  let proposedPlaces: SceneContributionFeedItem["proposedPlaces"] = []
+
+  if (base.type === "add_place_to_scene") {
+    const pendingMap = await listPendingScenePlacesForContributionIds(supabase, [base.id])
+    const pendingRows = pendingMap.get(base.id) ?? []
+    if (pendingRows.length > 0) {
+      const placeIds = pendingRows.map((r) => r.place_id)
+      const [placeMeta, avatars] = await Promise.all([
+        placeMetaByIds(supabase, placeIds),
+        placeAvatarThumbByIds(supabase, placeIds),
+      ])
+      proposedPlaces = pendingRows.map((r) => ({
+        placeId: r.place_id,
+        name: placeMeta.get(r.place_id)?.name ?? null,
+        avatarUrl: avatars.get(r.place_id) ?? null,
+      }))
+    }
+  }
+
+  return {
+    ...base,
+    sceneTitle: sceneMeta?.title ?? null,
+    sceneVideoUrl: sceneMeta?.videoUrl ?? null,
+    scenePreviewUrl: sceneMeta?.previewUrl ?? null,
+    fictionId: fid,
+    fictionTitle: fid ? (fictionTitles.get(fid) ?? null) : null,
+    placeNames: sceneMeta?.placeNames ?? [],
+    proposedPlaces,
   }
 }
 
@@ -639,6 +909,8 @@ export function createContributionsSupabaseAdapter(
         q = q.eq("entity_type", "fiction").in("type", ["create_fiction", "add_photo"])
       } else if (kind === "place") {
         q = q.eq("entity_type", "place").in("type", ["create_place", "add_photo"])
+      } else if (kind === "scene") {
+        q = q.eq("entity_type", "scene").in("type", ["add_scene", "add_place_to_scene"])
       } else {
         q = q.in("type", ["create_fiction", "create_place", "add_photo"])
       }
@@ -666,11 +938,18 @@ export function createContributionsSupabaseAdapter(
       type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
       const fictionItems: FictionContributionFeedItem[] = []
       const placeItems: PlaceContributionFeedItem[] = []
+      const sceneItems: SceneContributionFeedItem[] = []
 
       for (const row of (data ?? []) as Row[]) {
         if (row.entity_type === "place" && (row.type === "create_place" || row.type === "add_photo")) {
           const item = mapPlaceFeedItem(row, row.profiles)
           if (item) placeItems.push(item)
+        } else if (
+          row.entity_type === "scene" &&
+          (row.type === "add_scene" || row.type === "add_place_to_scene")
+        ) {
+          const item = mapSceneFeedItem(row, row.profiles)
+          if (item) sceneItems.push(item)
         } else if (
           row.entity_type === "fiction" &&
           (row.type === "create_fiction" || row.type === "add_photo")
@@ -680,15 +959,27 @@ export function createContributionsSupabaseAdapter(
         }
       }
 
-      const [fictionTitles, fictionCovers, placeMeta, placeAvatars] = await Promise.all([
-        fictionTitlesByIds(supabase, fictionItems.map((i) => i.entityId)),
-        fictionCoverThumbByIds(supabase, fictionItems.map((i) => i.entityId)),
-        placeMetaByIds(supabase, placeItems.map((i) => i.entityId)),
-        placeAvatarThumbByIds(supabase, placeItems.map((i) => i.entityId)),
-      ])
+      const addPlaceToSceneIds = sceneItems.filter((i) => i.type === "add_place_to_scene").map((i) => i.id)
+      const pendingScenePlaces = await listPendingScenePlacesForContributionIds(supabase, addPlaceToSceneIds)
+      const proposedPlaceIds = [...pendingScenePlaces.values()].flatMap((rows) => rows.map((r) => r.place_id))
+
+      const [fictionTitles, fictionCovers, placeMeta, placeAvatars, sceneMeta, proposedPlaceMeta, proposedPlaceAvatars] =
+        await Promise.all([
+          fictionTitlesByIds(supabase, fictionItems.map((i) => i.entityId)),
+          fictionCoverThumbByIds(supabase, fictionItems.map((i) => i.entityId)),
+          placeMetaByIds(supabase, placeItems.map((i) => i.entityId)),
+          placeAvatarThumbByIds(supabase, placeItems.map((i) => i.entityId)),
+          sceneMetaByIds(supabase, sceneItems.map((i) => i.entityId)),
+          placeMetaByIds(supabase, proposedPlaceIds),
+          placeAvatarThumbByIds(supabase, proposedPlaceIds),
+        ])
 
       const fictionIdsForPlaces = [...new Set(placeItems.map((i) => placeMeta.get(i.entityId)?.fictionId).filter(Boolean) as string[])]
-      const parentFictionTitles = await fictionTitlesByIds(supabase, fictionIdsForPlaces)
+      const fictionIdsForScenes = [...new Set(sceneItems.map((i) => sceneMeta.get(i.entityId)?.fictionId).filter(Boolean) as string[])]
+      const [parentFictionTitles, sceneFictionTitles] = await Promise.all([
+        fictionTitlesByIds(supabase, fictionIdsForPlaces),
+        fictionTitlesByIds(supabase, fictionIdsForScenes),
+      ])
 
       const fictionAddPhotoIds = fictionItems.filter((i) => i.type === "add_photo").map((i) => i.id)
       const placeAddPhotoIds = placeItems.filter((i) => i.type === "add_photo").map((i) => i.id)
@@ -721,9 +1012,31 @@ export function createContributionsSupabaseAdapter(
         }
       })
 
+      const enrichedScene = sceneItems.map((i) => {
+        const meta = sceneMeta.get(i.entityId)
+        const fid = meta?.fictionId ?? null
+        const pendingRows =
+          i.type === "add_place_to_scene" ? (pendingScenePlaces.get(i.id) ?? []) : []
+        return {
+          ...i,
+          sceneTitle: meta?.title ?? null,
+          sceneVideoUrl: meta?.videoUrl ?? null,
+          scenePreviewUrl: meta?.previewUrl ?? null,
+          fictionId: fid,
+          fictionTitle: fid ? (sceneFictionTitles.get(fid) ?? null) : null,
+          placeNames: meta?.placeNames ?? [],
+          proposedPlaces: pendingRows.map((r) => ({
+            placeId: r.place_id,
+            name: proposedPlaceMeta.get(r.place_id)?.name ?? null,
+            avatarUrl: proposedPlaceAvatars.get(r.place_id) ?? null,
+          })),
+        }
+      })
+
       const itemById = new Map<string, StaffCreateContributionFeedItem>()
       for (const item of enrichedFiction) itemById.set(item.id, item)
       for (const item of enrichedPlace) itemById.set(item.id, item)
+      for (const item of enrichedScene) itemById.set(item.id, item)
 
       const ordered: StaffCreateContributionFeedItem[] = []
       for (const row of (data ?? []) as Row[]) {
@@ -760,6 +1073,8 @@ export function createContributionsSupabaseAdapter(
 
     async insertPendingContributionImages(input: InsertContributionPendingImagesInput): Promise<boolean> {
       const supabase = await getSupabase()
+      const focusX = input.focus?.x ?? 50
+      const focusY = input.focus?.y ?? 50
       const rows: Database["public"]["Tables"]["contribution_pending_images"]["Insert"][] = []
       if (input.paths.xs?.trim()) {
         rows.push({
@@ -767,6 +1082,8 @@ export function createContributionsSupabaseAdapter(
           role: input.role,
           variant: "xs",
           storage_path: input.paths.xs,
+          focus_x: focusX,
+          focus_y: focusY,
         })
       }
       if (input.paths.sm?.trim()) {
@@ -775,6 +1092,8 @@ export function createContributionsSupabaseAdapter(
           role: input.role,
           variant: "sm",
           storage_path: input.paths.sm,
+          focus_x: focusX,
+          focus_y: focusY,
         })
       }
       if (input.paths.lg?.trim()) {
@@ -783,6 +1102,8 @@ export function createContributionsSupabaseAdapter(
           role: input.role,
           variant: "lg",
           storage_path: input.paths.lg,
+          focus_x: focusX,
+          focus_y: focusY,
         })
       }
       if (rows.length === 0) return false
@@ -794,6 +1115,39 @@ export function createContributionsSupabaseAdapter(
       }
       return true
     },
+
+    async insertPendingScenePlace(input: InsertContributionPendingScenePlaceInput): Promise<boolean> {
+      const supabase = await getSupabase()
+      const { error } = await supabase.from("contribution_pending_scene_places").insert({
+        contribution_id: input.contributionId,
+        place_id: input.placeId,
+        start_second: input.startSecond ?? null,
+        end_second: input.endSecond ?? null,
+      })
+      if (error) {
+        console.error("[contributions repo] insertPendingScenePlace:", error.message)
+        return false
+      }
+      return true
+    },
+
+    countPendingAddPlaceToScene: cache(async (sceneId: string, placeId: string): Promise<number> => {
+      const supabase = await getSupabase()
+      const { data, error } = await supabase
+        .from("contributions")
+        .select("id, contribution_pending_scene_places!inner(place_id)")
+        .eq("entity_type", "scene")
+        .eq("entity_id", sceneId)
+        .eq("type", "add_place_to_scene")
+        .eq("status", "pending")
+        .eq("contribution_pending_scene_places.place_id", placeId)
+
+      if (error) {
+        console.error("[contributions repo] countPendingAddPlaceToScene:", error.message)
+        return 0
+      }
+      return data?.length ?? 0
+    }),
 
     async listPendingImagesByContributionId(contributionId: string): Promise<ContributionPendingImage[]> {
       const supabase = await getSupabase()
@@ -904,15 +1258,35 @@ export function createContributionsSupabaseAdapter(
       const supabase = await getSupabase()
       const { data, error } = await supabase
         .from("contributions")
-        .select("*")
+        .select(
+          "id, user_id, type, entity_type, entity_id, status, moderator_id, moderator_note, fpp_awarded, created_at, updated_at",
+        )
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
 
       if (error) {
-        console.error("[contributions repo] getByUser error:", error.message)
+        console.error("[contributions repo] getByUser error:", error.message, error)
         return []
       }
       return (data as ContributionRow[] | null)?.map(mapRow) ?? []
+    }),
+
+    listProfileContributionsByUser: cache(async (userId: string): Promise<ProfileContributionItem[]> => {
+      const supabase = await getSupabase()
+      const { data, error } = await supabase
+        .from("contributions")
+        .select(
+          "id, user_id, type, entity_type, entity_id, status, moderator_id, moderator_note, fpp_awarded, created_at, updated_at",
+        )
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        console.error("[contributions repo] listProfileContributionsByUser error:", error.message, error)
+        return []
+      }
+      const rows = (data as ContributionRow[] | null)?.map(mapRow) ?? []
+      return enrichContributionsWithEntityLabels(supabase, rows)
     }),
 
     countByUser: cache(async (userId: string): Promise<number> => {
@@ -936,7 +1310,7 @@ export function createContributionsSupabaseAdapter(
         .select("entity_type, entity_id")
         .eq("user_id", userId)
         .eq("status", "approved")
-        .in("entity_type", ["fiction", "place"])
+        .in("entity_type", ["fiction", "place", "scene"])
 
       if (error) {
         console.error("[contributions repo] countApprovedFictionAndPlaceScopesByUser error:", error.message)
@@ -945,10 +1319,12 @@ export function createContributionsSupabaseAdapter(
 
       const placeIds = new Set<string>()
       const fictionIds = new Set<string>()
+      const sceneIds = new Set<string>()
 
       for (const row of data ?? []) {
         if (row.entity_type === "fiction") fictionIds.add(row.entity_id)
         if (row.entity_type === "place") placeIds.add(row.entity_id)
+        if (row.entity_type === "scene") sceneIds.add(row.entity_id)
       }
 
       if (placeIds.size > 0) {
@@ -962,6 +1338,21 @@ export function createContributionsSupabaseAdapter(
         } else {
           for (const place of places ?? []) {
             if (place.fiction_id) fictionIds.add(place.fiction_id)
+          }
+        }
+      }
+
+      if (sceneIds.size > 0) {
+        const { data: scenes, error: scenesError } = await supabase
+          .from("scenes")
+          .select("fiction_id")
+          .in("id", [...sceneIds])
+
+        if (scenesError) {
+          console.error("[contributions repo] countApprovedFictionAndPlaceScopesByUser scenes:", scenesError.message)
+        } else {
+          for (const scene of scenes ?? []) {
+            if (scene.fiction_id) fictionIds.add(scene.fiction_id)
           }
         }
       }
@@ -1244,6 +1635,15 @@ export function createContributionsSupabaseAdapter(
           return enrichPlaceFeedItem(supabase, base)
         }
 
+        if (
+          row.entity_type === "scene" &&
+          (row.type === "add_scene" || row.type === "add_place_to_scene")
+        ) {
+          const base = mapSceneFeedItem(row, row.profiles)
+          if (!base) return null
+          return enrichSceneFeedItem(supabase, base)
+        }
+
         return null
       },
     ),
@@ -1319,11 +1719,19 @@ export function createContributionsSupabaseAdapter(
             console.error("[contributions repo] approve add_photo place missing avatar variants")
             return false
           }
-          const promoted = await promotePendingContributionPhotoToAssetImages("place", entityId, "avatar", {
-            xs: avatar.xs,
-            sm: avatar.sm,
-            lg: avatar.lg,
-          })
+          const pendingRows = pendingMap.get(input.id) ?? []
+          const focusRow = pendingRows.find((r) => r.role === "avatar")
+          const promoted = await promotePendingContributionPhotoToAssetImages(
+            "place",
+            entityId,
+            "avatar",
+            {
+              xs: avatar.xs,
+              sm: avatar.sm,
+              lg: avatar.lg,
+            },
+            { x: focusRow?.focusX ?? 50, y: focusRow?.focusY ?? 50 },
+          )
           if (!promoted.success) {
             console.error("[contributions repo] approve add_photo promote:", promoted.error)
             return false
@@ -1337,21 +1745,36 @@ export function createContributionsSupabaseAdapter(
             console.error("[contributions repo] approve add_photo fiction missing pending images")
             return false
           }
+          const pendingRows = pendingMap.get(input.id) ?? []
           if (hasCover) {
-            const coverPromoted = await promotePendingContributionPhotoToAssetImages("fiction", entityId, "cover", {
-              xs: cover!.xs,
-              sm: cover!.sm!,
-              lg: cover!.lg!,
-            })
+            const focusRow = pendingRows.find((r) => r.role === "cover")
+            const coverPromoted = await promotePendingContributionPhotoToAssetImages(
+              "fiction",
+              entityId,
+              "cover",
+              {
+                xs: cover!.xs,
+                sm: cover!.sm!,
+                lg: cover!.lg!,
+              },
+              { x: focusRow?.focusX ?? 50, y: focusRow?.focusY ?? 50 },
+            )
             if (!coverPromoted.success) {
               console.error("[contributions repo] approve add_photo promote cover:", coverPromoted.error)
               return false
             }
           }
           if (hasBanner) {
-            const bannerPromoted = await promotePendingContributionPhotoToAssetImages("fiction", entityId, "banner", {
-              lg: banner!.lg!,
-            })
+            const focusRow = pendingRows.find((r) => r.role === "banner")
+            const bannerPromoted = await promotePendingContributionPhotoToAssetImages(
+              "fiction",
+              entityId,
+              "banner",
+              {
+                lg: banner!.lg!,
+              },
+              { x: focusRow?.focusX ?? 50, y: focusRow?.focusY ?? 50 },
+            )
             if (!bannerPromoted.success) {
               console.error("[contributions repo] approve add_photo promote banner:", bannerPromoted.error)
               return false
@@ -1366,6 +1789,47 @@ export function createContributionsSupabaseAdapter(
           console.error("[contributions repo] approve add_photo delete pending rows:", pendingDelErr.message)
           return false
         }
+      }
+
+      if (contributionType === "add_place_to_scene" && entityType === "scene") {
+        const pendingMap = await listPendingScenePlacesForContributionIds(supabase, [input.id])
+        const pendingRows = pendingMap.get(input.id) ?? []
+        if (pendingRows.length === 0) {
+          console.error("[contributions repo] approve add_place_to_scene missing pending place")
+          return false
+        }
+
+        // Staff moderator session passes scene_places INSERT RLS.
+        const { data: maxRow, error: maxError } = await supabase
+          .from("scene_places")
+          .select("sort_order")
+          .eq("scene_id", entityId)
+          .order("sort_order", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (maxError) {
+          console.error("[contributions repo] approve add_place_to_scene max sort:", maxError.message)
+          return false
+        }
+
+        let sortOrder = (maxRow?.sort_order ?? -1) + 1
+        for (const pending of pendingRows) {
+          const { error: linkErr } = await supabase.from("scene_places").insert({
+            scene_id: entityId,
+            place_id: pending.place_id,
+            sort_order: sortOrder,
+            start_second: pending.start_second,
+            end_second: pending.end_second,
+            created_by: authorId,
+          })
+          if (linkErr) {
+            console.error("[contributions repo] approve add_place_to_scene link:", linkErr.message)
+            return false
+          }
+          sortOrder += 1
+        }
+        // Keep staging rows after approve so staff detail/feed can still show proposed places.
       }
 
       const { error: contribErr } = await supabase
@@ -1470,6 +1934,21 @@ export function createContributionsSupabaseAdapter(
 
         if (pendingDelErr) {
           console.error("[contributions repo] reject add_photo delete pending rows:", pendingDelErr.message)
+          return false
+        }
+      }
+
+      if (contributionType === "add_place_to_scene") {
+        const { error: pendingDelErr } = await supabase
+          .from("contribution_pending_scene_places")
+          .delete()
+          .eq("contribution_id", input.id)
+
+        if (pendingDelErr) {
+          console.error(
+            "[contributions repo] reject add_place_to_scene delete pending:",
+            pendingDelErr.message,
+          )
           return false
         }
       }

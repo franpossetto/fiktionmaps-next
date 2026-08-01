@@ -40,7 +40,7 @@ export function FictionContributeLayout({
         )}
       >
         <div className="fiction-contrib-grid-gutter hidden min-h-0 min-[1500px]:block" aria-hidden />
-        <aside className="fiction-contrib-rail-left hidden min-h-0 min-w-0 border-r border-border/50 bg-background pl-1 pr-2 min-[900px]:block">
+        <aside className="fiction-contrib-rail-left hidden h-full min-h-0 min-w-0 flex-col border-r border-border/50 bg-background pl-1 pr-2 min-[900px]:flex">
           {leftAside ?? null}
         </aside>
         <div

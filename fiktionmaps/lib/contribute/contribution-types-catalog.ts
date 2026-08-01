@@ -21,7 +21,13 @@ export type ContributionTypeCatalogEntry = {
   icon: LucideIcon
   /** Full wizard flow (navigates on click). */
   hasWizard: boolean
-  href?: "/contribute/fiction" | "/contribute/place" | "/contribute/photo" | "/contribute/hunt"
+  href?:
+    | "/contribute/fiction"
+    | "/contribute/place"
+    | "/contribute/photo"
+    | "/contribute/hunt"
+    | "/contribute/scene"
+    | "/contribute/scene-place"
   /** Short badge label shown on the card (e.g. "AI Hunt"). */
   tag?: string
   /** Requires contributor, moderator, or admin role (e.g. AI wizards). */
@@ -43,7 +49,13 @@ const CONTRIBUTION_TYPES_CATALOG_BASE: ContributionTypeCatalogEntry[] = [
     requiresContributor: true,
     aiRequired: true,
   },
-  { type: "add_scene", icon: Clapperboard, hasWizard: false },
+  { type: "add_scene", icon: Clapperboard, hasWizard: true, href: "/contribute/scene" },
+  {
+    type: "add_place_to_scene",
+    icon: MapPin,
+    hasWizard: true,
+    href: "/contribute/scene-place",
+  },
   { type: "add_photo", icon: ImagePlus, hasWizard: true, href: "/contribute/photo" },
   { type: "enrich_entity", icon: Layers, hasWizard: false },
   { type: "correct_data", icon: PenLine, hasWizard: false },

@@ -12,9 +12,45 @@ export function countFictionContributeDescriptionWords(text: string): number {
 }
 
 /**
- * Mismo orden y valores que `@/lib/constants/fiction-genres`.
- * Se declara acá (no se importa el módulo) para evitar fallos en el cliente si el
- * orden de evaluación del bundle deja el import en `undefined` al armar `z.enum`.
+ * Cover: portrait-leaning (taller than wide), not a hard 2:3 match.
+ * Accepts roughly book/poster through slightly wide portrait.
+ */
+export const COVER_ASPECT_MIN_WIDTH_OVER_HEIGHT = 0.45
+export const COVER_ASPECT_MAX_WIDTH_OVER_HEIGHT = 0.95
+
+/** @deprecated Kept for callers; prefer min/max band. */
+export const COVER_ASPECT_WIDTH_OVER_HEIGHT = 2 / 3
+/** @deprecated Kept for callers; band replaces tolerance. */
+export const COVER_ASPECT_RATIO_TOLERANCE = 0.35
+
+export function isCoverAspectRatioOk(width: number, height: number): boolean {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return false
+  const actual = width / height
+  return (
+    actual >= COVER_ASPECT_MIN_WIDTH_OVER_HEIGHT &&
+    actual <= COVER_ASPECT_MAX_WIDTH_OVER_HEIGHT
+  )
+}
+
+/** Lado corto mínimo (px) para que la portada siga siendo legible en miniatura. */
+export const COVER_READABLE_MIN_SHORT_EDGE_PX = 400
+
+export function isCoverReadableResolutionOk(width: number, height: number): boolean {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return false
+  return Math.min(width, height) >= COVER_READABLE_MIN_SHORT_EDGE_PX
+}
+
+/** Banner: landscape (wider than tall). */
+export const BANNER_MIN_WIDTH_OVER_HEIGHT = 1.2
+
+export function isBannerAspectRatioOk(width: number, height: number): boolean {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return false
+  return width / height >= BANNER_MIN_WIDTH_OVER_HEIGHT
+}
+
+/**
+ * Same order/values as `@/lib/constants/fiction-genres`.
+ * Declared here (not imported) so client bundle eval order cannot break `z.enum`.
  */
 const FICTION_GENRE_VALUES = [
   "Romance",
@@ -37,35 +73,6 @@ const FICTION_LANGUAGE_CODE_VALUES = [
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
-
-/** Objetivo ancho/alto para portada vertical tipo póster o libro (2:3). */
-export const COVER_ASPECT_WIDTH_OVER_HEIGHT = 2 / 3
-
-/** Tolerancia relativa respecto al objetivo (“aproximadamente 2:3”). */
-export const COVER_ASPECT_RATIO_TOLERANCE = 0.12
-
-export function isCoverAspectRatioOk(width: number, height: number): boolean {
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return false
-  const actual = width / height
-  const target = COVER_ASPECT_WIDTH_OVER_HEIGHT
-  return Math.abs(actual - target) / target <= COVER_ASPECT_RATIO_TOLERANCE
-}
-
-/** Lado corto mínimo (px) para que la portada siga siendo legible en miniatura. */
-export const COVER_READABLE_MIN_SHORT_EDGE_PX = 400
-
-export function isCoverReadableResolutionOk(width: number, height: number): boolean {
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return false
-  return Math.min(width, height) >= COVER_READABLE_MIN_SHORT_EDGE_PX
-}
-
-/** Banner: claramente apaisado (cabecera ancha). */
-export const BANNER_MIN_WIDTH_OVER_HEIGHT = 1.35
-
-export function isBannerAspectRatioOk(width: number, height: number): boolean {
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return false
-  return width / height >= BANNER_MIN_WIDTH_OVER_HEIGHT
-}
 
 export const BANNER_READABLE_MIN_SHORT_EDGE_PX = 360
 

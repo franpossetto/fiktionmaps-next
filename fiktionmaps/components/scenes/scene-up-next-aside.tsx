@@ -7,17 +7,19 @@ import { useRouter } from "@/i18n/navigation"
 import { publicFictionScenePath } from "@/lib/fictions/public-fiction-paths"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
+import { primaryScenePlace } from "@/src/scenes/domain/scene.helpers"
 
+/** Scene id -> its primary place, for the "same fiction" rail labels. */
 function buildSceneLocationsMap(scenes: Scene[], places: Place[]): Map<string, Place> {
   const placeById = new Map(places.map((p) => [p.id, p]))
-  const locMap = new Map<string, Place>()
+  const sceneLocations = new Map<string, Place>()
   for (const scene of scenes) {
-    const place = placeById.get(scene.placeId)
+    const primaryPlaceId = primaryScenePlace(scene)?.placeId
+    const place = primaryPlaceId ? placeById.get(primaryPlaceId) : undefined
     if (!place) continue
-    locMap.set(scene.locationId, place)
-    locMap.set(scene.placeId, place)
+    sceneLocations.set(scene.id, place)
   }
-  return locMap
+  return sceneLocations
 }
 
 type ListItem =
@@ -100,10 +102,7 @@ export function SceneUpNextAside({
       .map((scene) => ({
         kind: "fiction",
         scene,
-        locationName:
-          sceneLocations.get(scene.locationId)?.name ??
-          sceneLocations.get(scene.placeId)?.name ??
-          "",
+        locationName: sceneLocations.get(scene.id)?.name ?? "",
       }))
 
     const cityItems: ListItem[] = cityScenes.flatMap((place) => {
@@ -139,7 +138,7 @@ export function SceneUpNextAside({
             >
               <Thumb
                 src={scene.thumbnail?.trim() || undefined}
-                video={scene.videoUrl?.trim() || undefined}
+                video={scene.previewUrl?.trim() || scene.videoUrl?.trim() || undefined}
                 alt={scene.title}
                 timestamp={scene.timestamp}
               />

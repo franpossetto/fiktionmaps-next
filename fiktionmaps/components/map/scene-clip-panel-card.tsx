@@ -4,6 +4,7 @@ import { useRef, useEffect, useState } from "react"
 import { Tv, Film, Play } from "lucide-react"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import { sceneListVideoUrl } from "@/src/scenes/domain/scene.helpers"
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,7 @@ export function SceneClipPanelCard({
 }: SceneClipPanelCardProps) {
   const isTv = fiction?.type === "tv-series"
   const hasVideo = Boolean(scene.videoUrl?.trim())
+  const listVideoSrc = sceneListVideoUrl(scene)
   const [modalOpen, setModalOpen] = useState(false)
   const modalVideoRef = useRef<HTMLVideoElement>(null)
 
@@ -77,7 +79,7 @@ export function SceneClipPanelCard({
                 muted
                 playsInline
                 preload="metadata"
-                src={scene.videoUrl!}
+                src={listVideoSrc!}
                 poster={scene.thumbnail?.trim() || undefined}
                 className="absolute inset-0 h-full w-full object-cover"
               />

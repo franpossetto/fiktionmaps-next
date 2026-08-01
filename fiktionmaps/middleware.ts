@@ -18,7 +18,15 @@ const ENFORCE_CANONICAL_HOST = process.env.VERCEL_ENV
   ? process.env.VERCEL_ENV === "production"
   : process.env.NODE_ENV === "production"
 
-const PROTECTED_PATHS = ["/profile", "/settings", "/admin", "/contributions", "/contribute"]
+const PROTECTED_PATHS = [
+  "/profile",
+  "/settings",
+  "/admin",
+  "/contributions",
+  "/contribute",
+  "/u",
+  "/auth/update-password",
+]
 
 function isProtected(pathname: string): boolean {
   return PROTECTED_PATHS.some(

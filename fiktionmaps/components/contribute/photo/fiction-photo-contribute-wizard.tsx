@@ -51,6 +51,7 @@ export function FictionPhotoContributeWizard({ target, initialFictions }: Fictio
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
   const [photoInspecting, setPhotoInspecting] = useState(false)
   const [photoDims, setPhotoDims] = useState<{ width: number; height: number } | null>(null)
+  const [photoFocus, setPhotoFocus] = useState({ x: 50, y: 50 })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [doneVariant, setDoneVariant] = useState<"pending" | "approved" | null>(null)
@@ -160,6 +161,7 @@ export function FictionPhotoContributeWizard({ target, initialFictions }: Fictio
   function clearPhoto() {
     setPhotoFile(null)
     setPhotoDims(null)
+    setPhotoFocus({ x: 50, y: 50 })
     if (photoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(photoPreviewUrl)
     setPhotoPreviewUrl(null)
   }
@@ -172,6 +174,8 @@ export function FictionPhotoContributeWizard({ target, initialFictions }: Fictio
       fd.set("fictionId", fictionId)
       fd.set("targetRole", targetRole)
       fd.set("photoFile", photoFile)
+      fd.set("focusX", String(photoFocus.x))
+      fd.set("focusY", String(photoFocus.y))
       const res = await submitFictionAddPhotoContributionAction(fd)
       if (!res.success) {
         setErrors({ submit: res.error })
@@ -304,6 +308,8 @@ export function FictionPhotoContributeWizard({ target, initialFictions }: Fictio
                           onClear={clearPhoto}
                           inline={Boolean(currentImageUrl)}
                           className={currentImageUrl ? "space-y-0" : undefined}
+                          focus={photoFocus}
+                          onFocusChange={setPhotoFocus}
                         />
                       </div>
                     </div>

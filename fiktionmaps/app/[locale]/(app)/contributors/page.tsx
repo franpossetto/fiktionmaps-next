@@ -1,7 +1,10 @@
 import type { Metadata } from "next"
 import { getTranslations } from "next-intl/server"
 import { getProfilesPageCached } from "@/src/users/infrastructure/next/user.queries"
+import { getCatalogEntityCountsCached } from "@/src/shared/infrastructure/next/catalog.queries"
+import { AppDetailRailsShell } from "@/components/layout/app-detail-rails-shell"
 import { ContributorsPage } from "@/components/contributors/contributors-page"
+import { ContributorsRightRail } from "@/components/contributors/contributors-right-rail"
 import { getSiteUrl } from "@/lib/site"
 
 const PAGE_SIZE = 20
@@ -33,11 +36,14 @@ export default async function ContributorsRoute({ searchParams }: Props) {
   const { page: pageStr } = await searchParams
   const page = Math.max(1, parseInt(pageStr ?? "1", 10) || 1)
 
-  const { profiles, totalCount } = await getProfilesPageCached(page, PAGE_SIZE)
+  const [{ profiles, totalCount }, catalogCounts] = await Promise.all([
+    getProfilesPageCached(page, PAGE_SIZE),
+    getCatalogEntityCountsCached(),
+  ])
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
 
   return (
-    <div className="h-full overflow-y-auto bg-background">
+    <AppDetailRailsShell rightAside={<ContributorsRightRail catalogCounts={catalogCounts} />}>
       <ContributorsPage
         contributors={profiles}
         page={page}
@@ -45,6 +51,6 @@ export default async function ContributorsRoute({ searchParams }: Props) {
         totalCount={totalCount}
         pageSize={PAGE_SIZE}
       />
-    </div>
+    </AppDetailRailsShell>
   )
 }

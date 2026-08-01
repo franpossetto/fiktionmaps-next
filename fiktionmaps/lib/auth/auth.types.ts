@@ -23,3 +23,30 @@ export interface AuthResult<T = void> {
   data: T | null
   error: string | null
 }
+
+export type ChangePasswordInput = {
+  currentPassword: string
+  newPassword: string
+}
+
+export type ResetPasswordEmailInput = {
+  email: string
+  redirectTo: string
+}
+
+export type UpdatePasswordInput = {
+  newPassword: string
+}
+
+/** Stable codes for password flows — map to i18n in the UI. */
+export type AuthPasswordErrorCode =
+  | "UNAUTHORIZED"
+  | "INVALID_CURRENT_PASSWORD"
+  | "WEAK_PASSWORD"
+  | "TOO_SHORT"
+  | "MISSING_UPPERCASE"
+  | "MISSING_SYMBOL"
+  | "SAME_PASSWORD"
+  | "UPDATE_FAILED"
+  | "RATE_LIMITED"
+  | "NOT_RECOVERY_SESSION"

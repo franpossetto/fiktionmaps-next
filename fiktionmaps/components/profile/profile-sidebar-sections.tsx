@@ -262,11 +262,12 @@ export function ArticlesSection({ rows: previewRows }: { rows: ProfileArticlePre
 interface SidebarCardProps {
   title: string
   ctaLabel?: string
+  onCtaClick?: () => void
   emptyMessage?: string
   children?: ReactNode
 }
 
-export function SidebarCard({ title, ctaLabel, emptyMessage, children }: SidebarCardProps) {
+export function SidebarCard({ title, ctaLabel, onCtaClick, emptyMessage, children }: SidebarCardProps) {
   const hasChildren =
     !!children &&
     (Array.isArray(children)
@@ -282,6 +283,7 @@ export function SidebarCard({ title, ctaLabel, emptyMessage, children }: Sidebar
         {ctaLabel && (
           <button
             type="button"
+            onClick={onCtaClick}
             className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             {ctaLabel}

@@ -1,6 +1,11 @@
 import sharp from "sharp"
 import { createClient } from "@/lib/supabase/server"
 import {
+  DEFAULT_IMAGE_FOCUS,
+  normalizeImageFocus,
+  type ImageFocus,
+} from "./image-focus"
+import {
   ASSET_IMAGES_BUCKET,
   VARIANT_SIZES,
   VARIANT_WEBP_QUALITY,
@@ -22,6 +27,8 @@ export interface UploadImageOptions {
   file: File | Buffer
   /** Optional: remove existing rows for this (entity_type, entity_id, role) before inserting. */
   replace?: boolean
+  /** Focal point for object-position (0–100). Defaults to center. */
+  focus?: ImageFocus
 }
 
 /**
@@ -33,6 +40,10 @@ export async function uploadEntityImage(options: UploadImageOptions): Promise<
   | { success: false; error: string }
 > {
   const { entityType, entityId, role, variants, file, replace = true } = options
+  const focus = normalizeImageFocus(
+    options.focus?.x ?? DEFAULT_IMAGE_FOCUS.x,
+    options.focus?.y ?? DEFAULT_IMAGE_FOCUS.y,
+  )
 
   const buffer = Buffer.isBuffer(file) ? file : Buffer.from(await file.arrayBuffer())
   if (buffer.length > MAX_FILE_SIZE_BYTES) {
@@ -69,7 +80,15 @@ export async function uploadEntityImage(options: UploadImageOptions): Promise<
   }
 
   const urls: Partial<Record<ImageVariant, string>> = {}
-  const inserts: { entity_type: string; entity_id: string; role: string; variant: string; url: string }[] = []
+  const inserts: {
+    entity_type: string
+    entity_id: string
+    role: string
+    variant: string
+    url: string
+    focus_x: number
+    focus_y: number
+  }[] = []
   const version = Date.now()
 
   for (const variant of variants) {
@@ -104,6 +123,8 @@ export async function uploadEntityImage(options: UploadImageOptions): Promise<
       role,
       variant,
       url,
+      focus_x: focus.x,
+      focus_y: focus.y,
     })
   }
 

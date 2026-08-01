@@ -18,6 +18,8 @@ export interface FictionsRepositoryPort {
   /** Published catalog fiction eligible for cover photo contributions. */
   isApprovedActiveFiction(fictionId: string): Promise<boolean>
   listApprovedActive(): Promise<FictionWithMedia[]>
+  /** Count of approved + active fictions in the public catalog. */
+  countApprovedActive(): Promise<number>
   create(data: CreateFictionData): Promise<FictionWithMedia | null>
   update(id: string, data: UpdateFictionData): Promise<FictionWithMedia | null>
   delete(id: string): Promise<boolean>

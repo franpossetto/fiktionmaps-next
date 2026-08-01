@@ -6,6 +6,7 @@ import { createAnonymousClient, createClient } from "@/lib/supabase/server"
 import type { Database } from "@/supabase/database.types"
 import { getContributionByIdUseCase } from "@/src/contributions/application/get-contribution-by-id.usecase"
 import { getContributionsByUserUseCase } from "@/src/contributions/application/get-contributions-by-user.usecase"
+import { getProfileContributionsByUserUseCase } from "@/src/contributions/application/get-profile-contributions-by-user.usecase"
 import { getApprovedByEntityUseCase } from "@/src/contributions/application/get-approved-by-entity.usecase"
 import { getFictionContributorsUseCase } from "@/src/contributions/application/get-fiction-contributors.usecase"
 import { getContributorsFirstContributionByEntityUseCase } from "@/src/contributions/application/get-contributors-first-contribution-by-entity.usecase"
@@ -26,6 +27,7 @@ import type {
   FictionContributionFeedItem,
   FictionContributorRankedProfile,
   PlaceContributionFeedItem,
+  ProfileContributionItem,
   StaffContributionsFeedKind,
   StaffCreateContributionFeedItem,
   StaffCreateContributionsFeedPageResult,
@@ -33,7 +35,10 @@ import type {
   StaffFictionContributionsFeedStatusTab,
   TopContributorProfile,
 } from "@/src/contributions/domain/contribution.entity"
-import { createContributionsSupabaseAdapter } from "@/src/contributions/infrastructure/supabase/contribution.repository.impl"
+import {
+  createContributionsSupabaseAdapter,
+  supabaseRepositoryAdapter as contributionsCookieRepo,
+} from "@/src/contributions/infrastructure/supabase/contribution.repository.impl"
 import { createUsersSupabaseAdapter } from "@/src/users/infrastructure/supabase/user.repository.impl"
 import { getIsUserStaff } from "@/src/users/infrastructure/next/user.queries"
 import { CacheKeys } from "@/src/shared/infrastructure/next/cache.keys"
@@ -67,6 +72,40 @@ export function getContributionsByUserCached(userId: string) {
     { ...CacheConfig.medium, tags: ["contributions", `contributions-user-${userId}`] },
   )()
 }
+
+/**
+ * Current user's contributions for the profile page (with entity labels).
+ * Request-scoped. Uses module-level repo singletons only — never construct a
+ * fresh `createContributionsSupabaseAdapter()` per call (React `cache()` inside
+ * the factory must stay stable at module scope).
+ */
+export const getCurrentUserContributions = cache(async (): Promise<ProfileContributionItem[]> => {
+  const userId = await getSessionUserId()
+  if (!userId) return []
+  return getProfileContributionsForViewer(userId)
+})
+
+/**
+ * Contributions visible to the current session for a profile page.
+ * Own profile: all statuses (cookie RLS). Other users: approved only (public SELECT).
+ */
+export const getProfileContributionsForViewer = cache(
+  async (profileUserId: string): Promise<ProfileContributionItem[]> => {
+    const sessionUserId = await getSessionUserId()
+    if (!sessionUserId) return []
+
+    if (sessionUserId === profileUserId) {
+      const ownRows = await getProfileContributionsByUserUseCase(
+        profileUserId,
+        contributionsCookieRepo,
+      )
+      if (ownRows.length > 0) return ownRows
+      return getProfileContributionsByUserUseCase(profileUserId, anonRepo)
+    }
+
+    return getProfileContributionsByUserUseCase(profileUserId, anonRepo)
+  },
+)
 
 export function getContributionByIdCached(id: string) {
   return unstable_cache(

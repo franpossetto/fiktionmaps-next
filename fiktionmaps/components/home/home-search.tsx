@@ -45,6 +45,8 @@ interface HomeSearchProps {
   fictions: FictionWithMedia[]
   placeCounts: Record<string, number>
   cityIdsWithPlaces: string[]
+  /** fictionId → city slug with places (for map-mode deep links). */
+  fictionMapCitySlugs: Record<string, string>
   locale: string
 }
 
@@ -52,7 +54,14 @@ const NO_PLACES_SUGGESTIONS = 3
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, locale }: HomeSearchProps) {
+export function HomeSearch({
+  cities,
+  fictions,
+  placeCounts,
+  cityIdsWithPlaces,
+  fictionMapCitySlugs,
+  locale,
+}: HomeSearchProps) {
   const router = useRouter()
   const t = useTranslations("Home")
   const tFictions = useTranslations("Fictions")
@@ -160,13 +169,19 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
   }
 
   function hrefForFiction(fiction: FictionWithMedia): string {
-    if (mode === "map") return `/map?fiction=${fiction.id}`
+    if (mode === "map") {
+      const citySlug = fictionMapCitySlugs[fiction.id]
+      if (citySlug) {
+        return `/map?fiction=${encodeURIComponent(fiction.id)}&city=${encodeURIComponent(citySlug)}`
+      }
+      return `/map?fiction=${encodeURIComponent(fiction.id)}`
+    }
     return `/fictions/${fiction.slug ?? fiction.id}`
   }
 
   function hrefForHit(hit: SearchHit): string {
     if (hit.kind === "city") {
-      return mode === "article" ? `/cities/${hit.city.id}` : `/map?city=${hit.city.id}`
+      return mode === "article" ? `/cities/${hit.city.slug}` : `/map?city=${hit.city.slug}`
     }
     return hrefForFiction(hit.fiction)
   }
@@ -257,7 +272,7 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
       if (mode === "map") {
         if (rouletteCityPool.length === 0) return
         const pick = rouletteCityPool[Math.floor(Math.random() * rouletteCityPool.length)]
-        navigate(`/map?city=${encodeURIComponent(pick.id)}`)
+        navigate(`/map?city=${encodeURIComponent(pick.slug)}`)
         return
       }
 
@@ -555,7 +570,7 @@ export function HomeSearch({ cities, fictions, placeCounts, cityIdsWithPlaces, l
                 <button
                   key={city.id}
                   type="button"
-                  onClick={() => { setNoPlacesModal(null); navigate(`/map?city=${city.id}`) }}
+                  onClick={() => { setNoPlacesModal(null); navigate(`/map?city=${city.slug}`) }}
                   className="flex items-center gap-3 rounded-xl border border-border/60 bg-background px-3 py-2.5 text-left transition-colors hover:bg-accent"
                 >
                   <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />

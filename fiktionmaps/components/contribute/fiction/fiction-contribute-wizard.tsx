@@ -1,13 +1,14 @@
 "use client"
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
-import Image from "next/image"
 import { useLocale, useTranslations } from "next-intl"
 import { useRouter, Link } from "@/i18n/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import { Check, ImagePlus, Loader2, X } from "lucide-react"
 import { z } from "zod"
 import { cn } from "@/lib/utils"
+import { ImageFocusPicker } from "@/components/ui/image-focus-picker"
+import { DEFAULT_IMAGE_FOCUS } from "@/lib/asset-images/image-focus"
 import { FICTION_GENRES } from "@/lib/constants/fiction-genres"
 import { FICTION_LANGUAGE_CODES, FICTION_LANGUAGE_LABELS } from "@/lib/constants/fiction-languages"
 import type { InterestCatalogItem } from "@/src/interests"
@@ -245,6 +246,8 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
   const [coverInspecting, setCoverInspecting] = useState(false)
   const [bannerImageDims, setBannerImageDims] = useState<{ width: number; height: number } | null>(null)
   const [bannerInspecting, setBannerInspecting] = useState(false)
+  const [coverFocus, setCoverFocus] = useState(DEFAULT_IMAGE_FOCUS)
+  const [bannerFocus, setBannerFocus] = useState(DEFAULT_IMAGE_FOCUS)
 
   const coverCriterionChecks = useMemo((): readonly [boolean, boolean, boolean, boolean] | undefined => {
     if (step !== 2) return undefined
@@ -282,6 +285,7 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
     setCoverInspecting(false)
     setIdentity((s) => ({ ...s, coverFile: null }))
     setCoverImageDims(null)
+    setCoverFocus(DEFAULT_IMAGE_FOCUS)
     setStep1Errors((prev) => {
       const next = { ...prev }
       delete next.coverFile
@@ -294,6 +298,7 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
     setBannerInspecting(false)
     setIdentity((s) => ({ ...s, bannerFile: undefined }))
     setBannerImageDims(null)
+    setBannerFocus(DEFAULT_IMAGE_FOCUS)
     setStep1Errors((prev) => {
       const next = { ...prev }
       delete next.bannerFile
@@ -802,9 +807,15 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
     fd.set("slug", slug)
     fd.set("originalLanguage", identity.originalLanguage.trim())
     fd.set("contentLanguage", identity.contentLanguage.trim())
-    if (identity.coverFile) fd.set("coverFile", identity.coverFile)
+    if (identity.coverFile) {
+      fd.set("coverFile", identity.coverFile)
+      fd.set("coverFocusX", String(coverFocus.x))
+      fd.set("coverFocusY", String(coverFocus.y))
+    }
     if (identity.bannerFile instanceof File && identity.bannerFile.size > 0) {
       fd.set("bannerFile", identity.bannerFile)
+      fd.set("bannerFocusX", String(bannerFocus.x))
+      fd.set("bannerFocusY", String(bannerFocus.y))
     }
 
     const createRes = await createContributorFictionWithImagesAction(fd)
@@ -1355,37 +1366,34 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
                     <ContributeFieldWrapper label={tf("fieldCover")} required>
                       <div className="mx-auto flex w-full max-w-[336px] flex-col items-center">
                         {coverPreviewUrl ? (
-                          <div className="relative aspect-[2/3] w-full max-w-[336px] overflow-hidden rounded-xl border border-border bg-muted/30">
-                            <Image
+                          <div className="w-full max-w-[336px] space-y-2">
+                            <ImageFocusPicker
                               src={coverPreviewUrl}
                               alt={tf("coverPreviewAlt")}
-                              fill
-                              className="object-cover pointer-events-none select-none"
-                              unoptimized
-                            />
-                            <button
-                              type="button"
+                              aspectRatio="2 / 3"
+                              focus={coverFocus}
+                              onFocusChange={setCoverFocus}
                               disabled={coverInspecting}
-                              onClick={() => coverInputRef.current?.click()}
-                              className="absolute inset-0 z-[1] rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              aria-label={tf("change")}
                             />
-                            <span className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] bg-gradient-to-t from-black/55 via-black/15 to-transparent px-2 pb-2 pt-12 text-center">
-                              <span className="text-xs font-medium text-white drop-shadow-sm">{tf("change")}</span>
-                            </span>
-                            <button
-                              type="button"
-                              disabled={coverInspecting}
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                clearContributedCover()
-                              }}
-                              className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-destructive/15 hover:text-destructive focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                              aria-label={tf("removeCoverAria")}
-                            >
-                              <X className="h-4 w-4 shrink-0" strokeWidth={2.25} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                disabled={coverInspecting}
+                                onClick={() => coverInputRef.current?.click()}
+                                className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium"
+                              >
+                                {tf("change")}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={coverInspecting}
+                                onClick={clearContributedCover}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border"
+                                aria-label={tf("removeCoverAria")}
+                              >
+                                <X className="h-4 w-4" strokeWidth={2.25} />
+                              </button>
+                            </div>
                           </div>
                         ) : (
                           <button
@@ -1490,37 +1498,34 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
                     <ContributeFieldWrapper label={tf("fieldBanner")}>
                       <div className="mx-auto flex w-full max-w-xl flex-col items-center">
                         {bannerPreviewUrl ? (
-                          <div className="relative aspect-video w-full max-w-xl overflow-hidden rounded-xl border border-border bg-muted/30">
-                            <Image
+                          <div className="w-full max-w-xl space-y-2">
+                            <ImageFocusPicker
                               src={bannerPreviewUrl}
                               alt={tf("bannerPreviewAlt")}
-                              fill
-                              className="object-cover pointer-events-none select-none"
-                              unoptimized
-                            />
-                            <button
-                              type="button"
+                              aspectRatio="21 / 9"
+                              focus={bannerFocus}
+                              onFocusChange={setBannerFocus}
                               disabled={bannerInspecting}
-                              onClick={() => bannerInputRef.current?.click()}
-                              className="absolute inset-0 z-[1] rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              aria-label={tf("change")}
                             />
-                            <span className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] bg-gradient-to-t from-black/55 via-black/15 to-transparent px-2 pb-2 pt-12 text-center">
-                              <span className="text-xs font-medium text-white drop-shadow-sm">{tf("change")}</span>
-                            </span>
-                            <button
-                              type="button"
-                              disabled={bannerInspecting}
-                              onClick={(ev) => {
-                                ev.preventDefault()
-                                ev.stopPropagation()
-                                clearContributedBanner()
-                              }}
-                              className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background/95 text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-destructive/15 hover:text-destructive focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                              aria-label={tf("removeBannerAria")}
-                            >
-                              <X className="h-4 w-4 shrink-0" strokeWidth={2.25} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                disabled={bannerInspecting}
+                                onClick={() => bannerInputRef.current?.click()}
+                                className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium"
+                              >
+                                {tf("change")}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={bannerInspecting}
+                                onClick={clearContributedBanner}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border"
+                                aria-label={tf("removeBannerAria")}
+                              >
+                                <X className="h-4 w-4" strokeWidth={2.25} />
+                              </button>
+                            </div>
                           </div>
                         ) : (
                           <button

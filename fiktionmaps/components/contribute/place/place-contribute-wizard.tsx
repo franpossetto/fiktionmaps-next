@@ -157,7 +157,10 @@ export function PlaceContributeWizard({
     variant: "pending" | "approved"
     placeId: string
     placeSlug: string
+    fictionId: string
     fictionSlug: string
+    citySlug: string
+    cityHasPublicPlaces: boolean
     placeName: string
     imageUrl: string | null
   } | null>(null)
@@ -175,6 +178,7 @@ export function PlaceContributeWizard({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [photoInspecting, setPhotoInspecting] = useState(false)
   const [photoImageDims, setPhotoImageDims] = useState<{ width: number; height: number } | null>(null)
+  const [photoFocus, setPhotoFocus] = useState({ x: 50, y: 50 })
   const mapControlRef = useRef<MapControlHandle | null>(null)
 
   useEffect(() => {
@@ -242,6 +246,7 @@ export function PlaceContributeWizard({
   const clearPhoto = useCallback(() => {
     setDraft((p) => ({ ...p, imageFile: null }))
     setPhotoImageDims(null)
+    setPhotoFocus({ x: 50, y: 50 })
     setErrors((prev) => {
       const next = { ...prev }
       delete next.image
@@ -322,7 +327,11 @@ export function PlaceContributeWizard({
       fd.set("isLandmark", String(draft.isLandmark))
       fd.set("locationType", draft.locationType)
       if (draft.shootEnvironment) fd.set("shootEnvironment", draft.shootEnvironment)
-      if (draft.imageFile) fd.set("imageFile", draft.imageFile)
+      if (draft.imageFile) {
+        fd.set("imageFile", draft.imageFile)
+        fd.set("focusX", String(photoFocus.x))
+        fd.set("focusY", String(photoFocus.y))
+      }
       if (draft.streetViewReference) {
         fd.set("streetViewReference", JSON.stringify(draft.streetViewReference))
       }
@@ -341,7 +350,10 @@ export function PlaceContributeWizard({
         variant: res.contributionAutoApproved ? "approved" : "pending",
         placeId: res.placeId,
         placeSlug: res.placeSlug,
+        fictionId: res.fictionId,
         fictionSlug: res.fictionSlug,
+        citySlug: res.citySlug,
+        cityHasPublicPlaces: res.cityHasPublicPlaces,
         placeName: draft.placeName.trim(),
         imageUrl: imagePreviewForDone,
       })
@@ -368,8 +380,28 @@ export function PlaceContributeWizard({
   }, [draft.cityId, initialCities, validateStep])
 
   if (done) {
-    const returnHref = huntPrefill ? `/contribute/hunt/${huntPrefill.huntId}/review` : "/map"
+    const huntReturnHref = huntPrefill ? `/contribute/hunt/${huntPrefill.huntId}/review` : null
     const returnLabel = huntPrefill ? tHunt("postulateBackToHunt") : t("backToMap")
+
+    let returnHref: string | null = huntReturnHref
+    let returnDisabled = false
+    if (!huntPrefill) {
+      const citySlug = done.citySlug.trim()
+      if (done.variant === "approved") {
+        // Live place: open map on that city filtered to the fiction.
+        returnHref = citySlug
+          ? `/map?city=${encodeURIComponent(citySlug)}&fiction=${encodeURIComponent(done.fictionId)}`
+          : `/map?fiction=${encodeURIComponent(done.fictionId)}`
+      } else if (citySlug && done.cityHasPublicPlaces) {
+        // Pending place, but city already exists on the public map.
+        returnHref = `/map?city=${encodeURIComponent(citySlug)}`
+      } else {
+        // Pending and city not yet on the map (no approved places).
+        returnHref = null
+        returnDisabled = true
+      }
+    }
+
     return (
       <FictionContributeLayout leftAside={null} rightAside={null} mainColumnScroll>
         <div className="flex min-h-full items-center justify-center px-4 py-10">
@@ -380,6 +412,7 @@ export function PlaceContributeWizard({
             placeHref={`/fictions/${done.fictionSlug}/places/${done.placeSlug}`}
             returnHref={returnHref}
             returnLabel={returnLabel}
+            returnDisabled={returnDisabled}
           />
         </div>
       </FictionContributeLayout>
@@ -667,6 +700,8 @@ export function PlaceContributeWizard({
                     inspecting={photoInspecting}
                     onPickFile={(file) => void handlePhotoFile(file)}
                     onClear={clearPhoto}
+                    focus={photoFocus}
+                    onFocusChange={setPhotoFocus}
                   />
                 </ContributeFieldWrapper>
                 <p className="text-center text-xs text-muted-foreground sm:text-sm">{t("photoAspectHint")}</p>

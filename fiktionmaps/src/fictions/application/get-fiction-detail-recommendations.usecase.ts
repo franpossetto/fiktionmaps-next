@@ -70,8 +70,10 @@ export async function getFictionDetailRecommendationsUseCase(
     if (cityIds.length === 0) return []
 
     const idSet = new Set<string>()
-    for (const cityId of cityIds) {
-      const ids = await deps.placesRepo.getFictionIdsByCityId(cityId)
+    const perCity = await Promise.all(
+      cityIds.map((cityId) => deps.placesRepo.getFictionIdsByCityId(cityId)),
+    )
+    for (const ids of perCity) {
       for (const id of ids) {
         if (id && id !== fictionId) idSet.add(id)
       }

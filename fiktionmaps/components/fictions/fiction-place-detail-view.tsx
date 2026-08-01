@@ -2,10 +2,9 @@
 
 import dynamic from "next/dynamic"
 import Image from "next/image"
-import { useState } from "react"
-import { ChevronRight, Compass, Heart } from "lucide-react"
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react"
+import { Compass } from "lucide-react"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
-import { cn } from "@/lib/utils"
 import { Link } from "@/i18n/navigation"
 import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
@@ -16,10 +15,12 @@ import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import type { ContributorProfileWithDate } from "@/src/contributions/domain/contribution.entity"
-import { ScenePreviewThumb } from "@/components/scenes/scene-preview-thumb"
+import { FictionDetailSectionHeading } from "@/components/fictions/fiction-detail-section-heading"
 import { PlaceContributorsByline } from "@/components/fictions/place-contributors-byline"
 import { PlaceShootEnvironmentBadge } from "@/components/places/place-shoot-environment-badge"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
+import { cn } from "@/lib/utils"
+import { ScenePreviewThumb } from "@/components/scenes/scene-preview-thumb"
 import { publicFictionScenePath } from "@/lib/fictions/public-fiction-paths"
 
 const FictionPlaceDirectionsMap = dynamic(
@@ -38,6 +39,39 @@ const FictionPlaceDirectionsMap = dynamic(
   },
 )
 
+function MapSkeleton() {
+  return (
+    <div
+      className="h-[min(58vw,420px)] min-h-[280px] w-full animate-pulse rounded-xl border border-border/60 bg-muted/40 sm:min-h-[320px] sm:h-[400px]"
+      aria-hidden
+    />
+  )
+}
+
+/** Load Mapbox only when the directions block nears the viewport. */
+function LazyFictionPlaceDirectionsMap(props: ComponentProps<typeof FictionPlaceDirectionsMap>) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el || visible) return
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setVisible(true)
+          io.disconnect()
+        }
+      },
+      { rootMargin: "240px 0px" },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [visible])
+
+  return <div ref={ref}>{visible ? <FictionPlaceDirectionsMap {...props} /> : <MapSkeleton />}</div>
+}
+
 function hasValidPlaceCoordinates(lat: number, lng: number): boolean {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false
   if (lat === 0 && lng === 0) return false
@@ -52,44 +86,19 @@ function googleMapsHref(coordsOk: boolean, lat: number, lng: number, addressQuer
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressQuery)}`
 }
 
-function PlaceDetailLikeCluster() {
-  const t = useTranslations("Fictions")
-  const [liked, setLiked] = useState(false)
-  const [likeCount, setLikeCount] = useState(0)
-
-  function toggle() {
-    const next = !liked
-    setLiked(next)
-    setLikeCount((c) => (next ? c + 1 : Math.max(0, c - 1)))
-  }
-
-  return (
-    <div className="flex shrink-0 items-center gap-1.5">
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        className="h-8 gap-1 px-2 text-muted-foreground hover:text-foreground"
-        aria-label={liked ? t("unlikePlace") : t("likePlace")}
-        aria-pressed={liked}
-        onClick={toggle}
-      >
-        <Heart className={`h-4 w-4 shrink-0 ${liked ? "text-rose-500" : ""}`} fill={liked ? "currentColor" : "none"} />
-        <span className="min-w-[1ch] text-xs font-medium tabular-nums text-foreground">{likeCount}</span>
-      </Button>
-    </div>
-  )
-}
-
 export interface FictionPlaceDetailViewProps {
   fiction: FictionWithMedia
   /** Slug segment for `/fictions/...` paths. */
   fictionPathSlug: string
   place: Place
   city: City | undefined
-  scenes: Scene[]
   exploreMapHref: string
-  placeContributors: ContributorProfileWithDate[]
+  /** Sync props for preview / contribute; prefer Suspense slots on public page. */
+  scenes?: Scene[]
+  placeContributors?: ContributorProfileWithDate[]
+  /** Deferred RSC slots (public place page). */
+  contributorsSlot?: ReactNode
+  scenesSlot?: ReactNode
   /** Contribute wizard: same layout, no navigation away from the flow. */
   previewMode?: boolean
 }
@@ -99,9 +108,11 @@ export function FictionPlaceDetailView({
   fictionPathSlug,
   place,
   city,
-  scenes,
   exploreMapHref,
-  placeContributors,
+  scenes = [],
+  placeContributors = [],
+  contributorsSlot,
+  scenesSlot,
   previewMode = false,
 }: FictionPlaceDetailViewProps) {
   const t = useTranslations("Fictions")
@@ -126,6 +137,64 @@ export function FictionPlaceDetailView({
     ""
 
   const showDirectionsSection = coordsOk || Boolean(addressLine)
+
+  const contributorsNode =
+    contributorsSlot ??
+    (placeContributors.length > 0 ? (
+      <PlaceContributorsByline contributors={placeContributors} className="max-w-full" />
+    ) : null)
+
+  const scenesNode =
+    scenesSlot ??
+    (
+      <section className="space-y-5">
+        <FictionDetailSectionHeading
+          title={t("placeDetailScenesHeading")}
+          count={scenes.length}
+        />
+
+        {scenes.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("placeDetailNoScenes")}</p>
+        ) : (
+          <ol className="divide-y divide-border/60 rounded-xl border border-border/40 bg-card/30">
+            {scenes.map((scene, index) => {
+              const timeLabel = scene.timestamp?.trim() || ""
+              return (
+                <li key={scene.id} className="px-4 py-4 sm:px-5 sm:py-5">
+                  <Link
+                    href={publicFictionScenePath(fictionPathSlug, scene.id)}
+                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-4 rounded-lg outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <p className="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground">
+                      {index + 1}
+                    </p>
+                    <ScenePreviewThumb scene={scene} className="h-16 w-20 sm:h-18 sm:w-24" sizes="96px" />
+                    <div className="min-w-0 flex-1">
+                      {timeLabel ? (
+                        <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                          {timeLabel}
+                        </p>
+                      ) : null}
+                      <p
+                        className={cn(
+                          "text-base font-semibold leading-snug text-foreground sm:text-lg",
+                          timeLabel ? "mt-1" : "",
+                        )}
+                      >
+                        {scene.title}
+                      </p>
+                      {scene.description ? (
+                        <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{scene.description}</p>
+                      ) : null}
+                    </div>
+                  </Link>
+                </li>
+              )
+            })}
+          </ol>
+        )}
+      </section>
+    )
 
   return (
     <main
@@ -212,50 +281,44 @@ export function FictionPlaceDetailView({
               ) : null}
             </header>
 
-            <div className="border-b border-border/60 py-3">
-              <div className="flex items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <PlaceContributorsByline contributors={placeContributors} className="max-w-full" />
+            {contributorsNode ? (
+              <div className="border-b border-border/60 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">{contributorsNode}</div>
                 </div>
-                <PlaceDetailLikeCluster />
               </div>
-            </div>
+            ) : null}
           </div>
 
           {showDirectionsSection ? (
             <section className="space-y-4 border-b border-border/60 pb-10" aria-labelledby="place-directions-heading">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <span className="h-7 w-1 shrink-0 rounded-full bg-yellow-500" aria-hidden />
-                  <h2
-                    id="place-directions-heading"
-                    className="text-3xl font-semibold tracking-tight text-foreground"
-                  >
-                    {t("placeDetailDirectionsHeading")}
-                  </h2>
-                </div>
-                {previewMode ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled
-                    className="pointer-events-none h-9 shrink-0 border-border bg-background px-3 text-sm opacity-80 shadow-none"
-                  >
-                    <Compass className="h-4 w-4" />
-                    <span>{t("placeDetailGoToMap")}</span>
-                  </Button>
-                ) : (
-                  <Button asChild size="sm" variant="outline" className="h-9 shrink-0 border-border bg-background px-3 text-sm shadow-none">
-                    <Link href={exploreMapHref}>
+              <FictionDetailSectionHeading
+                id="place-directions-heading"
+                title={t("placeDetailDirectionsHeading")}
+                trailing={
+                  previewMode ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled
+                      className="pointer-events-none h-9 shrink-0 border-border bg-background px-3 text-sm opacity-80 shadow-none"
+                    >
                       <Compass className="h-4 w-4" />
                       <span>{t("placeDetailGoToMap")}</span>
-                    </Link>
-                  </Button>
-                )}
-              </div>
+                    </Button>
+                  ) : (
+                    <Button asChild size="sm" variant="outline" className="h-9 shrink-0 border-border bg-background px-3 text-sm shadow-none">
+                      <Link href={exploreMapHref}>
+                        <Compass className="h-4 w-4" />
+                        <span>{t("placeDetailGoToMap")}</span>
+                      </Link>
+                    </Button>
+                  )
+                }
+              />
               {coordsOk ? (
-                <FictionPlaceDirectionsMap
+                <LazyFictionPlaceDirectionsMap
                   mapInstanceId={`fiction-place-directions-${place.id}`}
                   center={{ lat: geo.lat, lng: geo.lng }}
                   placeName={displayName}
@@ -288,55 +351,7 @@ export function FictionPlaceDetailView({
             </section>
           ) : null}
 
-          <section className="space-y-5">
-            <div>
-              <div className="flex items-center gap-3">
-                <span className="h-7 w-1 rounded-full bg-yellow-500" aria-hidden />
-                <h2 className="text-3xl font-semibold tracking-tight text-foreground">{t("placeDetailScenesHeading")}</h2>
-                <span className="text-base font-medium text-muted-foreground">{scenes.length}</span>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
-              </div>
-            </div>
-
-            {scenes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("placeDetailNoScenes")}</p>
-            ) : (
-              <ol className="divide-y divide-border/60 rounded-xl border border-border/40 bg-card/30">
-                {scenes.map((scene, index) => {
-                  const timeLabel = scene.timestamp?.trim() || ""
-                  return (
-                    <li key={scene.id} className="px-4 py-4 sm:px-5 sm:py-5">
-                      <Link
-                        href={publicFictionScenePath(fictionPathSlug, scene.id)}
-                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-4 rounded-lg outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        <p className="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground">
-                          {index + 1}
-                        </p>
-                        <ScenePreviewThumb scene={scene} className="h-16 w-20 sm:h-18 sm:w-24" sizes="96px" />
-                        <div className="min-w-0 flex-1">
-                          {timeLabel ? (
-                            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{timeLabel}</p>
-                          ) : null}
-                          <p
-                            className={cn(
-                              "text-base font-semibold leading-snug text-foreground sm:text-lg",
-                              timeLabel ? "mt-1" : "",
-                            )}
-                          >
-                            {scene.title}
-                          </p>
-                          {scene.description ? (
-                            <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{scene.description}</p>
-                          ) : null}
-                        </div>
-                      </Link>
-                    </li>
-                  )
-                })}
-              </ol>
-            )}
-          </section>
+          {scenesNode}
         </article>
       </div>
     </main>

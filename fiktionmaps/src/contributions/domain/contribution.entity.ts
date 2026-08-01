@@ -19,6 +19,8 @@ export interface ContributionPendingImage {
   role: ContributionPendingImageRole
   variant: ContributionPendingImageVariant
   storagePath: string
+  focusX: number
+  focusY: number
   createdAt: string
 }
 
@@ -74,6 +76,14 @@ export interface Contribution {
   fppAwarded: number | null
   createdAt: string
   updatedAt: string
+}
+
+/** Profile contributions list row: contribution + resolved entity name. */
+export interface ProfileContributionItem extends Contribution {
+  /** Fiction title / place name / scene title for `entityId`. */
+  entityLabel: string | null
+  /** Parent fiction title when the entity is a place or scene. */
+  parentLabel: string | null
 }
 
 /** Profile snapshot for listing fiction collaborators (approved contributions on the fiction entity). */
@@ -144,8 +154,8 @@ export interface ContributorModerationContext {
 /** Staff fiction create feed tab — matches UI `ContributionsFeedTab`. */
 export type StaffFictionContributionsFeedStatusTab = "all" | "pending" | "approved" | "rejected"
 
-/** Staff `/contributions` feed filter for create_fiction vs create_place. */
-export type StaffContributionsFeedKind = "fiction" | "place" | "all"
+/** Staff `/contributions` feed filter for create_fiction vs create_place vs add_scene. */
+export type StaffContributionsFeedKind = "fiction" | "place" | "scene" | "all"
 
 export type StaffFictionContributionsFeedPageInput = {
   userIdFilter?: string
@@ -169,6 +179,24 @@ export interface PlaceContributionFeedItem extends Contribution {
   pendingImagesByRole: ContributionPendingImagesByRole | null
 }
 
+/** Staff feed row: an add_scene / add_place_to_scene contribution plus scene snapshots. */
+export interface SceneContributionFeedItem extends Contribution {
+  contributor: FictionContributorProfile
+  sceneTitle: string | null
+  sceneVideoUrl: string | null
+  /** Low-res preview MP4 when available; feed thumbs should prefer this over `sceneVideoUrl`. */
+  scenePreviewUrl: string | null
+  fictionId: string | null
+  fictionTitle: string | null
+  placeNames: string[]
+  /** Proposed place(s) for `add_place_to_scene` (staging; one contribution = one place). */
+  proposedPlaces: Array<{
+    placeId: string
+    name: string | null
+    avatarUrl: string | null
+  }>
+}
+
 export type StaffCreateContributionsFeedPageInput = {
   kind: StaffContributionsFeedKind
   userIdFilter?: string
@@ -177,7 +205,10 @@ export type StaffCreateContributionsFeedPageInput = {
   offset: number
 }
 
-export type StaffCreateContributionFeedItem = FictionContributionFeedItem | PlaceContributionFeedItem
+export type StaffCreateContributionFeedItem =
+  | FictionContributionFeedItem
+  | PlaceContributionFeedItem
+  | SceneContributionFeedItem
 
 export type StaffCreateContributionsFeedPageResult = {
   items: StaffCreateContributionFeedItem[]
@@ -206,4 +237,17 @@ export function isFictionContributionFeedItem(
 
 export function isFictionCreateContributionFeedItem(item: FictionContributionFeedItem): boolean {
   return item.type === "create_fiction"
+}
+
+export function isSceneContributionFeedItem(
+  item: StaffCreateContributionFeedItem,
+): item is SceneContributionFeedItem {
+  return (
+    item.entityType === "scene" &&
+    (item.type === "add_scene" || item.type === "add_place_to_scene")
+  )
+}
+
+export function isAddPlaceToSceneContribution(item: Contribution): boolean {
+  return item.entityType === "scene" && item.type === "add_place_to_scene"
 }

@@ -17,6 +17,7 @@ function toFormState(c: City) {
   return {
     name: c.name,
     country: c.country,
+    slug: c.slug,
     lat: String(c.lat),
     lng: String(c.lng),
     zoom: String(c.zoom),
@@ -41,6 +42,10 @@ export function CityEditView({ initialCity }: CityEditViewProps) {
     const newErrors: Record<string, string> = {}
     if (!formData.name.trim()) newErrors.name = "Name is required"
     if (!formData.country.trim()) newErrors.country = "Country is required"
+    if (!formData.slug.trim()) newErrors.slug = "Slug is required"
+    else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(formData.slug.trim())) {
+      newErrors.slug = "Use lowercase letters, numbers, and hyphens only"
+    }
     const lat = parseFloat(formData.lat)
     const lng = parseFloat(formData.lng)
     const zoom = parseInt(formData.zoom, 10)
@@ -58,6 +63,7 @@ export function CityEditView({ initialCity }: CityEditViewProps) {
     const fd = new FormData()
     fd.set("name", formData.name.trim())
     fd.set("country", formData.country.trim())
+    fd.set("slug", formData.slug.trim())
     fd.set("lat", formData.lat)
     fd.set("lng", formData.lng)
     fd.set("zoom", formData.zoom)
@@ -100,21 +106,38 @@ export function CityEditView({ initialCity }: CityEditViewProps) {
           </p>
         </div>
 
-        {/* Image URL field */}
-        <div className="px-4 sm:px-6 pb-4">
-          <label className="block text-sm font-medium text-foreground mb-1">
-            City photo URL
-          </label>
-          <input
-            type="url"
-            value={formData.image_url}
-            onChange={(e) => setFormData((p) => ({ ...p, image_url: e.target.value }))}
-            placeholder="https://images.unsplash.com/…"
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <p className="mt-1 text-xs text-muted-foreground">
-            Used as the hero image on the public city page. Paste any direct image URL.
-          </p>
+        <div className="px-4 sm:px-6 pb-4 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              Public slug
+            </label>
+            <input
+              type="text"
+              value={formData.slug}
+              onChange={(e) => setFormData((p) => ({ ...p, slug: e.target.value }))}
+              placeholder="paris-france"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              URL: /cities/{formData.slug || "…"}. Changing the name does not rewrite this slug.
+            </p>
+            {errors.slug && <p className="mt-1 text-xs text-destructive">{errors.slug}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              City photo URL
+            </label>
+            <input
+              type="url"
+              value={formData.image_url}
+              onChange={(e) => setFormData((p) => ({ ...p, image_url: e.target.value }))}
+              placeholder="https://images.unsplash.com/…"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Used as the hero image on the public city page. Paste any direct image URL.
+            </p>
+          </div>
         </div>
 
         {/* Full-width map */}

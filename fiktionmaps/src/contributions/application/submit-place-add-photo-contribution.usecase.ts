@@ -10,6 +10,7 @@ export type SubmitPlaceAddPhotoContributionInput = {
   placeId: string
   imageFile: File
   autoApprove: boolean
+  focus?: { x: number; y: number }
 }
 
 export type SubmitPlaceAddPhotoContributionResult =
@@ -62,6 +63,7 @@ export async function submitPlaceAddPhotoContributionUseCase(
     contributionId: created.contributionId,
     role: PLACE_PHOTO_ASSET_ROLE,
     paths: { xs: xsPath, sm: smPath, lg: lgPath },
+    focus: input.focus,
   })
   if (!linked) {
     return { success: false, error: "Failed to save pending photo" }

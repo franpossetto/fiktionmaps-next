@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useTranslations } from "next-intl"
 import { useAuth } from "@/context/auth-context"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -23,14 +23,18 @@ export function UserMenu() {
   const { user, isAdmin, isStaffModerator, isContributor, logout } = useAuth()
   const [authOpen, setAuthOpen] = useState(false)
   const [huntAvailable, setHuntAvailable] = useState(false)
+  const [huntChecked, setHuntChecked] = useState(false)
 
   useEffect(() => {
-    if (!user || !isContributor) {
-      setHuntAvailable(false)
-      return
-    }
+    setHuntAvailable(false)
+    setHuntChecked(false)
+  }, [user?.id, isContributor])
+
+  const loadHuntAvailability = useCallback(() => {
+    if (!user || !isContributor || huntChecked) return
+    setHuntChecked(true)
     void isHuntAvailableAction().then(setHuntAvailable)
-  }, [user, isContributor])
+  }, [user, isContributor, huntChecked])
 
   if (!user) {
     return (
@@ -66,7 +70,11 @@ export function UserMenu() {
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (open) loadHuntAvailability()
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <button
           className="flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 hover:bg-chrome-hover mx-auto overflow-hidden"

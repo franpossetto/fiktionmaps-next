@@ -1,7 +1,6 @@
 "use client"
 
 import {
-  startTransition,
   useEffect,
   useState,
   useCallback,
@@ -28,11 +27,20 @@ import {
   useMapMarkerHoverScaleMode,
   useMapMarkerLabelMode,
 } from "@/lib/theme-settings-context"
-import { ensureXsOnce } from "@/lib/asset-images/ensure-xs-client"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { City } from "@/src/cities/domain/city.entity"
+import type { MapCluster } from "@/src/places/domain/map-cluster.entity"
+import {
+  MAP_MODE_CITY,
+  MAP_MODE_WORLD,
+  WORLD_MAX_ZOOM,
+  WORLD_MIN_ZOOM,
+  WORLD_Z_ENTER,
+  type MapBrowseMode,
+} from "@/lib/map/world-map"
 import { Map3DToggle } from "./map-3d-toggle"
 import { MAP_3D_TOGGLE_SLOT_ID } from "./map-slots"
+import { WorldAggregateLayer } from "./world-aggregate-layer"
 
 const NavMap = dynamic(
   () => import("./nav-map").then((m) => ({ default: m.NavMap })),
@@ -41,9 +49,37 @@ const NavMap = dynamic(
 
 const FOCUS_ZOOM = 18
 
+export type MapViewport = {
+  bounds: { west: number; south: number; east: number; north: number }
+  zoom: number
+  center: { lat: number; lng: number }
+}
+
 interface MapViewProps {
   city: City
   places: Place[]
+  /** City sandbox (default) vs free-world browse. */
+  mode?: MapBrowseMode
+  /** Server aggregates — only rendered in world mode. */
+  worldClusters?: MapCluster[]
+  /** True while a world cluster fetch is in flight (stale pins may still show). */
+  worldClustersStale?: boolean
+  /** Resolve dominant city labels on world pins. */
+  cityNameById?: Record<string, string>
+  /** Optional camera when entering world / deep link. */
+  initialCamera?: { lat: number; lng: number; zoom: number } | null
+  /** Smooth zoom into city when entering from a world cluster. */
+  animateCityEntry?: boolean
+  onCityEntryAnimationComplete?: () => void
+  /** Smooth fly to world overview (toggle). Off for zoom-out exit. */
+  animateWorldEntry?: boolean
+  /** Called when the world overview fly finishes (or immediately if not animating). */
+  onWorldEntryAnimationComplete?: () => void
+  /** World cluster: city chrome or fiction cover → enter city sandbox. */
+  onWorldClusterEnterCity?: (
+    cluster: MapCluster,
+    opts?: { fictionId?: string; fictionCoverUrl?: string | null; fictionTitle?: string | null },
+  ) => boolean
   onLocationClick: (location: Place) => void
   selectedLocationId?: string | null
   focusLocationId?: string | null
@@ -53,48 +89,139 @@ interface MapViewProps {
   onToggle3D?: (is3D: boolean) => void
   onMapLoaded?: () => void
   onBoundsChange?: (bounds: { west: number; south: number; east: number; north: number }) => void
+  onViewportChange?: (viewport: MapViewport) => void
 }
 
 function CityCameraController({
   city,
   zoom,
+  enabled,
+  animate = false,
+  onAnimateComplete,
 }: {
   city: City
   zoom: number
+  enabled: boolean
+  /** Smooth zoom/pan when entering a city from free-world. */
+  animate?: boolean
+  onAnimateComplete?: () => void
 }) {
   const control = useMapControl()
   const prevCityIdRef = useRef<string | null>(null)
+  const onAnimateCompleteRef = useRef(onAnimateComplete)
+  onAnimateCompleteRef.current = onAnimateComplete
 
   useEffect(() => {
-    if (!control) return
-    if (prevCityIdRef.current === null) {
-      prevCityIdRef.current = city.id
+    if (!enabled) {
+      // Next city entry (e.g. from world) should always be allowed to fly.
+      prevCityIdRef.current = null
       return
     }
-    if (prevCityIdRef.current === city.id) return
+    if (!control) return
+
+    const prev = prevCityIdRef.current
+    const cityChanged = prev !== null && prev !== city.id
+    const fromWorld = prev === null
     prevCityIdRef.current = city.id
 
+    // Initial city sandbox mount: camera already matches defaultCenter.
+    if (!animate && fromWorld) return
+    if (!animate && !cityChanged) return
+
+    // One-shot fly; ignore subsequent effect re-runs for the same animate entry.
+    const duration = animate ? 1100 : 0
     let cancelled = false
     let timeoutId: ReturnType<typeof setTimeout> | undefined
-    const tryJump = (attempt: number) => {
-      if (cancelled) return
-      // duration 0 = instant camera jump; keeps the Mapbox instance alive across cities.
+    let doneId: ReturnType<typeof setTimeout> | undefined
+    let didFly = false
+
+    const tryFly = (attempt: number) => {
+      if (cancelled || didFly) return
       const ok = control.flyTo({
         center: { lat: city.lat, lng: city.lng },
         zoom,
-        duration: 0,
+        duration,
       })
-      if (ok) return
+      if (ok) {
+        didFly = true
+        if (animate) {
+          doneId = setTimeout(() => onAnimateCompleteRef.current?.(), duration + 50)
+        }
+        return
+      }
       if (attempt < 8) {
-        timeoutId = setTimeout(() => tryJump(attempt + 1), 50)
+        timeoutId = setTimeout(() => tryFly(attempt + 1), 50)
       }
     }
-    tryJump(0)
+    tryFly(0)
     return () => {
       cancelled = true
       if (timeoutId !== undefined) clearTimeout(timeoutId)
+      if (doneId !== undefined) clearTimeout(doneId)
     }
-  }, [city.id, city.lat, city.lng, zoom, control])
+    // Intentionally omit `animate` flipping false from re-triggering a second fly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city.id, city.lat, city.lng, zoom, control, enabled, animate === true])
+
+  return null
+}
+
+/** Fly out to globe overview when entering free-world mode. */
+function WorldCameraController({
+  enabled,
+  camera,
+  animate = false,
+  onAnimateComplete,
+}: {
+  enabled: boolean
+  camera: { lat: number; lng: number; zoom: number } | null
+  /** Smooth overview fly (toggle). Zoom-out exit stays put — no redundant fly. */
+  animate?: boolean
+  onAnimateComplete?: () => void
+}) {
+  const control = useMapControl()
+  const prevEnabledRef = useRef(false)
+  const onAnimateCompleteRef = useRef(onAnimateComplete)
+  onAnimateCompleteRef.current = onAnimateComplete
+
+  useEffect(() => {
+    const wasEnabled = prevEnabledRef.current
+    prevEnabledRef.current = enabled
+    if (!enabled || !control || !camera) return
+    if (wasEnabled) return
+    if (!animate) {
+      onAnimateCompleteRef.current?.()
+      return
+    }
+
+    const duration = 1100
+    let cancelled = false
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    let doneId: ReturnType<typeof setTimeout> | undefined
+    const tryFly = (attempt: number) => {
+      if (cancelled) return
+      const ok = control.flyTo({
+        center: { lat: camera.lat, lng: camera.lng },
+        zoom: camera.zoom,
+        duration,
+      })
+      if (ok) {
+        doneId = setTimeout(() => onAnimateCompleteRef.current?.(), duration + 50)
+        return
+      }
+      if (attempt < 8) {
+        timeoutId = setTimeout(() => tryFly(attempt + 1), 50)
+      } else {
+        onAnimateCompleteRef.current?.()
+      }
+    }
+    tryFly(0)
+    return () => {
+      cancelled = true
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+      if (doneId !== undefined) clearTimeout(doneId)
+    }
+  }, [enabled, camera?.lat, camera?.lng, camera?.zoom, control, animate])
 
   return null
 }
@@ -165,25 +292,18 @@ function MapFocusController({
   return null
 }
 
-const ZOOM_2D_MIN = 12
-const ZOOM_2D_MAX = 20
 const PITCH_3D_THRESHOLD = 20
 
 type MapPinClusterItem = ClusterItem & { place: Place }
 
-function toClusterItems(
-  places: Place[],
-  xsByPlaceId: Record<string, string>,
-): MapPinClusterItem[] {
-  return places.map((p) => {
-    const image = xsByPlaceId[p.id] || p.image
-    return {
-      id: p.id,
-      position: { lat: p.location.lat, lng: p.location.lng },
-      imageUrl: image,
-      place: image === p.image ? p : { ...p, image },
-    }
-  })
+/** Pin thumbs come from place.image (server prefers xs → sm). No client ensureXs. */
+function toClusterItems(places: Place[]): MapPinClusterItem[] {
+  return places.map((p) => ({
+    id: p.id,
+    position: { lat: p.location.lat, lng: p.location.lng },
+    imageUrl: p.image,
+    place: p,
+  }))
 }
 
 function MapLoadReporter({ onLoaded }: { onLoaded?: () => void }) {
@@ -208,29 +328,50 @@ function boundsRoughlyEqual(
 }
 
 function MapBoundsReporter({
-  cityId,
+  resetKey,
+  immediate,
+  unlockKey,
   onBoundsChange,
+  onViewportChange,
 }: {
-  cityId: string
+  resetKey: string
+  /** When true, emit on load / programmatic moves (world mode needs first paint data). */
+  immediate: boolean
+  /** After city-entry fly finishes, parent bumps this so we publish city bounds once. */
+  unlockKey?: string
   onBoundsChange?: (bounds: { west: number; south: number; east: number; north: number }) => void
+  onViewportChange?: (viewport: MapViewport) => void
 }) {
   const maps = useMap()
+  const mapLoaded = useMapLoaded()
   const mapRef = maps?.current
   const onBoundsChangeRef = useRef(onBoundsChange)
+  const onViewportChangeRef = useRef(onViewportChange)
   const lastBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(
     null,
   )
+  const lastZoomRef = useRef<number | null>(null)
   /** After a city jump, ignore programmatic moveend until the user pans/zooms. */
-  const awaitUserGestureRef = useRef(true)
+  const awaitUserGestureRef = useRef(!immediate)
+  const reportRef = useRef<() => void>(() => {})
   onBoundsChangeRef.current = onBoundsChange
+  onViewportChangeRef.current = onViewportChange
 
   useEffect(() => {
-    awaitUserGestureRef.current = true
+    awaitUserGestureRef.current = !immediate
     lastBoundsRef.current = null
-  }, [cityId])
+    lastZoomRef.current = null
+  }, [resetKey, immediate])
 
   useEffect(() => {
-    if (!mapRef) return
+    if (!unlockKey || immediate) return
+    awaitUserGestureRef.current = false
+    reportRef.current()
+  }, [unlockKey, immediate])
+
+  useEffect(() => {
+    // useMap().current can be set without a React re-render — gate on mapLoaded.
+    if (!mapLoaded || !mapRef) return
     let map: mapboxgl.Map
     try {
       map = mapRef.getMap()
@@ -239,8 +380,9 @@ function MapBoundsReporter({
     }
 
     const report = () => {
-      const emit = onBoundsChangeRef.current
-      if (!emit) return
+      const emitBounds = onBoundsChangeRef.current
+      const emitVp = onViewportChangeRef.current
+      if (!emitBounds && !emitVp) return
       try {
         const b = map.getBounds()
         if (!b) return
@@ -250,13 +392,26 @@ function MapBoundsReporter({
           east: b.getEast(),
           north: b.getNorth(),
         }
-        if (lastBoundsRef.current && boundsRoughlyEqual(lastBoundsRef.current, next)) return
+        const zoom = map.getZoom()
+        const center = map.getCenter()
+        const boundsSame =
+          lastBoundsRef.current && boundsRoughlyEqual(lastBoundsRef.current, next)
+        const zoomSame =
+          lastZoomRef.current != null && Math.abs(lastZoomRef.current - zoom) < 1e-3
+        if (boundsSame && zoomSame) return
         lastBoundsRef.current = next
-        emit(next)
+        lastZoomRef.current = zoom
+        emitBounds?.(next)
+        emitVp?.({
+          bounds: next,
+          zoom,
+          center: { lat: center.lat, lng: center.lng },
+        })
       } catch {
         // map not ready
       }
     }
+    reportRef.current = report
 
     const onMoveEnd = (e: { originalEvent?: Event }) => {
       if (awaitUserGestureRef.current) {
@@ -268,10 +423,19 @@ function MapBoundsReporter({
     }
 
     map.on("moveend", onMoveEnd)
+    if (immediate) {
+      // World mode: first paint needs data without waiting for a user gesture.
+      report()
+      const t = window.setTimeout(report, 100)
+      return () => {
+        window.clearTimeout(t)
+        map.off("moveend", onMoveEnd)
+      }
+    }
     return () => {
       map.off("moveend", onMoveEnd)
     }
-  }, [mapRef])
+  }, [mapLoaded, mapRef, immediate, resetKey])
 
   return null
 }
@@ -340,6 +504,7 @@ function renderMapPin(
   const label = item.place.name
   const props = {
     imageSrc: item.place.image,
+    imageFocus: item.place.imageFocus,
     label,
     labelMode: markerLabelMode,
     hoverScaleMode: markerHoverScale,
@@ -354,6 +519,16 @@ function renderMapPin(
 export function MapView({
   city,
   places,
+  mode = MAP_MODE_CITY,
+  worldClusters = [],
+  worldClustersStale = false,
+  cityNameById,
+  initialCamera = null,
+  animateCityEntry = false,
+  onCityEntryAnimationComplete,
+  animateWorldEntry = false,
+  onWorldEntryAnimationComplete,
+  onWorldClusterEnterCity,
   onLocationClick,
   selectedLocationId,
   focusLocationId,
@@ -362,10 +537,37 @@ export function MapView({
   onToggle3D,
   onMapLoaded,
   onBoundsChange,
+  onViewportChange,
 }: MapViewProps) {
-  const [xsByPlaceId, setXsByPlaceId] = useState<Record<string, string>>({})
+  const isWorld = mode === MAP_MODE_WORLD
   const [primaryMapLoaded, setPrimaryMapLoaded] = useState(false)
-  const clusterItems = useMemo(() => toClusterItems(places, xsByPlaceId), [places, xsByPlaceId])
+  /** Defer second Mapbox (minimap) until browser idle after primary load. */
+  const [minimapReady, setMinimapReady] = useState(false)
+  /** World = aggregates only; city = place pins from city cache. */
+  const showPlacePins = !isWorld
+  const showWorldClusters = isWorld && worldClusters.length > 0
+  const clusterItems = useMemo(
+    () => (showPlacePins ? toClusterItems(places) : []),
+    [places, showPlacePins],
+  )
+
+  // Dev-only tripwire: catches a future regression of the World/City pin-mixing bug class
+  // (see docs/plans/free-world.md / docs/plans/free-world-perf.md) without waiting for a user report.
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return
+    if (showPlacePins && showWorldClusters) {
+      console.warn(
+        "[MapView] Both place pins and world clusters are set to render in the same frame.",
+      )
+    }
+    if (!showPlacePins) return
+    const wrongCity = places.find((p) => p.location.cityId && p.location.cityId !== city.id)
+    if (wrongCity) {
+      console.warn(
+        `[MapView] Place "${wrongCity.id}" belongs to city "${wrongCity.location.cityId}" but the map is showing city "${city.id}".`,
+      )
+    }
+  }, [showPlacePins, showWorldClusters, places, city.id])
   const marker2dShape = useMapMarker2dShape()
   const markerLabelMode = useMapMarkerLabelMode()
   const markerHoverScale = useMapMarkerHoverScaleMode()
@@ -375,114 +577,134 @@ export function MapView({
     [marker2dShape, markerLabelMode, markerHoverScale, is3D],
   )
 
-  const effectiveZoom = is3D ? 18 : 14
+  const cityZoom = is3D ? 18 : 14
+  const effectiveZoom = isWorld
+    ? (initialCamera?.zoom ?? 4)
+    : cityZoom
+  const defaultCenter = initialCamera
+    ? { lat: initialCamera.lat, lng: initialCamera.lng }
+    : { lat: city.lat, lng: city.lng }
+  /**
+   * World: cap inward zoom at WORLD_Z_ENTER (must click cluster to enter city).
+   * City: full zoom range; exit uses Z_EXIT hysteresis, not a hard min.
+   * Limits applied imperatively in MapboxContainer (safe across mode switches).
+   */
+  const minZoom = WORLD_MIN_ZOOM
+  const maxZoom = isWorld ? WORLD_Z_ENTER : WORLD_MAX_ZOOM
   const handleMapLoaded = useCallback(() => {
     setPrimaryMapLoaded(true)
     onMapLoaded?.()
   }, [onMapLoaded])
 
+  useEffect(() => {
+    if (!primaryMapLoaded || isWorld) {
+      setMinimapReady(false)
+      return
+    }
+    let cancelled = false
+    let idleId: number | undefined
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const enable = () => {
+      if (!cancelled) setMinimapReady(true)
+    }
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(enable, { timeout: 2500 })
+    } else {
+      timeoutId = setTimeout(enable, 1500)
+    }
+    return () => {
+      cancelled = true
+      if (idleId != null && typeof window !== "undefined" && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId)
+      }
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+    }
+  }, [primaryMapLoaded, isWorld])
+
   const [viewportCenter, setViewportCenter] = useState(() => ({
-    lat: city.lat,
-    lng: city.lng,
+    lat: defaultCenter.lat,
+    lng: defaultCenter.lng,
   }))
   const onCenterChange = useCallback((center: { lat: number; lng: number }) => {
     setViewportCenter(center)
   }, [])
   useEffect(() => {
+    if (isWorld) return
     setViewportCenter({ lat: city.lat, lng: city.lng })
-  }, [city.id, city.lat, city.lng])
+  }, [city.id, city.lat, city.lng, isWorld])
 
-  // Lazy xs backfill for place pin thumbs (pins previously never triggered ensure).
-  useEffect(() => {
-    if (!primaryMapLoaded) return
-    let cancelled = false
-    const targets = places.filter((place) => {
-      const src = place.image?.trim()
-      return Boolean(src && !src.startsWith("/") && !xsByPlaceId[place.id])
-    })
-    if (targets.length === 0) return
-
-    const backfill = async () => {
-      const resolved: Array<readonly [string, string]> = []
-      // Keep image generation traffic bounded and commit all URLs in one React update.
-      for (let i = 0; i < targets.length && !cancelled; i += 4) {
-        const batch = targets.slice(i, i + 4)
-        const results = await Promise.all(
-          batch.map(async (place) => {
-            const result = await ensureXsOnce({
-              entityType: "place",
-              entityId: place.id,
-              role: "avatar",
-            })
-            return result.success ? ([place.id, result.url] as const) : null
-          }),
-        )
-        for (const result of results) {
-          if (result) resolved.push(result)
-        }
-      }
-      if (cancelled || resolved.length === 0) return
-      startTransition(() => {
-        setXsByPlaceId((prev) => {
-          const next = { ...prev }
-          let changed = false
-          for (const [placeId, url] of resolved) {
-            if (next[placeId] === url) continue
-            next[placeId] = url
-            changed = true
-          }
-          return changed ? next : prev
-        })
-      })
-    }
-
-    const idleId = window.requestIdleCallback(() => void backfill(), { timeout: 3000 })
-    return () => {
-      cancelled = true
-      window.cancelIdleCallback(idleId)
-    }
-  }, [places, primaryMapLoaded, xsByPlaceId])
+  const boundsResetKey = isWorld ? `world-${mode}` : city.id
 
   return (
     <MapContainer
       id="main"
       mapKey="main-map"
-      defaultCenter={{ lat: city.lat, lng: city.lng }}
+      defaultCenter={defaultCenter}
       defaultZoom={effectiveZoom}
-      minZoom={ZOOM_2D_MIN}
-      maxZoom={ZOOM_2D_MAX}
+      minZoom={minZoom}
+      maxZoom={maxZoom}
       controls={{ fullscreen: false }}
       showLoadingOverlay={false}
       className="h-full w-full"
       onCenterChange={onCenterChange}
     >
       <MapLoadReporter onLoaded={handleMapLoaded} />
-      <CityCameraController city={city} zoom={effectiveZoom} />
-      <MapBoundsReporter cityId={city.id} onBoundsChange={onBoundsChange} />
+      <CityCameraController
+        city={city}
+        zoom={cityZoom}
+        enabled={!isWorld}
+        animate={animateCityEntry}
+        onAnimateComplete={onCityEntryAnimationComplete}
+      />
+      <WorldCameraController
+        enabled={isWorld}
+        camera={isWorld ? initialCamera : null}
+        animate={animateWorldEntry}
+        onAnimateComplete={onWorldEntryAnimationComplete}
+      />
+      <MapBoundsReporter
+        resetKey={boundsResetKey}
+        immediate={isWorld}
+        unlockKey={
+          !isWorld && !animateCityEntry ? `city-ready-${city.id}` : undefined
+        }
+        onBoundsChange={onBoundsChange}
+        onViewportChange={onViewportChange}
+      />
       <MapFocusController
         cityId={city.id}
         places={places}
         focusLocationId={focusLocationId}
         focusPaddingRight={focusPaddingRight}
       />
-      <MapViewPins
-        cityId={city.id}
-        is3D={is3D}
-        marker2dShape={marker2dShape}
-        markerLabelMode={markerLabelMode}
-        markerHoverScale={markerHoverScale}
-        clusterItems={clusterItems}
-        selectedLocationId={selectedLocationId ?? focusLocationId}
-        onLocationClick={onLocationClick}
-        renderMarker={renderMarker}
-      />
-      {onToggle3D && (
+      {showWorldClusters && (
+        <WorldAggregateLayer
+          clusters={worldClusters}
+          cityNameById={cityNameById}
+          stale={worldClustersStale}
+          onEnterCity={onWorldClusterEnterCity}
+        />
+      )}
+      {showPlacePins && (
+        <MapViewPins
+          cityId={city.id}
+          is3D={is3D}
+          marker2dShape={marker2dShape}
+          markerLabelMode={markerLabelMode}
+          markerHoverScale={markerHoverScale}
+          clusterItems={clusterItems}
+          selectedLocationId={selectedLocationId ?? focusLocationId}
+          onLocationClick={onLocationClick}
+          renderMarker={renderMarker}
+        />
+      )}
+      {onToggle3D && !isWorld && (
         <>
           <SyncPitchTo3D onToggle3D={onToggle3D} />
           <Map3DTogglePortal is3D={is3D} onToggle={onToggle3D} cityId={city.id} />
         </>
       )}
-      {primaryMapLoaded && (
+      {minimapReady && !isWorld && (
         <NavMapPortal city={city} viewportCenter={viewportCenter} places={places} />
       )}
     </MapContainer>

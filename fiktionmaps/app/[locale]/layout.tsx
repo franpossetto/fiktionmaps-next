@@ -5,6 +5,7 @@ import { hasLocale } from "next-intl"
 import { notFound } from "next/navigation"
 import { ThemeSettingsProvider } from "@/lib/theme-settings-context"
 import { AuthProvider } from "@/context/auth-context"
+import { AuthRecoveryRedirect } from "@/components/auth/auth-recovery-redirect"
 import { LangSetter } from "@/components/layout/lang-setter"
 import { Toaster } from "@/components/ui/toaster"
 import { routing } from "@/i18n/routing"
@@ -31,6 +32,7 @@ export default async function LocaleLayout({ children, params }: Props) {
       <LangSetter locale={locale} />
       <ThemeSettingsProvider>
         <AuthProvider>
+          <AuthRecoveryRedirect />
           {children}
           <Toaster />
         </AuthProvider>

@@ -1,14 +1,15 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useTranslations } from "next-intl"
 import { useRouter } from "@/i18n/navigation"
 import { Plus, Edit2, Trash2, ChevronRight, Clapperboard, CheckCircle2, Search, Loader2 } from "lucide-react"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
-import { createClient } from "@/lib/supabase/client"
-import { ASSET_VIDEOS_BUCKET } from "@/lib/asset-videos/asset-videos-bucket"
+import { primaryScenePlace } from "@/src/scenes/domain/scene.helpers"
+import { uploadSceneVideoPair } from "@/lib/asset-videos/upload-scene-videos"
+import { SCENE_VIDEO_MAX_BYTES } from "@/components/contribute/scene/scene-contribute-video-schema"
 import { buildTimecodeLabel, type TimecodeParts } from "@/lib/scenes/scene-timecode"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
@@ -18,24 +19,9 @@ import { WizardShell } from "./wizard-shell"
 import {
   createSceneAction,
   deleteSceneAction,
+  linkScenePlaceAction,
   listScenesAction,
 } from "@/src/scenes/infrastructure/next/scene.actions"
-
-function sanitizeFileName(name: string) {
-  return name.replace(/[^a-zA-Z0-9._-]/g, "_")
-}
-
-async function uploadSceneVideoToBucket(file: File): Promise<string> {
-  const supabase = createClient()
-  const path = `scenes/${crypto.randomUUID()}/${sanitizeFileName(file.name)}`
-  const { error } = await supabase.storage.from(ASSET_VIDEOS_BUCKET).upload(path, file, {
-    contentType: file.type || "video/mp4",
-    upsert: false,
-  })
-  if (error) throw new Error(error.message)
-  const { data } = supabase.storage.from(ASSET_VIDEOS_BUCKET).getPublicUrl(path)
-  return data.publicUrl
-}
 
 interface SceneFormData {
   title: string
@@ -48,6 +34,8 @@ interface SceneFormData {
   episode: string
   episodeTitle: string
   videoFile: File | null
+  processedVideoFile: File | null
+  processedPreviewFile: File | null
 }
 
 const emptyForm = (): SceneFormData => ({
@@ -61,6 +49,8 @@ const emptyForm = (): SceneFormData => ({
   episode: "",
   episodeTitle: "",
   videoFile: null,
+  processedVideoFile: null,
+  processedPreviewFile: null,
 })
 
 type WorkflowStep = "list" | "select-fiction" | "select-location" | "details"
@@ -79,6 +69,9 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
   const [fictionFilter, setFictionFilter] = useState("all")
   const [formData, setFormData] = useState<SceneFormData>(emptyForm)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [videoProcessing, setVideoProcessing] = useState(false)
+  const [videoProcessingPercent, setVideoProcessingPercent] = useState<number | null>(null)
+  const processGenRef = useRef(0)
 
   const loadScenes = useCallback(async () => {
     try {
@@ -97,8 +90,71 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
   const audiovisualFictions = fictions.filter((f) => f.type === "movie" || f.type === "tv-series")
 
   const resetFlowState = () => {
+    processGenRef.current += 1
+    setVideoProcessing(false)
+    setVideoProcessingPercent(null)
     setErrors({})
     setFormData(emptyForm())
+  }
+
+  const handleVideoPick = (f: File | null) => {
+    setError(null)
+    if (!f) {
+      processGenRef.current += 1
+      setVideoProcessing(false)
+      setVideoProcessingPercent(null)
+      setFormData((prev) => ({
+        ...prev,
+        videoFile: null,
+        processedVideoFile: null,
+        processedPreviewFile: null,
+      }))
+      return
+    }
+    if (f.size > SCENE_VIDEO_MAX_BYTES) {
+      setError(t("videoTooLarge"))
+      return
+    }
+
+    const gen = ++processGenRef.current
+    setFormData((prev) => ({
+      ...prev,
+      videoFile: f,
+      processedVideoFile: null,
+      processedPreviewFile: null,
+    }))
+    setVideoProcessing(true)
+    setVideoProcessingPercent(0)
+
+    void (async () => {
+      try {
+        const { processSceneVideoClient } = await import("@/lib/video/client-video-processor")
+        const result = await processSceneVideoClient(f, (p) => {
+          if (processGenRef.current !== gen) return
+          setVideoProcessingPercent(p.percent)
+        })
+        if (processGenRef.current !== gen) return
+        setFormData((prev) => ({
+          ...prev,
+          processedVideoFile: result.videoFile,
+          processedPreviewFile: result.previewFile,
+        }))
+      } catch (err) {
+        if (processGenRef.current !== gen) return
+        setFormData((prev) => ({
+          ...prev,
+          videoFile: null,
+          processedVideoFile: null,
+          processedPreviewFile: null,
+        }))
+        setError(err instanceof Error ? err.message : "Video compression failed")
+      } finally {
+        if (processGenRef.current === gen) {
+          setVideoProcessing(false)
+          setVideoProcessingPercent(null)
+        }
+      }
+    })()
   }
 
   const handleCancelWorkflow = () => {
@@ -112,7 +168,7 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
     if (!searchTerm.trim()) return true
     const q = searchTerm.toLowerCase()
     const fiction = fictions.find((f) => f.id === scene.fictionId)
-    const place = places.find((p) => p.placeId === scene.placeId)
+    const place = places.find((p) => p.placeId === primaryScenePlace(scene)?.placeId)
     return (
       scene.title.toLowerCase().includes(q) ||
       scene.description.toLowerCase().includes(q) ||
@@ -136,12 +192,25 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateForm()) return
+    if (videoProcessing) {
+      setError("Wait for video compression to finish")
+      return
+    }
     setSaving(true)
     setError(null)
     try {
       let videoUrl: string | null = null
+      let previewUrl: string | null = null
       if (formData.videoFile) {
-        videoUrl = await uploadSceneVideoToBucket(formData.videoFile)
+        if (!formData.processedVideoFile || !formData.processedPreviewFile) {
+          throw new Error("Video is still processing or failed. Pick the file again.")
+        }
+        const uploaded = await uploadSceneVideoPair({
+          video: formData.processedVideoFile,
+          preview: formData.processedPreviewFile,
+        })
+        videoUrl = uploaded.videoUrl
+        previewUrl = uploaded.previewUrl
       }
 
       const fiction = fictions.find((f) => f.id === formData.fictionId)
@@ -164,7 +233,6 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
 
       const basePayload = {
         fictionId: formData.fictionId,
-        placeId: formData.placeId,
         title: formData.title.trim(),
         description: formData.description.trim(),
         quote: formData.quote.trim() || null,
@@ -177,12 +245,27 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
       const result = await createSceneAction({
         ...basePayload,
         videoUrl,
+        previewUrl,
         sortOrder: 0,
         active: true,
       })
 
       if (!result.success) {
         throw new Error(result.error || "Failed to create scene")
+      }
+
+      // Creating a scene and linking its place are separate atomic operations (D5). If the
+      // link fails, the scene stays place-less (invisible in every list) — surface the error
+      // and keep the wizard open instead of navigating away, so staff can retry.
+      const linkResult = await linkScenePlaceAction({
+        sceneId: result.scene.id,
+        placeId: formData.placeId,
+      })
+
+      if (!linkResult.success) {
+        setError(linkResult.error || "Scene created, but failed to link the place. Please retry.")
+        setSaving(false)
+        return
       }
 
       await loadScenes()
@@ -289,7 +372,7 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredScenes.map((scene) => {
               const fiction = fictions.find((f) => f.id === scene.fictionId)
-              const place = places.find((p) => p.placeId === scene.placeId)
+              const place = places.find((p) => p.placeId === primaryScenePlace(scene)?.placeId)
               const timeLabel =
                 scene.timestamp ||
                 (scene.season != null && scene.episode != null
@@ -568,12 +651,9 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
 
           <FormField label={t("videoUpload")}>
             <DragDropZone
-              onFilesSelected={(files) => {
-                const f = files[0]
-                setFormData((prev) => ({ ...prev, videoFile: f ?? null }))
-              }}
+              onFilesSelected={(files) => handleVideoPick(files[0] ?? null)}
               accept="video/mp4,video/webm,video/quicktime"
-              maxSize={100 * 1024 * 1024}
+              maxSize={SCENE_VIDEO_MAX_BYTES}
               multiple={false}
               preview={false}
             />
@@ -582,12 +662,17 @@ export function ScenesTab({ initialFictions = [], initialPlaces = [] }: { initia
                 {t("selectedFile", { name: formData.videoFile.name })}
               </p>
             )}
+            {videoProcessing ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Compressing…{videoProcessingPercent != null ? ` ${videoProcessingPercent}%` : ""}
+              </p>
+            ) : null}
           </FormField>
 
           <div className="flex gap-3 pt-4">
             <Button
               type="submit"
-              disabled={saving}
+              disabled={saving || videoProcessing}
               className="flex-1 gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

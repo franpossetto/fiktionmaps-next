@@ -185,6 +185,7 @@ export type Database = {
           id: string
           name: string
           country: string
+          slug: string
           lat: number
           lng: number
           zoom: number
@@ -196,6 +197,7 @@ export type Database = {
           id?: string
           name: string
           country: string
+          slug: string
           lat: number
           lng: number
           zoom: number
@@ -207,6 +209,7 @@ export type Database = {
           id?: string
           name?: string
           country?: string
+          slug?: string
           lat?: number
           lng?: number
           zoom?: number
@@ -224,6 +227,8 @@ export type Database = {
           role: string
           variant: string
           url: string
+          focus_x: number
+          focus_y: number
           created_at: string
         }
         Insert: {
@@ -233,6 +238,8 @@ export type Database = {
           role: string
           variant: string
           url: string
+          focus_x?: number
+          focus_y?: number
           created_at?: string
         }
         Update: {
@@ -242,6 +249,8 @@ export type Database = {
           role?: string
           variant?: string
           url?: string
+          focus_x?: number
+          focus_y?: number
           created_at?: string
         }
         Relationships: []
@@ -423,7 +432,8 @@ export type Database = {
         Row: {
           id: string
           fiction_id: string
-          place_id: string
+          /** @deprecated Superseded by `scene_places` (063). Dropped in 064. */
+          place_id: string | null
           title: string
           description: string
           quote: string | null
@@ -432,6 +442,7 @@ export type Database = {
           episode: number | null
           episode_title: string | null
           video_url: string | null
+          preview_url: string | null
           sort_order: number
           active: boolean
           status: "pending" | "approved" | "rejected"
@@ -442,7 +453,8 @@ export type Database = {
         Insert: {
           id?: string
           fiction_id: string
-          place_id: string
+          /** @deprecated Superseded by `scene_places` (063). Dropped in 064. */
+          place_id?: string | null
           title: string
           description: string
           quote?: string | null
@@ -451,6 +463,7 @@ export type Database = {
           episode?: number | null
           episode_title?: string | null
           video_url?: string | null
+          preview_url?: string | null
           sort_order?: number
           active?: boolean
           status?: "pending" | "approved" | "rejected"
@@ -461,7 +474,8 @@ export type Database = {
         Update: {
           id?: string
           fiction_id?: string
-          place_id?: string
+          /** @deprecated Superseded by `scene_places` (063). Dropped in 064. */
+          place_id?: string | null
           title?: string
           description?: string
           quote?: string | null
@@ -470,6 +484,7 @@ export type Database = {
           episode?: number | null
           episode_title?: string | null
           video_url?: string | null
+          preview_url?: string | null
           sort_order?: number
           active?: boolean
           status?: "pending" | "approved" | "rejected"
@@ -487,6 +502,57 @@ export type Database = {
           },
           {
             foreignKeyName: "scenes_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scene_places: {
+        Row: {
+          id: string
+          scene_id: string
+          place_id: string
+          sort_order: number
+          start_second: number | null
+          end_second: number | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          scene_id: string
+          place_id: string
+          sort_order?: number
+          start_second?: number | null
+          end_second?: number | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          scene_id?: string
+          place_id?: string
+          sort_order?: number
+          start_second?: number | null
+          end_second?: number | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scene_places_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "scenes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scene_places_place_id_fkey"
             columns: ["place_id"]
             isOneToOne: false
             referencedRelation: "places"
@@ -826,6 +892,7 @@ export type Database = {
             | "create_place"
             | "add_scene"
             | "add_photo"
+            | "add_place_to_scene"
             | "enrich_entity"
             | "correct_data"
             | "mark_inaccessible"
@@ -850,6 +917,7 @@ export type Database = {
             | "create_place"
             | "add_scene"
             | "add_photo"
+            | "add_place_to_scene"
             | "enrich_entity"
             | "correct_data"
             | "mark_inaccessible"
@@ -874,6 +942,7 @@ export type Database = {
             | "create_place"
             | "add_scene"
             | "add_photo"
+            | "add_place_to_scene"
             | "enrich_entity"
             | "correct_data"
             | "mark_inaccessible"
@@ -914,6 +983,8 @@ export type Database = {
           role: "avatar" | "hero" | "cover" | "banner"
           variant: "xs" | "sm" | "lg"
           storage_path: string
+          focus_x: number
+          focus_y: number
           created_at: string
         }
         Insert: {
@@ -922,6 +993,8 @@ export type Database = {
           role: "avatar" | "hero" | "cover" | "banner"
           variant: "xs" | "sm" | "lg"
           storage_path: string
+          focus_x?: number
+          focus_y?: number
           created_at?: string
         }
         Update: {
@@ -930,6 +1003,8 @@ export type Database = {
           role?: "avatar" | "hero" | "cover" | "banner"
           variant?: "xs" | "sm" | "lg"
           storage_path?: string
+          focus_x?: number
+          focus_y?: number
           created_at?: string
         }
         Relationships: [
@@ -938,6 +1013,48 @@ export type Database = {
             columns: ["contribution_id"]
             isOneToOne: false
             referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contribution_pending_scene_places: {
+        Row: {
+          id: string
+          contribution_id: string
+          place_id: string
+          start_second: number | null
+          end_second: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          contribution_id: string
+          place_id: string
+          start_second?: number | null
+          end_second?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          contribution_id?: string
+          place_id?: string
+          start_second?: number | null
+          end_second?: number | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contribution_pending_scene_places_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contribution_pending_scene_places_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
             referencedColumns: ["id"]
           },
         ]
@@ -1125,6 +1242,28 @@ export type Database = {
         Args: { p_username: string }
         Returns: boolean
       }
+      map_place_clusters: {
+        Args: {
+          p_west: number
+          p_south: number
+          p_east: number
+          p_north: number
+          p_grid_deg: number
+          p_fiction_ids?: string[] | null
+          p_max_clusters?: number
+        }
+        Returns: {
+          cluster_id: string
+          lat: number
+          lng: number
+          place_count: number
+          dominant_city_id: string | null
+          dominant_share: number
+          city_count: number
+          fiction_total: number
+          top_fiction_ids: string[]
+        }[]
+      }
     }
     Enums: {
       contribution_status: "pending" | "approved" | "rejected"
@@ -1134,6 +1273,7 @@ export type Database = {
         | "create_place"
         | "add_scene"
         | "add_photo"
+        | "add_place_to_scene"
         | "enrich_entity"
         | "correct_data"
         | "mark_inaccessible"
@@ -1297,6 +1437,9 @@ export type ContributionRow = Tables<"contributions">
 export type ContributionPendingImageRow = Tables<"contribution_pending_images">
 export type ContributionPendingImageInsert = TablesInsert<"contribution_pending_images">
 export type ContributionPendingImageUpdate = TablesUpdate<"contribution_pending_images">
+export type ContributionPendingScenePlaceRow = Tables<"contribution_pending_scene_places">
+export type ContributionPendingScenePlaceInsert = TablesInsert<"contribution_pending_scene_places">
+export type ContributionPendingScenePlaceUpdate = TablesUpdate<"contribution_pending_scene_places">
 export type ContributionInsert = TablesInsert<"contributions">
 export type ContributionUpdate = TablesUpdate<"contributions">
 

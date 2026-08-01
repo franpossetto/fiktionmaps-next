@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
-import { getTranslations } from "next-intl/server"
 import { getSessionUserId } from "@/lib/auth/auth.service"
+import { SceneContributeWizard } from "@/components/contribute/scene/scene-contribute-wizard"
+import { getActiveFictionsCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 
 type Props = { params: Promise<{ locale: string }> }
 
@@ -8,12 +9,10 @@ export default async function ContributeScenePage({ params }: Props) {
   const userId = await getSessionUserId()
   if (!userId) redirect("/login")
 
-  const { locale } = await params
-  const t = await getTranslations({ locale, namespace: "Contribute" })
+  await params
 
-  return (
-    <div className="flex h-full min-h-0 items-center justify-center p-6">
-      <p className="text-center text-sm text-muted-foreground">{t("sceneComingSoon")}</p>
-    </div>
-  )
+  const fictions = await getActiveFictionsCached()
+  const audiovisualFictions = fictions.filter((f) => f.type === "movie" || f.type === "tv-series")
+
+  return <SceneContributeWizard initialFictions={audiovisualFictions} />
 }

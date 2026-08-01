@@ -6,6 +6,11 @@ import {
   ensureXsOnce,
   type EnsureXsTarget,
 } from "@/lib/asset-images/ensure-xs-client"
+import {
+  DEFAULT_IMAGE_FOCUS,
+  imageFocusToObjectPosition,
+  type ImageFocus,
+} from "@/lib/asset-images/image-focus"
 import { cn } from "@/lib/utils"
 
 export type AssetThumbEnsureTarget = EnsureXsTarget
@@ -16,6 +21,7 @@ type AssetThumbImageProps = {
   /** CSS pixel size of the square (or short side) display box. */
   size: number
   className?: string
+  focus?: ImageFocus | null
   /**
    * When set, lazily generates and stores an `xs` variant if missing.
    * Does not block first paint — swaps src when ready.
@@ -31,6 +37,7 @@ export function AssetThumbImage({
   alt = "",
   size,
   className,
+  focus,
   ensure,
 }: AssetThumbImageProps) {
   const [currentSrc, setCurrentSrc] = useState(src)
@@ -55,6 +62,7 @@ export function AssetThumbImage({
   }, [ensure, ensure?.entityType, ensure?.entityId, ensure?.role, currentSrc])
 
   const sizes = `${size}px`
+  const objectPosition = imageFocusToObjectPosition(focus ?? DEFAULT_IMAGE_FOCUS)
 
   return (
     <Image
@@ -65,6 +73,7 @@ export function AssetThumbImage({
       sizes={sizes}
       quality={85}
       className={cn("h-full w-full object-cover", className)}
+      style={{ objectPosition }}
     />
   )
 }

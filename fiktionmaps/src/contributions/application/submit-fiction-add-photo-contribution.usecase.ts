@@ -16,6 +16,7 @@ export type SubmitFictionAddPhotoContributionInput = {
   targetRole: FictionAddPhotoTargetRole
   file: File
   autoApprove: boolean
+  focus?: { x: number; y: number }
 }
 
 export type SubmitFictionAddPhotoContributionResult =
@@ -78,6 +79,7 @@ export async function submitFictionAddPhotoContributionUseCase(
       contributionId: created.contributionId,
       role: FICTION_COVER_ASSET_ROLE,
       paths: { xs, sm, lg },
+      focus: input.focus,
     })
     if (!linked) {
       return { success: false, error: "Failed to save pending cover" }
@@ -123,6 +125,7 @@ export async function submitFictionAddPhotoContributionUseCase(
     contributionId: created.contributionId,
     role: FICTION_BANNER_ASSET_ROLE,
     paths: { lg },
+    focus: input.focus,
   })
   if (!linked) {
     return { success: false, error: "Failed to save pending hero" }

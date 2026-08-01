@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# FFmpeg.wasm assets copied from node_modules (see scripts/copy-ffmpeg-assets.mjs)
+/public/ffmpeg/
+
 # production
 /build
 
@@ -46,3 +49,6 @@ skills-lock.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# supabase CLI temp
+supabase/.temp/

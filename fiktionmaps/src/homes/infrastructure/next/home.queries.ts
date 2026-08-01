@@ -1,15 +1,12 @@
-import { unstable_cache } from "next/cache"
-import { createClient } from "@/lib/supabase/server"
 import { createHomesSupabaseAdapter } from "@/src/homes/infrastructure/supabase/home.repository.impl"
-import { CacheKeys } from "@/src/shared/infrastructure/next/cache.keys"
-import { CacheConfig } from "@/src/shared/infrastructure/next/cache.config"
+import { createClient } from "@/lib/supabase/server"
+import type { UserHome } from "@/src/homes/domain/home.entity"
 
-const repo = createHomesSupabaseAdapter(createClient)
-
-export function getHomesByUserIdCached(userId: string) {
-  return unstable_cache(
-    () => repo.getByUserId(userId),
-    CacheKeys.user(`homes:${userId}`),
-    { ...CacheConfig.short, tags: [`user-homes-${userId}`, "homes"] }
-  )()
+/**
+ * User-scoped homes read. Not shared-cached — needs the cookie-authenticated
+ * Supabase client (RLS). Request dedupe lives in `getUserHomesAction` via React `cache()`.
+ */
+export async function getHomesByUserId(userId: string): Promise<UserHome[]> {
+  const repo = createHomesSupabaseAdapter(createClient)
+  return repo.getByUserId(userId)
 }

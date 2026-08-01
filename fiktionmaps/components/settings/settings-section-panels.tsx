@@ -12,6 +12,7 @@ import type {
 } from "@/lib/theme-settings"
 import { cn } from "@/lib/utils"
 import { MarkersSettingsPanel } from "./markers-settings-panel"
+import { ChangePasswordForm } from "./change-password-form"
 import type { SettingsSectionId } from "./settings-sections"
 
 type MapStyleOption = "day" | "dawn" | "night" | "dusk"
@@ -250,6 +251,19 @@ export function SettingsSectionPanel(props: SettingsSectionPanelsProps) {
             />
           </SettingsSubsection>
         ) : null}
+      </div>
+    )
+  }
+
+  if (sectionId === "account") {
+    return (
+      <div className="space-y-10">
+        <SettingsSubsection
+          title={t("account.passwordSectionTitle")}
+          description={t("account.passwordSectionDescription")}
+        >
+          <ChangePasswordForm />
+        </SettingsSubsection>
       </div>
     )
   }

@@ -22,9 +22,8 @@ const SHOW_PROFILE_HERO_BANNER = false
 
 interface ProfileHeaderProps {
   profile: UserProfile
-  fpp?: number
-  badge?: string
-  path?: string
+  fpp: number
+  roleLabel: string
   onEdit?: () => void
   onShare?: () => void
   /** When true, hides the hero banner and shows a single compact row (e.g. after starting a mission). */
@@ -33,9 +32,8 @@ interface ProfileHeaderProps {
 
 export function ProfileHeader({
   profile,
-  fpp = 350,
-  badge = "Caminante II",
-  path = "Explorador path",
+  fpp,
+  roleLabel,
   onEdit,
   onShare,
   compact = false,
@@ -89,9 +87,8 @@ export function ProfileHeader({
             <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
               <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-emerald-500/15 px-2 py-0.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                 <span className="h-1 w-1 shrink-0 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-                <span className="truncate">{badge}</span>
+                <span className="truncate">{roleLabel}</span>
               </span>
-              <span className="truncate text-sm text-muted-foreground">{path}</span>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -127,7 +124,6 @@ export function ProfileHeader({
 
   return (
     <div>
-      {/* ── Cover image (hidden until SHOW_PROFILE_HERO_BANNER) ── */}
       {SHOW_PROFILE_HERO_BANNER && (
         <div className="relative h-36 sm:h-44 w-full overflow-hidden bg-muted">
           <Image
@@ -152,19 +148,16 @@ export function ProfileHeader({
         </div>
       )}
 
-      {/* ── Profile info (below cover) ── */}
       <div
         className={cn(
-          "flex items-start justify-between border-b border-border/40 px-5 pb-8",
-          SHOW_PROFILE_HERO_BANNER ? "pt-4" : "pt-6",
+          "flex flex-col gap-5 border-b border-border/40 pb-8 sm:flex-row sm:items-start sm:justify-between",
+          SHOW_PROFILE_HERO_BANNER ? "pt-4" : "pt-1",
         )}
       >
-        {/* Left: avatar + identity */}
-        <div className="flex items-start gap-4">
-          {/* Avatar */}
+        <div className="flex min-w-0 items-start gap-4">
           <div
             className={cn(
-              "relative h-44 w-44 shrink-0 overflow-hidden rounded-2xl border-[3px] border-background bg-muted",
+              "relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-[3px] border-background bg-muted sm:h-28 sm:w-28",
               SHOW_PROFILE_HERO_BANNER && "-mt-16",
             )}
           >
@@ -172,8 +165,8 @@ export function ProfileHeader({
               <Image
                 src={avatarUrl}
                 alt={profile.username}
-                width={176}
-                height={176}
+                width={112}
+                height={112}
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -183,29 +176,27 @@ export function ProfileHeader({
             )}
           </div>
 
-          {/* Name + meta */}
-          <div className="min-w-0 pt-2">
-            <h1 className="text-4xl font-bold tracking-tight text-foreground leading-[1.1] sm:text-[2.5rem]">
+          <div className="min-w-0 pt-1">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground leading-[1.1] sm:text-4xl">
               {profile.username}
             </h1>
-            <p className="mt-1.5 text-base text-muted-foreground">
-              {handle} · miembro desde {joinYear}
+            <p className="mt-1.5 text-sm text-muted-foreground sm:text-base">
+              {handle} · {joinYear}
             </p>
-            <div className="mt-2 flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-sm font-semibold text-emerald-500 dark:text-emerald-400">
+            <div className="mt-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-                {badge}
+                {roleLabel}
               </span>
-              <span className="text-sm text-muted-foreground">{path}</span>
             </div>
           </div>
         </div>
 
-        {/* Right: FPP + actions */}
-        <div className="flex flex-col items-end gap-2 shrink-0">
+        <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-end sm:gap-2">
           <div className="flex items-center gap-1">
             {onShare && (
               <button
+                type="button"
                 onClick={onShare}
                 className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
                 title="Share"
@@ -215,6 +206,7 @@ export function ProfileHeader({
             )}
             {onEdit && (
               <button
+                type="button"
                 onClick={onEdit}
                 className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
                 title="Settings"
@@ -223,14 +215,13 @@ export function ProfileHeader({
               </button>
             )}
           </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold text-foreground leading-none">{fpp.toLocaleString()}</p>
-            <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground mt-0.5">FPP</p>
+          <div className="text-left sm:text-right">
+            <p className="text-2xl font-bold leading-none text-foreground">{fpp.toLocaleString()}</p>
+            <p className="mt-0.5 text-sm font-medium uppercase tracking-widest text-muted-foreground">FPP</p>
           </div>
         </div>
       </div>
 
-      {/* ── Hero picker modal ── */}
       {showHeroPicker && (
         <>
           <div
@@ -238,10 +229,10 @@ export function ProfileHeader({
             aria-hidden
             onClick={() => setShowHeroPicker(false)}
           />
-          <div className="fixed left-1/2 top-1/2 z-50 w-[min(520px,100vw-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-background p-5 shadow-xl max-h-[80vh] overflow-hidden flex flex-col">
-            <p className="text-sm font-semibold text-foreground mb-1">Choose your cover</p>
-            <p className="text-sm text-muted-foreground mb-4">Pick an image. You can change it anytime.</p>
-            <div className="grid grid-cols-4 gap-2 overflow-y-auto pr-1 pb-1">
+          <div className="fixed left-1/2 top-1/2 z-50 flex max-h-[80vh] w-[min(520px,100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-border bg-background p-5 shadow-xl">
+            <p className="mb-1 text-sm font-semibold text-foreground">Choose your cover</p>
+            <p className="mb-4 text-sm text-muted-foreground">Pick an image. You can change it anytime.</p>
+            <div className="grid grid-cols-4 gap-2 overflow-y-auto pb-1 pr-1">
               {HERO_IMAGES.slice(0, 8).map((hero) => (
                 <button
                   key={hero.id}
@@ -254,7 +245,7 @@ export function ProfileHeader({
                     "relative aspect-[4/3] overflow-hidden rounded-lg border transition-all",
                     heroUrl === hero.url
                       ? "border-foreground ring-2 ring-foreground/20"
-                      : "border-border hover:border-muted-foreground/50"
+                      : "border-border hover:border-muted-foreground/50",
                   )}
                 >
                   <Image src={hero.url} alt={hero.label} fill sizes="120px" className="object-cover" />

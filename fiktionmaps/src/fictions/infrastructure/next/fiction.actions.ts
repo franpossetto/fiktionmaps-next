@@ -41,6 +41,7 @@ import {
 import { parseFictionAppRoute } from "@/lib/navigation/parse-fiction-app-route"
 import type { NavSearchScope } from "@/src/fictions/domain/nav-search-scope"
 import { resolvePlaceForFictionPathCached } from "@/src/places/infrastructure/next/place.queries"
+import { parseImageFocusFromFormData } from "@/lib/asset-images/image-focus"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
 import { THUMB_UPLOAD_VARIANTS } from "@/lib/asset-images/variant-sizes"
 import {
@@ -238,6 +239,7 @@ async function createFictionWithImagesFromParsed(
         variants: THUMB_UPLOAD_VARIANTS,
         file: coverFile,
         replace: true,
+        focus: parseImageFocusFromFormData(formData, "cover"),
       })
     }
   }
@@ -251,6 +253,7 @@ async function createFictionWithImagesFromParsed(
         variants: ["lg"],
         file: bannerFile,
         replace: true,
+        focus: parseImageFocusFromFormData(formData, "banner"),
       })
     }
   }
@@ -293,7 +296,15 @@ export async function uploadFictionImageAction(
   if (validationError) return { success: false, error: validationError }
 
   const variants = role === "cover" ? THUMB_UPLOAD_VARIANTS : (["lg"] as const)
-  const result = await uploadEntityImage({ entityType: "fiction", entityId: fictionId, role, variants, file, replace: true })
+  const result = await uploadEntityImage({
+    entityType: "fiction",
+    entityId: fictionId,
+    role,
+    variants,
+    file,
+    replace: true,
+    focus: parseImageFocusFromFormData(formData),
+  })
 
   if (!result.success) return result
 
@@ -311,6 +322,22 @@ export async function uploadFictionImageAction(
 }
 
 export async function updateFictionAction(id: string, formData: FormData): Promise<UpdateFictionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: "Unauthorized" }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  if (!isStaffModerator) return { success: false, error: "Unauthorized" }
+
+  if (!uuidSchema.safeParse(id).success) return { success: false, error: "Invalid fictionId" }
+
   const parsed = parseUpdateFictionFormData(formData)
   if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
 
@@ -416,6 +443,22 @@ export async function createContributorFictionWithImagesAction(formData: FormDat
 }
 
 export async function deleteFictionAction(id: string): Promise<DeleteFictionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: "Unauthorized" }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  if (!isStaffModerator) return { success: false, error: "Unauthorized" }
+
+  if (!uuidSchema.safeParse(id).success) return { success: false, error: "Invalid fictionId" }
+
   const ok = await deleteFictionUseCase(id, fictionsRepo)
   if (!ok) return { success: false, error: "Failed to delete fiction" }
   revalidatePath("/admin")
@@ -425,6 +468,22 @@ export async function deleteFictionAction(id: string): Promise<DeleteFictionResu
 }
 
 export async function setFictionActiveAction(id: string, active: boolean): Promise<SetFictionActiveResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: "Unauthorized" }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  if (!isStaffModerator) return { success: false, error: "Unauthorized" }
+
+  if (!uuidSchema.safeParse(id).success) return { success: false, error: "Invalid fictionId" }
+
   const fiction = await updateFictionUseCase(id, { active }, fictionsRepo)
   if (!fiction) return { success: false, error: "Failed to update fiction" }
   revalidatePath("/admin")

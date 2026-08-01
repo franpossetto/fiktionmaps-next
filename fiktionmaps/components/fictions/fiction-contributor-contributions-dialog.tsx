@@ -108,7 +108,7 @@ function ContributionRow({
   const t = useTranslations("Fictions")
   const action = getFictionContributorActionFromItem(item)
   const params = {
-    place: action.params.place || t("contributorModalFallbackPlace"),
+    place: action.params.place || (item.entityType === "scene" ? t("contributorModalFallbackScene") : t("contributorModalFallbackPlace")),
   }
   const showCrown = item.type === "create_fiction" && item.entityType === "fiction"
 

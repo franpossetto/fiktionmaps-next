@@ -11,17 +11,16 @@ import type { Scene } from "@/src/scenes/domain/scene.entity"
 import type { ContributorProfileWithDate } from "@/src/contributions/domain/contribution.entity"
 import { PlaceContributorsByline } from "@/components/fictions/place-contributors-byline"
 import { PlaceShootEnvironmentBadge } from "@/components/places/place-shoot-environment-badge"
-import { getPlaceContributorsAction } from "@/src/contributions/infrastructure/next/contribution.actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { DEFAULT_FICTION_ACCENT, DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import { publicFictionPlacePath } from "@/lib/fictions/public-fiction-paths"
+import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { SceneClipPanelCard } from "./scene-clip-panel-card"
 import { getActiveFictionsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
-import { getPlaceLocationDetailAction } from "@/src/places/infrastructure/next/place.actions"
-import { listScenesAction } from "@/src/scenes/infrastructure/next/scene.actions"
+import { loadMapLocationPanel } from "@/lib/map/map-location-panel-cache"
 
 interface LocationDetailProps {
   place: Place
@@ -53,6 +52,7 @@ export function LocationDetail({
   const [placeScenes, setPlaceScenes] = useState<Scene[]>([])
   const [placeDetail, setPlaceDetail] = useState<Place | null>(null)
   const [placeContributors, setPlaceContributors] = useState<ContributorProfileWithDate[]>([])
+  const [panelLoading, setPanelLoading] = useState(true)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLElement>(null)
   const [portalReady, setPortalReady] = useState(false)
@@ -103,42 +103,22 @@ export function LocationDetail({
 
   useEffect(() => {
     let cancelled = false
-    setPlaceDetail(null)
-    getPlaceLocationDetailAction(place.id)
-      .then((detail) => {
-        if (!cancelled) setPlaceDetail(detail)
+    setPanelLoading(true)
+    // Keep pin thumb visible; don't wipe contributors to empty flash if prefetch already settled.
+    loadMapLocationPanel(place.id)
+      .then((panel) => {
+        if (cancelled) return
+        setPlaceDetail(panel.place)
+        setPlaceScenes(panel.scenes)
+        setPlaceContributors(panel.contributors)
+        setPanelLoading(false)
       })
       .catch(() => {
-        if (!cancelled) setPlaceDetail(null)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [place.id])
-
-  useEffect(() => {
-    let cancelled = false
-    listScenesAction({ placeId: place.id, active: "true" })
-      .then((s) => {
-        if (!cancelled) setPlaceScenes(s)
-      })
-      .catch(() => {
-        if (!cancelled) setPlaceScenes([])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [place.id])
-
-  useEffect(() => {
-    let cancelled = false
-    setPlaceContributors([])
-    getPlaceContributorsAction(place.id)
-      .then((rows) => {
-        if (!cancelled) setPlaceContributors(rows)
-      })
-      .catch(() => {
-        if (!cancelled) setPlaceContributors([])
+        if (cancelled) return
+        setPlaceDetail(null)
+        setPlaceScenes([])
+        setPlaceContributors([])
+        setPanelLoading(false)
       })
     return () => {
       cancelled = true
@@ -146,8 +126,11 @@ export function LocationDetail({
   }, [place.id])
 
   const displayName = place.name
-  const heroSrc =
-    placeDetail?.image?.trim() || place.image?.trim() || DEFAULT_FICTION_COVER
+  /** Pin payload is xs — only use as LQIP; hero waits for lg from panel. */
+  const pinThumb = place.image?.trim() || null
+  const heroLg = placeDetail?.image?.trim() || null
+  const heroSrc = heroLg || pinThumb || DEFAULT_FICTION_COVER
+  const heroIsLqip = !heroLg && Boolean(pinThumb)
   const placeDescription = placeDetail?.description?.trim() || place.description?.trim()
   const shootEnvironment = placeDetail?.shootEnvironment ?? place.shootEnvironment
   const fictionMeta = [fiction?.year, fiction?.genre, fiction?.author].filter(Boolean).join(" · ")
@@ -218,18 +201,39 @@ export function LocationDetail({
                 </div>
               </div>
 
-              <div className="relative aspect-[21/9] overflow-hidden rounded-xl border border-border/60">
+              <div className="relative aspect-[21/9] overflow-hidden rounded-xl border border-border/60 bg-muted/40">
+                {pinThumb && heroLg && pinThumb !== heroLg ? (
+                  <Image
+                    src={pinThumb}
+                    alt=""
+                    fill
+                    aria-hidden
+                    className="object-cover scale-105 blur-md"
+                    sizes="(max-width: 768px) 100vw, 580px"
+                  />
+                ) : null}
                 <Image
+                  key={heroLg || place.id}
                   src={heroSrc}
                   alt={displayName}
                   fill
-                  className="object-cover"
+                  className={cn(
+                    "object-cover transition-[filter,transform,opacity] duration-300",
+                    heroIsLqip ? "scale-105 blur-md" : "blur-0 scale-100",
+                  )}
                   sizes="(max-width: 768px) 100vw, 580px"
                   priority
                 />
               </div>
 
-              <PlaceContributorsByline contributors={placeContributors} className="max-w-full" />
+              {panelLoading && placeContributors.length === 0 ? (
+                <div className="flex items-center gap-2.5" aria-hidden>
+                  <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-muted" />
+                  <div className="h-4 w-40 animate-pulse rounded bg-muted" />
+                </div>
+              ) : (
+                <PlaceContributorsByline contributors={placeContributors} className="max-w-full" />
+              )}
 
               {placeDescription ? (
                 <p className="text-sm leading-relaxed text-muted-foreground sm:text-base sm:leading-8">

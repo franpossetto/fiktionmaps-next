@@ -6,6 +6,7 @@ import {
   pin2dPointerColorClass,
   pin2dPointerSizeClass,
   pinConicRingClass,
+  pinRoundImageClipClass,
   pinStrokeBorderClass,
 } from "@/lib/map/pin-marker-styles"
 import { PinMarkerLabel } from "../pin-marker-label"
@@ -17,6 +18,7 @@ import { PinMarkerRoot } from "../motion"
 /** Round 2D pin with conic ring (settings: marker2dShape = round). */
 export function PlaceMarker2dRound({
   imageSrc,
+  imageFocus,
   label,
   labelMode,
   hoverScaleMode,
@@ -56,7 +58,7 @@ export function PlaceMarker2dRound({
                 className={`absolute inset-0 rounded-full ${pinConicRingClass} ${active ? "pin3d-spin opacity-100" : "opacity-60"}`}
               />
               <div
-                className={`relative overflow-hidden rounded-full ${pinStrokeBorderClass} ${
+                className={`relative ${pinRoundImageClipClass} ${pinStrokeBorderClass} ${
                   isSelected ? "ring-2 ring-black/20 dark:ring-white/30" : ""
                 }`}
                 style={{ width: inner, height: inner }}
@@ -65,15 +67,13 @@ export function PlaceMarker2dRound({
                   src={imageSrc}
                   alt={label}
                   fill
-                  className="object-cover"
+                  className="rounded-full object-cover"
+                  style={{
+                    objectPosition: `${imageFocus?.x ?? 50}% ${imageFocus?.y ?? 50}%`,
+                  }}
                   sizes="128px"
                   quality={85}
                 />
-                {showStackBadge && (
-                  <span className="absolute -right-0.5 -top-0.5 z-[2] flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-background bg-[#e8365d] px-1 text-[10px] font-bold text-white shadow-md">
-                    {stackSize}
-                  </span>
-                )}
                 <div
                   className="pointer-events-none absolute inset-0 rounded-full"
                   style={{
@@ -82,6 +82,11 @@ export function PlaceMarker2dRound({
                   }}
                 />
               </div>
+              {showStackBadge && (
+                <span className="absolute -right-0.5 -top-0.5 z-[2] flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-background bg-[#e8365d] px-1 text-[10px] font-bold text-white shadow-md">
+                  {stackSize}
+                </span>
+              )}
             </div>
           </>
         }

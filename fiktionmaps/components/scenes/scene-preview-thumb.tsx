@@ -2,6 +2,13 @@ import Image from "next/image"
 import { Clapperboard } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
+import { sceneListVideoUrl } from "@/src/scenes/domain/scene.helpers"
+
+/** Force browsers to decode a visible frame for list thumbs (`preload=metadata` alone is often blank). */
+function videoThumbSrc(url: string): string {
+  if (url.includes("#")) return url
+  return `${url}#t=0.1`
+}
 
 /**
  * List/sidebar preview: prefers `asset_images` thumbnail; otherwise shows first frame via `<video preload="metadata">`.
@@ -16,7 +23,7 @@ export function ScenePreviewThumb({
   sizes?: string
 }) {
   const thumb = scene.thumbnail?.trim()
-  const video = scene.videoUrl?.trim()
+  const video = sceneListVideoUrl(scene)
 
   return (
     <div
@@ -29,7 +36,7 @@ export function ScenePreviewThumb({
         <Image src={thumb} alt={scene.title} fill className="object-cover" sizes={sizes} />
       ) : video ? (
         <video
-          src={video}
+          src={videoThumbSrc(video)}
           muted
           playsInline
           preload="metadata"

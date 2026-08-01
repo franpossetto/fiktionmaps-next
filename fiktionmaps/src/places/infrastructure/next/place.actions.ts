@@ -9,7 +9,6 @@ import { resolveEntityContributionInsertDefaults } from "@/src/contributions/app
 import { uuidSchema } from "@/lib/validation/primitives"
 import type { MapBbox } from "@/lib/validation/map-query"
 import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
-import { listApprovedFictionPlacesUseCase } from "@/src/places/application/list-approved-fiction-places.usecase"
 import {
   getPlacePhotoContributeContextUseCase,
   type PlacePhotoContributeContext,
@@ -17,6 +16,7 @@ import {
 import { createPlaceUseCase } from "@/src/places/application/create-place.usecase"
 import { updatePlaceUseCase } from "@/src/places/application/update-place.usecase"
 import { deletePlaceUseCase } from "@/src/places/application/delete-place.usecase"
+import { parseImageFocusFromFormData } from "@/lib/asset-images/image-focus"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
 import { THUMB_UPLOAD_VARIANTS } from "@/lib/asset-images/variant-sizes"
 import {
@@ -28,11 +28,25 @@ import {
   listCityIdsWithPlacesCached,
   listMapSearchCatalogCached,
   listPlacesInBboxForFictionIds,
+  listMapPlacesInBboxCached,
+  listMapClustersInBboxCached,
 } from "./place.queries"
+import { getMapLocationPanelUseCase } from "@/src/places/application/get-map-location-panel.usecase"
+import type { MapLocationPanel } from "@/src/places/application/get-map-location-panel.usecase"
+import { getScenesForPlace } from "@/src/scenes/infrastructure/next/scene.queries"
+import { getPlaceContributorsWithDatesCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import type { MapSearchCatalog } from "@/src/places/domain/map-search-catalog.entity"
+import type { MapCluster } from "@/src/places/domain/map-cluster.entity"
 import type { Place } from "@/src/places/domain/place.entity"
+import {
+  WORLD_MAX_CLUSTERS,
+  WORLD_MAX_PLACES,
+} from "@/lib/map/world-map"
 import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
 import { getFictionByIdCached } from "@/src/fictions/infrastructure/next/fiction.queries"
+import { getCityByIdUseCase } from "@/src/cities/application/get-city-by-id.usecase"
+import { cityHasPublicPlacesUseCase } from "@/src/cities/application/city-has-public-places.usecase"
+import { supabaseRepositoryAdapter as citiesRepo } from "@/src/cities/infrastructure/supabase/city.repository.impl"
 import { createContributionAction } from "@/src/contributions/infrastructure/next/contribution.actions"
 import { parsePlaceContributeFormData } from "@/src/places/domain/place-contribute.schemas"
 import { markHuntCandidatePostedUseCase } from "@/src/hunts/application/mark-hunt-candidate-posted.usecase"
@@ -115,6 +129,7 @@ export async function uploadPlaceImageAction(
     variants: THUMB_UPLOAD_VARIANTS,
     file,
     replace: true,
+    focus: parseImageFocusFromFormData(formData),
   })
 
   if (!result.success) return result
@@ -139,15 +154,27 @@ export async function getPlaceLocationDetailAction(placeId: string): Promise<Pla
   return getPlaceLocationByIdDetailCached(placeId)
 }
 
+/** Map sidebar: detail + scenes + contributors in one round-trip (uuid-validated). */
+export async function getMapLocationPanelAction(placeId: string): Promise<MapLocationPanel> {
+  if (!uuidSchema.safeParse(placeId).success) {
+    return { place: null, scenes: [], contributors: [] }
+  }
+  return getMapLocationPanelUseCase(placeId, {
+    getPlaceDetail: getPlaceLocationByIdDetailCached,
+    listActiveScenesForPlace: getScenesForPlace,
+    getContributors: getPlaceContributorsWithDatesCached,
+  })
+}
+
 export async function getFictionPlacesAction(fictionId: string): Promise<Place[]> {
   if (!uuidSchema.safeParse(fictionId).success) return []
   return getFictionPlacesCached(fictionId)
 }
 
-/** Approved active places for contribute photo wizard (fiction-scoped list). */
+/** Approved active places for contribute wizards (fiction-scoped, anon cache). */
 export async function getApprovedFictionPlacesForContributeAction(fictionId: string): Promise<Place[]> {
   if (!uuidSchema.safeParse(fictionId).success) return []
-  return listApprovedFictionPlacesUseCase(fictionId, placesRepo)
+  return getFictionPlacesCached(fictionId)
 }
 
 export type { PlacePhotoContributeContext } from "@/src/places/application/get-place-photo-contribute-context.usecase"
@@ -168,6 +195,29 @@ export async function getPlacesInBboxAction(fictionIds: string[], bbox: MapBbox)
   const { west, south, east, north } = bbox
   if (![west, south, east, north].every((n) => Number.isFinite(n))) return []
   return listPlacesInBboxForFictionIds(fictionIds, bbox)
+}
+
+/** Free-world detail zoom: places in viewport (optional fiction filter, hard cap). */
+export async function getMapPlacesInBboxAction(
+  bbox: MapBbox,
+  fictionIds?: string[] | null,
+  limit: number = WORLD_MAX_PLACES,
+): Promise<Place[]> {
+  const { west, south, east, north } = bbox
+  if (![west, south, east, north].every((n) => Number.isFinite(n))) return []
+  return listMapPlacesInBboxCached(bbox, fictionIds, limit)
+}
+
+/** Free-world low zoom: server grid clusters. */
+export async function getMapClustersInBboxAction(
+  bbox: MapBbox,
+  zoom: number,
+  fictionIds?: string[] | null,
+  maxClusters: number = WORLD_MAX_CLUSTERS,
+): Promise<MapCluster[]> {
+  const { west, south, east, north } = bbox
+  if (![west, south, east, north, zoom].every((n) => Number.isFinite(n))) return []
+  return listMapClustersInBboxCached(bbox, zoom, fictionIds, maxClusters)
 }
 
 /** City IDs that have at least one place (map city picker: disable others). */
@@ -212,6 +262,22 @@ export async function createPlaceAction(data: CreatePlaceData): Promise<CreatePl
 }
 
 export async function updatePlaceAction(placeId: string, data: UpdatePlaceData): Promise<UpdatePlaceResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: "Unauthorized" }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  if (!isStaffModerator) return { success: false, error: "Unauthorized" }
+
+  if (!uuidSchema.safeParse(placeId).success) return { success: false, error: "Invalid placeId" }
+
   const ok = await updatePlaceUseCase(placeId, data, placesRepo)
   if (!ok) return { success: false, error: "Place not found or update failed" }
   updateTag("places")
@@ -219,6 +285,22 @@ export async function updatePlaceAction(placeId: string, data: UpdatePlaceData):
 }
 
 export async function deletePlaceAction(placeId: string): Promise<DeletePlaceResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: "Unauthorized" }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  if (!isStaffModerator) return { success: false, error: "Unauthorized" }
+
+  if (!uuidSchema.safeParse(placeId).success) return { success: false, error: "Invalid placeId" }
+
   const ok = await deletePlaceUseCase(placeId, placesRepo)
   if (!ok) return { success: false, error: "Place not found or delete failed" }
   updateTag("places")
@@ -265,6 +347,7 @@ export async function createContributorPlaceWithImageAction(
       description: parsed.data.description,
       isLandmark: parsed.data.isLandmark,
       locationType: parsed.data.locationType ?? null,
+      shootEnvironment: parsed.data.shootEnvironment ?? null,
       streetViewReference: parsed.data.streetViewReference ?? null,
       status,
       created_by,
@@ -289,6 +372,7 @@ export async function createContributorPlaceWithImageAction(
         variants: THUMB_UPLOAD_VARIANTS,
         file: parsed.imageFile,
         replace: true,
+        focus: parseImageFocusFromFormData(formData),
       })
     }
   }
@@ -299,7 +383,11 @@ export async function createContributorPlaceWithImageAction(
   updateTag(`place-${result.placeId}`)
   updateTag("contributions")
 
-  const fiction = await getFictionByIdCached(parsed.data.fictionId)
+  const [fiction, city, cityHasPublicPlaces] = await Promise.all([
+    getFictionByIdCached(parsed.data.fictionId),
+    getCityByIdUseCase(parsed.data.cityId, citiesRepo),
+    cityHasPublicPlacesUseCase(parsed.data.cityId, citiesRepo),
+  ])
 
   if (parsed.huntId != null && parsed.placeIndex != null) {
     try {
@@ -331,6 +419,9 @@ export async function createContributorPlaceWithImageAction(
     placeSlug: result.slug,
     fictionId: parsed.data.fictionId,
     fictionSlug: fiction?.slug ?? "",
+    cityId: parsed.data.cityId,
+    citySlug: city?.slug ?? "",
+    cityHasPublicPlaces,
   }
   if (typeof contributionAutoApproved === "boolean") {
     return { ...out, contributionAutoApproved }

@@ -18,7 +18,7 @@
 
 ### Places, slugs & naming (pendiente)
 
-- [ ] **[places] G1 — Docs**: update `docs/places-locations-design.md` (`places.name`, `places.slug`, place vs location semantics).
+- [ ] **[places] G1 — Docs**: update `docs/reference/places-and-locations.md` (`places.name`, `places.slug`, place vs location semantics).
 - [ ] **[places] G2 — Future**: scene slugs (keep `sceneId` in URL for now).
 - [ ] **[places] QA**: manual pass after applying migration `043` locally/prod.
 
@@ -59,7 +59,7 @@
 
 #### Fase 4 — Coherencia de arquitectura
 - [x] **[CLN-7] Migrar `users` a la regla de arquitectura**: `getProfilesPageCached` movido de `supabase.from` directo en `user.queries.ts` a `getProfilesPageUseCase` + `UsersRepositoryPort.listProfilesPage` en repo impl. Sin `supabase.from` de tablas de negocio en `infrastructure/next/users`.
-- [x] **[CLN-8] Unificar documentación de arquitectura**: reescritos `src/README.md` y `docs/architecture-modules.md` (eliminada referencia obsoleta a `lib/server`, `*.services.ts`, `*.repository.port.ts`). Alineados con `.cursor/rules/fiktionmaps-architecture.mdc`.
+- [x] **[CLN-8] Unificar documentación de arquitectura**: reescritos `src/README.md` y `docs/reference/architecture.md` (eliminada referencia obsoleta a `lib/server`, `*.services.ts`, `*.repository.port.ts`). Alineados con `.cursor/rules/fiktionmaps-architecture.mdc`.
 
 #### Fase 5 — Performance de runtime
 - [x] **[CLN-9] Activar optimización de imágenes**: `images.unoptimized` removido de `next.config.ts` (Next Image + `sharp` activos). `priority` + `sizes` en heroes de fiction-detail, fiction-place-detail y city-detail. `unoptimized` solo en blobs/previews (wizards, admin upload). Admin/checkins: quitado `unoptimized` innecesario en URLs remotas.
@@ -112,5 +112,5 @@
 
 ## Related docs
 
-- [ ] Update `docs/places-locations-design.md` (see Places G1)
-- [ ] Image loading optimization — see `docs/plan-image-loading-optimization.md`
+- [ ] Update `docs/reference/places-and-locations.md` (see Places G1)
+- [ ] Image loading optimization — see `docs/plans/image-loading-optimization.md`

@@ -42,7 +42,7 @@ export async function FictionDetailRightRail({
             {initialCities.map((city) => (
               <li key={city.id} className="text-sm">
                 <Link
-                  href={`/cities/${city.id}`}
+                  href={`/cities/${city.slug}`}
                   className="inline-flex items-center gap-1 text-muted-foreground transition-colors hover:text-foreground"
                 >
                   <MapPin className="h-3.5 w-3.5 shrink-0" />

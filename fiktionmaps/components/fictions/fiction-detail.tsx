@@ -1,169 +1,73 @@
-"use client"
-
-import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
-import { ChevronRight, Compass, Heart, MapPin } from "lucide-react"
+import { Compass, MapPin } from "lucide-react"
+import { getFormatter, getTranslations } from "next-intl/server"
 import { DEFAULT_FICTION_COVER } from "@/lib/constants/placeholders"
 import { Link } from "@/i18n/navigation"
-import { useAuth } from "@/context/auth-context"
-import { useFormatter, useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { FictionCard } from "@/components/fictions/fiction-card"
 import { FictionDetailPlacesEmpty } from "@/components/fictions/fiction-detail-places-empty"
+import { FictionDetailSectionHeading } from "@/components/fictions/fiction-detail-section-heading"
 import { FictionInterestTags, type FictionInterestTagItem } from "@/components/fictions/fiction-interest-tags"
+import { FictionDetailLikeButton } from "@/components/fictions/fiction-detail-like-button"
+import { FictionDetailPlaceLikeButton } from "@/components/fictions/fiction-detail-place-like-button"
+import { FictionDetailRecentTracker } from "@/components/fictions/fiction-detail-recent-tracker"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Place } from "@/src/places/domain/place.entity"
-import { getFictionLikeCountsAction } from "@/src/fictions/infrastructure/next/fiction.actions"
-import { getMyLikedFictionIdsAction, toggleFictionLikeAction } from "@/src/users/infrastructure/next/user.actions"
-import { localStorageService } from "@/lib/local-storage-service"
-import type { FictionDetailRecommendationReason } from "@/src/fictions/application/get-fiction-detail-recommendations.usecase"
+import type { ReactNode } from "react"
 
 export interface FictionDetailProps {
   fiction: FictionWithMedia
   initialPlaces: Place[]
   initialCities: City[]
   initialLikeCount: number
-  initialLiked: boolean
+  /** From RSC session when available. */
+  initialLiked?: boolean
   /** Shown in main column below `xl` (right rail is `xl`+ only). */
   fictionInterestTags?: FictionInterestTagItem[]
-  /** Movie recommendations (same city → interests → random); see `fictionRecommendationReason` for copy. */
-  fictionRecommendations?: FictionWithMedia[]
-  fictionRecommendationReason?: FictionDetailRecommendationReason
-  fictionRecommendationPlaceCounts?: Record<string, number>
+  /** Deferred recommendations (Suspense slot) rendered after places list. */
+  recommendationsSlot?: ReactNode
 }
 
-export function FictionDetail({
+/** Server Component: hero + copy + places SSR; likes are client islands. */
+export async function FictionDetail({
   fiction,
   initialPlaces,
   initialCities,
   initialLikeCount,
-  initialLiked,
+  initialLiked = false,
   fictionInterestTags = [],
-  fictionRecommendations = [],
-  fictionRecommendationReason,
-  fictionRecommendationPlaceCounts = {},
+  recommendationsSlot,
 }: FictionDetailProps) {
-  const { user, isAuthReady } = useAuth()
-  const t = useTranslations("Fictions")
-  const tMeta = useTranslations("Metadata")
-  const format = useFormatter()
-  const [liked, setLiked] = useState(initialLiked)
-  const [likeCount, setLikeCount] = useState(initialLikeCount)
-  const [likeBusy, setLikeBusy] = useState(false)
-  const [coverError, setCoverError] = useState(false)
-  const [likedPlaces, setLikedPlaces] = useState<Record<string, boolean>>({})
-  const previousUserId = useRef<string | null | undefined>(undefined)
+  const t = await getTranslations("Fictions")
+  const tMeta = await getTranslations("Metadata")
+  const format = await getFormatter()
 
-  useEffect(() => {
-    localStorageService.recentFictions.add({ id: fiction.id, slug: fiction.slug })
-  }, [fiction.id, fiction.slug])
-
-  useEffect(() => {
-    setLiked(initialLiked)
-    setLikeCount(initialLikeCount)
-  }, [fiction.id, initialLiked, initialLikeCount])
-
-  useEffect(() => {
-    if (initialLikeCount !== undefined) return
-    let cancelled = false
-    getFictionLikeCountsAction([fiction.id])
-      .then((counts) => {
-        if (!cancelled) setLikeCount(counts[fiction.id] ?? 0)
-      })
-      .catch(() => {
-        if (!cancelled) setLikeCount(0)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [fiction.id, initialLikeCount])
-
-  useEffect(() => {
-    if (!isAuthReady) return
-
-    if (!user) {
-      setLiked(false)
-      previousUserId.current = null
-      return
-    }
-
-    const prev = previousUserId.current
-    const uid = user.id
-
-    if (prev === undefined) {
-      previousUserId.current = uid
-      setLiked(initialLiked)
-      return
-    }
-
-    if (prev === null || prev !== uid) {
-      previousUserId.current = uid
-      let cancelled = false
-      getMyLikedFictionIdsAction()
-        .then((ids) => {
-          if (!cancelled) setLiked(ids.includes(fiction.id))
-        })
-        .catch(() => {
-          if (!cancelled) setLiked(false)
-        })
-      return () => {
-        cancelled = true
-      }
-    }
-  }, [isAuthReady, user, fiction.id, initialLiked])
-
-  async function handleToggleLike() {
-    if (!user || likeBusy) return
-    const wasLiked = liked
-    const prevCount = likeCount
-    setLikeBusy(true)
-    setLiked(!wasLiked)
-    setLikeCount(wasLiked ? Math.max(0, prevCount - 1) : prevCount + 1)
-    try {
-      const result = await toggleFictionLikeAction(fiction.id)
-      if (!result.success) {
-        setLiked(wasLiked)
-        setLikeCount(prevCount)
-        return
-      }
-      setLiked(result.liked)
-      setLikeCount(result.likeCount)
-    } catch {
-      setLiked(wasLiked)
-      setLikeCount(prevCount)
-    } finally {
-      setLikeBusy(false)
-    }
-  }
-
-  function togglePlaceLike(locationId: string) {
-    setLikedPlaces((prev) => ({
-      ...prev,
-      [locationId]: !prev[locationId],
-    }))
-  }
-
-  const locationRows = useMemo(() => {
-    const cityById = new Map(initialCities.map((city) => [city.id, city]))
-    return initialPlaces.map((location, index) => ({
-      index: index + 1,
-      location,
-      city: cityById.get(location.location.cityId),
-    }))
-  }, [initialPlaces, initialCities])
+  const cityById = new Map(initialCities.map((city) => [city.id, city]))
+  const locationRows = initialPlaces.map((location, index) => ({
+    index: index + 1,
+    location,
+    city: cityById.get(location.location.cityId),
+  }))
 
   const heroSrc =
-    !coverError &&
-    (fiction.bannerImage?.trim() || fiction.coverImageLarge?.trim() || fiction.coverImage?.trim())
-      ? (fiction.bannerImage?.trim() || fiction.coverImageLarge?.trim() || fiction.coverImage?.trim())!
-      : DEFAULT_FICTION_COVER
+    fiction.bannerImage?.trim() ||
+    fiction.coverImageLarge?.trim() ||
+    fiction.coverImage?.trim() ||
+    DEFAULT_FICTION_COVER
+  const heroFocus = fiction.bannerImage?.trim()
+    ? fiction.bannerFocus
+    : fiction.coverFocus
+  const heroObjectPosition = `${heroFocus?.x ?? 50}% ${heroFocus?.y ?? 50}%`
 
-  const firstCityId = initialCities[0]?.id ?? initialPlaces[0]?.location.cityId
-  const exploreMapHref = firstCityId
-    ? `/map?fiction=${encodeURIComponent(fiction.id)}&city=${encodeURIComponent(firstCityId)}`
+  const firstCity =
+    initialCities[0] ??
+    (initialPlaces[0]?.location.cityId
+      ? cityById.get(initialPlaces[0].location.cityId)
+      : undefined)
+  const exploreMapHref = firstCity
+    ? `/map?fiction=${encodeURIComponent(fiction.id)}&city=${encodeURIComponent(firstCity.slug)}`
     : `/map?fiction=${encodeURIComponent(fiction.id)}`
 
   const cityNamesForHeadline = initialCities.map((c) => c.name)
@@ -182,26 +86,9 @@ export function FictionDetail({
   const headline = t(headlineKey, { title: fiction.title, city: headlineCityLabel })
   const pathSlug = fiction.slug.trim()
 
-  const recommendationsDescription = (() => {
-    if (!fictionRecommendationReason) return ""
-    switch (fictionRecommendationReason) {
-      case "same_city":
-        return t("fictionRecommendationsSameCity")
-      case "shared_interests_no_places":
-        return t("fictionRecommendationsSharedInterestsNoPlaces")
-      case "shared_interests_no_city_peers":
-        return t("fictionRecommendationsSharedInterestsNoCityPeers")
-      case "random_no_matches":
-        return t("fictionRecommendationsRandomNoMatches")
-      case "random_no_places_no_interests":
-        return t("fictionRecommendationsRandomNoPlacesNoInterests")
-      default:
-        return ""
-    }
-  })()
-
   return (
     <main className="px-6 py-8 sm:px-8 lg:px-10">
+      <FictionDetailRecentTracker fictionId={fiction.id} fictionSlug={fiction.slug} />
       <div className="mx-auto w-full max-w-[920px]">
         <div className="mb-6 flex items-center justify-between gap-3">
           <PageBreadcrumb
@@ -213,19 +100,11 @@ export function FictionDetail({
             ]}
           />
           <div className="flex items-center gap-2">
-            {user && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleToggleLike}
-                disabled={likeBusy}
-                aria-label={liked ? t("unlike") : t("like")}
-                className="gap-1.5"
-              >
-                <Heart className={`h-4 w-4 ${liked ? "text-rose-500" : ""}`} fill={liked ? "currentColor" : "none"} />
-                {likeCount > 0 && <span className="text-xs tabular-nums">{likeCount}</span>}
-              </Button>
-            )}
+            <FictionDetailLikeButton
+              fictionId={fiction.id}
+              initialLikeCount={initialLikeCount}
+              initialLiked={initialLiked}
+            />
             <Button asChild size="sm" variant="cta">
               <Link href={exploreMapHref}>
                 <Compass className="h-4 w-4" />
@@ -261,9 +140,9 @@ export function FictionDetail({
                 alt={fiction.title}
                 fill
                 className="object-cover"
+                style={{ objectPosition: heroObjectPosition }}
                 sizes="(max-width: 1024px) 100vw, 920px"
                 priority
-                onError={() => setCoverError(true)}
               />
             </div>
             {fiction.description && (
@@ -290,20 +169,14 @@ export function FictionDetail({
           </header>
 
           <section className="space-y-5">
-            <div>
-              <div className="flex items-center gap-3">
-                <span className="h-7 w-1 rounded-full bg-yellow-500" aria-hidden />
-                <h2 className="text-3xl font-semibold tracking-tight text-foreground">{t("filmingLocationsHeading")}</h2>
-                <span className="text-base font-medium text-muted-foreground">{locationRows.length}</span>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <p className="mt-1.5 text-base text-muted-foreground">
-                {t("placesAcrossCities", {
-                  placeCount: locationRows.length,
-                  cityCount: initialCities.length,
-                })}
-              </p>
-            </div>
+            <FictionDetailSectionHeading
+              title={t("filmingLocationsHeading")}
+              count={locationRows.length}
+              description={t("placesAcrossCities", {
+                placeCount: locationRows.length,
+                cityCount: initialCities.length,
+              })}
+            />
 
             {locationRows.length === 0 ? (
               <FictionDetailPlacesEmpty />
@@ -327,6 +200,9 @@ export function FictionDetail({
                               alt={location.name}
                               fill
                               className="object-cover"
+                              style={{
+                                objectPosition: `${location.imageFocus?.x ?? 50}% ${location.imageFocus?.y ?? 50}%`,
+                              }}
                               sizes="96px"
                             />
                           </div>
@@ -347,18 +223,7 @@ export function FictionDetail({
                               {t("mapsShort")}
                             </a>
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="h-9 w-9 p-0"
-                            aria-label={likedPlaces[location.id] ? t("unlikePlace") : t("likePlace")}
-                            onClick={() => togglePlaceLike(location.id)}
-                          >
-                            <Heart
-                              className={`h-4 w-4 ${likedPlaces[location.id] ? "text-rose-500" : ""}`}
-                              fill={likedPlaces[location.id] ? "currentColor" : "none"}
-                            />
-                          </Button>
+                          <FictionDetailPlaceLikeButton placeId={location.id} />
                         </div>
                       </div>
                     </li>
@@ -368,27 +233,7 @@ export function FictionDetail({
             )}
           </section>
 
-          {fictionRecommendations.length > 0 && (
-            <section className="space-y-5 border-t border-border/60 pt-8">
-              <div className="flex items-center gap-3">
-                <span className="h-7 w-1 rounded-full bg-yellow-500" aria-hidden />
-                <h2 className="text-3xl font-semibold tracking-tight text-foreground">{t("fictionRecommendationsTitle")}</h2>
-                <span className="text-base font-medium text-muted-foreground">{fictionRecommendations.length}</span>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <p className="text-base text-muted-foreground">{recommendationsDescription}</p>
-              <div className="grid grid-cols-[repeat(2,minmax(0,172px))] gap-3 sm:grid-cols-[repeat(3,minmax(0,172px))]">
-                {fictionRecommendations.map((rec) => (
-                  <FictionCard
-                    key={rec.id}
-                    fiction={rec}
-                    locationCount={fictionRecommendationPlaceCounts[rec.id] ?? 0}
-                    href={`/fictions/${rec.slug}`}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
+          {recommendationsSlot}
         </article>
       </div>
     </main>

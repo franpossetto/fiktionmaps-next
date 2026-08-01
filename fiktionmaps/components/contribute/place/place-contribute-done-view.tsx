@@ -16,8 +16,11 @@ export interface PlaceContributeDoneViewProps {
   placeName: string
   imageSrc: string | null
   placeHref: string
-  returnHref?: string
+  /** When null, falls back to `/map` unless `returnDisabled`. */
+  returnHref?: string | null
   returnLabel?: string
+  /** Pending place in a city not yet on the public map. */
+  returnDisabled?: boolean
   className?: string
 }
 
@@ -28,12 +31,18 @@ export function PlaceContributeDoneView({
   placeHref,
   returnHref,
   returnLabel,
+  returnDisabled = false,
   className,
 }: PlaceContributeDoneViewProps) {
   const t = useTranslations("Contribute.place")
   const img = imageSrc?.trim() || DEFAULT_FICTION_COVER
   const isBlob = img.startsWith("blob:")
   const isApproved = variant === "approved"
+  const label = returnLabel ?? t("backToMap")
+  const mapButtonClass = cn(
+    "h-10 rounded-lg px-5 text-sm font-semibold",
+    isApproved ? "mt-4 w-full max-w-[240px]" : "mt-6",
+  )
 
   return (
     <motion.div
@@ -70,13 +79,20 @@ export function PlaceContributeDoneView({
         </div>
       ) : null}
 
-      <Button
-        asChild
-        variant={isApproved ? "outline" : "default"}
-        className={cn("h-10 rounded-lg px-5 text-sm font-semibold", isApproved ? "mt-4 w-full max-w-[240px]" : "mt-6")}
-      >
-        <Link href={returnHref ?? "/map"}>{returnLabel ?? t("backToMap")}</Link>
-      </Button>
+      {returnDisabled ? (
+        <Button
+          type="button"
+          variant={isApproved ? "outline" : "default"}
+          disabled
+          className={mapButtonClass}
+        >
+          {label}
+        </Button>
+      ) : (
+        <Button asChild variant={isApproved ? "outline" : "default"} className={mapButtonClass}>
+          <Link href={returnHref ?? "/map"}>{label}</Link>
+        </Button>
+      )}
     </motion.div>
   )
 }

@@ -1,13 +1,19 @@
 import type { Metadata } from "next"
+import { Suspense } from "react"
 import { notFound } from "next/navigation"
 import { getTranslations } from "next-intl/server"
-import { getFictionBySlugCached, getFictionCitiesCached } from "@/src/fictions/infrastructure/next/fiction.queries"
+import { getFictionBySlugCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { resolvePlaceForFictionPathCached } from "@/src/places/infrastructure/next/place.queries"
-import { getScenesForPlace } from "@/src/scenes/infrastructure/next/scene.queries"
+import { getCityByIdCached } from "@/src/cities/infrastructure/next/city.queries"
 import { getSiteUrl } from "@/lib/site"
 import { FictionPlaceDetailView } from "@/components/fictions/fiction-place-detail-view"
+import {
+  PlaceDetailContributors,
+  PlaceDetailContributorsFallback,
+  PlaceDetailScenes,
+  PlaceDetailScenesFallback,
+} from "@/components/fictions/place-detail-deferred"
 import { FictionSlugDetailShell } from "@/components/fictions/fiction-slug-detail-shell"
-import { getPlaceContributorsWithDatesCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { getFictionSidebarSummaryText } from "@/lib/fictions/get-fiction-sidebar-summary-text"
 
 type Props = {
@@ -78,22 +84,21 @@ export default async function FictionPlaceUnderSlugPage({ params }: Props) {
   const place = await resolvePlaceForFictionPathCached(fiction.id, placeSegment)
   if (!place || place.fictionId !== fiction.id) notFound()
 
-  const [initialCities, scenes, sidebarSummary, placeContributors] = await Promise.all([
-    getFictionCitiesCached(fiction.id),
-    getScenesForPlace(place.id),
+  const cityId = place.location?.cityId?.trim() || ""
+  const fictionSlug = fiction.slug.trim()
+
+  // Critical path only: city + sidebar copy. Scenes/contributors stream via Suspense.
+  const [city, sidebarSummary] = await Promise.all([
+    cityId ? getCityByIdCached(cityId) : Promise.resolve(null),
     getFictionSidebarSummaryText(fiction, locale),
-    getPlaceContributorsWithDatesCached(place.id),
   ])
 
-  const cityById = new Map(initialCities.map((c) => [c.id, c]))
-  const geo = place.location
-  const city = geo?.cityId ? cityById.get(geo.cityId) : undefined
-  const fictionSlug = fiction.slug.trim()
   const baseMapParams = new URLSearchParams({
     fiction: fiction.id,
     place: place.id,
+    openSidebar: "1",
   })
-  if (city) baseMapParams.set("city", city.id)
+  if (city) baseMapParams.set("city", city.slug)
   const exploreMapHref = `/map?${baseMapParams.toString()}`
 
   return (
@@ -102,10 +107,18 @@ export default async function FictionPlaceUnderSlugPage({ params }: Props) {
         fiction={fiction}
         fictionPathSlug={fictionSlug}
         place={place}
-        city={city}
-        scenes={scenes}
+        city={city ?? undefined}
         exploreMapHref={exploreMapHref}
-        placeContributors={placeContributors}
+        contributorsSlot={
+          <Suspense fallback={<PlaceDetailContributorsFallback />}>
+            <PlaceDetailContributors placeId={place.id} />
+          </Suspense>
+        }
+        scenesSlot={
+          <Suspense fallback={<PlaceDetailScenesFallback />}>
+            <PlaceDetailScenes placeId={place.id} fictionPathSlug={fictionSlug} />
+          </Suspense>
+        }
       />
     </FictionSlugDetailShell>
   )
