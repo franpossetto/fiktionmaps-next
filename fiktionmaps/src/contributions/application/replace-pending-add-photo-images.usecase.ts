@@ -23,9 +23,6 @@ export async function replacePendingAddPhotoImagesUseCase(
   input: ReplacePendingAddPhotoImagesInput,
   contributionsRepo: ContributionsRepositoryPort,
 ): Promise<ReplacePendingAddPhotoImagesResult> {
-  const oldPaths = await contributionsRepo.deletePendingImagesByContributionId(input.contributionId)
-  await removePendingContributionStoragePaths(oldPaths)
-
   const uploaded = await uploadPendingContributionImage(
     input.contributionId,
     input.role,
@@ -36,6 +33,10 @@ export async function replacePendingAddPhotoImagesUseCase(
     return { success: false, error: uploaded.error }
   }
 
+  // contribution_pending_images is UNIQUE (contribution_id, role, variant), so the old rows
+  // must go before the new ones land. Uploaded paths are version-stamped and never collide.
+  const oldPaths = await contributionsRepo.deletePendingImagesByContributionId(input.contributionId)
+
   const linked = await contributionsRepo.insertPendingContributionImages({
     contributionId: input.contributionId,
     role: input.role,
@@ -45,6 +46,8 @@ export async function replacePendingAddPhotoImagesUseCase(
   if (!linked) {
     return { success: false, error: "Failed to save pending photo" }
   }
+
+  await removePendingContributionStoragePaths(oldPaths)
 
   return { success: true, previewUrl: uploaded.previewUrl }
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { FileText, Loader2, Trash2 } from "lucide-react"
 import { Link } from "@/i18n/navigation"
 import { Button } from "@/components/ui/button"
@@ -44,7 +44,13 @@ export function ContributionsTab() {
   const [toDelete, setToDelete] = useState<AdminContributionListItem | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  const loadPage = useCallback(async (tab: StatusTab, offset: number, append: boolean) => {
+  const offsetRef = useRef(0)
+  const requestIdRef = useRef(0)
+
+  const loadPage = useCallback(async (tab: StatusTab, append: boolean) => {
+    const requestId = ++requestIdRef.current
+    const offset = append ? offsetRef.current : 0
+
     if (append) setLoadingMore(true)
     else {
       setLoading(true)
@@ -52,13 +58,17 @@ export function ContributionsTab() {
     }
 
     const result = await listAdminContributionsAction(tab, offset)
+    if (requestIdRef.current !== requestId) return
+
     if (!result.success) {
       setError(result.error)
       if (!append) {
         setItems([])
         setTotalCount(0)
+        offsetRef.current = 0
       }
     } else {
+      offsetRef.current = offset + result.page.items.length
       setItems((prev) => (append ? [...prev, ...result.page.items] : result.page.items))
       setTotalCount(result.page.totalCount)
     }
@@ -68,7 +78,8 @@ export function ContributionsTab() {
   }, [])
 
   useEffect(() => {
-    void loadPage(statusTab, 0, false)
+    offsetRef.current = 0
+    void loadPage(statusTab, false)
   }, [statusTab, loadPage])
 
   const canDelete = statusTab === "pending" || statusTab === "rejected"
@@ -80,6 +91,7 @@ export function ContributionsTab() {
     const result = await deleteContributionAction(toDelete.id)
     setDeleting(false)
     if (result.success) {
+      offsetRef.current = Math.max(0, offsetRef.current - 1)
       setItems((prev) => prev.filter((item) => item.id !== toDelete.id))
       setTotalCount((prev) => Math.max(0, prev - 1))
       setToDelete(null)
@@ -212,7 +224,7 @@ export function ContributionsTab() {
             type="button"
             variant="outline"
             disabled={loadingMore}
-            onClick={() => void loadPage(statusTab, items.length, true)}
+            onClick={() => void loadPage(statusTab, true)}
           >
             {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Load more ({PAGE_SIZE})
