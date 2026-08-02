@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { useTranslations } from "next-intl"
 import { useRouter } from "@/i18n/navigation"
+import { useAuth } from "@/context/auth-context"
 import { useThemeSettings } from "@/lib/theme-settings-context"
 import type { ThemeBase, StyleVariant, TimeOfDay } from "@/lib/theme-settings"
 import type { ThemeSettings } from "@/lib/theme-settings"
@@ -31,9 +32,10 @@ type MapStyleOption = "day" | "dawn" | "night" | "dusk"
 export function SettingsPage() {
   const t = useTranslations("Settings")
   const router = useRouter()
+  const { user } = useAuth()
   const { settings, applyAndSave, timeOfDay } = useThemeSettings()
   const [pending, setPending] = useState<ThemeSettings>(settings)
-  const [activeSection, setActiveSection] = useState<SettingsSectionId>("appearance")
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>("account")
   const [profile, setProfile] = useState<ProfileWithOnboarding | null>(null)
 
   const navItems = useMemo<SettingsNavItem[]>(
@@ -86,7 +88,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     if (!navItems.some((item) => item.id === activeSection)) {
-      setActiveSection("appearance")
+      setActiveSection("account")
     }
   }, [navItems, activeSection])
 
@@ -141,6 +143,9 @@ export function SettingsPage() {
     localTime,
     localTz,
     timeOfDayLabels,
+    profile,
+    email: user?.email,
+    onProfileSaved: setProfile,
   }
 
   const username = profile?.username?.trim() || ""
@@ -192,9 +197,11 @@ export function SettingsPage() {
             <h1 className="text-xl font-semibold tracking-tight text-foreground">
               {t(`sections.${activeSection}.title`)}
             </h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {t(`sections.${activeSection}.description`)}
-            </p>
+            {activeSection !== "account" ? (
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {t(`sections.${activeSection}.description`)}
+              </p>
+            ) : null}
           </div>
           {activeSection !== "account" ? (
             <Button onClick={handleSave} size="sm">

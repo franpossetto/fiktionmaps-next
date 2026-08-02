@@ -832,18 +832,24 @@
       "account": {
         "nav": "Account",
         "title": "Account",
-        "description": "Password and account security."
+        "description": "Personal info, password, and account security."
       }
     },
     "account": {
+      "personalInfoSectionTitle": "Personal info",
+      "personalInfoSectionDescription": "Name, bio, and contact details shown on your profile.",
       "passwordSectionTitle": "Password",
-      "passwordSectionDescription": "Change the password you use to sign in.",
+      "passwordSectionDescription": "Your password protects access to your account. You can change it here if you remember the current one, or send a reset link to your email and choose a new password from there.",
       "permissionSectionDescription": "Your current access level. Staff assign this — it can’t be changed here.",
       "currentPassword": "Current password",
       "newPassword": "New password",
       "confirmPassword": "Confirm new password",
       "changePassword": "Change password",
-      "passwordChanged": "Password updated successfully."
+      "passwordChanged": "Password updated successfully.",
+      "sendResetLinkTitle": "Or reset by email",
+      "sendResetLinkDescription": "We’ll send a secure link to {email}. Open it to set a new password — useful if you don’t remember the current one.",
+      "sendResetLink": "Send reset link",
+      "resetLinkSent": "Reset link sent — check your inbox."
     },
     "themeMode": "Theme mode",
     "themeModeDescription": "Choose how the app and map look — pick a fixed theme or follow your local time of day.",

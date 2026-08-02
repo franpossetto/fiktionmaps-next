@@ -11,6 +11,8 @@ import type {
   ThemeSettings,
 } from "@/lib/theme-settings"
 import { cn } from "@/lib/utils"
+import { ProfilePersonalInfoForm } from "@/components/profile/profile-personal-info-form"
+import type { ProfileWithOnboarding } from "@/src/users/infrastructure/next/user.mappers"
 import { MarkersSettingsPanel } from "./markers-settings-panel"
 import { ChangePasswordForm } from "./change-password-form"
 import type { SettingsSectionId } from "./settings-sections"
@@ -34,25 +36,42 @@ export type SettingsSectionPanelsProps = {
   localTime: string
   localTz: string
   timeOfDayLabels: Record<TimeOfDay, string>
+  profile: ProfileWithOnboarding | null
+  email?: string | null
+  onProfileSaved: (profile: ProfileWithOnboarding) => void
 }
 
 function SettingsSubsection({
   title,
   description,
   children,
+  accent = false,
 }: {
   title: string
   description?: string
   children: ReactNode
+  /** Yellow vertical bar used on place/fiction section headings. */
+  accent?: boolean
 }) {
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          {title}
-        </h2>
+        {accent ? (
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="h-7 w-1 shrink-0 rounded-full bg-yellow-500" aria-hidden />
+            <h2 className="text-base font-semibold tracking-tight text-foreground">
+              {title}
+            </h2>
+          </div>
+        ) : (
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            {title}
+          </h2>
+        )}
         {description ? (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <p className={cn("text-sm text-muted-foreground", accent ? "mt-2" : "mt-1")}>
+            {description}
+          </p>
         ) : null}
       </div>
       {children}
@@ -256,14 +275,41 @@ export function SettingsSectionPanel(props: SettingsSectionPanelsProps) {
   }
 
   if (sectionId === "account") {
+    const { profile, email, onProfileSaved } = props
     return (
-      <div className="space-y-10">
-        <SettingsSubsection
-          title={t("account.passwordSectionTitle")}
-          description={t("account.passwordSectionDescription")}
-        >
-          <ChangePasswordForm />
-        </SettingsSubsection>
+      <div className="divide-y divide-border">
+        {profile ? (
+          <div className="pb-10">
+            <SettingsSubsection accent title={t("account.personalInfoSectionTitle")}>
+              <ProfilePersonalInfoForm
+                className="max-w-md"
+                idPrefix="settings-profile"
+                username={profile.username}
+                email={email}
+                initial={{
+                  fullName: profile.fullName,
+                  bio: profile.bio,
+                  gender: profile.gender,
+                  phone: profile.phone,
+                  dateOfBirth: profile.dateOfBirth,
+                }}
+                onSaved={onProfileSaved}
+                actionsAlign="end"
+                saveButtonClassName="border border-border bg-white text-zinc-900 hover:bg-zinc-100"
+              />
+            </SettingsSubsection>
+          </div>
+        ) : null}
+
+        <div className={cn(profile ? "pt-10" : undefined)}>
+          <SettingsSubsection
+            accent
+            title={t("account.passwordSectionTitle")}
+            description={t("account.passwordSectionDescription")}
+          >
+            <ChangePasswordForm />
+          </SettingsSubsection>
+        </div>
       </div>
     )
   }
