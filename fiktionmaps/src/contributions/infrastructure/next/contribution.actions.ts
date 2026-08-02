@@ -10,9 +10,13 @@ import { getContributorEntityScopeCountsUseCase } from "@/src/contributions/appl
 import { getPlaceContributorsWithDatesCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { approveContributionUseCase } from "@/src/contributions/application/approve-contribution.usecase"
 import { createContributionUseCase } from "@/src/contributions/application/create-contribution.usecase"
+import { deleteContributionUseCase } from "@/src/contributions/application/delete-contribution.usecase"
 import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/ensure-user-is-moderator.usecase"
 import { getContributionByIdUseCase } from "@/src/contributions/application/get-contribution-by-id.usecase"
+import { listAdminContributionsPageUseCase } from "@/src/contributions/application/list-admin-contributions-page.usecase"
 import { rejectContributionUseCase } from "@/src/contributions/application/reject-contribution.usecase"
+import { isUserAdminUseCase } from "@/src/users/application/is-user-admin.usecase"
+import { createUsersSupabaseAdapter } from "@/src/users/infrastructure/supabase/user.repository.impl"
 import { getPlaceByIdUseCase } from "@/src/places/application/get-place-by-id.usecase"
 import { parseImageFocusFromFormData } from "@/lib/asset-images/image-focus"
 import { submitPlaceAddPhotoContributionUseCase } from "@/src/contributions/application/submit-place-add-photo-contribution.usecase"
@@ -36,6 +40,8 @@ import { profilesReaderSupabaseAdapter } from "@/src/contributions/infrastructur
 import type {
   ApproveContributionResult,
   CreateContributionResult,
+  DeleteContributionResult,
+  ListAdminContributionsResult,
   RejectContributionResult,
   GetFictionScopeContributorContributionsResult,
 } from "./contribution.actions.types"
@@ -44,9 +50,15 @@ import type { ApproveContributionData, CreateContributionData, RejectContributio
 export type {
   ApproveContributionResult,
   CreateContributionResult,
+  DeleteContributionResult,
+  ListAdminContributionsResult,
   RejectContributionResult,
   GetFictionScopeContributorContributionsResult,
 } from "./contribution.actions.types"
+
+const usersRepo = createUsersSupabaseAdapter(createClient)
+
+const ADMIN_CONTRIBUTIONS_PAGE_SIZE = 50
 
 export async function getPlaceContributorsAction(
   placeId: string,
@@ -398,4 +410,78 @@ export async function getFictionScopeContributorContributionsAction(
   } catch {
     return { success: false, error: "Failed to load contributor details" }
   }
+}
+
+export async function listAdminContributionsAction(
+  statusTab: "pending" | "rejected" | "approved",
+  offset = 0,
+): Promise<ListAdminContributionsResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const isAdmin = await isUserAdminUseCase(user.id, usersRepo)
+  if (!isAdmin) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  if (statusTab !== "pending" && statusTab !== "rejected" && statusTab !== "approved") {
+    return { success: false, error: "Invalid status" }
+  }
+
+  const page = await listAdminContributionsPageUseCase(
+    {
+      statusTab,
+      limit: ADMIN_CONTRIBUTIONS_PAGE_SIZE,
+      offset: Math.max(0, offset),
+    },
+    contributionsRepo,
+  )
+  return { success: true, page }
+}
+
+export async function deleteContributionAction(id: string): Promise<DeleteContributionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const isAdmin = await isUserAdminUseCase(user.id, usersRepo)
+  if (!isAdmin) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const parsedId = uuidSchema.safeParse(id)
+  if (!parsedId.success) {
+    return { success: false, error: "Invalid id" }
+  }
+
+  const contributionBefore = await getContributionByIdUseCase(parsedId.data, contributionsRepo)
+  if (!contributionBefore) {
+    return { success: false, error: "Contribution not found" }
+  }
+  if (contributionBefore.status === "approved") {
+    return { success: false, error: "Approved contributions cannot be deleted" }
+  }
+
+  const ok = await deleteContributionUseCase(parsedId.data, contributionsRepo)
+  if (!ok) {
+    return { success: false, error: "Failed to delete contribution" }
+  }
+
+  revalidatePath("/admin")
+  revalidatePath("/contributions")
+  updateTag("contributions")
+  updateTag("profiles")
+  await revalidateContributionEntityTags(contributionBefore.entityType, contributionBefore.entityId)
+  return { success: true }
 }

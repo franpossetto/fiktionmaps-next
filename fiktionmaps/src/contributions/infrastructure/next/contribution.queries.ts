@@ -87,20 +87,23 @@ export const getCurrentUserContributions = cache(async (): Promise<ProfileContri
 
 /**
  * Contributions visible to the current session for a profile page.
- * Own profile: all statuses (cookie RLS). Other users: approved only (public SELECT).
+ * Own profile or staff: all statuses (cookie RLS). Other viewers: approved only.
  */
 export const getProfileContributionsForViewer = cache(
   async (profileUserId: string): Promise<ProfileContributionItem[]> => {
     const sessionUserId = await getSessionUserId()
     if (!sessionUserId) return []
 
-    if (sessionUserId === profileUserId) {
-      const ownRows = await getProfileContributionsByUserUseCase(
+    const isOwnProfile = sessionUserId === profileUserId
+    const isStaff = !isOwnProfile ? await getIsUserStaff(sessionUserId) : false
+
+    if (isOwnProfile || isStaff) {
+      const rows = await getProfileContributionsByUserUseCase(
         profileUserId,
         contributionsCookieRepo,
       )
-      if (ownRows.length > 0) return ownRows
-      return getProfileContributionsByUserUseCase(profileUserId, anonRepo)
+      // Own profile: if the session client returns nothing, fall back to public approved.
+      if (rows.length > 0 || isStaff) return rows
     }
 
     return getProfileContributionsByUserUseCase(profileUserId, anonRepo)

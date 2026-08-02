@@ -32,6 +32,8 @@ import type {
   TopContributorProfile,
 } from "@/src/contributions/domain/contribution.entity"
 import type {
+  AdminContributionsListPageInput,
+  AdminContributionsListPageResult,
   ContributionsRepositoryPort,
   InsertContributionPendingImagesInput,
   InsertContributionPendingScenePlaceInput,
@@ -1207,6 +1209,60 @@ export function createContributionsSupabaseAdapter(
       return count ?? 0
     }),
 
+    findPendingAddPhotoByPlaceAndUser: cache(
+      async (placeId: string, userId: string): Promise<{ contributionId: string } | null> => {
+        const supabase = await getSupabase()
+        const { data, error } = await supabase
+          .from("contributions")
+          .select("id")
+          .eq("entity_type", "place")
+          .eq("entity_id", placeId)
+          .eq("type", "add_photo")
+          .eq("status", "pending")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (error) {
+          console.error("[contributions repo] findPendingAddPhotoByPlaceAndUser:", error.message)
+          return null
+        }
+        return data?.id ? { contributionId: data.id } : null
+      },
+    ),
+
+    findPendingAddPhotoByFictionRoleAndUser: cache(
+      async (
+        fictionId: string,
+        role: "cover" | "banner",
+        userId: string,
+      ): Promise<{ contributionId: string } | null> => {
+        const supabase = await getSupabase()
+        const { data, error } = await supabase
+          .from("contributions")
+          .select("id, contribution_pending_images!inner(role)")
+          .eq("entity_type", "fiction")
+          .eq("entity_id", fictionId)
+          .eq("type", "add_photo")
+          .eq("status", "pending")
+          .eq("user_id", userId)
+          .eq("contribution_pending_images.role", role)
+          .order("created_at", { ascending: false })
+          .limit(1)
+
+        if (error) {
+          console.error(
+            "[contributions repo] findPendingAddPhotoByFictionRoleAndUser:",
+            error.message,
+          )
+          return null
+        }
+        const id = data?.[0]?.id
+        return id ? { contributionId: id } : null
+      },
+    ),
+
     countPendingAddPhotoByFiction: cache(async (fictionId: string): Promise<number> => {
       const supabase = await getSupabase()
       const { count, error } = await supabase
@@ -1295,6 +1351,7 @@ export function createContributionsSupabaseAdapter(
         .from("contributions")
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId)
+        .eq("status", "approved")
 
       if (error) {
         console.error("[contributions repo] countByUser error:", error.message)
@@ -1302,6 +1359,142 @@ export function createContributionsSupabaseAdapter(
       }
       return count ?? 0
     }),
+
+    listAdminContributionsPage: cache(
+      async (input: AdminContributionsListPageInput): Promise<AdminContributionsListPageResult> => {
+        const supabase = await getSupabase()
+        const safeLimit = Math.max(1, input.limit)
+        const from = Math.max(0, input.offset)
+        const to = from + safeLimit - 1
+
+        const { data, error, count } = await supabase
+          .from("contributions")
+          .select(
+            `
+            id, user_id, type, entity_type, entity_id, status, moderator_id, moderator_note,
+            fpp_awarded, origin, external_id, created_at, updated_at,
+            profiles!contributions_user_id_fkey (
+              username,
+              full_name
+            )
+          `,
+            { count: "exact" },
+          )
+          .eq("status", input.statusTab)
+          .order("created_at", { ascending: false })
+          .range(from, to)
+
+        if (error) {
+          console.error("[contributions repo] listAdminContributionsPage:", error.message)
+          return { items: [], totalCount: 0 }
+        }
+
+        type Row = ContributionRow & {
+          profiles:
+            | { username: string | null; full_name: string | null }
+            | { username: string | null; full_name: string | null }[]
+            | null
+        }
+
+        const rows = (data ?? []) as Row[]
+        const enriched = await enrichContributionsWithEntityLabels(
+          supabase,
+          rows.map((row) => mapRow(row)),
+        )
+        const labelById = new Map(enriched.map((item) => [item.id, item.entityLabel]))
+
+        return {
+          items: rows.map((row) => {
+            const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+            return {
+              id: row.id,
+              type: row.type,
+              entityType: row.entity_type,
+              entityId: row.entity_id,
+              status: row.status,
+              createdAt: row.created_at,
+              updatedAt: row.updated_at,
+              fppAwarded: row.fpp_awarded,
+              contributorUsername: profile?.username ?? null,
+              contributorFullName: profile?.full_name ?? null,
+              entityLabel: labelById.get(row.id) ?? null,
+            }
+          }),
+          totalCount: count ?? 0,
+        }
+      },
+    ),
+
+    async deletePendingOrRejected(
+      id: string,
+    ): Promise<{ deleted: true; storagePaths: string[] } | null> {
+      const supabase = await getSupabase()
+      const { data: row, error: fetchErr } = await supabase
+        .from("contributions")
+        .select("id, type, status")
+        .eq("id", id)
+        .maybeSingle()
+
+      if (fetchErr || !row) {
+        console.error("[contributions repo] deletePendingOrRejected fetch:", fetchErr?.message)
+        return null
+      }
+      if (row.status !== "pending" && row.status !== "rejected") {
+        return null
+      }
+
+      let storagePaths: string[] = []
+      if (row.type === "add_photo") {
+        const { data: pendingRows, error: pendingFetchErr } = await supabase
+          .from("contribution_pending_images")
+          .select("storage_path")
+          .eq("contribution_id", id)
+
+        if (pendingFetchErr) {
+          console.error(
+            "[contributions repo] deletePendingOrRejected pending fetch:",
+            pendingFetchErr.message,
+          )
+          return null
+        }
+
+        storagePaths = (pendingRows ?? []).map((r) => r.storage_path).filter(Boolean)
+        await removePendingContributionStoragePaths(storagePaths)
+
+        const { error: pendingDelErr } = await supabase
+          .from("contribution_pending_images")
+          .delete()
+          .eq("contribution_id", id)
+        if (pendingDelErr) {
+          console.error(
+            "[contributions repo] deletePendingOrRejected pending delete:",
+            pendingDelErr.message,
+          )
+          return null
+        }
+      }
+
+      if (row.type === "add_place_to_scene") {
+        const { error: pendingDelErr } = await supabase
+          .from("contribution_pending_scene_places")
+          .delete()
+          .eq("contribution_id", id)
+        if (pendingDelErr) {
+          console.error(
+            "[contributions repo] deletePendingOrRejected scene places:",
+            pendingDelErr.message,
+          )
+          return null
+        }
+      }
+
+      const { error: deleteErr } = await supabase.from("contributions").delete().eq("id", id)
+      if (deleteErr) {
+        console.error("[contributions repo] deletePendingOrRejected:", deleteErr.message)
+        return null
+      }
+      return { deleted: true, storagePaths }
+    },
 
     countApprovedFictionAndPlaceScopesByUser: cache(async (userId: string) => {
       const supabase = await getSupabase()

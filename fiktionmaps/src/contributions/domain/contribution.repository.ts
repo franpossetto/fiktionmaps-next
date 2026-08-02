@@ -49,6 +49,31 @@ export type ContributionPendingScenePlace = {
   endSecond: number | null
 }
 
+export type AdminContributionsListPageInput = {
+  statusTab: "pending" | "rejected" | "approved"
+  limit: number
+  offset: number
+}
+
+export type AdminContributionListItem = {
+  id: string
+  type: ContributionType
+  entityType: ContributionEntityType
+  entityId: string
+  status: Contribution["status"]
+  createdAt: string
+  updatedAt: string
+  fppAwarded: number | null
+  contributorUsername: string | null
+  contributorFullName: string | null
+  entityLabel: string | null
+}
+
+export type AdminContributionsListPageResult = {
+  items: AdminContributionListItem[]
+  totalCount: number
+}
+
 export interface ContributionsRepositoryPort {
   create(input: CreateContributionInput): Promise<{ contributionId: string } | null>
   insertPendingContributionImages(input: InsertContributionPendingImagesInput): Promise<boolean>
@@ -58,6 +83,17 @@ export interface ContributionsRepositoryPort {
     fictionId: string,
     role: Extract<ContributionPendingImageRole, "cover" | "banner">,
   ): Promise<number>
+  /** Latest pending add_photo by this user for the place, if any. */
+  findPendingAddPhotoByPlaceAndUser(
+    placeId: string,
+    userId: string,
+  ): Promise<{ contributionId: string } | null>
+  /** Latest pending add_photo by this user for the fiction + image role, if any. */
+  findPendingAddPhotoByFictionRoleAndUser(
+    fictionId: string,
+    role: Extract<ContributionPendingImageRole, "cover" | "banner">,
+    userId: string,
+  ): Promise<{ contributionId: string } | null>
   listPendingImagesByContributionId(contributionId: string): Promise<ContributionPendingImage[]>
   deletePendingImagesByContributionId(contributionId: string): Promise<string[]>
   countPendingAddPhotoByPlace(placeId: string): Promise<number>
@@ -67,7 +103,16 @@ export interface ContributionsRepositoryPort {
   getByUser(userId: string): Promise<Contribution[]>
   /** Contributions for the profile page with entity / parent labels resolved. */
   listProfileContributionsByUser(userId: string): Promise<ProfileContributionItem[]>
+  /** Approved contributions only (pending/rejected do not count). */
   countByUser(userId: string): Promise<number>
+  listAdminContributionsPage(
+    input: AdminContributionsListPageInput,
+  ): Promise<AdminContributionsListPageResult>
+  /**
+   * Hard-delete a pending or rejected contribution (and cascaded staging rows).
+   * Returns storage paths that should be removed by the caller when type is add_photo.
+   */
+  deletePendingOrRejected(id: string): Promise<{ deleted: true; storagePaths: string[] } | null>
   /** Distinct fictions (direct + via places) and places with approved contributions. */
   countApprovedFictionAndPlaceScopesByUser(userId: string): Promise<ContributorEntityScopeCounts>
   /** Sum of `fpp_awarded` for approved contributions (legacy; prefer profiles.fpp_total). */

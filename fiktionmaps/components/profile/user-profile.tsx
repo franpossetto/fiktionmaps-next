@@ -197,6 +197,7 @@ export function UserProfileComponent({
   const displayName = activeProfile.username || user?.name || user?.email?.split("@")[0] || ""
   const role: UserRole = activeProfile.role
   const fppTotal = activeProfile.fppTotal
+  const approvedContributionCount = contributions.filter((c) => c.status === "approved").length
   const joinYear = activeProfile.joinedDate
     ? new Date(activeProfile.joinedDate).getFullYear()
     : new Date().getFullYear()
@@ -245,7 +246,7 @@ export function UserProfileComponent({
             {isOwnProfile ? <HomesTimeline /> : null}
             <ProfileStatsAside
               fppTotal={fppTotal}
-              contributionCount={contributions.length}
+              contributionCount={approvedContributionCount}
               joinYear={joinYear}
             />
             {interestsAside}
@@ -281,7 +282,7 @@ export function UserProfileComponent({
             {isOwnProfile ? <HomesTimeline /> : null}
             <ProfileStatsAside
               fppTotal={fppTotal}
-              contributionCount={contributions.length}
+              contributionCount={approvedContributionCount}
               joinYear={joinYear}
             />
             {interestsAside}
