@@ -1,9 +1,9 @@
-export type SettingsSectionId = "appearance" | "markers" | "account"
+export type SettingsSectionId = "account" | "appearance" | "markers"
 
 export const SETTINGS_SECTION_IDS = [
+  "account",
   "appearance",
   "markers",
-  "account",
 ] as const satisfies readonly SettingsSectionId[]
 
 export type SettingsNavItem = {

@@ -324,6 +324,21 @@ export function ProfileContributionsHeatmap({
                               {cell.items.map((item, index) => {
                                 const typeLabel = t(`heatmapType_${item.type}`)
                                 const name = itemShortLabel(item)
+                                const statusDot =
+                                  item.status === "approved"
+                                    ? {
+                                        ring: "bg-emerald-500/15",
+                                        dot: "bg-emerald-500",
+                                      }
+                                    : item.status === "pending"
+                                      ? {
+                                          ring: "bg-amber-500/15",
+                                          dot: "bg-amber-500",
+                                        }
+                                      : {
+                                          ring: "bg-muted",
+                                          dot: "bg-muted-foreground/50",
+                                        }
                                 return (
                                   <li key={item.id}>
                                     {index > 0 ? (
@@ -331,10 +346,13 @@ export function ProfileContributionsHeatmap({
                                     ) : null}
                                     <div className="flex items-center gap-2.5 px-3 py-2">
                                       <span
-                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/15"
+                                        className={cn(
+                                          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
+                                          statusDot.ring,
+                                        )}
                                         aria-hidden
                                       >
-                                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                                        <span className={cn("h-2 w-2 rounded-full", statusDot.dot)} />
                                       </span>
                                       <div className="min-w-0 flex-1">
                                         <p className="truncate text-[11px] leading-tight text-muted-foreground">

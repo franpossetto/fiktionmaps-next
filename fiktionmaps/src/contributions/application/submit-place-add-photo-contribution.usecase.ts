@@ -1,6 +1,7 @@
 import { validateImageFile } from "@/lib/asset-images/image-variant-service"
 import { uploadPendingContributionImage } from "@/lib/asset-images/pending-contribution-image"
 import { approveContributionUseCase } from "@/src/contributions/application/approve-contribution.usecase"
+import { replacePendingAddPhotoImagesUseCase } from "@/src/contributions/application/replace-pending-add-photo-images.usecase"
 import { PLACE_PHOTO_ASSET_ROLE } from "@/src/contributions/domain/contribution.config"
 import type { ContributionsRepositoryPort } from "@/src/contributions/domain/contribution.repository"
 import type { PlacesRepositoryPort } from "@/src/places/domain/place.repository"
@@ -28,6 +29,44 @@ export async function submitPlaceAddPhotoContributionUseCase(
   const eligible = await placesRepo.isApprovedActivePlace(input.placeId)
   if (!eligible) {
     return { success: false, error: "Place not found or not available for photo contributions" }
+  }
+
+  const ownPending = await contributionsRepo.findPendingAddPhotoByPlaceAndUser(
+    input.placeId,
+    input.userId,
+  )
+
+  if (ownPending) {
+    const replaced = await replacePendingAddPhotoImagesUseCase(
+      {
+        contributionId: ownPending.contributionId,
+        role: PLACE_PHOTO_ASSET_ROLE,
+        file: input.imageFile,
+        focus: input.focus,
+      },
+      contributionsRepo,
+    )
+    if (!replaced.success) return replaced
+
+    if (input.autoApprove) {
+      const approved = await approveContributionUseCase(
+        { id: ownPending.contributionId, moderatorId: input.userId },
+        contributionsRepo,
+      )
+      return {
+        success: true,
+        contributionId: ownPending.contributionId,
+        autoApproved: approved,
+        previewUrl: replaced.previewUrl,
+      }
+    }
+
+    return {
+      success: true,
+      contributionId: ownPending.contributionId,
+      autoApproved: false,
+      previewUrl: replaced.previewUrl,
+    }
   }
 
   const pendingCount = await contributionsRepo.countPendingAddPhotoByPlace(input.placeId)

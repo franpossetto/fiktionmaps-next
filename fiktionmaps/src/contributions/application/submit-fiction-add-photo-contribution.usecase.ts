@@ -1,6 +1,7 @@
 import { validateImageFile } from "@/lib/asset-images/image-variant-service"
 import { uploadPendingContributionImage } from "@/lib/asset-images/pending-contribution-image"
 import { approveContributionUseCase } from "@/src/contributions/application/approve-contribution.usecase"
+import { replacePendingAddPhotoImagesUseCase } from "@/src/contributions/application/replace-pending-add-photo-images.usecase"
 import {
   FICTION_BANNER_ASSET_ROLE,
   FICTION_COVER_ASSET_ROLE,
@@ -23,6 +24,34 @@ export type SubmitFictionAddPhotoContributionResult =
   | { success: true; contributionId: string; autoApproved: boolean; previewUrl: string }
   | { success: false; error: string }
 
+async function finalizeFictionAddPhoto(
+  contributionId: string,
+  previewUrl: string,
+  userId: string,
+  autoApprove: boolean,
+  contributionsRepo: ContributionsRepositoryPort,
+): Promise<SubmitFictionAddPhotoContributionResult> {
+  if (!autoApprove) {
+    return {
+      success: true,
+      contributionId,
+      autoApproved: false,
+      previewUrl,
+    }
+  }
+
+  const approved = await approveContributionUseCase(
+    { id: contributionId, moderatorId: userId },
+    contributionsRepo,
+  )
+  return {
+    success: true,
+    contributionId,
+    autoApproved: approved,
+    previewUrl,
+  }
+}
+
 export async function submitFictionAddPhotoContributionUseCase(
   input: SubmitFictionAddPhotoContributionInput,
   contributionsRepo: ContributionsRepositoryPort,
@@ -37,6 +66,34 @@ export async function submitFictionAddPhotoContributionUseCase(
       success: false,
       error: "Fiction not found or not available for photo contributions",
     }
+  }
+
+  const ownPending = await contributionsRepo.findPendingAddPhotoByFictionRoleAndUser(
+    input.fictionId,
+    input.targetRole,
+    input.userId,
+  )
+
+  if (ownPending) {
+    const replaced = await replacePendingAddPhotoImagesUseCase(
+      {
+        contributionId: ownPending.contributionId,
+        role: input.targetRole,
+        file: input.file,
+        variants: input.targetRole === FICTION_BANNER_ASSET_ROLE ? ["lg"] : undefined,
+        focus: input.focus,
+      },
+      contributionsRepo,
+    )
+    if (!replaced.success) return replaced
+
+    return finalizeFictionAddPhoto(
+      ownPending.contributionId,
+      replaced.previewUrl,
+      input.userId,
+      input.autoApprove,
+      contributionsRepo,
+    )
   }
 
   const pendingCount = await contributionsRepo.countPendingAddPhotoByFictionAndRole(
@@ -85,25 +142,13 @@ export async function submitFictionAddPhotoContributionUseCase(
       return { success: false, error: "Failed to save pending cover" }
     }
 
-    if (input.autoApprove) {
-      const approved = await approveContributionUseCase(
-        { id: created.contributionId, moderatorId: input.userId },
-        contributionsRepo,
-      )
-      return {
-        success: true,
-        contributionId: created.contributionId,
-        autoApproved: approved,
-        previewUrl: uploaded.previewUrl,
-      }
-    }
-
-    return {
-      success: true,
-      contributionId: created.contributionId,
-      autoApproved: false,
-      previewUrl: uploaded.previewUrl,
-    }
+    return finalizeFictionAddPhoto(
+      created.contributionId,
+      uploaded.previewUrl,
+      input.userId,
+      input.autoApprove,
+      contributionsRepo,
+    )
   }
 
   const uploaded = await uploadPendingContributionImage(
@@ -131,23 +176,11 @@ export async function submitFictionAddPhotoContributionUseCase(
     return { success: false, error: "Failed to save pending hero" }
   }
 
-  if (input.autoApprove) {
-    const approved = await approveContributionUseCase(
-      { id: created.contributionId, moderatorId: input.userId },
-      contributionsRepo,
-    )
-    return {
-      success: true,
-      contributionId: created.contributionId,
-      autoApproved: approved,
-      previewUrl: uploaded.previewUrl,
-    }
-  }
-
-  return {
-    success: true,
-    contributionId: created.contributionId,
-    autoApproved: false,
-    previewUrl: uploaded.previewUrl,
-  }
+  return finalizeFictionAddPhoto(
+    created.contributionId,
+    uploaded.previewUrl,
+    input.userId,
+    input.autoApprove,
+    contributionsRepo,
+  )
 }

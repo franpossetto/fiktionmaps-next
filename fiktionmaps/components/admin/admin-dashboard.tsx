@@ -2,20 +2,21 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { Book, MapPin, Clapperboard, Building2, LayoutGrid, List, Users } from "lucide-react"
+import { Book, MapPin, Clapperboard, Building2, LayoutGrid, List, Users, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { FictionsTab } from "./fictions-tab"
 import { CitiesTab } from "./cities-tab"
 import { LocationsTab } from "./locations-tab"
 import { ScenesTab } from "./scenes-tab"
 import { PersonsTab } from "./persons-tab"
+import { ContributionsTab } from "./contributions-tab"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { Person } from "@/src/persons/domain/person.entity"
 import { useAdminViewModeStorage } from "@/lib/local-storage-service-hooks"
 
-type AdminSection = "fictions" | "cities" | "locations" | "scenes" | "persons"
+type AdminSection = "fictions" | "cities" | "locations" | "scenes" | "persons" | "contributions"
 
 interface SectionItem {
   id: AdminSection
@@ -60,6 +61,13 @@ const sections: SectionItem[] = [
     description: "Create and manage authors, directors, actors, and other people",
     icon: Users,
     color: "from-teal-600 to-emerald-600",
+  },
+  {
+    id: "contributions",
+    label: "Manage Contributions",
+    description: "Inspect and delete pending or rejected contribution rows",
+    icon: FileText,
+    color: "from-slate-600 to-zinc-600",
   },
 ]
 
@@ -175,6 +183,7 @@ export function AdminDashboard({ initialFictions, initialCities, initialPlaces, 
           {activeSection === "locations" && <LocationsTab initialPlaces={initialPlaces} initialFictions={initialFictions} initialCities={initialCities} />}
           {activeSection === "scenes" && <ScenesTab initialFictions={initialFictions} initialPlaces={initialPlaces} />}
           {activeSection === "persons" && <PersonsTab initialPersons={initialPersons} viewMode={viewMode} />}
+          {activeSection === "contributions" && <ContributionsTab />}
         </div>
       </div>
     </div>

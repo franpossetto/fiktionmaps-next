@@ -15,6 +15,21 @@
 | `add_tip` | `place` | Visitor tips: access, hours, etiquette |
 | `checkin` | `city` / `place` | Log a visit to a city or place |
 
+## Status, FPP, and counts
+
+Statuses: `pending` | `approved` | `rejected`.
+
+- **FPP** is awarded only on **approve** (`fpp_awarded` + `profiles.fpp_total`). Pending/rejected never increment FPP.
+- **Contribution counts** (`countByUser`, profile stats) include **approved only**. Own-profile and staff viewers may still see pending/rejected in the profile list/heatmap (amber for pending); other viewers only see approved.
+
+## `add_photo` idempotency
+
+If the same user already has a **pending** `add_photo` for that place (or fiction + cover/banner role), a new submit **overwrites** the staged pending images on that contribution instead of creating another row. If another user already has a pending photo for the same target, the submit is blocked.
+
+## Admin cleanup (`/admin` → Contributions)
+
+Admins can list contributions by status (`pending` / `rejected` / `approved`) and **hard-delete** pending or rejected rows (staging assets cleaned for `add_photo`). Approved rows are view-only for now.
+
 ## Contracts
 
 ### `isCreateContributionType`

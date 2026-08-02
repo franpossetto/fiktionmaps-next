@@ -832,18 +832,24 @@
       "account": {
         "nav": "Cuenta",
         "title": "Cuenta",
-        "description": "Contraseña y seguridad de la cuenta."
+        "description": "Info personal, contraseña y seguridad de la cuenta."
       }
     },
     "account": {
+      "personalInfoSectionTitle": "Info personal",
+      "personalInfoSectionDescription": "Nombre, bio y datos de contacto que se muestran en tu perfil.",
       "passwordSectionTitle": "Contraseña",
-      "passwordSectionDescription": "Cambia la contraseña con la que inicias sesión.",
+      "passwordSectionDescription": "Tu contraseña protege el acceso a tu cuenta. Podés cambiarla acá si recordás la actual, o pedirnos un enlace por email para elegir una nueva desde ahí.",
       "permissionSectionDescription": "Tu nivel de acceso actual. Lo asigna el staff — no se puede cambiar acá.",
       "currentPassword": "Contraseña actual",
       "newPassword": "Nueva contraseña",
       "confirmPassword": "Confirmar nueva contraseña",
       "changePassword": "Cambiar contraseña",
-      "passwordChanged": "Contraseña actualizada correctamente."
+      "passwordChanged": "Contraseña actualizada correctamente.",
+      "sendResetLinkTitle": "O restablecer por email",
+      "sendResetLinkDescription": "Te enviamos un enlace seguro a {email}. Abrilo para elegir una nueva contraseña — útil si no recordás la actual.",
+      "sendResetLink": "Enviar enlace",
+      "resetLinkSent": "Enlace enviado — revisá tu bandeja de entrada."
     },
     "themeMode": "Modo de tema",
     "themeModeDescription": "Elige cómo se ve la app y el mapa — tema fijo o según tu hora local.",
