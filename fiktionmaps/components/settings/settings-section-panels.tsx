@@ -1,6 +1,6 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { Suspense, type ReactNode } from "react"
 import { useTranslations } from "next-intl"
 import Image from "next/image"
 import { Clock, Check, Palette } from "lucide-react"
@@ -12,10 +12,12 @@ import type {
 } from "@/lib/theme-settings"
 import { cn } from "@/lib/utils"
 import { ProfilePersonalInfoForm } from "@/components/profile/profile-personal-info-form"
-import type { ProfileWithOnboarding } from "@/src/users/infrastructure/next/user.mappers"
 import { MarkersSettingsPanel } from "./markers-settings-panel"
 import { ChangePasswordForm } from "./change-password-form"
-import type { SettingsSectionId } from "./settings-sections"
+import { useSettingsAccount } from "./settings-account-context"
+import { SettingsAccountSectionSkeleton } from "./settings-skeletons"
+import { FORM_CARD_ACTION_CLASS } from "@/components/ui/form-card"
+import type { LocalClock, SettingsSectionId } from "./settings-sections"
 
 type MapStyleOption = "day" | "dawn" | "night" | "dusk"
 
@@ -33,12 +35,8 @@ export type SettingsSectionPanelsProps = {
     image: typeof import("@/lib/map/styles/mapbox_day.png").default
   }[]
   mapPreviewByTimeOfDay: typeof import("@/lib/map/styles/mapbox_day.png").default
-  localTime: string
-  localTz: string
+  localClock: LocalClock | null
   timeOfDayLabels: Record<TimeOfDay, string>
-  profile: ProfileWithOnboarding | null
-  email?: string | null
-  onProfileSaved: (profile: ProfileWithOnboarding) => void
 }
 
 function SettingsSubsection({
@@ -197,12 +195,11 @@ function MapThemePanel({
 function CurrentPeriodPanel({
   timeOfDay,
   timeOfDayLabels,
-  localTime,
-  localTz,
+  localClock,
   mapPreviewByTimeOfDay,
 }: Pick<
   SettingsSectionPanelsProps,
-  "timeOfDay" | "timeOfDayLabels" | "localTime" | "localTz" | "mapPreviewByTimeOfDay"
+  "timeOfDay" | "timeOfDayLabels" | "localClock" | "mapPreviewByTimeOfDay"
 >) {
   const t = useTranslations("Settings")
 
@@ -215,7 +212,7 @@ function CurrentPeriodPanel({
           </p>
           <p className="mt-0.5 text-sm text-muted-foreground">{t("basedOnLocalTime")}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {localTz} · {localTime}
+            {localClock ? `${localClock.timeZone} · ${localClock.time}` : "—"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -237,6 +234,48 @@ function CurrentPeriodPanel({
   )
 }
 
+
+/** Suspends on the server account read; rendered behind `SettingsAccountSectionSkeleton`. */
+function AccountPanel() {
+  const t = useTranslations("Settings")
+  const { profile, email, onProfileSaved } = useSettingsAccount()
+
+  return (
+    <div className="space-y-10">
+      {profile ? (
+        <SettingsSubsection
+          accent
+          title={t("account.personalInfoSectionTitle")}
+          description={t("account.personalInfoSectionDescription")}
+        >
+          <ProfilePersonalInfoForm
+            variant="card"
+            idPrefix="settings-profile"
+            username={profile.username}
+            email={email}
+            initial={{
+              fullName: profile.fullName,
+              bio: profile.bio,
+              gender: profile.gender,
+              phone: profile.phone,
+              dateOfBirth: profile.dateOfBirth,
+            }}
+            onSaved={onProfileSaved}
+            saveButtonClassName={FORM_CARD_ACTION_CLASS}
+          />
+        </SettingsSubsection>
+      ) : null}
+
+      <SettingsSubsection
+        accent
+        title={t("account.passwordSectionTitle")}
+        description={t("account.passwordSectionDescription")}
+      >
+        <ChangePasswordForm email={email} />
+      </SettingsSubsection>
+    </div>
+  )
+}
 
 export function SettingsSectionPanel(props: SettingsSectionPanelsProps) {
   const t = useTranslations("Settings")
@@ -264,8 +303,7 @@ export function SettingsSectionPanel(props: SettingsSectionPanelsProps) {
             <CurrentPeriodPanel
               timeOfDay={props.timeOfDay}
               timeOfDayLabels={props.timeOfDayLabels}
-              localTime={props.localTime}
-              localTz={props.localTz}
+              localClock={props.localClock}
               mapPreviewByTimeOfDay={props.mapPreviewByTimeOfDay}
             />
           </SettingsSubsection>
@@ -275,42 +313,10 @@ export function SettingsSectionPanel(props: SettingsSectionPanelsProps) {
   }
 
   if (sectionId === "account") {
-    const { profile, email, onProfileSaved } = props
     return (
-      <div className="divide-y divide-border">
-        {profile ? (
-          <div className="pb-10">
-            <SettingsSubsection accent title={t("account.personalInfoSectionTitle")}>
-              <ProfilePersonalInfoForm
-                className="max-w-md"
-                idPrefix="settings-profile"
-                username={profile.username}
-                email={email}
-                initial={{
-                  fullName: profile.fullName,
-                  bio: profile.bio,
-                  gender: profile.gender,
-                  phone: profile.phone,
-                  dateOfBirth: profile.dateOfBirth,
-                }}
-                onSaved={onProfileSaved}
-                actionsAlign="end"
-                saveButtonClassName="border border-border bg-white text-zinc-900 hover:bg-zinc-100"
-              />
-            </SettingsSubsection>
-          </div>
-        ) : null}
-
-        <div className={cn(profile ? "pt-10" : undefined)}>
-          <SettingsSubsection
-            accent
-            title={t("account.passwordSectionTitle")}
-            description={t("account.passwordSectionDescription")}
-          >
-            <ChangePasswordForm />
-          </SettingsSubsection>
-        </div>
-      </div>
+      <Suspense fallback={<SettingsAccountSectionSkeleton />}>
+        <AccountPanel />
+      </Suspense>
     )
   }
 

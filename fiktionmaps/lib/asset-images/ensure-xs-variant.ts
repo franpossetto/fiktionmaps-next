@@ -1,14 +1,11 @@
-import sharp from "sharp"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/supabase/database.types"
 import { createAnonymousClient, createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
+import { detectAssetImageFormatFromUrl } from "./detect-asset-image-format"
+import { encodeImageVariant } from "./encode-image-variant"
 import type { EntityType, ImageRole } from "./image-variant-service"
-import {
-  ASSET_IMAGES_BUCKET,
-  VARIANT_SIZES,
-  VARIANT_WEBP_QUALITY,
-} from "./variant-sizes"
+import { ASSET_IMAGES_BUCKET, VARIANT_SIZES } from "./variant-sizes"
 
 function storagePathFromPublicUrl(url: string): string | null {
   const match = url.match(/\/storage\/v1\/object\/public\/[^/]+\/(.+)$/)
@@ -118,18 +115,17 @@ export async function ensureAssetImageXs(options: {
   const writeClient = write.client
 
   const sourceBuffer = Buffer.from(await blob.arrayBuffer())
-  const webpBuffer = await sharp(sourceBuffer)
-    .resize(VARIANT_SIZES.xs, null, { withoutEnlargement: true, fit: "inside" })
-    .webp({ quality: VARIANT_WEBP_QUALITY.xs })
-    .toBuffer()
+  const sourceFormat = detectAssetImageFormatFromUrl(sourceUrl)
+  const codec = sourceFormat === "avif" ? "avif" : "webp"
+  const encoded = await encodeImageVariant(sourceBuffer, "xs", codec)
 
   const version = Date.now()
-  const storagePath = `${entityType}/${entityId}/${role}/xs_${VARIANT_SIZES.xs}_${version}.webp`
+  const storagePath = `${entityType}/${entityId}/${role}/xs_${VARIANT_SIZES.xs}_${version}.${encoded.extension}`
 
   const { error: uploadError } = await writeClient.storage
     .from(ASSET_IMAGES_BUCKET)
-    .upload(storagePath, webpBuffer, {
-      contentType: "image/webp",
+    .upload(storagePath, encoded.buffer, {
+      contentType: encoded.contentType,
       upsert: true,
       cacheControl: "31536000",
     })

@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Plus, Edit2, Trash2, Search, MapPin } from "lucide-react"
+import { Plus, Edit2, Trash2, Search, MapPin, ImagePlus } from "lucide-react"
+import { useRouter } from "@/i18n/navigation"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 import type { Place } from "@/src/places/domain/place.entity"
@@ -25,6 +26,7 @@ interface LocationsTabProps {
 }
 
 export function LocationsTab({ initialPlaces, initialFictions = [], initialCities = [] }: LocationsTabProps) {
+  const router = useRouter()
   const [cities, setCities] = useState<City[]>(initialCities)
   const [fictions, setFictions] = useState<Fiction[]>(initialFictions)
   const [places, setPlaces] = useState<Place[]>(initialPlaces ?? [])
@@ -268,7 +270,7 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
                   {loc.location.address || loc.description}
                 </p>
 
-                <div className="flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity gap-2">
+                <div className="flex flex-wrap items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity gap-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -280,6 +282,16 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
                   >
                     <Edit2 className="h-3 w-3" />
                     Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push(`/admin/place/${loc.id}/improve-photo`)
+                    }
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors"
+                  >
+                    <ImagePlus className="h-3 w-3" />
+                    Improve photo
                   </button>
                   <button
                     type="button"

@@ -13,11 +13,13 @@ import { FICTION_GENRES } from "@/lib/constants/fiction-genres"
 import { FICTION_LANGUAGE_CODES, FICTION_LANGUAGE_LABELS } from "@/lib/constants/fiction-languages"
 import {
   updateFictionAction,
-  uploadFictionImageAction,
   deleteFictionAction,
   getFictionInterestsAction,
   setFictionInterestsAction,
 } from "@/src/fictions/infrastructure/next/fiction.actions"
+import {
+  imageFocusToObjectPosition,
+} from "@/lib/asset-images/image-focus"
 import {
   searchPersonsAction,
   createPersonAction,
@@ -74,21 +76,17 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const initialForm = useMemo(() => toFormState(initialFiction), [initialFiction])
   const [formData, setFormData] = useState(initialForm)
-  const [coverImage, setCoverImage] = useState<string | null>(
+  const coverImage =
     initialFiction.coverImage ?? initialFiction.coverImageLarge ?? null
-  )
-  const [bannerImage, setBannerImage] = useState<string | null>(
-    initialFiction.bannerImage ?? initialFiction.coverImageLarge ?? initialFiction.coverImage ?? null
-  )
-  const [uploadingCover, setUploadingCover] = useState(false)
-  const [uploadingBanner, setUploadingBanner] = useState(false)
-  const [imageError, setImageError] = useState<string | null>(null)
+  const bannerImage =
+    initialFiction.bannerImage ??
+    initialFiction.coverImageLarge ??
+    initialFiction.coverImage ??
+    null
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmTitle, setDeleteConfirmTitle] = useState("")
   const [deleting, setDeleting] = useState(false)
   const [slugEditing, setSlugEditing] = useState(false)
-  const coverInputRef = useRef<HTMLInputElement>(null)
-  const bannerInputRef = useRef<HTMLInputElement>(null)
 
   // Persons (admin selector)
   const [persons, setPersons] = useState<FictionPerson[]>([])
@@ -247,45 +245,6 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleUploadCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setImageError(null)
-    setUploadingCover(true)
-    const fd = new FormData()
-    fd.set("file", file)
-    const result = await uploadFictionImageAction(initialFiction.id, "cover", fd)
-    setUploadingCover(false)
-    e.target.value = ""
-    if (result.success && result.coverImage) {
-      setCoverImage(result.coverImage)
-      if (!initialFiction.bannerImage && result.coverImageLarge) {
-        setBannerImage(result.coverImageLarge)
-      }
-      router.refresh()
-    } else if (!result.success) {
-      setImageError(result.error ?? null)
-    }
-  }
-
-  const handleUploadBanner = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setImageError(null)
-    setUploadingBanner(true)
-    const fd = new FormData()
-    fd.set("file", file)
-    const result = await uploadFictionImageAction(initialFiction.id, "banner", fd)
-    setUploadingBanner(false)
-    e.target.value = ""
-    if (result.success && result.bannerImage) {
-      setBannerImage(result.bannerImage)
-      router.refresh()
-    } else if (!result.success) {
-      setImageError(result.error ?? null)
-    }
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validate()) return
@@ -344,12 +303,6 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
                   {errors.submit}
                 </p>
               )}
-              {imageError && (
-                <p className="text-sm text-red-500 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2">
-                  {imageError}
-                </p>
-              )}
-
               {/* 4 inputs first — same as create */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField label="Title" required error={errors.title}>
@@ -437,97 +390,58 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
                 </FormField>
               </div>
 
-              {/* Images — same layout as create */}
+              {/* Images: read-only preview; replace via Improve photo wizard */}
               <section className="space-y-3">
-                <input
-                  ref={coverInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  className="hidden"
-                  disabled={uploadingCover}
-                  onChange={handleUploadCover}
-                />
-                <input
-                  ref={bannerInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  className="hidden"
-                  disabled={uploadingBanner}
-                  onChange={handleUploadBanner}
-                />
                 <div className="flex flex-col sm:flex-row gap-4 sm:h-[200px]">
-                  <button
-                    type="button"
-                    onClick={() => !uploadingCover && coverInputRef.current?.click()}
-                    disabled={uploadingCover}
-                    className="group relative w-[120px] sm:w-[140px] h-[180px] sm:h-full rounded-xl border border-border overflow-hidden bg-muted/30 flex items-center justify-center text-muted-foreground hover:border-foreground/30 hover:bg-muted/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0 disabled:opacity-60"
-                  >
+                  <div className="relative w-[120px] sm:w-[140px] h-[180px] sm:h-full rounded-xl border border-border overflow-hidden bg-muted/30 flex items-center justify-center text-muted-foreground shrink-0">
                     {coverImage ? (
-                      <>
-                        <Image
-                          src={coverImage}
-                          alt="Cover"
-                          fill
-                          className="object-cover"
-                          sizes="140px"
-                          unoptimized={coverImage.startsWith("blob:")}
-                        />
-                        <span className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end justify-center pb-2">
-                          <span className="text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow">
-                            {uploadingCover ? "Uploading…" : "Change"}
-                          </span>
-                        </span>
-                      </>
+                      <Image
+                        src={coverImage}
+                        alt="Cover"
+                        fill
+                        className="object-cover"
+                        style={{
+                          objectPosition: imageFocusToObjectPosition(
+                            initialFiction.coverFocus,
+                          ),
+                        }}
+                        sizes="140px"
+                      />
                     ) : (
-                      <>
-                        {uploadingCover ? (
-                          <Loader2 className="h-10 w-10 animate-spin" />
-                        ) : (
-                          <ImagePlus className="h-10 w-10" />
-                        )}
-                      </>
+                      <ImagePlus className="h-10 w-10" />
                     )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => !uploadingBanner && bannerInputRef.current?.click()}
-                    disabled={uploadingBanner}
-                    className="group relative flex-1 min-w-0 h-[180px] sm:h-full rounded-xl border border-border overflow-hidden bg-muted/30 flex items-center justify-center text-muted-foreground hover:border-foreground/30 hover:bg-muted/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-                  >
+                  </div>
+                  <div className="relative flex-1 min-w-0 h-[180px] sm:h-full rounded-xl border border-border overflow-hidden bg-muted/30 flex items-center justify-center text-muted-foreground">
                     {bannerImage ? (
-                      <>
-                        <Image
-                          src={bannerImage}
-                          alt="Banner"
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 640px) 100vw, 50vw"
-                          unoptimized={bannerImage.startsWith("blob:")}
-                        />
-                        <span className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                          <span className="text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow">
-                            {uploadingBanner ? "Uploading…" : "Change"}
-                          </span>
-                        </span>
-                      </>
+                      <Image
+                        src={bannerImage}
+                        alt="Hero"
+                        fill
+                        className="object-cover"
+                        style={{
+                          objectPosition: imageFocusToObjectPosition(
+                            initialFiction.bannerFocus,
+                          ),
+                        }}
+                        sizes="(max-width: 640px) 100vw, 50vw"
+                      />
                     ) : (
-                      <>
-                        {uploadingBanner ? (
-                          <Loader2 className="h-10 w-10 animate-spin" />
-                        ) : (
-                          <ImagePlus className="h-10 w-10" />
-                        )}
-                      </>
+                      <ImagePlus className="h-10 w-10" />
                     )}
-                  </button>
+                  </div>
                 </div>
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-muted-foreground">
-                    <strong className="text-foreground">Cover (optional):</strong> Ratio 2:3 portrait. JPG, PNG, WebP, GIF. Max 10 MB. We generate sm (300px) and lg (800px) WebP.
+                    Cover and hero are managed in{" "}
+                    <strong className="text-foreground">Improve photo</strong> (not Save
+                    changes).
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    <strong className="text-foreground">Banner (optional):</strong> Ratio 21:9 wide. JPG, PNG, WebP, GIF. Max 10 MB. We generate lg (800px) WebP.
-                  </p>
+                  <Link href={`/admin/fiction/${initialFiction.id}/improve-photo`}>
+                    <Button type="button" variant="outline" className="gap-2 rounded-xl">
+                      <ImagePlus className="h-4 w-4" />
+                      Improve photo
+                    </Button>
+                  </Link>
                 </div>
               </section>
 

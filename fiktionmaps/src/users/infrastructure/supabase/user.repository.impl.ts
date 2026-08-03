@@ -60,14 +60,13 @@ export function createUsersSupabaseAdapter(
   return {
     getProfile: cache(async (userId: string): Promise<Profile | null> => {
       const supabase = await getSupabase()
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single()
+      // `asset_images` is polymorphic (no FK to embed), so both reads are issued in parallel.
+      const [{ data, error }, focus] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", userId).single(),
+        fetchProfileAvatarFocus(supabase, userId),
+      ])
 
       if (error || !data) return null
-      const focus = await fetchProfileAvatarFocus(supabase, userId)
       return mapProfileRow(data, focus)
     }),
 
@@ -94,15 +93,12 @@ export function createUsersSupabaseAdapter(
       updates: UpdateProfileData
     ): Promise<Profile | null> {
       const supabase = await getSupabase()
-      const { data, error } = await supabase
-        .from("profiles")
-        .update(updates)
-        .eq("id", userId)
-        .select()
-        .single()
+      const [{ data, error }, focus] = await Promise.all([
+        supabase.from("profiles").update(updates).eq("id", userId).select().single(),
+        fetchProfileAvatarFocus(supabase, userId),
+      ])
 
       if (error || !data) return null
-      const focus = await fetchProfileAvatarFocus(supabase, userId)
       return mapProfileRow(data, focus)
     },
 

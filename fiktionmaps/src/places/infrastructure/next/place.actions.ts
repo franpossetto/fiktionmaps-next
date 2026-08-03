@@ -130,12 +130,15 @@ export async function uploadPlaceImageAction(
     file,
     replace: true,
     focus: parseImageFocusFromFormData(formData),
+    codec: "avif",
   })
 
   if (!result.success) return result
 
   revalidatePath("/admin")
+  revalidatePath(`/admin/place/${placeId}/improve-photo`)
   updateTag("places")
+  updateTag(`place-${placeId}`)
   return { success: true, avatarUrl: result.urls.sm }
 }
 
@@ -373,6 +376,7 @@ export async function createContributorPlaceWithImageAction(
         file: parsed.imageFile,
         replace: true,
         focus: parseImageFocusFromFormData(formData),
+        codec: "avif",
       })
     }
   }

@@ -33,8 +33,16 @@ export async function signOut(): Promise<AuthResult> {
   return supabase.signOut()
 }
 
+/**
+ * `getUser()` is a network round-trip to the Auth server, so every caller in the
+ * same request shares one call.
+ */
+const getAuthenticatedUserCached = cache(
+  async (): Promise<AuthResult<AuthUser>> => supabase.getUser(),
+)
+
 export async function getAuthenticatedUser(): Promise<AuthResult<AuthUser>> {
-  return supabase.getUser()
+  return getAuthenticatedUserCached()
 }
 
 function validateNewPasswordResult(
@@ -91,7 +99,7 @@ export async function updatePassword(
 }
 
 /** Resolves the current user id via `getUser()` (validated with Auth), not from session storage alone. */
-export const getSessionUserId = cache(async (): Promise<string | null> => {
-  const result = await supabase.getUser()
+export async function getSessionUserId(): Promise<string | null> {
+  const result = await getAuthenticatedUserCached()
   return result.data?.id ?? null
-})
+}

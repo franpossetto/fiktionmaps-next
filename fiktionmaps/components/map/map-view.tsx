@@ -552,7 +552,7 @@ export function MapView({
   )
 
   // Dev-only tripwire: catches a future regression of the World/City pin-mixing bug class
-  // (see docs/plans/free-world.md / docs/plans/free-world-perf.md) without waiting for a user report.
+  // (see docs/plans/2026-07-26-free-world.md / docs/plans/2026-07-26-free-world-perf.md) without waiting for a user report.
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return
     if (showPlacePins && showWorldClusters) {

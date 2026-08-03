@@ -1,5 +1,5 @@
-import sharp from "sharp"
 import { createClient } from "@/lib/supabase/server"
+import { encodeImageVariant } from "./encode-image-variant"
 import {
   DEFAULT_IMAGE_FOCUS,
   normalizeImageFocus,
@@ -9,7 +9,6 @@ import {
   ASSET_IMAGES_BUCKET,
   THUMB_UPLOAD_VARIANTS,
   VARIANT_SIZES,
-  VARIANT_WEBP_QUALITY,
   type ImageVariant,
 } from "./variant-sizes"
 import type { ImageRole } from "./image-variant-service"
@@ -25,6 +24,11 @@ export type PlaceContributionImageRole = Extract<PendingContributionImageRole, "
 
 function pendingBasePath(contributionId: string, role: PendingContributionImageRole): string {
   return `pending/contributions/${contributionId}/${role}`
+}
+
+function extensionFromStoragePath(path: string): string {
+  const match = path.trim().toLowerCase().match(/\.([a-z0-9]+)$/)
+  return match?.[1] ?? "avif"
 }
 
 export async function uploadPendingContributionImage(
@@ -51,20 +55,16 @@ export async function uploadPendingContributionImage(
   const paths: Partial<Record<ImageVariant, string>> = {}
 
   for (const variant of variants) {
-    const width = VARIANT_SIZES[variant]
-    const webpBuffer = await sharp(buffer)
-      .resize(width, null, { withoutEnlargement: true })
-      .webp({ quality: VARIANT_WEBP_QUALITY[variant] })
-      .toBuffer()
+    const encoded = await encodeImageVariant(buffer, variant, "avif")
 
     const storagePath =
       variant === "xs"
-        ? `${basePath}/xs_${VARIANT_SIZES.xs}_${version}.webp`
-        : `${basePath}/${variant}_${version}.webp`
+        ? `${basePath}/xs_${VARIANT_SIZES.xs}_${version}.${encoded.extension}`
+        : `${basePath}/${variant}_${version}.${encoded.extension}`
     const { error: uploadError } = await supabase.storage
       .from(ASSET_IMAGES_BUCKET)
-      .upload(storagePath, webpBuffer, {
-        contentType: "image/webp",
+      .upload(storagePath, encoded.buffer, {
+        contentType: encoded.contentType,
         upsert: true,
         cacheControl: "31536000",
       })
@@ -158,10 +158,11 @@ export async function promotePendingContributionPhotoToAssetImages(
   }[] = []
 
   for (const { variant, from } of pairs) {
+    const ext = extensionFromStoragePath(from)
     const dest =
       variant === "xs"
-        ? `${entityType}/${entityId}/${role}/xs_${VARIANT_SIZES.xs}_${version}.webp`
-        : `${entityType}/${entityId}/${role}/${variant}_${version}.webp`
+        ? `${entityType}/${entityId}/${role}/xs_${VARIANT_SIZES.xs}_${version}.${ext}`
+        : `${entityType}/${entityId}/${role}/${variant}_${version}.${ext}`
     const { error: copyErr } = await supabase.storage.from(ASSET_IMAGES_BUCKET).copy(from, dest)
     if (copyErr) {
       return { success: false, error: `Copy failed: ${copyErr.message}` }

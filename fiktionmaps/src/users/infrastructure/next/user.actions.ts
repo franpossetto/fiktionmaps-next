@@ -18,7 +18,7 @@ import { getUserFictionLikesUseCase } from "@/src/fiction-likes/application/get-
 import { toggleFictionLikeUseCase } from "@/src/fiction-likes/application/toggle-fiction-like.usecase"
 import { getUserInterestIdsUseCase } from "@/src/user-interests/application/get-user-interest-ids.usecase"
 import { setUserInterestsUseCase } from "@/src/user-interests/application/set-user-interests.usecase"
-import { getProfileUseCase } from "@/src/users/application/get-profile.usecase"
+import { getSessionAccount } from "@/src/users/infrastructure/next/user.queries"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
 import { parseImageFocusFromFormData } from "@/lib/asset-images/image-focus"
 import { updateAssetImageFocusUseCase } from "@/src/asset-images/application/update-asset-image-focus.usecase"
@@ -35,25 +35,8 @@ export type GetCurrentProfileResult =
 
 async function fetchCurrentUserProfileAction(): Promise<GetCurrentProfileResult> {
   try {
-    const userId = await getSessionUserId()
-    if (!userId) {
-      return { data: null, error: null }
-    }
-    // Fresh read for the session (avoid unstable_cache stale role after DB changes).
-    const profile = await getProfileUseCase(userId, createUsersSupabaseAdapter(createClient))
-    if (!profile) {
-      if (process.env.NODE_ENV === "development") {
-        console.warn("[getCurrentUserProfileAction] no profile row for userId", userId)
-      }
-      return { data: null, error: null }
-    }
-    if (process.env.NODE_ENV === "development") {
-      console.info("[getCurrentUserProfileAction] role", profile.role, "userId", userId)
-    }
-    return {
-      data: mapProfileToUserProfile(profile),
-      error: null,
-    }
+    const { profile } = await getSessionAccount()
+    return { data: profile, error: null }
   } catch (e) {
     return {
       data: null,

@@ -18,11 +18,6 @@ export async function signIn(credentials: SignInCredentials): Promise<AuthResult
   if (error) return { data: null, error: error.message }
   if (!data.user) return { data: null, error: "No user returned" }
 
-  // Debug: inspect Supabase user metadata to verify display_name/full_name
-  // This logs on the server where the auth call runs.
-  // eslint-disable-next-line no-console
-  console.log("[auth.supabase] signIn user_metadata:", data.user.user_metadata)
-
   const meta = data.user.user_metadata
   const display_name = (meta?.display_name as string | undefined) ?? null
   const full_name = (meta?.full_name as string | undefined) ?? null
@@ -92,10 +87,6 @@ export async function getUser(): Promise<AuthResult<AuthUser>> {
 
   if (error || !data.user) return { data: null, error: error?.message ?? null }
 
-  // Debug: inspect Supabase user metadata when restoring session
-  // eslint-disable-next-line no-console
-  console.log("[auth.supabase] getUser user_metadata:", data.user.user_metadata)
-
   const meta = data.user.user_metadata
   const display_name = (meta?.display_name as string | undefined) ?? null
   const full_name = (meta?.full_name as string | undefined) ?? null
@@ -164,7 +155,6 @@ export async function requestPasswordReset(
     redirectTo: input.redirectTo,
   })
   if (error) {
-    // eslint-disable-next-line no-console
     console.error("[auth.supabase] resetPasswordForEmail:", error.message)
   }
   return { data: null, error: null }

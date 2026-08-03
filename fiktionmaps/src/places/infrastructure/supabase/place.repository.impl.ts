@@ -796,7 +796,7 @@ export function createPlacesSupabaseAdapter(
       // Hot path: RPC aggregates only — no fiction cover/title round-trip. Nothing renders
       // fictionCovers today (WorldClusterPin is a text/count pill); wiring a real consumer
       // back in later should fetch covers lazily (e.g. on hover) instead of blocking every
-      // viewport fetch on two extra Supabase round-trips for unused data (docs/plans/free-world-perf.md P1.3).
+      // viewport fetch on two extra Supabase round-trips for unused data (docs/plans/2026-07-26-free-world-perf.md P1.3).
       const clusters: MapCluster[] = []
 
       for (const row of rows ?? []) {
