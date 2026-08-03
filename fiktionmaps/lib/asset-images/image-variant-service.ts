@@ -1,5 +1,5 @@
-import sharp from "sharp"
 import { createClient } from "@/lib/supabase/server"
+import { encodeImageVariant } from "./encode-image-variant"
 import {
   DEFAULT_IMAGE_FOCUS,
   normalizeImageFocus,
@@ -8,7 +8,7 @@ import {
 import {
   ASSET_IMAGES_BUCKET,
   VARIANT_SIZES,
-  VARIANT_WEBP_QUALITY,
+  type ImageCodec,
   type ImageVariant,
 } from "./variant-sizes"
 
@@ -29,17 +29,27 @@ export interface UploadImageOptions {
   replace?: boolean
   /** Focal point for object-position (0–100). Defaults to center. */
   focus?: ImageFocus
+  /** Output codec. Defaults to webp (e.g. profile); fiction/place/contributions use avif. */
+  codec?: ImageCodec
 }
 
 /**
- * Generates WebP variants, uploads to Supabase Storage, and upserts asset_images rows.
+ * Generates image variants, uploads to Supabase Storage, and upserts asset_images rows.
  * Call from a Server Action with the user's uploaded file.
  */
 export async function uploadEntityImage(options: UploadImageOptions): Promise<
   | { success: true; urls: Record<ImageVariant, string> }
   | { success: false; error: string }
 > {
-  const { entityType, entityId, role, variants, file, replace = true } = options
+  const {
+    entityType,
+    entityId,
+    role,
+    variants,
+    file,
+    replace = true,
+    codec = "webp",
+  } = options
   const focus = normalizeImageFocus(
     options.focus?.x ?? DEFAULT_IMAGE_FOCUS.x,
     options.focus?.y ?? DEFAULT_IMAGE_FOCUS.y,
@@ -92,20 +102,18 @@ export async function uploadEntityImage(options: UploadImageOptions): Promise<
   const version = Date.now()
 
   for (const variant of variants) {
-    const width = VARIANT_SIZES[variant]
-    const webpBuffer = await sharp(buffer)
-      .resize(width, null, { withoutEnlargement: true })
-      .webp({ quality: VARIANT_WEBP_QUALITY[variant] })
-      .toBuffer()
+    const encoded = await encodeImageVariant(buffer, variant, codec)
 
     const fileName =
-      variant === "xs" ? `xs_${VARIANT_SIZES.xs}_${version}.webp` : `${variant}_${version}.webp`
+      variant === "xs"
+        ? `xs_${VARIANT_SIZES.xs}_${version}.${encoded.extension}`
+        : `${variant}_${version}.${encoded.extension}`
     const storagePath = `${basePath}/${fileName}`
 
     const { error: uploadError } = await supabase.storage
       .from(ASSET_IMAGES_BUCKET)
-      .upload(storagePath, webpBuffer, {
-        contentType: "image/webp",
+      .upload(storagePath, encoded.buffer, {
+        contentType: encoded.contentType,
         upsert: true,
         cacheControl: "31536000",
       })

@@ -10,3 +10,9 @@ export type SettingsNavItem = {
   id: SettingsSectionId
   label: string
 }
+
+/** Resolved after hydration: locale and timezone are only known on the client. */
+export type LocalClock = {
+  time: string
+  timeZone: string
+}

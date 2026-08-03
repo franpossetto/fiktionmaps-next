@@ -240,6 +240,7 @@ async function createFictionWithImagesFromParsed(
         file: coverFile,
         replace: true,
         focus: parseImageFocusFromFormData(formData, "cover"),
+        codec: "avif",
       })
     }
   }
@@ -254,6 +255,7 @@ async function createFictionWithImagesFromParsed(
         file: bannerFile,
         replace: true,
         focus: parseImageFocusFromFormData(formData, "banner"),
+        codec: "avif",
       })
     }
   }
@@ -304,11 +306,13 @@ export async function uploadFictionImageAction(
     file,
     replace: true,
     focus: parseImageFocusFromFormData(formData),
+    codec: "avif",
   })
 
   if (!result.success) return result
 
   revalidatePath(`/admin/fiction/${fictionId}`)
+  revalidatePath(`/admin/fiction/${fictionId}/improve-photo`)
   updateTag("fictions")
 
   if (role === "cover") {

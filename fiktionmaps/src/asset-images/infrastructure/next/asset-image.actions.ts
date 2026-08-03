@@ -1,9 +1,20 @@
 "use server"
 
 import { z } from "zod"
-import type { EntityType, ImageRole } from "@/lib/asset-images/image-variant-service"
+import { encodeImageVariant } from "@/lib/asset-images/encode-image-variant"
+import {
+  validateImageFile,
+  type EntityType,
+  type ImageRole,
+} from "@/lib/asset-images/image-variant-service"
+import type { ImageVariant } from "@/lib/asset-images/variant-sizes"
+import { createClient } from "@/lib/supabase/server"
 import { ensureAssetImageXsUseCase } from "@/src/asset-images/application/ensure-asset-image-xs.usecase"
 import { updateAssetImageFocusUseCase } from "@/src/asset-images/application/update-asset-image-focus.usecase"
+import { isUserAdminUseCase } from "@/src/users/application/is-user-admin.usecase"
+import { createUsersSupabaseAdapter } from "@/src/users/infrastructure/supabase/user.repository.impl"
+
+const usersRepo = createUsersSupabaseAdapter(createClient)
 
 const ensureXsSchema = z.object({
   entityType: z.enum(["fiction", "city", "location", "scene", "profile", "place"]),
@@ -60,4 +71,84 @@ export async function updateAssetImageFocusAction(input: {
     role: parsed.data.role,
     focus: { x: parsed.data.focusX, y: parsed.data.focusY },
   })
+}
+
+export type ImageCodecPreviewVariant = {
+  codec: "webp" | "avif"
+  variant: ImageVariant
+  /** Encode quality used (WebP or AVIF). */
+  quality: number
+  byteLength: number
+  width: number
+  height: number
+  dataUrl: string
+}
+
+export type PreviewImageCodecsResult =
+  | { success: true; previews: ImageCodecPreviewVariant[] }
+  | { success: false; error: string }
+
+function parseVariants(raw: FormDataEntryValue | null): ImageVariant[] {
+  if (typeof raw !== "string" || !raw.trim()) return ["lg"]
+  return raw
+    .split(",")
+    .map((v) => v.trim())
+    .filter((v): v is ImageVariant => v === "xs" || v === "sm" || v === "lg" || v === "xl")
+}
+
+/**
+ * Admin-only: encode variants as WebP + AVIF (q48) in memory for comparison.
+ * No Storage write.
+ */
+export async function previewImageCodecsAction(
+  formData: FormData,
+): Promise<PreviewImageCodecsResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const isAdmin = await isUserAdminUseCase(user.id, usersRepo)
+  if (!isAdmin) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const file = formData.get("file")
+  if (!(file instanceof File) || file.size === 0) {
+    return { success: false, error: "No file provided" }
+  }
+
+  const validationError = validateImageFile(file)
+  if (validationError) {
+    return { success: false, error: validationError }
+  }
+
+  const variants = parseVariants(formData.get("variants"))
+  if (!variants.length) {
+    return { success: false, error: "No variants requested" }
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer())
+  const previews: ImageCodecPreviewVariant[] = []
+
+  for (const variant of variants) {
+    for (const codec of ["webp", "avif"] as const) {
+      const encoded = await encodeImageVariant(buffer, variant, codec)
+      previews.push({
+        codec,
+        variant,
+        quality: encoded.quality,
+        byteLength: encoded.buffer.byteLength,
+        width: encoded.width,
+        height: encoded.height,
+        dataUrl: `data:${encoded.contentType};base64,${encoded.buffer.toString("base64")}`,
+      })
+    }
+  }
+
+  return { success: true, previews }
 }

@@ -303,7 +303,7 @@ function MapPageInner({ initial }: { initial: MapPageInitialData }) {
   /**
    * Single source of truth for the pins actually painted in city mode. Replaces the four
    * independent `setViewportPlaces(...)` call sites that used to race each other (city load,
-   * fiction filter, bbox filter, click-to-pin) — see docs/plans/free-world.md and free-world-perf.md registry.
+   * fiction filter, bbox filter, click-to-pin) — see docs/plans/2026-07-26-free-world.md and 2026-07-26-free-world-perf.md registry.
    * Recomputed from primitives only; no effect ever writes viewportPlaces directly anymore.
    */
   const viewportPlaces = useMemo((): Place[] => {

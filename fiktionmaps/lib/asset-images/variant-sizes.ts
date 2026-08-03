@@ -17,6 +17,22 @@ export const VARIANT_WEBP_QUALITY: Record<ImageVariant, number> = {
   xl: 85,
 }
 
+/**
+ * AVIF quality per variant (sharp 0–100; not 1:1 with WebP).
+ * Calibrated at 48 for all sizes.
+ */
+export const VARIANT_AVIF_QUALITY: Record<ImageVariant, number> = {
+  xs: 48,
+  sm: 48,
+  lg: 48,
+  xl: 48,
+}
+
+/** sharp AVIF encode effort (0–9). Higher = slower + often smaller. */
+export const VARIANT_AVIF_EFFORT = 6
+
+export type ImageCodec = "webp" | "avif"
+
 /** Default set for cover / avatar style assets. */
 export const THUMB_UPLOAD_VARIANTS = ["xs", "sm", "lg"] as const satisfies readonly ImageVariant[]
 

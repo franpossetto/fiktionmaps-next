@@ -467,7 +467,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">
-                      <strong className="text-foreground">Cover (optional):</strong> Ratio 2:3 portrait. JPG, PNG, WebP, GIF. Max 10 MB. We generate sm (300px) and lg (800px) WebP.
+                      <strong className="text-foreground">Cover (optional):</strong> Ratio 2:3 portrait. JPG, PNG, WebP, GIF. Max 10 MB. We generate xs/sm/lg AVIF.
                     </p>
                     <p className="text-sm text-muted-foreground">
                       <strong className="text-foreground">Banner (optional):</strong> Ratio 21:9 wide. JPG, PNG, WebP, GIF. Max 10 MB. We generate lg (800px) WebP.
@@ -695,6 +695,15 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            router.push(`/admin/fiction/${fiction.id}/improve-photo`)
+                          }}
+                        >
+                          <ImagePlus className="h-3 w-3" />
+                          Improve photo
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                           onClick={() =>
                             fiction.active
                               ? setFictionToDeactivate(fiction)
@@ -784,6 +793,14 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                         <DropdownMenuItem onClick={() => openFiction(fiction.id)}>
                           <Edit2 className="h-3 w-3" />
                           Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            router.push(`/admin/fiction/${fiction.id}/improve-photo`)
+                          }
+                        >
+                          <ImagePlus className="h-3 w-3" />
+                          Improve photo
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() =>

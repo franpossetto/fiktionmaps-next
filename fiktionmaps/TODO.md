@@ -113,4 +113,4 @@
 ## Related docs
 
 - [ ] Update `docs/reference/places-and-locations.md` (see Places G1)
-- [ ] Image loading optimization — see `docs/plans/image-loading-optimization.md`
+- [ ] Image loading optimization — see `docs/plans/2026-04-18-image-loading-optimization.md`

@@ -1,23 +1,28 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { Suspense, useState, useEffect, useMemo } from "react"
 import { useTranslations } from "next-intl"
 import { useRouter } from "@/i18n/navigation"
-import { useAuth } from "@/context/auth-context"
 import { useThemeSettings } from "@/lib/theme-settings-context"
 import type { ThemeBase, StyleVariant, TimeOfDay } from "@/lib/theme-settings"
 import type { ThemeSettings } from "@/lib/theme-settings"
 import { Button } from "@/components/ui/button"
 import { FictionContributeLayout } from "@/components/contribute/fiction/fiction-contribute-layout"
 import {
-  getCurrentUserProfileAction,
-  type ProfileWithOnboarding,
-} from "@/src/users/infrastructure/next/user.actions"
+  SettingsAccountProvider,
+  useSettingsAccount,
+  type SessionAccount,
+} from "./settings-account-context"
 import { SettingsNav } from "./settings-nav"
 import { SettingsUserHeader } from "./settings-user-header"
 import { SettingsPermissionAside } from "./settings-permission-aside"
 import {
+  SettingsPermissionAsideSkeleton,
+  SettingsUserHeaderSkeleton,
+} from "./settings-skeletons"
+import {
   SETTINGS_SECTION_IDS,
+  type LocalClock,
   type SettingsNavItem,
   type SettingsSectionId,
 } from "./settings-sections"
@@ -29,14 +34,72 @@ import mapNight from "@/lib/map/styles/mapbox_night.png"
 
 type MapStyleOption = "day" | "dawn" | "night" | "dusk"
 
-export function SettingsPage() {
+function readLocalClock(): LocalClock {
+  return {
+    time: new Date().toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }),
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  }
+}
+
+function UserHeaderContent() {
+  const { profile } = useSettingsAccount()
+  const username = profile?.username?.trim() ?? ""
+  if (!username) return null
+
+  return (
+    <SettingsUserHeader
+      username={username}
+      fullName={profile?.fullName}
+      avatar={profile?.avatar}
+      avatarFocus={profile?.avatarFocus ?? null}
+    />
+  )
+}
+
+function UserHeaderSlot() {
+  return (
+    <Suspense fallback={<SettingsUserHeaderSkeleton />}>
+      <UserHeaderContent />
+    </Suspense>
+  )
+}
+
+function PermissionAsideContent() {
+  const { profile } = useSettingsAccount()
+  return <SettingsPermissionAside role={profile?.role ?? "user"} />
+}
+
+function PermissionAsideSlot() {
+  return (
+    <Suspense fallback={<SettingsPermissionAsideSkeleton />}>
+      <PermissionAsideContent />
+    </Suspense>
+  )
+}
+
+export function SettingsPage({
+  accountPromise,
+}: {
+  accountPromise: Promise<SessionAccount>
+}) {
+  return (
+    <SettingsAccountProvider accountPromise={accountPromise}>
+      <SettingsPageShell />
+    </SettingsAccountProvider>
+  )
+}
+
+function SettingsPageShell() {
   const t = useTranslations("Settings")
   const router = useRouter()
-  const { user } = useAuth()
   const { settings, applyAndSave, timeOfDay } = useThemeSettings()
   const [pending, setPending] = useState<ThemeSettings>(settings)
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("account")
-  const [profile, setProfile] = useState<ProfileWithOnboarding | null>(null)
+  const [localClock, setLocalClock] = useState<LocalClock | null>(null)
 
   const navItems = useMemo<SettingsNavItem[]>(
     () =>
@@ -77,30 +140,13 @@ export function SettingsPage() {
 
   useEffect(() => {
     setPending(settings)
-  }, [
-    settings.mode,
-    settings.base,
-    settings.styleVariant,
-    settings.marker2dShape,
-    settings.markerLabelMode,
-    settings.markerHoverScale,
-  ])
+  }, [settings])
 
+  // Locale/timezone are client-only, so the clock is resolved after hydration.
   useEffect(() => {
-    if (!navItems.some((item) => item.id === activeSection)) {
-      setActiveSection("account")
-    }
-  }, [navItems, activeSection])
-
-  useEffect(() => {
-    let cancelled = false
-    getCurrentUserProfileAction().then((result) => {
-      if (cancelled || !result.data) return
-      setProfile(result.data)
-    })
-    return () => {
-      cancelled = true
-    }
+    setLocalClock(readLocalClock())
+    const id = setInterval(() => setLocalClock(readLocalClock()), 60_000)
+    return () => clearInterval(id)
   }, [])
 
   const handleSave = () => {
@@ -114,14 +160,6 @@ export function SettingsPage() {
       : timeOfDay === "day" || timeOfDay === "afternoon"
         ? "light"
         : "dark"
-
-  const now = new Date()
-  const localTime = now.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
-  const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   const mapPreviewByTimeOfDay =
     timeOfDay === "day"
@@ -140,32 +178,13 @@ export function SettingsPage() {
     timeOfDay,
     mapStyleOptions,
     mapPreviewByTimeOfDay,
-    localTime,
-    localTz,
+    localClock,
     timeOfDayLabels,
-    profile,
-    email: user?.email,
-    onProfileSaved: setProfile,
   }
-
-  const username = profile?.username?.trim() || ""
-  const userHeader =
-    username.length > 0 ? (
-      <SettingsUserHeader
-        username={username}
-        fullName={profile?.fullName}
-        avatar={profile?.avatar}
-        avatarFocus={profile?.avatarFocus ?? null}
-      />
-    ) : null
-
-  const permissionAside = (
-    <SettingsPermissionAside role={profile?.role ?? "user"} />
-  )
 
   const navAside = (
     <div className="mx-auto w-full max-w-full space-y-5 pt-1">
-      {userHeader}
+      <UserHeaderSlot />
       <SettingsNav
         items={navItems}
         activeId={activeSection}
@@ -178,12 +197,14 @@ export function SettingsPage() {
     <FictionContributeLayout
       leftAside={navAside}
       rightAside={
-        <div className="w-full min-w-0 max-w-full space-y-5 pt-1">{permissionAside}</div>
+        <div className="w-full min-w-0 max-w-full space-y-5 pt-1">
+          <PermissionAsideSlot />
+        </div>
       }
     >
       <div className="w-full min-w-0 px-4 pb-10 sm:px-5">
         <div className="mb-6 space-y-4 min-[900px]:hidden">
-          {userHeader}
+          <UserHeaderSlot />
           <SettingsNav
             items={navItems}
             activeId={activeSection}
@@ -212,7 +233,9 @@ export function SettingsPage() {
 
         <SettingsSectionPanel {...panelProps} />
 
-        <div className="mt-8 min-[900px]:hidden">{permissionAside}</div>
+        <div className="mt-8 min-[900px]:hidden">
+          <PermissionAsideSlot />
+        </div>
       </div>
     </FictionContributeLayout>
   )

@@ -3,21 +3,32 @@
 import { useState } from "react"
 import { useLocale, useTranslations } from "next-intl"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { useAuth } from "@/context/auth-context"
 import {
   changePasswordAction,
   requestPasswordResetAction,
 } from "@/lib/actions/auth/auth.actions"
 import { validateNewPassword } from "@/lib/auth/password-rules"
 import { isPasswordErrorCode } from "@/lib/auth/password-error-i18n"
+import {
+  FORM_CARD_ACTION_CLASS,
+  FORM_CARD_BODY_CLASS,
+  FORM_CARD_CLASS,
+  FORM_CARD_FOOTER_CLASS,
+  FORM_FIELD_GRID_CLASS,
+} from "@/components/ui/form-card"
 
-export function ChangePasswordForm() {
+type ChangePasswordFormProps = {
+  /** Session email, used for the "send reset link" fallback. */
+  email?: string | null
+}
+
+export function ChangePasswordForm({ email: sessionEmail }: ChangePasswordFormProps) {
   const t = useTranslations("Settings.account")
   const tAuth = useTranslations("Auth")
   const tCommon = useTranslations("Common")
   const locale = useLocale()
-  const { user } = useAuth()
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -28,7 +39,7 @@ export function ChangePasswordForm() {
   const [linkSuccess, setLinkSuccess] = useState("")
   const [isSendingLink, setIsSendingLink] = useState(false)
 
-  const email = user?.email?.trim() ?? ""
+  const email = sessionEmail?.trim() ?? ""
 
   const mapError = (code: string) => {
     if (isPasswordErrorCode(code)) return tAuth(`passwordErrors.${code}`)
@@ -100,65 +111,62 @@ export function ChangePasswordForm() {
   const busy = isLoading || isSendingLink
 
   return (
-    <div className="max-w-md space-y-8">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <p className="text-sm text-muted-foreground">{tAuth("passwordRulesHint")}</p>
+    <div className="space-y-6">
+      <form onSubmit={handleSubmit} className={FORM_CARD_CLASS}>
+        <div className={FORM_CARD_BODY_CLASS}>
+          <div className={FORM_FIELD_GRID_CLASS}>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="current-password">{t("currentPassword")}</Label>
+              <Input
+                id="current-password"
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                disabled={busy}
+                required
+              />
+            </div>
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-foreground" htmlFor="current-password">
-            {t("currentPassword")}
-          </label>
-          <Input
-            id="current-password"
-            type="password"
-            autoComplete="current-password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            disabled={busy}
-            required
-          />
+            <div className="space-y-1.5">
+              <Label htmlFor="new-password">{t("newPassword")}</Label>
+              <Input
+                id="new-password"
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                disabled={busy}
+                required
+              />
+              <p className="text-xs text-muted-foreground">{tAuth("passwordRulesHint")}</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="confirm-password">{t("confirmPassword")}</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={busy}
+                required
+              />
+            </div>
+          </div>
+
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {success ? (
+            <p className="text-sm text-emerald-600 dark:text-emerald-400">{success}</p>
+          ) : null}
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-foreground" htmlFor="new-password">
-            {t("newPassword")}
-          </label>
-          <Input
-            id="new-password"
-            type="password"
-            autoComplete="new-password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            disabled={busy}
-            required
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-foreground" htmlFor="confirm-password">
-            {t("confirmPassword")}
-          </label>
-          <Input
-            id="confirm-password"
-            type="password"
-            autoComplete="new-password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            disabled={busy}
-            required
-          />
-        </div>
-
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        {success ? (
-          <p className="text-sm text-emerald-600 dark:text-emerald-400">{success}</p>
-        ) : null}
-
-        <div className="flex justify-end">
+        <div className={FORM_CARD_FOOTER_CLASS}>
           <Button
             type="submit"
             disabled={busy || !currentPassword || !newPassword || !confirmPassword}
-            className="border border-border bg-white text-zinc-900 hover:bg-zinc-100"
+            className={FORM_CARD_ACTION_CLASS}
           >
             {isLoading ? tCommon("loading") : t("changePassword")}
           </Button>
@@ -166,26 +174,28 @@ export function ChangePasswordForm() {
       </form>
 
       {email ? (
-        <div className="space-y-3 border-t border-border pt-6">
-          <div>
-            <p className="text-sm font-medium text-foreground">{t("sendResetLinkTitle")}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {t("sendResetLinkDescription", { email })}
-            </p>
+        <div className={FORM_CARD_CLASS}>
+          <div className={FORM_CARD_BODY_CLASS}>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">{t("sendResetLinkTitle")}</p>
+              <p className="text-sm text-muted-foreground">
+                {t("sendResetLinkDescription", { email })}
+              </p>
+            </div>
+
+            {linkError ? <p className="text-sm text-destructive">{linkError}</p> : null}
+            {linkSuccess ? (
+              <p className="text-sm text-emerald-600 dark:text-emerald-400">{linkSuccess}</p>
+            ) : null}
           </div>
 
-          {linkError ? <p className="text-sm text-destructive">{linkError}</p> : null}
-          {linkSuccess ? (
-            <p className="text-sm text-emerald-600 dark:text-emerald-400">{linkSuccess}</p>
-          ) : null}
-
-          <div className="flex justify-end">
+          <div className={FORM_CARD_FOOTER_CLASS}>
             <Button
               type="button"
               variant="outline"
               disabled={busy}
               onClick={handleSendResetLink}
-              className="border border-border bg-white text-zinc-900 hover:bg-zinc-100"
+              className={FORM_CARD_ACTION_CLASS}
             >
               {isSendingLink ? tCommon("sending") : t("sendResetLink")}
             </Button>

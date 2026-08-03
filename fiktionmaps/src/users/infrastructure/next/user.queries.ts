@@ -1,7 +1,7 @@
 import { cache } from "react"
 import { unstable_cache } from "next/cache"
 import { createAnonymousClient, createClient } from "@/lib/supabase/server"
-import { getSessionUserId } from "@/lib/auth/auth.service"
+import { getAuthenticatedUser, getSessionUserId } from "@/lib/auth/auth.service"
 import { createUsersSupabaseAdapter } from "@/src/users/infrastructure/supabase/user.repository.impl"
 import { getProfileUseCase } from "@/src/users/application/get-profile.usecase"
 import { getProfileByUsernameUseCase } from "@/src/users/application/get-profile-by-username.usecase"
@@ -21,6 +21,26 @@ import { CacheConfig } from "@/src/shared/infrastructure/next/cache.config"
 
 const usersRepo = createUsersSupabaseAdapter(createClient)
 const anonUsersRepo = createUsersSupabaseAdapter(() => Promise.resolve(createAnonymousClient()))
+
+export type SessionAccount = {
+  email: string | null
+  profile: ProfileWithOnboarding | null
+}
+
+/**
+ * Session identity + profile for the account screen.
+ * Dynamic read (session-scoped, no `unstable_cache`) so a role change is never served stale.
+ */
+export const getSessionAccount = cache(async (): Promise<SessionAccount> => {
+  const { data: authUser } = await getAuthenticatedUser()
+  if (!authUser) return { email: null, profile: null }
+
+  const profile = await getProfileUseCase(authUser.id, usersRepo)
+  return {
+    email: authUser.email?.trim() || null,
+    profile: profile ? mapProfileToUserProfile(profile) : null,
+  }
+})
 
 /** Dynamic read (no unstable_cache): must call createClient/cookies outside a cache scope. */
 export async function getIsUserAdmin(userId: string): Promise<boolean> {

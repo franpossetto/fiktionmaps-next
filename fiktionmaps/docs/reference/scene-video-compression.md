@@ -1,6 +1,6 @@
 # Scene video compression (client-side)
 
-How scene clips are compressed in the browser, uploaded to Storage, and stored on `scenes`. Planning notes: `docs/plans/client-side-video-compression.md`.
+How scene clips are compressed in the browser, uploaded to Storage, and stored on `scenes`. Planning notes: `docs/plans/2026-08-01-client-side-video-compression.md`.
 
 ---
 
@@ -142,6 +142,6 @@ So: seeing one file in Storage / empty `preview_url` is expected for that scene 
 
 ## Related
 
-- Plan: `docs/plans/client-side-video-compression.md`
-- Orphan cleanup (both objects): `docs/plans/orphan-video-cleanup.md`
+- Plan: `docs/plans/2026-08-01-client-side-video-compression.md`
+- Orphan cleanup (both objects): `docs/plans/2026-08-01-orphan-video-cleanup.md`
 - Migration: `supabase/migrations/065_scenes_preview_url.sql`
