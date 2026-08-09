@@ -470,7 +470,7 @@ export function FictionsTab({ initialFictions, onOpenFiction, viewMode = "cards"
                       <strong className="text-foreground">Cover (optional):</strong> Ratio 2:3 portrait. JPG, PNG, WebP, GIF. Max 10 MB. We generate xs/sm/lg AVIF.
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      <strong className="text-foreground">Banner (optional):</strong> Ratio 21:9 wide. JPG, PNG, WebP, GIF. Max 10 MB. We generate lg (800px) WebP.
+                      <strong className="text-foreground">Banner (optional):</strong> Ratio 21:9 wide. JPG, PNG, WebP, GIF. Max 10 MB. We generate lg (800px) + xl (1200px) AVIF.
                     </p>
                   </div>
                 </section>

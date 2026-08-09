@@ -8,6 +8,8 @@ export const createPersonSchema = z.object({
   nationality: z.string().trim().nullable().optional(),
 })
 
+export const updatePersonSchema = createPersonSchema
+
 export const fictionPersonEntrySchema = z.object({
   person_id: z.string().uuid(),
   role: z.string().trim().min(1),
@@ -15,4 +17,5 @@ export const fictionPersonEntrySchema = z.object({
 })
 
 export type CreatePersonData = z.infer<typeof createPersonSchema>
+export type UpdatePersonData = z.infer<typeof updatePersonSchema>
 export type FictionPersonEntry = z.infer<typeof fictionPersonEntrySchema>

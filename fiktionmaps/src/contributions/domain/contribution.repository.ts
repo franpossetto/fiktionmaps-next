@@ -28,7 +28,7 @@ import type {
 export type InsertContributionPendingImagesInput = {
   contributionId: string
   role: ContributionPendingImageRole
-  paths: { xs?: string; sm?: string; lg?: string }
+  paths: { xs?: string; sm?: string; lg?: string; xl?: string }
   focus?: { x: number; y: number }
 }
 
@@ -47,6 +47,20 @@ export type ContributionPendingScenePlace = {
   placeId: string
   startSecond: number | null
   endSecond: number | null
+}
+
+export type InsertContributionPendingFictionPersonInput = {
+  contributionId: string
+  personId: string
+  role: string
+  sortOrder?: number
+}
+
+export type ContributionPendingFictionPerson = {
+  contributionId: string
+  personId: string
+  role: string
+  sortOrder: number
 }
 
 export type AdminContributionsListPageInput = {
@@ -78,6 +92,7 @@ export interface ContributionsRepositoryPort {
   create(input: CreateContributionInput): Promise<{ contributionId: string } | null>
   insertPendingContributionImages(input: InsertContributionPendingImagesInput): Promise<boolean>
   insertPendingScenePlace(input: InsertContributionPendingScenePlaceInput): Promise<boolean>
+  insertPendingFictionPerson(input: InsertContributionPendingFictionPersonInput): Promise<boolean>
   countPendingAddPhotoByFiction(fictionId: string): Promise<number>
   countPendingAddPhotoByFictionAndRole(
     fictionId: string,
@@ -99,6 +114,8 @@ export interface ContributionsRepositoryPort {
   countPendingAddPhotoByPlace(placeId: string): Promise<number>
   /** Pending add_place_to_scene rows for the same scene + place pair. */
   countPendingAddPlaceToScene(sceneId: string, placeId: string): Promise<number>
+  /** Pending add_credits rows for the same fiction + person + role. */
+  countPendingAddCredits(fictionId: string, personId: string, role: string): Promise<number>
   getById(id: string): Promise<Contribution | null>
   getByUser(userId: string): Promise<Contribution[]>
   /** Contributions for the profile page with entity / parent labels resolved. */

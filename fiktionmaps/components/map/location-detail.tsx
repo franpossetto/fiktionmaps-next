@@ -126,7 +126,7 @@ export function LocationDetail({
   }, [place.id])
 
   const displayName = place.name
-  /** Pin payload is xs — only use as LQIP; hero waits for lg from panel. */
+  /** Pin payload is xs — only use as LQIP; hero waits for lg (map panel) from detail fetch. */
   const pinThumb = place.image?.trim() || null
   const heroLg = placeDetail?.image?.trim() || null
   const heroSrc = heroLg || pinThumb || DEFAULT_FICTION_COVER

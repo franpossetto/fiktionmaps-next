@@ -12,6 +12,7 @@ import {
   MessageSquareQuote,
   PenLine,
   Sparkles,
+  Users,
 } from "lucide-react"
 
 export type ContributionTypeCatalogEntry = {
@@ -28,6 +29,7 @@ export type ContributionTypeCatalogEntry = {
     | "/contribute/hunt"
     | "/contribute/scene"
     | "/contribute/scene-place"
+    | "/contribute/credits"
   /** Short badge label shown on the card (e.g. "AI Hunt"). */
   tag?: string
   /** Requires contributor, moderator, or admin role (e.g. AI wizards). */
@@ -57,6 +59,7 @@ const CONTRIBUTION_TYPES_CATALOG_BASE: ContributionTypeCatalogEntry[] = [
     href: "/contribute/scene-place",
   },
   { type: "add_photo", icon: ImagePlus, hasWizard: true, href: "/contribute/photo" },
+  { type: "add_credits", icon: Users, hasWizard: true, href: "/contribute/credits" },
   { type: "enrich_entity", icon: Layers, hasWizard: false },
   { type: "correct_data", icon: PenLine, hasWizard: false },
   { type: "mark_inaccessible", icon: CircleOff, hasWizard: false },

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslations } from "next-intl"
 import { AnimatePresence, motion } from "framer-motion"
 import { Loader2 } from "lucide-react"
-import type { MapControlHandle } from "@/lib/map/types"
+import type { LatLng, MapControlHandle } from "@/lib/map/types"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { createContributorPlaceWithImageAction } from "@/src/places/infrastructure/next/place.actions"
@@ -16,6 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -66,6 +68,28 @@ const INPUT_AREA =
 
 const TOTAL_STEPS = 8
 const PLACE_MAP_ID = "contribute-place-map"
+
+type LocationInputMode = "search" | "manual"
+
+function parseLatLng(latStr: string, lngStr: string): LatLng | null {
+  const lat = parseFloat(latStr.replace(",", "."))
+  const lng = parseFloat(lngStr.replace(",", "."))
+  if (
+    Number.isNaN(lat) ||
+    Number.isNaN(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
+    return null
+  }
+  return { lat, lng }
+}
+
+function formatCoord(value: number): string {
+  return Number.isFinite(value) ? String(value) : ""
+}
 
 const stepVariants = {
   initial: { opacity: 0 },
@@ -171,6 +195,7 @@ export function PlaceContributeWizard({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [locationMode, setLocationMode] = useState<LocationInputMode>("search")
   const [addressLocked, setAddressLocked] = useState(Boolean(huntPrefill))
   const [searchTypes, setSearchTypes] = useState<MapboxSearchType[]>(DEFAULT_MAPBOX_SEARCH_TYPES)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -180,6 +205,13 @@ export function PlaceContributeWizard({
   const [photoImageDims, setPhotoImageDims] = useState<{ width: number; height: number } | null>(null)
   const [photoFocus, setPhotoFocus] = useState({ x: 50, y: 50 })
   const mapControlRef = useRef<MapControlHandle | null>(null)
+  const [manualLat, setManualLat] = useState(() =>
+    huntPrefill ? formatCoord(huntPrefill.latitude) : "",
+  )
+  const [manualLng, setManualLng] = useState(() =>
+    huntPrefill ? formatCoord(huntPrefill.longitude) : "",
+  )
+  const [manualCoordsError, setManualCoordsError] = useState(false)
 
   useEffect(() => {
     if (draft.imageFile) {
@@ -258,7 +290,13 @@ export function PlaceContributeWizard({
     (s: PlaceContributeFormStep): boolean => {
       const next: Record<string, string> = {}
       if (s === 1 && !draft.fictionId) next.fictionId = t("fictionRequired")
-      if (s === 2 && !addressLocked) next.address = t("addressRequired")
+      if (s === 2) {
+        const addressOk = Boolean((draft.formattedAddress || draft.address).trim())
+        const coordsOk =
+          Number.isFinite(draft.latitude) && Number.isFinite(draft.longitude)
+        if (!addressOk) next.address = t("addressRequired")
+        else if (!coordsOk) next.address = t("coordsRequired")
+      }
       if (s === 5) {
         if (!draft.imageFile) {
           next.image = t("photoRequired")
@@ -272,8 +310,20 @@ export function PlaceContributeWizard({
       setErrors(next)
       return Object.keys(next).length === 0
     },
-    [addressLocked, draft, photoImageDims, t, tVal],
+    [draft, photoImageDims, t, tVal],
   )
+
+  const applyCoords = useCallback((coords: LatLng) => {
+    setDraft((prev) => ({
+      ...prev,
+      latitude: coords.lat,
+      longitude: coords.lng,
+    }))
+    setManualLat(formatCoord(coords.lat))
+    setManualLng(formatCoord(coords.lng))
+    setManualCoordsError(false)
+    flyMapToLocation(mapControlRef.current, coords.lat, coords.lng, 17)
+  }, [])
 
   const handleAddressSelect = useCallback(
     (result: {
@@ -294,10 +344,56 @@ export function PlaceContributeWizard({
         cityId,
         mapSuggestion: suggested,
       }))
+      setManualLat(formatCoord(result.lat))
+      setManualLng(formatCoord(result.lng))
+      setManualCoordsError(false)
       setAddressLocked(true)
       flyMapToLocation(mapControlRef.current, result.lat, result.lng)
     },
     [initialCities],
+  )
+
+  const switchLocationMode = useCallback(
+    (mode: LocationInputMode) => {
+      setLocationMode(mode)
+      setManualCoordsError(false)
+      setErrors((prev) => {
+        const next = { ...prev }
+        delete next.address
+        return next
+      })
+      if (mode === "manual") {
+        setManualLat(formatCoord(draft.latitude))
+        setManualLng(formatCoord(draft.longitude))
+        // Unlock search chrome; address stays editable in manual mode.
+        setAddressLocked(false)
+      }
+    },
+    [draft.latitude, draft.longitude],
+  )
+
+  const handleApplyManualCoords = useCallback(() => {
+    const coords = parseLatLng(manualLat, manualLng)
+    if (!coords) {
+      setManualCoordsError(true)
+      return
+    }
+    applyCoords(coords)
+  }, [applyCoords, manualLat, manualLng])
+
+  const handleManualAddressChange = useCallback((value: string) => {
+    setDraft((prev) => ({
+      ...prev,
+      address: value,
+      formattedAddress: value,
+    }))
+  }, [])
+
+  const handleMapPinClick = useCallback(
+    (pos: LatLng) => {
+      applyCoords(pos)
+    },
+    [applyCoords],
   )
 
   const handleNext = useCallback(() => {
@@ -550,56 +646,146 @@ export function PlaceContributeWizard({
 
             {step === 2 ? (
               <div className="space-y-4">
-                <ContributeFieldWrapper label={t("stepLocation")} required error={errors.address}>
-                  {addressLocked ? (
-                    <div className="flex min-w-0 items-center gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={draft.formattedAddress || draft.address}
-                        className={cn(
-                          INPUT_ROW,
-                          "min-w-0 w-auto shrink flex-1 truncate cursor-not-allowed bg-muted/50",
-                        )}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0"
-                        onClick={() => {
-                          setAddressLocked(false)
-                          setDraft((p) => ({
-                            ...p,
-                            address: "",
-                            formattedAddress: "",
-                            latitude: Number.NaN,
-                            longitude: Number.NaN,
-                            cityId: "",
-                          }))
+                <div
+                  className="flex rounded-xl border border-border bg-muted/30 p-1"
+                  role="tablist"
+                  aria-label={t("locationModeAria")}
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={locationMode === "search"}
+                    onClick={() => switchLocationMode("search")}
+                    className={cn(
+                      "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      locationMode === "search"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {t("locationModeSearch")}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={locationMode === "manual"}
+                    onClick={() => switchLocationMode("manual")}
+                    className={cn(
+                      "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      locationMode === "manual"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {t("locationModeManual")}
+                  </button>
+                </div>
+
+                {locationMode === "search" ? (
+                  <ContributeFieldWrapper label={t("stepLocation")} required error={errors.address}>
+                    {addressLocked ? (
+                      <div className="flex min-w-0 items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={draft.formattedAddress || draft.address}
+                          className={cn(
+                            INPUT_ROW,
+                            "min-w-0 w-auto shrink flex-1 truncate cursor-not-allowed bg-muted/50",
+                          )}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0"
+                          onClick={() => {
+                            setAddressLocked(false)
+                            setDraft((p) => ({
+                              ...p,
+                              address: "",
+                              formattedAddress: "",
+                              latitude: Number.NaN,
+                              longitude: Number.NaN,
+                              cityId: "",
+                            }))
+                            setManualLat("")
+                            setManualLng("")
+                          }}
+                        >
+                          {t("addressLockedChange")}
+                        </Button>
+                      </div>
+                    ) : (
+                      <PlaceAddressSearchWithFilters
+                        value={draft.address}
+                        onChange={(v) => setDraft((p) => ({ ...p, address: v }))}
+                        onSelect={handleAddressSelect}
+                        searchTypes={searchTypes}
+                        onSearchTypesChange={setSearchTypes}
+                        placeholder={t("addressSearchPlaceholder")}
+                        intersectionHint={t("addressIntersectionHint")}
+                        filterLabel={t("addressSearchTypeFilter")}
+                        typeLabels={{
+                          poi: t("addressSearchTypePoi"),
+                          address: t("addressSearchTypeAddress"),
+                          street: t("addressSearchTypeStreet"),
                         }}
-                      >
-                        {t("addressLockedChange")}
-                      </Button>
+                      />
+                    )}
+                  </ContributeFieldWrapper>
+                ) : (
+                  <div className="space-y-4">
+                    <ContributeFieldWrapper label={t("manualAddressLabel")} required error={errors.address}>
+                      <input
+                        className={INPUT_ROW}
+                        value={draft.formattedAddress || draft.address}
+                        onChange={(e) => handleManualAddressChange(e.target.value)}
+                        placeholder={t("manualAddressPlaceholder")}
+                      />
+                    </ContributeFieldWrapper>
+                    <p className="text-xs text-muted-foreground">{t("manualCoordsHint")}</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="contribute-manual-lat">{t("manualLatLabel")}</Label>
+                        <Input
+                          id="contribute-manual-lat"
+                          type="text"
+                          inputMode="decimal"
+                          placeholder={t("manualLatPlaceholder")}
+                          value={manualLat}
+                          onChange={(e) => {
+                            setManualLat(e.target.value)
+                            setManualCoordsError(false)
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="contribute-manual-lng">{t("manualLngLabel")}</Label>
+                        <Input
+                          id="contribute-manual-lng"
+                          type="text"
+                          inputMode="decimal"
+                          placeholder={t("manualLngPlaceholder")}
+                          value={manualLng}
+                          onChange={(e) => {
+                            setManualLng(e.target.value)
+                            setManualCoordsError(false)
+                          }}
+                        />
+                      </div>
                     </div>
-                  ) : (
-                    <PlaceAddressSearchWithFilters
-                      value={draft.address}
-                      onChange={(v) => setDraft((p) => ({ ...p, address: v }))}
-                      onSelect={handleAddressSelect}
-                      searchTypes={searchTypes}
-                      onSearchTypesChange={setSearchTypes}
-                      placeholder={t("addressSearchPlaceholder")}
-                      intersectionHint={t("addressIntersectionHint")}
-                      filterLabel={t("addressSearchTypeFilter")}
-                      typeLabels={{
-                        poi: t("addressSearchTypePoi"),
-                        address: t("addressSearchTypeAddress"),
-                        street: t("addressSearchTypeStreet"),
-                      }}
-                    />
-                  )}
-                </ContributeFieldWrapper>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button type="button" size="sm" onClick={handleApplyManualCoords}>
+                        {t("manualCoordsApply")}
+                      </Button>
+                      {manualCoordsError ? (
+                        <p className="text-xs text-destructive">{t("manualCoordsInvalid")}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
+
                 <div className="relative h-[280px] overflow-hidden rounded-xl border border-border sm:h-[320px]">
                   <PlaceLocationMap
                     mapId={PLACE_MAP_ID}
@@ -608,11 +794,16 @@ export function PlaceContributeWizard({
                     longitude={draft.longitude}
                     placeName={draft.placeName}
                     previewUrl={previewUrl}
+                    pinEditMode={locationMode === "manual"}
+                    onMapClick={handleMapPinClick}
                     onMapReady={(ctrl) => {
                       mapControlRef.current = ctrl
                     }}
                   />
                 </div>
+                {locationMode === "manual" ? (
+                  <p className="text-xs text-muted-foreground">{t("manualMapHint")}</p>
+                ) : null}
               </div>
             ) : null}
 

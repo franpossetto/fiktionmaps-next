@@ -11,6 +11,7 @@ import { ImageFocusPicker } from "@/components/ui/image-focus-picker"
 import { DEFAULT_IMAGE_FOCUS } from "@/lib/asset-images/image-focus"
 import { FICTION_GENRES } from "@/lib/constants/fiction-genres"
 import { FICTION_LANGUAGE_CODES, FICTION_LANGUAGE_LABELS } from "@/lib/constants/fiction-languages"
+import { buildFictionContributeAutoDescription } from "@/lib/contribute/fiction-auto-description"
 import type { InterestCatalogItem } from "@/src/interests"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 import {
@@ -79,35 +80,6 @@ const INPUT_ROW_COMBO = {
 } as const
 
 const IMDB_TITLE_URL_PREFIX = "https://www.imdb.com/title/"
-
-/** Plantilla inicial de descripción (paso dedicado; el usuario puede editar o ampliar). */
-function buildFictionContributeAutoDescription(
-  id: Pick<FictionContributeIdentityDraft, "title" | "year" | "genre" | "type">,
-  creditName: string,
-  tf: (key: string, values?: Record<string, string>) => string,
-): string {
-  const typeLabel =
-    id.type === "movie" ? tf("typeLabelMovie") : id.type === "tv-series" ? tf("typeLabelTv") : tf("typeLabelBook")
-  const title = id.title.trim() || tf("descriptionFallbackShort")
-  const year = String(id.year)
-  const genre = id.genre.trim() || tf("descriptionFallbackShort")
-  if (id.type === "book") {
-    return tf("descriptionAutoTemplateBook", {
-      title,
-      year,
-      genre,
-      type: typeLabel,
-      author: creditName.trim() || tf("descriptionAuthorPlaceholder"),
-    })
-  }
-  return tf("descriptionAutoTemplate", {
-    title,
-    year,
-    genre,
-    type: typeLabel,
-    director: creditName.trim() || tf("descriptionDirectorPlaceholder"),
-  })
-}
 
 const stepVariants = {
   initial: { opacity: 0 },
@@ -697,7 +669,7 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
       if (!validateDirectorStep()) return
       setIdentity((s) => ({
         ...s,
-        description: s.description.trim() || buildFictionContributeAutoDescription(s, director, tf),
+        description: s.description.trim() || buildFictionContributeAutoDescription(s, director),
       }))
       setStep(6)
       return
@@ -715,7 +687,6 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
     identity,
     showImdbField,
     step,
-    tf,
     validateDescriptionStep,
     validateDirectorStep,
     validateIdentityBasics,
@@ -1699,7 +1670,7 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
                     onClick={() => {
                       setIdentity((s) => ({
                         ...s,
-                        description: s.description.trim() || buildFictionContributeAutoDescription(s, director, tf),
+                        description: s.description.trim() || buildFictionContributeAutoDescription(s, director),
                       }))
                       setStep(6)
                     }}

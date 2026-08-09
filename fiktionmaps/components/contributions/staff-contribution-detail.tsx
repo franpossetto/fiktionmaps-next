@@ -3,6 +3,7 @@ import Image from "next/image"
 import { Link } from "@/i18n/navigation"
 import {
   getPendingPathsForRole,
+  isAddCreditsContribution,
   isFictionAddPhotoContribution,
   type ContributorModerationContext,
   type FictionContributionFeedItem,
@@ -71,6 +72,7 @@ export interface StaffContributionDetailProps {
 export async function StaffContributionDetail({ item, fiction, contributorContext }: StaffContributionDetailProps) {
   const t = await getTranslations("Contributions")
   const isAddPhoto = isFictionAddPhotoContribution(item)
+  const isAddCredits = isAddCreditsContribution(item)
   const photoContext = isAddPhoto ? await getFictionPhotoContributeContextAction(item.entityId) : null
   const coverFromFiction = fiction?.coverImageLarge ?? fiction?.coverImage
   const cover = coverFromFiction?.trim() || item.fictionCoverUrl?.trim() || null
@@ -205,6 +207,33 @@ export async function StaffContributionDetail({ item, fiction, contributorContex
               </div>
             ) : null}
           </div>
+        </section>
+      ) : isAddCredits ? (
+        <section className="border-b border-border/60 py-6">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">
+            {t("sectionAddCreditsReview")}
+          </h2>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            {t("sectionAddCreditsReviewHelp")}
+          </p>
+          <dl className="mt-3 divide-y divide-border/50 rounded-lg border border-border/60 bg-muted/15">
+            <div className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-baseline sm:gap-4">
+              <dt className="shrink-0 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground sm:w-36">
+                {t("fieldCreditRole")}
+              </dt>
+              <dd className="text-sm font-medium text-foreground sm:flex-1">
+                {item.proposedCredit?.role?.trim() || "—"}
+              </dd>
+            </div>
+            <div className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-baseline sm:gap-4">
+              <dt className="shrink-0 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground sm:w-36">
+                {t("fieldCreditPerson")}
+              </dt>
+              <dd className="text-sm font-medium text-foreground sm:flex-1">
+                {item.proposedCredit?.personName?.trim() || "—"}
+              </dd>
+            </div>
+          </dl>
         </section>
       ) : (
       <section className="border-b border-border/60 py-6">

@@ -7,6 +7,7 @@ import {
   isPlaceContributionFeedItem,
   isSceneContributionFeedItem,
   isFictionAddPhotoContribution,
+  isFictionContributionFeedItem,
   type StaffCreateContributionFeedItem,
   type StaffContributionsFeedKind,
 } from "@/src/contributions/domain/contribution.entity"
@@ -162,7 +163,13 @@ export async function ContributionsFeedList({
               .join(" · ") || null
           : isPlace && item.fictionTitle?.trim()
             ? item.fictionTitle.trim()
-            : null
+            : isFictionContributionFeedItem(item) &&
+                item.type === "add_credits" &&
+                item.proposedCredit
+              ? [item.proposedCredit.role, item.proposedCredit.personName?.trim()]
+                  .filter(Boolean)
+                  .join(" · ") || null
+              : null
 
         return (
           <li key={item.id} className={cn("border-t border-border/60", idx === 0 && "border-t-0")}>

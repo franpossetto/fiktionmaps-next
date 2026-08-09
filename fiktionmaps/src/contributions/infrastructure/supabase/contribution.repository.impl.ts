@@ -2,6 +2,7 @@ import { cache } from "react"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type {
   ContributionPendingImageRow,
+  ContributionPendingFictionPersonRow,
   ContributionPendingScenePlaceRow,
   ContributionRow,
   Database,
@@ -35,6 +36,7 @@ import type {
   AdminContributionsListPageInput,
   AdminContributionsListPageResult,
   ContributionsRepositoryPort,
+  InsertContributionPendingFictionPersonInput,
   InsertContributionPendingImagesInput,
   InsertContributionPendingScenePlaceInput,
 } from "@/src/contributions/domain/contribution.repository"
@@ -396,6 +398,7 @@ function mapFictionFeedItem(
     fictionTitle: null,
     fictionCoverUrl: null,
     pendingImagesByRole: null,
+    proposedCredit: null,
   }
 }
 
@@ -472,6 +475,51 @@ async function listPendingScenePlacesForContributionIds(
     map.set(row.contribution_id, list)
   }
   return map
+}
+
+async function listPendingFictionPersonsForContributionIds(
+  supabase: SupabaseClient<Database>,
+  contributionIds: string[],
+): Promise<Map<string, ContributionPendingFictionPersonRow[]>> {
+  const unique = [...new Set(contributionIds)].filter(Boolean)
+  const map = new Map<string, ContributionPendingFictionPersonRow[]>()
+  if (unique.length === 0) return map
+
+  const { data, error } = await supabase
+    .from("contribution_pending_fiction_persons")
+    .select("*")
+    .in("contribution_id", unique)
+    .order("created_at", { ascending: true })
+
+  if (error) {
+    console.error("[contributions repo] listPendingFictionPersonsForContributionIds:", error.message)
+    return map
+  }
+
+  for (const row of (data ?? []) as ContributionPendingFictionPersonRow[]) {
+    const list = map.get(row.contribution_id) ?? []
+    list.push(row)
+    map.set(row.contribution_id, list)
+  }
+  return map
+}
+
+async function personNamesByIds(
+  supabase: SupabaseClient<Database>,
+  personIds: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(personIds)].filter(Boolean)
+  if (unique.length === 0) return new Map()
+  const { data, error } = await supabase.from("persons").select("id, name").in("id", unique)
+  if (error) {
+    console.error("[contributions repo] personNamesByIds:", error.message)
+    return new Map()
+  }
+  const m = new Map<string, string>()
+  for (const row of data ?? []) {
+    m.set(row.id, row.name)
+  }
+  return m
 }
 
 function mapPendingImageRow(row: ContributionPendingImageRow): ContributionPendingImage {
@@ -720,11 +768,27 @@ async function enrichFictionFeedItem(
       ? await listPendingImagesForContributionIds(supabase, [base.id])
       : new Map<string, ContributionPendingImage[]>()
   const pendingRows = pendingMap.get(base.id) ?? []
+
+  let proposedCredit: FictionContributionFeedItem["proposedCredit"] = null
+  if (base.type === "add_credits") {
+    const pendingCredits = await listPendingFictionPersonsForContributionIds(supabase, [base.id])
+    const creditRow = (pendingCredits.get(base.id) ?? [])[0]
+    if (creditRow) {
+      const names = await personNamesByIds(supabase, [creditRow.person_id])
+      proposedCredit = {
+        personId: creditRow.person_id,
+        personName: names.get(creditRow.person_id) ?? null,
+        role: creditRow.role,
+      }
+    }
+  }
+
   return {
     ...base,
     fictionTitle: titles.get(base.entityId) ?? null,
     fictionCoverUrl: covers.get(base.entityId) ?? null,
     pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
+    proposedCredit,
   }
 }
 
@@ -831,7 +895,7 @@ export function createContributionsSupabaseAdapter(
           { count: "exact" },
         )
         .eq("entity_type", "fiction")
-        .in("type", ["create_fiction", "add_photo"])
+        .in("type", ["create_fiction", "add_photo", "add_credits"])
 
       if (userIdFilter) q = q.eq("user_id", userIdFilter)
 
@@ -864,18 +928,32 @@ export function createContributionsSupabaseAdapter(
         fictionCoverThumbByIds(supabase, items.map((i) => i.entityId)),
       ])
       const fictionAddPhotoIds = items.filter((i) => i.type === "add_photo").map((i) => i.id)
-      const pendingByContribution = await listPendingImagesForContributionIds(
-        supabase,
-        fictionAddPhotoIds,
+      const addCreditsIds = items.filter((i) => i.type === "add_credits").map((i) => i.id)
+      const [pendingByContribution, pendingFictionPersons] = await Promise.all([
+        listPendingImagesForContributionIds(supabase, fictionAddPhotoIds),
+        listPendingFictionPersonsForContributionIds(supabase, addCreditsIds),
+      ])
+      const proposedPersonIds = [...pendingFictionPersons.values()].flatMap((rows) =>
+        rows.map((r) => r.person_id),
       )
+      const proposedPersonNames = await personNamesByIds(supabase, proposedPersonIds)
 
       const withMedia = items.map((i) => {
         const pendingRows = pendingByContribution.get(i.id) ?? []
+        const creditRow =
+          i.type === "add_credits" ? (pendingFictionPersons.get(i.id) ?? [])[0] : undefined
         return {
           ...i,
           fictionTitle: titles.get(i.entityId) ?? null,
           fictionCoverUrl: covers.get(i.entityId) ?? null,
           pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
+          proposedCredit: creditRow
+            ? {
+                personId: creditRow.person_id,
+                personName: proposedPersonNames.get(creditRow.person_id) ?? null,
+                role: creditRow.role,
+              }
+            : null,
         }
       })
 
@@ -908,13 +986,13 @@ export function createContributionsSupabaseAdapter(
         )
 
       if (kind === "fiction") {
-        q = q.eq("entity_type", "fiction").in("type", ["create_fiction", "add_photo"])
+        q = q.eq("entity_type", "fiction").in("type", ["create_fiction", "add_photo", "add_credits"])
       } else if (kind === "place") {
         q = q.eq("entity_type", "place").in("type", ["create_place", "add_photo"])
       } else if (kind === "scene") {
         q = q.eq("entity_type", "scene").in("type", ["add_scene", "add_place_to_scene"])
       } else {
-        q = q.in("type", ["create_fiction", "create_place", "add_photo"])
+        q = q.in("type", ["create_fiction", "create_place", "add_photo", "add_credits"])
       }
 
       if (userIdFilter) q = q.eq("user_id", userIdFilter)
@@ -954,7 +1032,7 @@ export function createContributionsSupabaseAdapter(
           if (item) sceneItems.push(item)
         } else if (
           row.entity_type === "fiction" &&
-          (row.type === "create_fiction" || row.type === "add_photo")
+          (row.type === "create_fiction" || row.type === "add_photo" || row.type === "add_credits")
         ) {
           const item = mapFictionFeedItem(row, row.profiles)
           if (item) fictionItems.push(item)
@@ -965,16 +1043,31 @@ export function createContributionsSupabaseAdapter(
       const pendingScenePlaces = await listPendingScenePlacesForContributionIds(supabase, addPlaceToSceneIds)
       const proposedPlaceIds = [...pendingScenePlaces.values()].flatMap((rows) => rows.map((r) => r.place_id))
 
-      const [fictionTitles, fictionCovers, placeMeta, placeAvatars, sceneMeta, proposedPlaceMeta, proposedPlaceAvatars] =
-        await Promise.all([
-          fictionTitlesByIds(supabase, fictionItems.map((i) => i.entityId)),
-          fictionCoverThumbByIds(supabase, fictionItems.map((i) => i.entityId)),
-          placeMetaByIds(supabase, placeItems.map((i) => i.entityId)),
-          placeAvatarThumbByIds(supabase, placeItems.map((i) => i.entityId)),
-          sceneMetaByIds(supabase, sceneItems.map((i) => i.entityId)),
-          placeMetaByIds(supabase, proposedPlaceIds),
-          placeAvatarThumbByIds(supabase, proposedPlaceIds),
-        ])
+      const addCreditsIds = fictionItems.filter((i) => i.type === "add_credits").map((i) => i.id)
+      const pendingFictionPersons = await listPendingFictionPersonsForContributionIds(supabase, addCreditsIds)
+      const proposedPersonIds = [...pendingFictionPersons.values()].flatMap((rows) =>
+        rows.map((r) => r.person_id),
+      )
+
+      const [
+        fictionTitles,
+        fictionCovers,
+        placeMeta,
+        placeAvatars,
+        sceneMeta,
+        proposedPlaceMeta,
+        proposedPlaceAvatars,
+        proposedPersonNames,
+      ] = await Promise.all([
+        fictionTitlesByIds(supabase, fictionItems.map((i) => i.entityId)),
+        fictionCoverThumbByIds(supabase, fictionItems.map((i) => i.entityId)),
+        placeMetaByIds(supabase, placeItems.map((i) => i.entityId)),
+        placeAvatarThumbByIds(supabase, placeItems.map((i) => i.entityId)),
+        sceneMetaByIds(supabase, sceneItems.map((i) => i.entityId)),
+        placeMetaByIds(supabase, proposedPlaceIds),
+        placeAvatarThumbByIds(supabase, proposedPlaceIds),
+        personNamesByIds(supabase, proposedPersonIds),
+      ])
 
       const fictionIdsForPlaces = [...new Set(placeItems.map((i) => placeMeta.get(i.entityId)?.fictionId).filter(Boolean) as string[])]
       const fictionIdsForScenes = [...new Set(sceneItems.map((i) => sceneMeta.get(i.entityId)?.fictionId).filter(Boolean) as string[])]
@@ -992,11 +1085,20 @@ export function createContributionsSupabaseAdapter(
 
       const enrichedFiction = fictionItems.map((i) => {
         const pendingRows = pendingByContribution.get(i.id) ?? []
+        const creditRow =
+          i.type === "add_credits" ? (pendingFictionPersons.get(i.id) ?? [])[0] : undefined
         return {
           ...i,
           fictionTitle: fictionTitles.get(i.entityId) ?? null,
           fictionCoverUrl: fictionCovers.get(i.entityId) ?? null,
           pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
+          proposedCredit: creditRow
+            ? {
+                personId: creditRow.person_id,
+                personName: proposedPersonNames.get(creditRow.person_id) ?? null,
+                role: creditRow.role,
+              }
+            : null,
         }
       })
 
@@ -1108,6 +1210,16 @@ export function createContributionsSupabaseAdapter(
           focus_y: focusY,
         })
       }
+      if (input.paths.xl?.trim()) {
+        rows.push({
+          contribution_id: input.contributionId,
+          role: input.role,
+          variant: "xl",
+          storage_path: input.paths.xl,
+          focus_x: focusX,
+          focus_y: focusY,
+        })
+      }
       if (rows.length === 0) return false
 
       const { error } = await supabase.from("contribution_pending_images").insert(rows)
@@ -1133,6 +1245,23 @@ export function createContributionsSupabaseAdapter(
       return true
     },
 
+    async insertPendingFictionPerson(
+      input: InsertContributionPendingFictionPersonInput,
+    ): Promise<boolean> {
+      const supabase = await getSupabase()
+      const { error } = await supabase.from("contribution_pending_fiction_persons").insert({
+        contribution_id: input.contributionId,
+        person_id: input.personId,
+        role: input.role,
+        sort_order: input.sortOrder ?? 0,
+      })
+      if (error) {
+        console.error("[contributions repo] insertPendingFictionPerson:", error.message)
+        return false
+      }
+      return true
+    },
+
     countPendingAddPlaceToScene: cache(async (sceneId: string, placeId: string): Promise<number> => {
       const supabase = await getSupabase()
       const { data, error } = await supabase
@@ -1150,6 +1279,27 @@ export function createContributionsSupabaseAdapter(
       }
       return data?.length ?? 0
     }),
+
+    countPendingAddCredits: cache(
+      async (fictionId: string, personId: string, role: string): Promise<number> => {
+        const supabase = await getSupabase()
+        const { data, error } = await supabase
+          .from("contributions")
+          .select("id, contribution_pending_fiction_persons!inner(person_id, role)")
+          .eq("entity_type", "fiction")
+          .eq("entity_id", fictionId)
+          .eq("type", "add_credits")
+          .eq("status", "pending")
+          .eq("contribution_pending_fiction_persons.person_id", personId)
+          .eq("contribution_pending_fiction_persons.role", role)
+
+        if (error) {
+          console.error("[contributions repo] countPendingAddCredits:", error.message)
+          return 0
+        }
+        return data?.length ?? 0
+      },
+    ),
 
     async listPendingImagesByContributionId(contributionId: string): Promise<ContributionPendingImage[]> {
       const supabase = await getSupabase()
@@ -1488,6 +1638,20 @@ export function createContributionsSupabaseAdapter(
         }
       }
 
+      if (row.type === "add_credits") {
+        const { error: pendingDelErr } = await supabase
+          .from("contribution_pending_fiction_persons")
+          .delete()
+          .eq("contribution_id", id)
+        if (pendingDelErr) {
+          console.error(
+            "[contributions repo] deletePendingOrRejected fiction persons:",
+            pendingDelErr.message,
+          )
+          return null
+        }
+      }
+
       const { error: deleteErr } = await supabase.from("contributions").delete().eq("id", id)
       if (deleteErr) {
         console.error("[contributions repo] deletePendingOrRejected:", deleteErr.message)
@@ -1743,7 +1907,9 @@ export function createContributionsSupabaseAdapter(
         type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
         const row = data as Row
         if (row.entity_type !== "fiction") return null
-        if (row.type !== "create_fiction" && row.type !== "add_photo") return null
+        if (row.type !== "create_fiction" && row.type !== "add_photo" && row.type !== "add_credits") {
+          return null
+        }
         const base = mapFictionFeedItem(row, row.profiles)
         if (!base) return null
         return enrichFictionFeedItem(supabase, base)
@@ -1815,7 +1981,7 @@ export function createContributionsSupabaseAdapter(
 
         if (
           row.entity_type === "fiction" &&
-          (row.type === "create_fiction" || row.type === "add_photo")
+          (row.type === "create_fiction" || row.type === "add_photo" || row.type === "add_credits")
         ) {
           const base = mapFictionFeedItem(row, row.profiles)
           if (!base) return null
@@ -1922,6 +2088,7 @@ export function createContributionsSupabaseAdapter(
               xs: avatar.xs,
               sm: avatar.sm,
               lg: avatar.lg,
+              xl: avatar.xl,
             },
             { x: focusRow?.focusX ?? 50, y: focusRow?.focusY ?? 50 },
           )
@@ -1949,6 +2116,7 @@ export function createContributionsSupabaseAdapter(
                 xs: cover!.xs,
                 sm: cover!.sm!,
                 lg: cover!.lg!,
+                xl: cover!.xl,
               },
               { x: focusRow?.focusX ?? 50, y: focusRow?.focusY ?? 50 },
             )
@@ -1965,6 +2133,7 @@ export function createContributionsSupabaseAdapter(
               "banner",
               {
                 lg: banner!.lg!,
+                xl: banner!.xl,
               },
               { x: focusRow?.focusX ?? 50, y: focusRow?.focusY ?? 50 },
             )
@@ -2023,6 +2192,32 @@ export function createContributionsSupabaseAdapter(
           sortOrder += 1
         }
         // Keep staging rows after approve so staff detail/feed can still show proposed places.
+      }
+
+      if (contributionType === "add_credits" && entityType === "fiction") {
+        const pendingMap = await listPendingFictionPersonsForContributionIds(supabase, [input.id])
+        const pendingRows = pendingMap.get(input.id) ?? []
+        if (pendingRows.length === 0) {
+          console.error("[contributions repo] approve add_credits missing pending person")
+          return false
+        }
+
+        for (const pending of pendingRows) {
+          const { error: linkErr } = await supabase.from("fiction_persons").upsert(
+            {
+              fiction_id: entityId,
+              person_id: pending.person_id,
+              role: pending.role,
+              sort_order: pending.sort_order,
+            },
+            { onConflict: "fiction_id,person_id,role" },
+          )
+          if (linkErr) {
+            console.error("[contributions repo] approve add_credits link:", linkErr.message)
+            return false
+          }
+        }
+        // Keep staging rows after approve so staff detail/feed can still show proposed credit.
       }
 
       const { error: contribErr } = await supabase
@@ -2140,6 +2335,21 @@ export function createContributionsSupabaseAdapter(
         if (pendingDelErr) {
           console.error(
             "[contributions repo] reject add_place_to_scene delete pending:",
+            pendingDelErr.message,
+          )
+          return false
+        }
+      }
+
+      if (contributionType === "add_credits") {
+        const { error: pendingDelErr } = await supabase
+          .from("contribution_pending_fiction_persons")
+          .delete()
+          .eq("contribution_id", input.id)
+
+        if (pendingDelErr) {
+          console.error(
+            "[contributions repo] reject add_credits delete pending:",
             pendingDelErr.message,
           )
           return false

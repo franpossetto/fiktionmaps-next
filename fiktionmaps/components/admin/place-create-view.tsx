@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ArrowLeft, Loader2 } from "lucide-react"
 import { useTranslations } from "next-intl"
-import type { MapControlHandle } from "@/lib/map/types"
+import type { LatLng, MapControlHandle } from "@/lib/map/types"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -12,6 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -35,6 +37,7 @@ import type { City } from "@/src/cities/domain/city.entity"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 import { SHOOT_ENVIRONMENT_OPTIONS } from "@/src/places/domain/place-shoot-environment"
 import type { PlaceShootEnvironment } from "@/src/places/domain/place-shoot-environment"
+import { cn } from "@/lib/utils"
 
 const PLACE_MAP_ID = "admin-place-map"
 
@@ -42,6 +45,28 @@ export type { PlaceFormData } from "@/components/places/place-form-data"
 export { LOCATION_TYPE_OPTIONS } from "@/components/places/place-location-picker"
 
 import type { PlaceFormData } from "@/components/places/place-form-data"
+
+type LocationInputMode = "search" | "manual"
+
+function parseLatLng(latStr: string, lngStr: string): LatLng | null {
+  const lat = parseFloat(latStr.replace(",", "."))
+  const lng = parseFloat(lngStr.replace(",", "."))
+  if (
+    Number.isNaN(lat) ||
+    Number.isNaN(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
+    return null
+  }
+  return { lat, lng }
+}
+
+function formatCoord(value: number): string {
+  return Number.isFinite(value) ? String(value) : ""
+}
 
 interface PlaceCreateViewProps {
   fictions: Fiction[]
@@ -72,11 +97,17 @@ export function PlaceCreateView({
   const [crop, setCrop] = useState({ x: 0, y: 0, scale: 1 })
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [acceptedUrl, setAcceptedUrl] = useState<string | null>(null)
-  const [addressLocked, setAddressLocked] = useState(!!placeId)
+  const [locationMode, setLocationMode] = useState<LocationInputMode>(
+    isEdit ? "manual" : "search",
+  )
+  const [addressLocked, setAddressLocked] = useState(false)
   const [searchTypes, setSearchTypes] = useState<MapboxSearchType[]>(DEFAULT_MAPBOX_SEARCH_TYPES)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmCityId, setConfirmCityId] = useState("")
   const mapControlRef = useRef<MapControlHandle | null>(null)
+  const [manualLat, setManualLat] = useState(() => formatCoord(initialFormData.latitude))
+  const [manualLng, setManualLng] = useState(() => formatCoord(initialFormData.longitude))
+  const [manualCoordsError, setManualCoordsError] = useState(false)
 
   useEffect(() => {
     if (formData.image) {
@@ -90,6 +121,18 @@ export function PlaceCreateView({
     }
     setPreviewUrl(null)
   }, [formData.image, isEdit, initialImageUrl])
+
+  const applyCoords = useCallback((coords: LatLng) => {
+    setFormData((prev) => ({
+      ...prev,
+      latitude: coords.lat,
+      longitude: coords.lng,
+    }))
+    setManualLat(formatCoord(coords.lat))
+    setManualLng(formatCoord(coords.lng))
+    setManualCoordsError(false)
+    flyMapToLocation(mapControlRef.current, coords.lat, coords.lng, 17)
+  }, [])
 
   const handleAddressSelect = useCallback(
     (result: {
@@ -112,6 +155,9 @@ export function PlaceCreateView({
         placeName: prev.placeName || suggestedName,
         cityId,
       }))
+      setManualLat(formatCoord(result.lat))
+      setManualLng(formatCoord(result.lng))
+      setManualCoordsError(false)
       setAddressLocked(true)
       flyMapToLocation(mapControlRef.current, result.lat, result.lng)
     },
@@ -126,14 +172,50 @@ export function PlaceCreateView({
       formattedAddress: "",
       latitude: Number.NaN,
       longitude: Number.NaN,
-      cityId: "",
+      cityId: isEdit ? p.cityId : "",
+    }))
+    setManualLat("")
+    setManualLng("")
+  }, [isEdit])
+
+  const switchLocationMode = useCallback(
+    (mode: LocationInputMode) => {
+      setLocationMode(mode)
+      setManualCoordsError(false)
+      if (mode === "manual") {
+        setManualLat(formatCoord(formData.latitude))
+        setManualLng(formatCoord(formData.longitude))
+        setAddressLocked(false)
+      }
+    },
+    [formData.latitude, formData.longitude],
+  )
+
+  const handleApplyManualCoords = useCallback(() => {
+    const coords = parseLatLng(manualLat, manualLng)
+    if (!coords) {
+      setManualCoordsError(true)
+      return
+    }
+    applyCoords(coords)
+  }, [applyCoords, manualLat, manualLng])
+
+  const handleManualAddressChange = useCallback((value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      address: value,
+      formattedAddress: value,
     }))
   }, [])
 
   const validate = useCallback((): boolean => {
     const next: Record<string, string> = {}
     if (!formData.fictionId) next.fictionId = "Fiction is required"
-    if (!formData.address?.trim()) next.address = "Address is required"
+    if (!(formData.formattedAddress || formData.address)?.trim()) {
+      next.address = "Address is required"
+    } else if (!Number.isFinite(formData.latitude) || !Number.isFinite(formData.longitude)) {
+      next.address = "Set latitude and longitude (or click the map)"
+    }
     if (!formData.locationName?.trim()) next.locationName = "Location name is required"
     if (!formData.placeName?.trim()) next.placeName = "Place name is required"
     if (!formData.description?.trim()) next.description = "Description is required"
@@ -193,8 +275,8 @@ export function PlaceCreateView({
             <h2 className="text-xl font-bold text-foreground">{isEdit ? "Edit place" : "Create Place"}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {isEdit
-                ? "Update place and location details."
-                : "Choose a fiction and pick an address. Place and location are created together."}
+                ? "Update place and location details, including address and coordinates."
+                : "Choose a fiction and pick an address or coordinates. Place and location are created together."}
             </p>
           </div>
 
@@ -230,31 +312,149 @@ export function PlaceCreateView({
               </label>
             </div>
 
-            <FormField label="Address" required error={errors.address}>
-              {addressLocked ? (
-                <div className="flex items-center gap-2">
+            <div
+              className="flex rounded-xl border border-border bg-muted/30 p-1"
+              role="tablist"
+              aria-label="How to set the location"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={locationMode === "search"}
+                onClick={() => switchLocationMode("search")}
+                className={cn(
+                  "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  locationMode === "search"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Search
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={locationMode === "manual"}
+                onClick={() => switchLocationMode("manual")}
+                className={cn(
+                  "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  locationMode === "manual"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Coordinates
+              </button>
+            </div>
+
+            {locationMode === "search" ? (
+              <FormField label="Address" required error={errors.address}>
+                {addressLocked ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={formData.formattedAddress || formData.address}
+                      className="h-9 min-w-0 flex-1 cursor-not-allowed truncate rounded-lg border border-border bg-muted/50 px-3 text-sm text-foreground"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddressClear}
+                      className="shrink-0"
+                    >
+                      Change
+                    </Button>
+                  </div>
+                ) : (
+                  <PlaceAddressSearchWithFilters
+                    value={formData.address}
+                    onChange={(v) => setFormData((p) => ({ ...p, address: v }))}
+                    onSelect={handleAddressSelect}
+                    searchTypes={searchTypes}
+                    onSearchTypesChange={setSearchTypes}
+                    placeholder="Search address, intersection, or place…"
+                    intersectionHint="For intersections use both street names, e.g. LaSalle St and Adams St, Chicago."
+                  />
+                )}
+              </FormField>
+            ) : (
+              <div className="space-y-3">
+                <FormField label="Address" required error={errors.address}>
                   <input
                     type="text"
-                    readOnly
                     value={formData.formattedAddress || formData.address}
-                    className="h-9 min-w-0 flex-1 cursor-not-allowed truncate rounded-lg border border-border bg-muted/50 px-3 text-sm text-foreground"
+                    onChange={(e) => handleManualAddressChange(e.target.value)}
+                    placeholder="Street, number, city, country…"
+                    className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
-                  <Button type="button" variant="outline" size="sm" onClick={handleAddressClear} className="shrink-0">
-                    Change
-                  </Button>
+                </FormField>
+                <p className="text-xs text-muted-foreground">
+                  Paste coordinates from Google Maps, then apply — or click the map to place the pin.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="admin-manual-lat">Latitude</Label>
+                    <Input
+                      id="admin-manual-lat"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g. 37.565081"
+                      value={manualLat}
+                      onChange={(e) => {
+                        setManualLat(e.target.value)
+                        setManualCoordsError(false)
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="admin-manual-lng">Longitude</Label>
+                    <Input
+                      id="admin-manual-lng"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g. 126.922154"
+                      value={manualLng}
+                      onChange={(e) => {
+                        setManualLng(e.target.value)
+                        setManualCoordsError(false)
+                      }}
+                    />
+                  </div>
                 </div>
-              ) : (
-                <PlaceAddressSearchWithFilters
-                  value={formData.address}
-                  onChange={(v) => setFormData((p) => ({ ...p, address: v }))}
-                  onSelect={handleAddressSelect}
-                  searchTypes={searchTypes}
-                  onSearchTypesChange={setSearchTypes}
-                  placeholder="Search address, intersection, or place…"
-                  intersectionHint="For intersections use both street names, e.g. LaSalle St and Adams St, Chicago."
-                />
-              )}
-            </FormField>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" size="sm" onClick={handleApplyManualCoords}>
+                    Show on map
+                  </Button>
+                  {manualCoordsError ? (
+                    <p className="text-xs text-destructive">
+                      Enter valid latitude (−90 to 90) and longitude (−180 to 180).
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            )}
+
+            {isEdit ? (
+              <FormField label="City">
+                <Select
+                  value={formData.cityId || undefined}
+                  onValueChange={(v) => setFormData((p) => ({ ...p, cityId: v }))}
+                >
+                  <SelectTrigger className="h-10 w-full rounded-lg">
+                    <SelectValue placeholder="Select city" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[10000]">
+                    {cities.map((city) => (
+                      <SelectItem key={city.id} value={city.id}>
+                        {city.name}, {city.country}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
+            ) : null}
 
             <FormField label="Location type">
               <Select
@@ -425,14 +625,25 @@ export function PlaceCreateView({
         <PlaceLocationMap
           mapId={PLACE_MAP_ID}
           mapKey="place-create-map"
-          latitude={safeCenter.lat}
-          longitude={safeCenter.lng}
+          latitude={
+            Number.isFinite(formData.latitude) ? formData.latitude : safeCenter.lat
+          }
+          longitude={
+            Number.isFinite(formData.longitude) ? formData.longitude : safeCenter.lng
+          }
           placeName={formData.placeName}
           previewUrl={acceptedUrl || previewUrl}
+          pinEditMode={locationMode === "manual"}
+          onMapClick={applyCoords}
           onMapReady={(ctrl) => {
             mapControlRef.current = ctrl
           }}
         />
+        {locationMode === "manual" ? (
+          <p className="pointer-events-none absolute bottom-3 left-3 right-3 rounded-lg bg-background/90 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur-sm md:left-auto md:right-3 md:max-w-sm">
+            Click the map to move the pin. Edit the address on the left to match the real place.
+          </p>
+        ) : null}
       </div>
     </div>
   )

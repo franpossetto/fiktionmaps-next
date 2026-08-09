@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { FictionDetailPlacesEmpty } from "@/components/fictions/fiction-detail-places-empty"
 import { FictionDetailSectionHeading } from "@/components/fictions/fiction-detail-section-heading"
+import { FictionDetailCredits } from "@/components/fictions/fiction-detail-credits"
 import { FictionInterestTags, type FictionInterestTagItem } from "@/components/fictions/fiction-interest-tags"
 import { FictionDetailLikeButton } from "@/components/fictions/fiction-detail-like-button"
 import { FictionDetailPlaceLikeButton } from "@/components/fictions/fiction-detail-place-like-button"
@@ -15,6 +16,7 @@ import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Place } from "@/src/places/domain/place.entity"
+import type { FictionPerson } from "@/src/persons/domain/person.entity"
 import type { ReactNode } from "react"
 
 export interface FictionDetailProps {
@@ -26,6 +28,7 @@ export interface FictionDetailProps {
   initialLiked?: boolean
   /** Shown in main column below `xl` (right rail is `xl`+ only). */
   fictionInterestTags?: FictionInterestTagItem[]
+  credits?: FictionPerson[]
   /** Deferred recommendations (Suspense slot) rendered after places list. */
   recommendationsSlot?: ReactNode
 }
@@ -38,6 +41,7 @@ export async function FictionDetail({
   initialLikeCount,
   initialLiked = false,
   fictionInterestTags = [],
+  credits = [],
   recommendationsSlot,
 }: FictionDetailProps) {
   const t = await getTranslations("Fictions")
@@ -234,6 +238,8 @@ export async function FictionDetail({
           </section>
 
           {recommendationsSlot}
+
+          <FictionDetailCredits credits={credits} fictionTitle={fiction.title} />
         </article>
       </div>
     </main>

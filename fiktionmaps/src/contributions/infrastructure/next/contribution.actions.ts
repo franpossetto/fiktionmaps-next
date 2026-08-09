@@ -19,9 +19,12 @@ import { isUserAdminUseCase } from "@/src/users/application/is-user-admin.usecas
 import { createUsersSupabaseAdapter } from "@/src/users/infrastructure/supabase/user.repository.impl"
 import { getPlaceByIdUseCase } from "@/src/places/application/get-place-by-id.usecase"
 import { parseImageFocusFromFormData } from "@/lib/asset-images/image-focus"
+import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
+import { PERSON_AVATAR_UPLOAD_VARIANTS } from "@/lib/asset-images/variant-sizes"
 import { submitPlaceAddPhotoContributionUseCase } from "@/src/contributions/application/submit-place-add-photo-contribution.usecase"
 import { submitFictionAddPhotoContributionUseCase } from "@/src/contributions/application/submit-fiction-add-photo-contribution.usecase"
 import { submitAddPlaceToSceneContributionUseCase } from "@/src/contributions/application/submit-add-place-to-scene-contribution.usecase"
+import { submitAddCreditsContributionUseCase } from "@/src/contributions/application/submit-add-credits-contribution.usecase"
 import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
 import type { ContributionEntityType } from "@/src/contributions/domain/contribution.entity"
 import {
@@ -31,11 +34,13 @@ import {
   submitPlaceAddPhotoContributionSchema,
   submitFictionAddPhotoContributionSchema,
   submitAddPlaceToSceneContributionSchema,
+  submitAddCreditsContributionSchema,
 } from "@/src/contributions/domain/contribution.schemas"
 import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
 import { supabaseRepositoryAdapter as fictionsRepo } from "@/src/fictions/infrastructure/supabase/fiction.repository.impl"
 import { scenesSupabaseAdapter as scenesRepo } from "@/src/scenes/infrastructure/supabase/scene.repository.impl"
 import { supabaseRepositoryAdapter as contributionsRepo } from "@/src/contributions/infrastructure/supabase/contribution.repository.impl"
+import { supabaseRepositoryAdapter as personsRepo } from "@/src/persons/infrastructure/supabase/person.repository.impl"
 import { profilesReaderSupabaseAdapter } from "@/src/contributions/infrastructure/supabase/profiles-reader.supabase"
 import type {
   ApproveContributionResult,
@@ -319,6 +324,108 @@ export async function submitAddPlaceToSceneContributionAction(
   if (result.autoApproved) updateTag("profiles")
 
   return result
+}
+
+export type SubmitAddCreditsContributionResult =
+  | { success: true; contributionId: string; autoApproved: boolean }
+  | { success: false; error: string }
+
+export async function submitAddCreditsContributionAction(
+  formData: FormData,
+): Promise<SubmitAddCreditsContributionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const fictionId = formData.get("fictionId")
+  const role = formData.get("role")
+  const personIdRaw = formData.get("personId")
+  const personNameRaw = formData.get("personName")
+  const photoFile = formData.get("photo")
+
+  const parsed = submitAddCreditsContributionSchema.safeParse({
+    fictionId: typeof fictionId === "string" ? fictionId : "",
+    role: typeof role === "string" ? role : "",
+    personId:
+      typeof personIdRaw === "string" && personIdRaw.trim() ? personIdRaw.trim() : undefined,
+    personName:
+      typeof personNameRaw === "string" && personNameRaw.trim() ? personNameRaw.trim() : undefined,
+  })
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+
+  const wantsPhoto =
+    photoFile instanceof File &&
+    photoFile.size > 0 &&
+    !parsed.data.personId
+  if (wantsPhoto) {
+    const validationError = validateImageFile(photoFile)
+    if (validationError) return { success: false, error: validationError }
+  }
+
+  const autoApprove = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+
+  const result = await submitAddCreditsContributionUseCase(
+    {
+      userId: user.id,
+      fictionId: parsed.data.fictionId,
+      role: parsed.data.role,
+      personId: parsed.data.personId,
+      personName: parsed.data.personName,
+      autoApprove,
+    },
+    {
+      contributionsRepo,
+      fictionsRepo,
+      personsRepo,
+    },
+  )
+
+  if (!result.success) return result
+
+  if (wantsPhoto && result.personWasCreated && photoFile instanceof File) {
+    const uploaded = await uploadEntityImage({
+      entityType: "person",
+      entityId: result.personId,
+      role: "avatar",
+      variants: PERSON_AVATAR_UPLOAD_VARIANTS,
+      file: photoFile,
+      replace: true,
+      focus: parseImageFocusFromFormData(formData),
+      codec: "avif",
+    })
+    if (uploaded.success) {
+      const photoUrl = uploaded.urls.sm ?? uploaded.urls.xs ?? uploaded.urls.lg ?? null
+      if (photoUrl) {
+        const person = await personsRepo.getById(result.personId)
+        if (person) {
+          await personsRepo.update(result.personId, { name: person.name, photo_url: photoUrl })
+        }
+      }
+    }
+  }
+
+  revalidatePath("/contributions")
+  revalidatePath("/profile/contribute")
+  updateTag("contributions")
+  updateTag("fictions")
+  updateTag(`fiction-${parsed.data.fictionId}`)
+  updateTag("persons")
+  if (result.autoApproved) updateTag("profiles")
+
+  return {
+    success: true,
+    contributionId: result.contributionId,
+    autoApproved: result.autoApproved,
+  }
 }
 
 export async function approveContributionAction(data: ApproveContributionData): Promise<ApproveContributionResult> {

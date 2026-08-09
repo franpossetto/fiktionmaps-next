@@ -4,30 +4,36 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "@/i18n/navigation"
 import { ChevronRight, ImagePlus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { CurrentAssetFormatBadge } from "@/components/admin/current-asset-format-badge"
+import { AssetVariantFormatChecklist } from "@/components/admin/asset-variant-format-checklist"
 import { WizardShell } from "@/components/admin/wizard-shell"
 import { ImageCodecCompare } from "@/components/admin/image-codec-compare"
+import { ImageCodecLab } from "@/components/admin/image-codec-lab"
 import { ImageFocusPicker } from "@/components/ui/image-focus-picker"
 import {
   DEFAULT_IMAGE_FOCUS,
   type ImageFocus,
 } from "@/lib/asset-images/image-focus"
+import type { AssetRoleFormatInventory } from "@/src/asset-images/domain/asset-image.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import { uploadPlaceImageAction } from "@/src/places/infrastructure/next/place.actions"
 import {
   previewImageCodecsAction,
   type ImageCodecPreviewVariant,
 } from "@/src/asset-images/infrastructure/next/asset-image.actions"
+import { cn } from "@/lib/utils"
 
 const WIZARD_STEPS = [
   { title: "Replace", description: "Current + new file" },
   { title: "Compare", description: "WebP vs AVIF" },
 ] as const
 
-const COMPARE_VARIANTS = ["xs", "sm", "lg"] as const
+const COMPARE_VARIANTS = ["xs", "sm", "lg", "xl"] as const
+
+type ImproveMode = "improve" | "lab"
 
 type PlaceImprovePhotoViewProps = {
   place: Place
+  inventory: AssetRoleFormatInventory
 }
 
 function isRealPlaceImage(url: string | null | undefined): url is string {
@@ -37,9 +43,10 @@ function isRealPlaceImage(url: string | null | undefined): url is string {
   return true
 }
 
-export function PlaceImprovePhotoView({ place }: PlaceImprovePhotoViewProps) {
+export function PlaceImprovePhotoView({ place, inventory }: PlaceImprovePhotoViewProps) {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
+  const [mode, setMode] = useState<ImproveMode>("improve")
   const [step, setStep] = useState(0)
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -135,13 +142,42 @@ export function PlaceImprovePhotoView({ place }: PlaceImprovePhotoViewProps) {
     <WizardShell
       title="Improve photo"
       subtitle={`${placeLabel} · replace place photo as AVIF`}
-      steps={[...WIZARD_STEPS]}
+      steps={mode === "improve" ? [...WIZARD_STEPS] : []}
       currentStep={step}
-      onBack={handleBack}
-      backLabel={step === 0 ? "← Back to places" : "← Back"}
+      onBack={mode === "lab" ? () => setMode("improve") : handleBack}
+      backLabel={
+        mode === "lab" ? "← Back to improve" : step === 0 ? "← Back to places" : "← Back"
+      }
       onCancel={exit}
       cancelLabel="Cancel"
     >
+      <div className="mb-6 flex flex-wrap gap-2">
+        {(
+          [
+            { id: "improve" as const, label: "Improve" },
+            { id: "lab" as const, label: "Lab" },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setMode(tab.id)}
+            className={cn(
+              "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+              mode === tab.id
+                ? "border-foreground bg-foreground text-background"
+                : "border-border bg-card/50 text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {mode === "lab" ? <ImageCodecLab /> : null}
+
+      {mode === "improve" ? (
+        <>
       <input
         ref={inputRef}
         type="file"
@@ -177,7 +213,7 @@ export function PlaceImprovePhotoView({ place }: PlaceImprovePhotoViewProps) {
                       }}
                     />
                   </div>
-                  <CurrentAssetFormatBadge url={currentUrl} />
+                  <AssetVariantFormatChecklist inventory={inventory} />
                 </div>
               ) : (
                 <div className="mx-auto flex aspect-[3/2] w-full max-w-[320px] items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
@@ -235,7 +271,7 @@ export function PlaceImprovePhotoView({ place }: PlaceImprovePhotoViewProps) {
           <div>
             <h2 className="mb-1 text-lg font-bold text-foreground">Compare codecs</h2>
             <p className="text-sm text-muted-foreground">
-              AVIF q48 (upload) vs WebP reference. Previews at real pixel size.
+              AVIF q60 (upload) vs WebP reference. Previews at real pixel size.
             </p>
           </div>
 
@@ -282,6 +318,8 @@ export function PlaceImprovePhotoView({ place }: PlaceImprovePhotoViewProps) {
             </Button>
           </div>
         </div>
+      ) : null}
+        </>
       ) : null}
     </WizardShell>
   )

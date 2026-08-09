@@ -305,37 +305,32 @@ export function createPlacesSupabaseAdapter(
 
     getPlaceImageUrlsByRole: async (
       placeId: string,
-      variant: "sm" | "lg" = "lg",
+      variant: "sm" | "lg" | "xl" = "lg",
     ): Promise<PlaceImageRoleUrls> => {
       const supabase = await getSupabase()
       const out: PlaceImageRoleUrls = { avatar: null, hero: null }
+      const fallbackOrder =
+        variant === "xl" ? (["xl", "lg", "sm"] as const) : variant === "lg" ? (["lg", "sm"] as const) : (["sm"] as const)
       for (const role of ["avatar", "hero"] as const) {
-        const { data, error } = await supabase
-          .from("asset_images")
-          .select("url")
-          .eq("entity_type", "place")
-          .eq("entity_id", placeId)
-          .eq("role", role)
-          .eq("variant", variant)
-          .limit(1)
-        if (error) {
-          console.error("[places repo] getPlaceImageUrlsByRole:", error.message)
-          continue
+        for (const v of fallbackOrder) {
+          const { data, error } = await supabase
+            .from("asset_images")
+            .select("url")
+            .eq("entity_type", "place")
+            .eq("entity_id", placeId)
+            .eq("role", role)
+            .eq("variant", v)
+            .limit(1)
+          if (error) {
+            console.error("[places repo] getPlaceImageUrlsByRole:", error.message)
+            break
+          }
+          const url = data?.[0]?.url?.trim()
+          if (url) {
+            out[role] = url
+            break
+          }
         }
-        const url = data?.[0]?.url?.trim()
-        if (url) out[role] = url
-      }
-      if (!out.avatar && variant === "lg") {
-        const { data } = await supabase
-          .from("asset_images")
-          .select("url")
-          .eq("entity_type", "place")
-          .eq("entity_id", placeId)
-          .eq("role", "avatar")
-          .eq("variant", "sm")
-          .limit(1)
-        const url = data?.[0]?.url?.trim()
-        if (url) out.avatar = url
       }
       return out
     },
@@ -530,7 +525,7 @@ export function createPlacesSupabaseAdapter(
       return pairs
     }),
 
-    getById: cache(async (placeId: string, avatarVariant: "sm" | "lg" = "sm"): Promise<Place | null> => {
+    getById: cache(async (placeId: string, avatarVariant: "sm" | "lg" | "xl" = "sm"): Promise<Place | null> => {
       const supabase = await getSupabase()
       const { data: row, error } = await supabase
         .from("places")
@@ -548,7 +543,7 @@ export function createPlacesSupabaseAdapter(
       const loc = parseLocationEmbedFromPlaceRow(row as Record<string, unknown>)
 
       const fetchAvatar = async (
-        variant: "sm" | "lg",
+        variant: "sm" | "lg" | "xl",
       ): Promise<PlaceAvatarAsset | null> => {
         const { data: avatarRows } = await supabase
           .from("asset_images")
@@ -571,7 +566,12 @@ export function createPlacesSupabaseAdapter(
         // Map / list thumbs: prefer xs, fall back to sm.
         const thumbs = await loadPlaceAvatarThumbs(supabase, [placeId])
         avatar = thumbs.get(placeId) ?? null
+      } else if (avatarVariant === "xl") {
+        // Place page: xl → lg → sm.
+        avatar =
+          (await fetchAvatar("xl")) ?? (await fetchAvatar("lg")) ?? (await fetchAvatar("sm"))
       } else {
+        // Map side panel: lg → sm (do not pull xl).
         avatar = (await fetchAvatar("lg")) ?? (await fetchAvatar("sm"))
       }
 
@@ -608,7 +608,7 @@ export function createPlacesSupabaseAdapter(
       }
     }),
 
-    getByIds: cache(async (placeIds: string[], avatarVariant: "sm" | "lg" = "sm"): Promise<Place[]> => {
+    getByIds: cache(async (placeIds: string[], avatarVariant: "sm" | "lg" | "xl" = "sm"): Promise<Place[]> => {
       const uniqueIds = [...new Set(placeIds.filter(Boolean))]
       if (uniqueIds.length === 0) return []
 
@@ -637,27 +637,28 @@ export function createPlacesSupabaseAdapter(
         )
       } else {
         const ids = rows.map((r) => r.id as string)
+        const variants =
+          avatarVariant === "xl" ? (["xl", "lg", "sm"] as const) : (["lg", "sm"] as const)
         const { data: avatarRows } = await supabase
           .from("asset_images")
           .select("entity_id, url, variant, focus_x, focus_y")
           .eq("entity_type", "place")
           .eq("role", "avatar")
-          .in("variant", ["lg", "sm"])
+          .in("variant", [...variants])
           .in("entity_id", ids)
-        for (const r of avatarRows ?? []) {
-          if (r.variant === "lg" && r.entity_id && r.url) {
-            avatarByPlaceId.set(r.entity_id as string, {
-              url: r.url as string,
-              focus: normalizeImageFocus(r.focus_x, r.focus_y),
-            })
-          }
-        }
-        for (const r of avatarRows ?? []) {
-          if (r.variant === "sm" && r.entity_id && r.url && !avatarByPlaceId.has(r.entity_id as string)) {
-            avatarByPlaceId.set(r.entity_id as string, {
-              url: r.url as string,
-              focus: normalizeImageFocus(r.focus_x, r.focus_y),
-            })
+        for (const preferred of variants) {
+          for (const r of avatarRows ?? []) {
+            if (
+              r.variant === preferred &&
+              r.entity_id &&
+              r.url &&
+              !avatarByPlaceId.has(r.entity_id as string)
+            ) {
+              avatarByPlaceId.set(r.entity_id as string, {
+                url: r.url as string,
+                focus: normalizeImageFocus(r.focus_x, r.focus_y),
+              })
+            }
           }
         }
       }
@@ -822,7 +823,7 @@ export function createPlacesSupabaseAdapter(
     },
 
     getByFictionIdAndSlug: cache(
-      async (fictionId: string, slug: string, avatarVariant: "sm" | "lg" = "sm"): Promise<Place | null> => {
+      async (fictionId: string, slug: string, avatarVariant: "sm" | "lg" | "xl" = "sm"): Promise<Place | null> => {
         const supabase = await getSupabase()
         const { data: row, error } = await supabase
           .from("places")

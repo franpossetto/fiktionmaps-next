@@ -21,10 +21,13 @@ export interface Fiction {
 
 /** Fiction with asset_images (cover/banner URLs) joined. */
 export interface FictionWithMedia extends Fiction {
-  /** xs thumb when present; use for chips / dense lists. */
+  /** xs thumb when present; use for map pins / dense chips. */
   coverImageThumb?: string | null
+  /** sm; lists and compact UI. */
   coverImage?: string | null
+  /** Page hero cover: xl when present, else lg (map panel stays on lg via direct variant fetch). */
   coverImageLarge?: string | null
+  /** Page hero banner: xl when present, else lg. */
   bannerImage?: string | null
   coverFocus?: { x: number; y: number } | null
   bannerFocus?: { x: number; y: number } | null

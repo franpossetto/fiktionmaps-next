@@ -10,6 +10,7 @@ export type FictionContributorActionKey =
   | "contributorModalAction_add_photo_fiction"
   | "contributorModalAction_add_photo_place"
   | "contributorModalAction_add_scene"
+  | "contributorModalAction_add_credits"
   | "contributorModalAction_enrich_entity_fiction"
   | "contributorModalAction_enrich_entity_place"
   | "contributorModalAction_correct_data"

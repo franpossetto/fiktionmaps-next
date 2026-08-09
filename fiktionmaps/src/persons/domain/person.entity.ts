@@ -16,6 +16,8 @@ export interface FictionPerson {
   name: string
   role: string
   sort_order: number
+  /** Avatar thumb URL (`asset_images` xs/sm or denormalized `persons.photo_url`). */
+  photo_url: string | null
 }
 
 export const FICTION_PERSON_ROLES = [

@@ -893,6 +893,7 @@ export type Database = {
             | "add_scene"
             | "add_photo"
             | "add_place_to_scene"
+            | "add_credits"
             | "enrich_entity"
             | "correct_data"
             | "mark_inaccessible"
@@ -918,6 +919,7 @@ export type Database = {
             | "add_scene"
             | "add_photo"
             | "add_place_to_scene"
+            | "add_credits"
             | "enrich_entity"
             | "correct_data"
             | "mark_inaccessible"
@@ -943,6 +945,7 @@ export type Database = {
             | "add_scene"
             | "add_photo"
             | "add_place_to_scene"
+            | "add_credits"
             | "enrich_entity"
             | "correct_data"
             | "mark_inaccessible"
@@ -981,7 +984,7 @@ export type Database = {
           id: string
           contribution_id: string
           role: "avatar" | "hero" | "cover" | "banner"
-          variant: "xs" | "sm" | "lg"
+          variant: "xs" | "sm" | "lg" | "xl"
           storage_path: string
           focus_x: number
           focus_y: number
@@ -991,7 +994,7 @@ export type Database = {
           id?: string
           contribution_id: string
           role: "avatar" | "hero" | "cover" | "banner"
-          variant: "xs" | "sm" | "lg"
+          variant: "xs" | "sm" | "lg" | "xl"
           storage_path: string
           focus_x?: number
           focus_y?: number
@@ -1001,7 +1004,7 @@ export type Database = {
           id?: string
           contribution_id?: string
           role?: "avatar" | "hero" | "cover" | "banner"
-          variant?: "xs" | "sm" | "lg"
+          variant?: "xs" | "sm" | "lg" | "xl"
           storage_path?: string
           focus_x?: number
           focus_y?: number
@@ -1055,6 +1058,48 @@ export type Database = {
             columns: ["place_id"]
             isOneToOne: false
             referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contribution_pending_fiction_persons: {
+        Row: {
+          id: string
+          contribution_id: string
+          person_id: string
+          role: string
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          contribution_id: string
+          person_id: string
+          role: string
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          contribution_id?: string
+          person_id?: string
+          role?: string
+          sort_order?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contribution_pending_fiction_persons_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: true
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contribution_pending_fiction_persons_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "persons"
             referencedColumns: ["id"]
           },
         ]
@@ -1274,6 +1319,7 @@ export type Database = {
         | "add_scene"
         | "add_photo"
         | "add_place_to_scene"
+        | "add_credits"
         | "enrich_entity"
         | "correct_data"
         | "mark_inaccessible"
@@ -1440,6 +1486,9 @@ export type ContributionPendingImageUpdate = TablesUpdate<"contribution_pending_
 export type ContributionPendingScenePlaceRow = Tables<"contribution_pending_scene_places">
 export type ContributionPendingScenePlaceInsert = TablesInsert<"contribution_pending_scene_places">
 export type ContributionPendingScenePlaceUpdate = TablesUpdate<"contribution_pending_scene_places">
+export type ContributionPendingFictionPersonRow = Tables<"contribution_pending_fiction_persons">
+export type ContributionPendingFictionPersonInsert = TablesInsert<"contribution_pending_fiction_persons">
+export type ContributionPendingFictionPersonUpdate = TablesUpdate<"contribution_pending_fiction_persons">
 export type ContributionInsert = TablesInsert<"contributions">
 export type ContributionUpdate = TablesUpdate<"contributions">
 

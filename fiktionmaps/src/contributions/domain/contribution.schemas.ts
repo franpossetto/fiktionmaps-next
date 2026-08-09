@@ -7,11 +7,21 @@ const contributionTypeSchema = z.enum([
   "add_scene",
   "add_photo",
   "add_place_to_scene",
+  "add_credits",
   "enrich_entity",
   "correct_data",
   "mark_inaccessible",
   "add_tip",
   "checkin",
+])
+
+const fictionPersonRoleSchema = z.enum([
+  "director",
+  "author",
+  "actor",
+  "creator",
+  "producer",
+  "screenwriter",
 ])
 
 const contributionEntityTypeSchema = z.enum(["fiction", "place", "scene"])
@@ -67,3 +77,17 @@ export const submitAddPlaceToSceneContributionSchema = z.object({
 export type SubmitAddPlaceToSceneContributionData = z.infer<
   typeof submitAddPlaceToSceneContributionSchema
 >
+
+export const submitAddCreditsContributionSchema = z
+  .object({
+    fictionId: uuidSchema,
+    role: fictionPersonRoleSchema,
+    personId: uuidSchema.optional(),
+    personName: z.string().trim().min(1).max(200).optional(),
+  })
+  .refine((data) => Boolean(data.personId) || Boolean(data.personName?.trim()), {
+    message: "Select or enter a person",
+    path: ["personName"],
+  })
+
+export type SubmitAddCreditsContributionData = z.infer<typeof submitAddCreditsContributionSchema>

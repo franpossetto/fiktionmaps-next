@@ -11,6 +11,7 @@ import { getFictionLikeCountsCached } from "@/src/fiction-likes/infrastructure/n
 import { getFictionPlacesCached } from "@/src/places/infrastructure/next/place.queries"
 import { getAllCitiesCached } from "@/src/cities/infrastructure/next/city.queries"
 import { getFictionContributorsCached } from "@/src/contributions/infrastructure/next/contribution.queries"
+import { getFictionPersonsCached } from "@/src/persons/infrastructure/next/person.queries"
 import { getCurrentUserHasLikedFiction } from "@/src/users/infrastructure/next/user.queries"
 import { getSiteUrl } from "@/lib/site"
 import { FictionDetail } from "@/components/fictions/fiction-detail"
@@ -158,6 +159,7 @@ export default async function FictionSlugPage({ params }: Props) {
     fictionInterestIds,
     interestCatalog,
     fictionContributors,
+    fictionCredits,
     sidebarSummary,
     initialLiked,
   ] = await Promise.all([
@@ -167,6 +169,7 @@ export default async function FictionSlugPage({ params }: Props) {
     getFictionInterestsCached(fiction.id),
     getInterestCatalogCached(locale),
     getFictionContributorsCached(fiction.id),
+    getFictionPersonsCached(fiction.id),
     getFictionSidebarSummaryText(fiction, locale),
     getCurrentUserHasLikedFiction(fiction.id),
   ])
@@ -214,6 +217,7 @@ export default async function FictionSlugPage({ params }: Props) {
           initialLikeCount={initialLikeCount}
           initialLiked={initialLiked}
           fictionInterestTags={fictionInterestTags}
+          credits={fictionCredits}
           recommendationsSlot={
             <Suspense fallback={<FictionDetailRecommendationsFallback />}>
               <FictionDetailRecommendations
