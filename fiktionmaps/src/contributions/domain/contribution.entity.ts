@@ -183,6 +183,29 @@ export interface PlaceContributionFeedItem extends Contribution {
   fictionTitle: string | null
   fictionId: string | null
   pendingImagesByRole: ContributionPendingImagesByRole | null
+  /** Proposed link for `link_place_relationship` (staging). */
+  proposedPlaceRelationship: ContributionPendingPlaceRelationship | null
+}
+
+export type ContributionPendingPlaceRelationshipKind = "shared_clone" | "composite"
+
+export type ContributionPendingPlaceRelationship = {
+  kind: ContributionPendingPlaceRelationshipKind
+  sourcePlaceId: string | null
+  targetFictionId: string | null
+  placeName: string | null
+  description: string | null
+  relationKind: string | null
+  shootEnvironment: string | null
+  relationshipName: string | null
+  placeAId: string | null
+  placeBId: string | null
+  groupName: string | null
+  /** Display helpers resolved for staff UI. */
+  sourcePlaceName?: string | null
+  targetFictionTitle?: string | null
+  placeAName?: string | null
+  placeBName?: string | null
 }
 
 /** Staff feed row: an add_scene / add_place_to_scene contribution plus scene snapshots. */
@@ -224,7 +247,12 @@ export type StaffCreateContributionsFeedPageResult = {
 export function isPlaceContributionFeedItem(
   item: StaffCreateContributionFeedItem,
 ): item is PlaceContributionFeedItem {
-  return item.entityType === "place" && (item.type === "create_place" || item.type === "add_photo")
+  return (
+    item.entityType === "place" &&
+    (item.type === "create_place" ||
+      item.type === "add_photo" ||
+      item.type === "link_place_relationship")
+  )
 }
 
 export function isPlaceAddPhotoContribution(item: Contribution): boolean {
@@ -263,4 +291,8 @@ export function isAddPlaceToSceneContribution(item: Contribution): boolean {
 
 export function isAddCreditsContribution(item: Contribution): boolean {
   return item.entityType === "fiction" && item.type === "add_credits"
+}
+
+export function isLinkPlaceRelationshipContribution(item: Contribution): boolean {
+  return item.entityType === "place" && item.type === "link_place_relationship"
 }

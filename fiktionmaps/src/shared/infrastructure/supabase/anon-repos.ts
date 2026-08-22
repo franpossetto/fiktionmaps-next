@@ -1,6 +1,7 @@
 import { createAnonymousClient } from "@/lib/supabase/server"
 import { createCitiesSupabaseAdapter } from "@/src/cities/infrastructure/supabase/city.repository.impl"
 import { createFictionsSupabaseAdapter } from "@/src/fictions/infrastructure/supabase/fiction.repository.impl"
+import { createPlaceRelationshipsSupabaseAdapter } from "@/src/place-relationships/infrastructure/supabase/place-relationship.repository.impl"
 import { createPlacesSupabaseAdapter } from "@/src/places/infrastructure/supabase/place.repository.impl"
 
 const anon = () => Promise.resolve(createAnonymousClient())
@@ -9,3 +10,4 @@ const anon = () => Promise.resolve(createAnonymousClient())
 export const citiesRepoPublic = createCitiesSupabaseAdapter(anon)
 export const placesRepoPublic = createPlacesSupabaseAdapter(anon)
 export const fictionsRepoPublic = createFictionsSupabaseAdapter(anon)
+export const placeRelationshipsRepoPublic = createPlaceRelationshipsSupabaseAdapter(anon)

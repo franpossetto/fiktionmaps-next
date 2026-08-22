@@ -44,6 +44,8 @@ function typeIcon(type: ContributionType): LucideIcon {
       return Link2
     case "add_credits":
       return Users
+    case "link_place_relationship":
+      return Link2
     case "enrich_entity":
       return Sparkles
     case "correct_data":

@@ -1,4 +1,5 @@
 import type { Location } from "@/src/locations/domain/location.entity"
+import type { PlaceRelationKind } from "@/src/places/domain/place-relation-kind"
 import type { PlaceShootEnvironment } from "@/src/places/domain/place-shoot-environment"
 
 export interface Place {
@@ -17,5 +18,6 @@ export interface Place {
   sceneQuote?: string
   visitTip?: string
   sceneTitle?: string | null
+  relationKind: PlaceRelationKind
   shootEnvironment?: PlaceShootEnvironment | null
 }

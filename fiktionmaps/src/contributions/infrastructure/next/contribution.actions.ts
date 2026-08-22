@@ -25,6 +25,7 @@ import { submitPlaceAddPhotoContributionUseCase } from "@/src/contributions/appl
 import { submitFictionAddPhotoContributionUseCase } from "@/src/contributions/application/submit-fiction-add-photo-contribution.usecase"
 import { submitAddPlaceToSceneContributionUseCase } from "@/src/contributions/application/submit-add-place-to-scene-contribution.usecase"
 import { submitAddCreditsContributionUseCase } from "@/src/contributions/application/submit-add-credits-contribution.usecase"
+import { submitLinkPlaceRelationshipContributionUseCase } from "@/src/contributions/application/submit-link-place-relationship-contribution.usecase"
 import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
 import type { ContributionEntityType } from "@/src/contributions/domain/contribution.entity"
 import {
@@ -35,9 +36,11 @@ import {
   submitFictionAddPhotoContributionSchema,
   submitAddPlaceToSceneContributionSchema,
   submitAddCreditsContributionSchema,
+  submitLinkPlaceRelationshipContributionSchema,
 } from "@/src/contributions/domain/contribution.schemas"
 import { supabaseRepositoryAdapter as placesRepo } from "@/src/places/infrastructure/supabase/place.repository.impl"
 import { supabaseRepositoryAdapter as fictionsRepo } from "@/src/fictions/infrastructure/supabase/fiction.repository.impl"
+import { placeRelationshipsSupabaseAdapter } from "@/src/place-relationships/infrastructure/supabase/place-relationship.repository.impl"
 import { scenesSupabaseAdapter as scenesRepo } from "@/src/scenes/infrastructure/supabase/scene.repository.impl"
 import { supabaseRepositoryAdapter as contributionsRepo } from "@/src/contributions/infrastructure/supabase/contribution.repository.impl"
 import { supabaseRepositoryAdapter as personsRepo } from "@/src/persons/infrastructure/supabase/person.repository.impl"
@@ -428,6 +431,67 @@ export async function submitAddCreditsContributionAction(
   }
 }
 
+export type SubmitLinkPlaceRelationshipContributionResult =
+  | { success: true; contributionId: string; autoApproved: boolean }
+  | { success: false; error: string }
+
+export async function submitLinkPlaceRelationshipContributionAction(
+  input: unknown,
+): Promise<SubmitLinkPlaceRelationshipContributionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const parsed = submitLinkPlaceRelationshipContributionSchema.safeParse(input)
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+
+  const autoApprove = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+
+  const result = await submitLinkPlaceRelationshipContributionUseCase(
+    {
+      ...parsed.data,
+      userId: user.id,
+      autoApprove,
+    },
+    {
+      contributionsRepo,
+      placesRepo,
+      relationshipsRepo: placeRelationshipsSupabaseAdapter,
+      fictionsRepo,
+    },
+  )
+
+  if (!result.success) return result
+
+  revalidatePath("/contributions")
+  revalidatePath("/profile/contribute")
+  updateTag("contributions")
+  updateTag("places")
+  if (parsed.data.kind === "shared_clone") {
+    updateTag(`place-${parsed.data.sourcePlaceId}`)
+    updateTag("fictions")
+    updateTag(`fiction-${parsed.data.targetFictionId}`)
+  } else {
+    updateTag(`place-${parsed.data.placeAId}`)
+    updateTag(`place-${parsed.data.placeBId}`)
+  }
+  if (result.autoApproved) {
+    updateTag("place-relationships")
+    updateTag("profiles")
+  }
+
+  return result
+}
+
 export async function approveContributionAction(data: ApproveContributionData): Promise<ApproveContributionResult> {
   const supabase = await createClient()
   const {
@@ -460,6 +524,9 @@ export async function approveContributionAction(data: ApproveContributionData): 
   revalidatePath("/contributions")
   updateTag("contributions")
   updateTag("profiles")
+  if (contributionBefore.type === "link_place_relationship") {
+    updateTag("place-relationships")
+  }
   await revalidateContributionEntityTags(contributionBefore.entityType, contributionBefore.entityId)
   return { success: true }
 }

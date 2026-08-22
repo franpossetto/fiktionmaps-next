@@ -30,14 +30,21 @@ const stepVariants = {
 
 type ScenePlaceContributeWizardProps = {
   initialFictions: FictionWithMedia[]
+  /** Deep link from a place page: fiction + place already picked, starts on the scene step. */
+  prefill?: { fictionId: string; place: Place } | null
 }
 
-export function ScenePlaceContributeWizard({ initialFictions }: ScenePlaceContributeWizardProps) {
+export function ScenePlaceContributeWizard({
+  initialFictions,
+  prefill = null,
+}: ScenePlaceContributeWizardProps) {
   const t = useTranslations("Contribute.scenePlace")
-  const [step, setStep] = useState(1)
-  const [fictionId, setFictionId] = useState("")
+  const [step, setStep] = useState(prefill ? 2 : 1)
+  const [fictionId, setFictionId] = useState(prefill?.fictionId ?? "")
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null)
-  const [selectedPlaces, setSelectedPlaces] = useState<Place[]>([])
+  const [selectedPlaces, setSelectedPlaces] = useState<Place[]>(
+    prefill ? [prefill.place] : [],
+  )
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [doneVariant, setDoneVariant] = useState<"pending" | "approved" | null>(null)
@@ -74,13 +81,19 @@ export function ScenePlaceContributeWizard({ initialFictions }: ScenePlaceContri
     [fictionId, sceneId, selectedPlaces.length, t],
   )
 
+  /** Shortcut from a place page skips the fiction step (1). */
+  const visibleSteps = prefill ? [2, 3, 4, 5] : [1, 2, 3, 4, 5]
+  const stepIndex = Math.max(0, visibleSteps.indexOf(step))
+
   function handleBack() {
-    if (step > 1) setStep((s) => s - 1)
+    const previous = visibleSteps[stepIndex - 1]
+    if (previous) setStep(previous)
   }
 
   function handleNext() {
     if (!validateStep(step)) return
-    if (step < TOTAL_STEPS) setStep((s) => s + 1)
+    const next = visibleSteps[stepIndex + 1]
+    if (next) setStep(next)
   }
 
   async function handleSubmit() {
@@ -127,11 +140,11 @@ export function ScenePlaceContributeWizard({ initialFictions }: ScenePlaceContri
   return (
     <FictionContributeLayout leftAside={null} rightAside={null} mainColumnScroll={false}>
       <ContributionWizardShell
-        stepIndex={step - 1}
-        totalSteps={TOTAL_STEPS}
+        stepIndex={stepIndex}
+        totalSteps={visibleSteps.length}
         contentMaxWidthClassName="max-w-3xl"
         footerNav={{
-          showBack: step > 1,
+          showBack: stepIndex > 0,
           onBack: handleBack,
           isLastStep: step === TOTAL_STEPS,
           onNext: handleNext,
@@ -142,7 +155,7 @@ export function ScenePlaceContributeWizard({ initialFictions }: ScenePlaceContri
           showTrailingArrow: step < TOTAL_STEPS,
         }}
       >
-        {step === 1 ? (
+        {stepIndex === 0 ? (
           <div className="mb-6 text-sm text-muted-foreground">{t("fppHint", { count: fppPerPlace })}</div>
         ) : null}
 
@@ -151,8 +164,8 @@ export function ScenePlaceContributeWizard({ initialFictions }: ScenePlaceContri
             title={t(`step${step}Title` as "step1Title")}
             description={t(`step${step}Description` as "step1Description")}
             badge="required"
-            stepNumber={step}
-            totalSteps={TOTAL_STEPS}
+            stepNumber={stepIndex + 1}
+            totalSteps={visibleSteps.length}
             variant="minimal"
           />
         ) : null}
@@ -187,7 +200,8 @@ export function ScenePlaceContributeWizard({ initialFictions }: ScenePlaceContri
                 sceneId={sceneId}
                 onSelect={(scene) => {
                   setSelectedScene(scene)
-                  setSelectedPlaces([])
+                  const alreadyLinked = scene.places.some((p) => p.placeId === prefill?.place.id)
+                  setSelectedPlaces(prefill && !alreadyLinked ? [prefill.place] : [])
                 }}
                 error={errors.sceneId}
               />

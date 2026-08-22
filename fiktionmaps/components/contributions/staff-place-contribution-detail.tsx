@@ -3,6 +3,7 @@ import Image from "next/image"
 import { Link } from "@/i18n/navigation"
 import {
   getPendingPathsForRole,
+  isLinkPlaceRelationshipContribution,
   isPlaceAddPhotoContribution,
   type ContributorModerationContext,
   type PlaceContributionFeedItem,
@@ -40,6 +41,8 @@ export async function StaffPlaceContributionDetail({
   const t = await getTranslations("Contributions")
   const tPlaces = await getTranslations("Places")
   const isAddPhoto = isPlaceAddPhotoContribution(item)
+  const isLinkRelationship = isLinkPlaceRelationshipContribution(item)
+  const proposed = item.proposedPlaceRelationship
   const photoContext = isAddPhoto ? await getPlacePhotoContributeContextAction(item.entityId) : null
   const placeTitle = place?.name?.trim() || item.placeName?.trim() || t("feedCard_untitledPlace")
   const avatarSrc = place?.image?.trim() || item.placeAvatarUrl?.trim() || DEFAULT_FICTION_COVER
@@ -199,6 +202,58 @@ export async function StaffPlaceContributionDetail({
           </div>
         </section>
       )}
+
+      {isLinkRelationship && proposed ? (
+        <section className="border-b border-border/60 py-10">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">
+            {t("sectionProposedPlaceRelationship")}
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            {t("sectionProposedPlaceRelationshipHelp")}
+          </p>
+          <div className="mt-6 max-w-2xl space-y-2 rounded-xl border border-border bg-card/40 p-4 text-sm">
+            <p>
+              <span className="text-muted-foreground">{t("fieldType")}</span>{" "}
+              <span className="font-medium text-foreground">
+                {proposed.kind === "shared_clone"
+                  ? t("proposedRelationshipSharedClone")
+                  : t("proposedRelationshipComposite")}
+              </span>
+            </p>
+            {proposed.kind === "shared_clone" ? (
+              <>
+                <p>
+                  <span className="text-muted-foreground">{t("proposedRelationshipSource")}</span>{" "}
+                  {proposed.sourcePlaceName ?? proposed.sourcePlaceId}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">{t("proposedRelationshipTargetFiction")}</span>{" "}
+                  {proposed.targetFictionTitle ?? proposed.targetFictionId}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">{t("proposedRelationshipNewPlace")}</span>{" "}
+                  {proposed.placeName}
+                </p>
+              </>
+            ) : (
+              <>
+                <p>
+                  <span className="text-muted-foreground">{t("proposedRelationshipPlaceA")}</span>{" "}
+                  {proposed.placeAName ?? proposed.placeAId}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">{t("proposedRelationshipPlaceB")}</span>{" "}
+                  {proposed.placeBName ?? proposed.placeBId}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">{t("proposedRelationshipGroup")}</span>{" "}
+                  {proposed.groupName}
+                </p>
+              </>
+            )}
+          </div>
+        </section>
+      ) : null}
 
       <section className="py-10">
         <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-foreground">{t("sectionContributor")}</h2>

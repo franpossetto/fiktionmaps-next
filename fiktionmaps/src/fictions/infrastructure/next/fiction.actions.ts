@@ -154,6 +154,7 @@ export async function linkFictionPrimaryCreditAction(
     updateTag("fictions")
     return { success: true }
   } catch (e) {
+    console.error("[linkFictionPrimaryCreditAction]", e)
     return { success: false, error: e instanceof Error ? e.message : "Failed to link credit" }
   }
 }

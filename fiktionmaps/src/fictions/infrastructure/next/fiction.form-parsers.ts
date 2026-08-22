@@ -34,6 +34,7 @@ function parseLanguageCode(entry: FormDataEntryValue | null): string | null {
 }
 
 function parseCreateFictionFormPayload(formData: FormData) {
+  const authorRaw = String(formData.get("author") ?? "").trim()
   return {
     title: String(formData.get("title") ?? ""),
     type: String(formData.get("type") ?? ""),
@@ -43,6 +44,7 @@ function parseCreateFictionFormPayload(formData: FormData) {
     active: formData.get("active") !== "false",
     duration_sec: parseRuntimeSec(formData.get("runtimeMinutes")),
     slug: parseSlug(formData.get("slug")),
+    author: authorRaw.length > 0 ? authorRaw : null,
     created_by: parseOptionalFormUuid(formData.get("createdBy")),
     status: parseOptionalFictionStatus(formData.get("fictionStatus")),
     original_language: parseLanguageCode(formData.get("originalLanguage")),

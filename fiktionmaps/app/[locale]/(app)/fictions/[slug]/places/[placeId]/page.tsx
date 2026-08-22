@@ -10,6 +10,8 @@ import { FictionPlaceDetailView } from "@/components/fictions/fiction-place-deta
 import {
   PlaceDetailContributors,
   PlaceDetailContributorsFallback,
+  PlaceDetailRelationships,
+  PlaceDetailRelationshipsFallback,
   PlaceDetailScenes,
   PlaceDetailScenesFallback,
 } from "@/components/fictions/place-detail-deferred"
@@ -112,6 +114,11 @@ export default async function FictionPlaceUnderSlugPage({ params }: Props) {
         contributorsSlot={
           <Suspense fallback={<PlaceDetailContributorsFallback />}>
             <PlaceDetailContributors placeId={place.id} />
+          </Suspense>
+        }
+        relationshipsSlot={
+          <Suspense fallback={<PlaceDetailRelationshipsFallback />}>
+            <PlaceDetailRelationships placeId={place.id} />
           </Suspense>
         }
         scenesSlot={

@@ -37,6 +37,8 @@ import type { City } from "@/src/cities/domain/city.entity"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 import { SHOOT_ENVIRONMENT_OPTIONS } from "@/src/places/domain/place-shoot-environment"
 import type { PlaceShootEnvironment } from "@/src/places/domain/place-shoot-environment"
+import { RELATION_KIND_OPTIONS } from "@/src/places/domain/place-relation-kind"
+import type { PlaceRelationKind } from "@/src/places/domain/place-relation-kind"
 import { cn } from "@/lib/utils"
 
 const PLACE_MAP_ID = "admin-place-map"
@@ -468,6 +470,26 @@ export function PlaceCreateView({
                   {LOCATION_TYPE_OPTIONS.filter((opt) => opt.value).map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+
+            <FormField label={tPlaces("fieldRelationKind")}>
+              <Select
+                value={formData.relationKind || undefined}
+                onValueChange={(v) =>
+                  setFormData((p) => ({ ...p, relationKind: v as PlaceRelationKind }))
+                }
+              >
+                <SelectTrigger className="h-10 w-full rounded-lg">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent className="z-[10000]">
+                  {RELATION_KIND_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {tPlaces(opt.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectContent>

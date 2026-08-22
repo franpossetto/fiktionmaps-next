@@ -21,10 +21,12 @@ export function createPersonsSupabaseAdapter(
 
     async search(query: string): Promise<Person[]> {
       const supabase = await getSupabase()
+      const escaped = query.trim().replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_")
+      if (!escaped) return []
       const { data, error } = await supabase
         .from("persons")
         .select("*")
-        .ilike("name", `%${query}%`)
+        .ilike("name", `%${escaped}%`)
         .order("name")
         .limit(20)
       if (error) throw new Error(error.message)

@@ -105,7 +105,7 @@ export function AppDetailRailsShell({
             )}
           </div>
         )}
-        <aside className="hidden min-h-0 border-l border-border/50 px-5 py-10 @[1600px]/rails:block">
+        <aside className="hidden min-h-0 border-l border-border/50 px-5 py-10 @[1600px]/rails:flex @[1600px]/rails:flex-col">
           {rightAside ?? null}
         </aside>
         <div className="hidden min-h-0 @[920px]/rails:block" aria-hidden />

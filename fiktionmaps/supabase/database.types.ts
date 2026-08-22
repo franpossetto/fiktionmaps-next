@@ -375,6 +375,7 @@ export type Database = {
           created_at: string
           updated_at: string
           shoot_environment: "interior" | "exterior" | "interior_exterior" | null
+          relation_kind: "filmed" | "featured" | "mentioned" | "inspired_by" | "related_to"
         }
         Insert: {
           id?: string
@@ -389,6 +390,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
           shoot_environment?: "interior" | "exterior" | "interior_exterior" | null
+          relation_kind?: "filmed" | "featured" | "mentioned" | "inspired_by" | "related_to"
         }
         Update: {
           id?: string
@@ -403,6 +405,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
           shoot_environment?: "interior" | "exterior" | "interior_exterior" | null
+          relation_kind?: "filmed" | "featured" | "mentioned" | "inspired_by" | "related_to"
         }
         Relationships: [
           {
@@ -424,6 +427,72 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      place_relationships: {
+        Row: {
+          id: string
+          type: Database["public"]["Enums"]["place_relationship_type"]
+          name: string
+          slug: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          type: Database["public"]["Enums"]["place_relationship_type"]
+          name: string
+          slug: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          type?: Database["public"]["Enums"]["place_relationship_type"]
+          name?: string
+          slug?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      place_relationship_members: {
+        Row: {
+          id: string
+          place_relationship_id: string
+          type: Database["public"]["Enums"]["place_relationship_type"]
+          place_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          place_relationship_id: string
+          type: Database["public"]["Enums"]["place_relationship_type"]
+          place_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          place_relationship_id?: string
+          type?: Database["public"]["Enums"]["place_relationship_type"]
+          place_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_relationship_members_group_fkey"
+            columns: ["place_relationship_id", "type"]
+            isOneToOne: false
+            referencedRelation: "place_relationships"
+            referencedColumns: ["id", "type"]
+          },
+          {
+            foreignKeyName: "place_relationship_members_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
             referencedColumns: ["id"]
           },
         ]
@@ -894,6 +963,7 @@ export type Database = {
             | "add_photo"
             | "add_place_to_scene"
             | "add_credits"
+            | "link_place_relationship"
             | "enrich_entity"
             | "correct_data"
             | "mark_inaccessible"
@@ -920,6 +990,7 @@ export type Database = {
             | "add_photo"
             | "add_place_to_scene"
             | "add_credits"
+            | "link_place_relationship"
             | "enrich_entity"
             | "correct_data"
             | "mark_inaccessible"
@@ -946,6 +1017,7 @@ export type Database = {
             | "add_photo"
             | "add_place_to_scene"
             | "add_credits"
+            | "link_place_relationship"
             | "enrich_entity"
             | "correct_data"
             | "mark_inaccessible"
@@ -1100,6 +1172,93 @@ export type Database = {
             columns: ["person_id"]
             isOneToOne: false
             referencedRelation: "persons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contribution_pending_place_relationships: {
+        Row: {
+          id: string
+          contribution_id: string
+          kind: "shared_clone" | "composite"
+          source_place_id: string | null
+          target_fiction_id: string | null
+          place_name: string | null
+          description: string | null
+          relation_kind: "filmed" | "featured" | "mentioned" | "inspired_by" | "related_to" | null
+          shoot_environment: "interior" | "exterior" | "interior_exterior" | null
+          relationship_name: string | null
+          place_a_id: string | null
+          place_b_id: string | null
+          group_name: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          contribution_id: string
+          kind: "shared_clone" | "composite"
+          source_place_id?: string | null
+          target_fiction_id?: string | null
+          place_name?: string | null
+          description?: string | null
+          relation_kind?: "filmed" | "featured" | "mentioned" | "inspired_by" | "related_to" | null
+          shoot_environment?: "interior" | "exterior" | "interior_exterior" | null
+          relationship_name?: string | null
+          place_a_id?: string | null
+          place_b_id?: string | null
+          group_name?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          contribution_id?: string
+          kind?: "shared_clone" | "composite"
+          source_place_id?: string | null
+          target_fiction_id?: string | null
+          place_name?: string | null
+          description?: string | null
+          relation_kind?: "filmed" | "featured" | "mentioned" | "inspired_by" | "related_to" | null
+          shoot_environment?: "interior" | "exterior" | "interior_exterior" | null
+          relationship_name?: string | null
+          place_a_id?: string | null
+          place_b_id?: string | null
+          group_name?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contribution_pending_place_relationships_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: true
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contribution_pending_place_relationships_source_place_id_fkey"
+            columns: ["source_place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contribution_pending_place_relationships_target_fiction_id_fkey"
+            columns: ["target_fiction_id"]
+            isOneToOne: false
+            referencedRelation: "fictions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contribution_pending_place_relationships_place_a_id_fkey"
+            columns: ["place_a_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contribution_pending_place_relationships_place_b_id_fkey"
+            columns: ["place_b_id"]
+            isOneToOne: false
+            referencedRelation: "places"
             referencedColumns: ["id"]
           },
         ]
@@ -1278,6 +1437,148 @@ export type Database = {
           },
         ]
       }
+      email_suppressions: {
+        Row: {
+          id: string
+          user_id: string
+          email_type: string
+          reason: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          email_type: string
+          reason?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          email_type?: string
+          reason?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_suppressions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_batches: {
+        Row: {
+          id: string
+          email_type: string
+          subject: string
+          custom_message: string
+          template_props: Json
+          created_by: string
+          source: string
+          status: string
+          dry_run: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          email_type: string
+          subject: string
+          custom_message: string
+          template_props?: Json
+          created_by: string
+          source: string
+          status?: string
+          dry_run?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          email_type?: string
+          subject?: string
+          custom_message?: string
+          template_props?: Json
+          created_by?: string
+          source?: string
+          status?: string
+          dry_run?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_batches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_sends: {
+        Row: {
+          id: string
+          batch_id: string
+          user_id: string
+          email_type: string
+          email_to: string
+          name_to: string
+          status: string
+          error: string | null
+          attempts: number
+          resend_message_id: string | null
+          sent_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          batch_id: string
+          user_id: string
+          email_type: string
+          email_to: string
+          name_to: string
+          status?: string
+          error?: string | null
+          attempts?: number
+          resend_message_id?: string | null
+          sent_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          batch_id?: string
+          user_id?: string
+          email_type?: string
+          email_to?: string
+          name_to?: string
+          status?: string
+          error?: string | null
+          attempts?: number
+          resend_message_id?: string | null
+          sent_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_sends_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "email_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_sends_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1286,6 +1587,42 @@ export type Database = {
       check_username_available: {
         Args: { p_username: string }
         Returns: boolean
+      }
+      is_admin_profile: {
+        Args: Record<string, never>
+        Returns: boolean
+      }
+      admin_search_email_recipients: {
+        Args: { q: string; filter?: string }
+        Returns: {
+          id: string
+          email: string
+          username: string | null
+          full_name: string | null
+          created_at: string
+        }[]
+      }
+      admin_resolve_email_recipients: {
+        Args: { ids: string[] }
+        Returns: {
+          id: string
+          email: string
+          username: string | null
+          full_name: string | null
+        }[]
+      }
+      queue_email_batch: {
+        Args: {
+          p_email_type: string
+          p_subject: string
+          p_custom_message: string
+          p_template_props: Json
+          p_created_by: string
+          p_source: string
+          p_dry_run: boolean
+          p_recipients: Json
+        }
+        Returns: string
       }
       map_place_clusters: {
         Args: {
@@ -1313,6 +1650,8 @@ export type Database = {
     Enums: {
       contribution_status: "pending" | "approved" | "rejected"
       place_shoot_environment: "interior" | "exterior" | "interior_exterior"
+      place_relation_kind: "filmed" | "featured" | "mentioned" | "inspired_by" | "related_to"
+      place_relationship_type: "shared" | "composite"
       contribution_type:
         | "create_fiction"
         | "create_place"
@@ -1320,6 +1659,7 @@ export type Database = {
         | "add_photo"
         | "add_place_to_scene"
         | "add_credits"
+        | "link_place_relationship"
         | "enrich_entity"
         | "correct_data"
         | "mark_inaccessible"
@@ -1489,6 +1829,10 @@ export type ContributionPendingScenePlaceUpdate = TablesUpdate<"contribution_pen
 export type ContributionPendingFictionPersonRow = Tables<"contribution_pending_fiction_persons">
 export type ContributionPendingFictionPersonInsert = TablesInsert<"contribution_pending_fiction_persons">
 export type ContributionPendingFictionPersonUpdate = TablesUpdate<"contribution_pending_fiction_persons">
+export type ContributionPendingPlaceRelationshipRow =
+  Tables<"contribution_pending_place_relationships">
+export type ContributionPendingPlaceRelationshipInsert =
+  TablesInsert<"contribution_pending_place_relationships">
 export type ContributionInsert = TablesInsert<"contributions">
 export type ContributionUpdate = TablesUpdate<"contributions">
 

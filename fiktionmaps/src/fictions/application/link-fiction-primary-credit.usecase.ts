@@ -11,6 +11,10 @@ export type LinkFictionPrimaryCreditInput = {
   displayName: string
 }
 
+/**
+ * Links primary credit on `fiction_persons`, then best-effort denormalizes to `fictions.author`.
+ * Author UPDATE is staff-only (RLS 057); contributors still succeed via fiction_persons (+ author on create INSERT).
+ */
 export async function linkFictionPrimaryCreditUseCase(
   input: LinkFictionPrimaryCreditInput,
   personsRepo: PersonsRepositoryPort,
@@ -23,8 +27,13 @@ export async function linkFictionPrimaryCreditUseCase(
     { person_id: input.personId, role, sort_order: 0 },
   ])
 
-  const fiction = await fictionsRepo.update(input.fictionId, { author: displayName || null })
+  if (!displayName) return
+
+  const fiction = await fictionsRepo.update(input.fictionId, { author: displayName })
   if (!fiction) {
-    throw new Error("Failed to update fiction author")
+    console.warn(
+      "[linkFictionPrimaryCredit] fiction_persons linked; fictions.author update skipped (likely staff-only RLS)",
+      { fictionId: input.fictionId },
+    )
   }
 }

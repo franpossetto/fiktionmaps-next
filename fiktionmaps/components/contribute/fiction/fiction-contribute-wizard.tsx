@@ -416,23 +416,26 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
 
   useEffect(() => {
     if (step !== 5) return
+    const q = directorCatalogFilter.trim()
+    if (q.length < 1) {
+      setDirectorCatalog([])
+      setDirectorCatalogLoading(false)
+      return
+    }
     let cancelled = false
     setDirectorCatalogLoading(true)
-    void listCreditCandidatesAction(primaryCreditRole, "").then((res) => {
-      if (cancelled) return
-      setDirectorCatalog(res.success ? res.persons : [])
-      setDirectorCatalogLoading(false)
-    })
+    const timer = window.setTimeout(() => {
+      void listCreditCandidatesAction(primaryCreditRole, q).then((res) => {
+        if (cancelled) return
+        setDirectorCatalog(res.success ? res.persons : [])
+        setDirectorCatalogLoading(false)
+      })
+    }, 250)
     return () => {
       cancelled = true
+      window.clearTimeout(timer)
     }
-  }, [primaryCreditRole, step])
-
-  const filteredDirectorCatalog = useMemo(() => {
-    const f = directorCatalogFilter.trim().toLowerCase()
-    if (!f) return directorCatalog
-    return directorCatalog.filter((p) => p.name.toLowerCase().includes(f))
-  }, [directorCatalog, directorCatalogFilter])
+  }, [directorCatalogFilter, primaryCreditRole, step])
 
   const descriptionWordCount = useMemo(
     () => countFictionContributeDescriptionWords(identity.description),
@@ -778,6 +781,7 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
     fd.set("slug", slug)
     fd.set("originalLanguage", identity.originalLanguage.trim())
     fd.set("contentLanguage", identity.contentLanguage.trim())
+    fd.set("author", director.trim())
     if (identity.coverFile) {
       fd.set("coverFile", identity.coverFile)
       fd.set("coverFocusX", String(coverFocus.x))
@@ -1599,19 +1603,17 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
                         <p className="px-3 py-3 text-center text-sm text-muted-foreground">
                           {tfCredit("directorCatalogLoading", "authorCatalogLoading")}
                         </p>
-                      ) : filteredDirectorCatalog.length === 0 &&
-                        directorCatalog.length === 0 &&
-                        !directorCatalogFilter.trim() ? (
+                      ) : !directorCatalogFilter.trim() ? (
                         <p className="px-3 py-3 text-center text-sm text-muted-foreground">
                           {tfCredit("directorCatalogNoDirectorsYet", "authorCatalogNoAuthorsYet")}
                         </p>
-                      ) : filteredDirectorCatalog.length === 0 ? (
+                      ) : directorCatalog.length === 0 ? (
                         <p className="px-3 py-3 text-center text-sm text-muted-foreground">
                           {tfCredit("directorCatalogEmpty", "authorCatalogEmpty")}
                         </p>
                       ) : (
                         <ul className="divide-y divide-border">
-                          {filteredDirectorCatalog.map((p) => {
+                          {directorCatalog.map((p) => {
                             const selected = director.trim().toLowerCase() === p.name.trim().toLowerCase()
                             return (
                               <li key={p.id}>

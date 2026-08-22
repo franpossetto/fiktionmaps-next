@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { Book, MapPin, Clapperboard, Building2, LayoutGrid, List, Users, FileText } from "lucide-react"
+import { Book, MapPin, Clapperboard, Building2, LayoutGrid, List, Users, FileText, Mail } from "lucide-react"
+import { Link } from "@/i18n/navigation"
 import { cn } from "@/lib/utils"
 import { FictionsTab } from "./fictions-tab"
 import { CitiesTab } from "./cities-tab"
@@ -124,41 +125,50 @@ export function AdminDashboard({ initialFictions, initialCities, initialPlaces, 
               )
             })}
           </nav>
-          <div
-            className="flex rounded-lg border border-border bg-card p-0.5"
-            role="tablist"
-            aria-label="View mode"
-          >
-            <button
-              type="button"
-              onClick={() => setViewMode("cards")}
-              aria-selected={viewMode === "cards"}
-              aria-label="Cards view"
-              className={cn(
-                "flex items-center justify-center p-2 rounded-md transition-colors",
-                viewMode === "cards"
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-              title="Cards view"
+          <div className="flex items-center gap-3">
+            <Link
+              href="/admin/emails"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("table")}
-              aria-selected={viewMode === "table"}
-              aria-label="Table view"
-              className={cn(
-                "flex items-center justify-center p-2 rounded-md transition-colors",
-                viewMode === "table"
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-              title="Table view"
+              <Mail className="h-3.5 w-3.5" />
+              Emails
+            </Link>
+            <div
+              className="flex rounded-lg border border-border bg-card p-0.5"
+              role="tablist"
+              aria-label="View mode"
             >
-              <List className="h-4 w-4" />
-            </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("cards")}
+                aria-selected={viewMode === "cards"}
+                aria-label="Cards view"
+                className={cn(
+                  "flex items-center justify-center p-2 rounded-md transition-colors",
+                  viewMode === "cards"
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                title="Cards view"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                aria-selected={viewMode === "table"}
+                aria-label="Table view"
+                className={cn(
+                  "flex items-center justify-center p-2 rounded-md transition-colors",
+                  viewMode === "table"
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                title="Table view"
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -2,6 +2,11 @@ import { z } from "zod"
 import { latitudeSchema, longitudeSchema, uuidSchema } from "@/lib/validation/primitives"
 import { streetViewReferenceSchema } from "@/src/locations/domain/location-view-reference.schemas"
 import {
+  parsePlaceRelationKind,
+  PLACE_RELATION_KIND_DEFAULT,
+  placeRelationKindSchema,
+} from "@/src/places/domain/place-relation-kind"
+import {
   parsePlaceShootEnvironment,
   placeShootEnvironmentSchema,
 } from "@/src/places/domain/place-shoot-environment"
@@ -17,6 +22,7 @@ export const placeContributeDraftSchema = z.object({
   description: z.string().trim().min(1),
   isLandmark: z.boolean().optional().default(false),
   locationType: z.string().nullable().optional(),
+  relationKind: placeRelationKindSchema.optional().default(PLACE_RELATION_KIND_DEFAULT),
   shootEnvironment: placeShootEnvironmentSchema.nullable().optional(),
   streetViewReference: streetViewReferenceSchema.nullable().optional(),
 })
@@ -55,6 +61,7 @@ export function parsePlaceContributeFormData(formData: FormData): {
     description: String(formData.get("description") ?? ""),
     isLandmark: formData.get("isLandmark") === "true",
     locationType: String(formData.get("locationType") ?? "") || null,
+    relationKind: parsePlaceRelationKind(formData.get("relationKind")),
     shootEnvironment: parsePlaceShootEnvironment(formData.get("shootEnvironment")),
     streetViewReference: parseStreetViewReferenceField(formData.get("streetViewReference")),
   }

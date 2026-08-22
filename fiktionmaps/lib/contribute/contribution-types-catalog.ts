@@ -8,6 +8,7 @@ import {
   Footprints,
   ImagePlus,
   Layers,
+  Link2,
   MapPin,
   MessageSquareQuote,
   PenLine,
@@ -30,6 +31,7 @@ export type ContributionTypeCatalogEntry = {
     | "/contribute/scene"
     | "/contribute/scene-place"
     | "/contribute/credits"
+    | "/contribute/place-relationship"
   /** Short badge label shown on the card (e.g. "AI Hunt"). */
   tag?: string
   /** Requires contributor, moderator, or admin role (e.g. AI wizards). */
@@ -60,6 +62,12 @@ const CONTRIBUTION_TYPES_CATALOG_BASE: ContributionTypeCatalogEntry[] = [
   },
   { type: "add_photo", icon: ImagePlus, hasWizard: true, href: "/contribute/photo" },
   { type: "add_credits", icon: Users, hasWizard: true, href: "/contribute/credits" },
+  {
+    type: "link_place_relationship",
+    icon: Link2,
+    hasWizard: true,
+    href: "/contribute/place-relationship",
+  },
   { type: "enrich_entity", icon: Layers, hasWizard: false },
   { type: "correct_data", icon: PenLine, hasWizard: false },
   { type: "mark_inaccessible", icon: CircleOff, hasWizard: false },

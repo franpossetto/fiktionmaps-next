@@ -8,6 +8,7 @@ const contributionTypeSchema = z.enum([
   "add_photo",
   "add_place_to_scene",
   "add_credits",
+  "link_place_relationship",
   "enrich_entity",
   "correct_data",
   "mark_inaccessible",
@@ -91,3 +92,31 @@ export const submitAddCreditsContributionSchema = z
   })
 
 export type SubmitAddCreditsContributionData = z.infer<typeof submitAddCreditsContributionSchema>
+
+export const submitLinkPlaceRelationshipContributionSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("shared_clone"),
+    sourcePlaceId: uuidSchema,
+    targetFictionId: uuidSchema,
+    placeName: z.string().trim().min(1).max(200),
+    description: z.string().trim().min(1),
+    relationKind: z
+      .enum(["filmed", "featured", "mentioned", "inspired_by", "related_to"])
+      .optional(),
+    shootEnvironment: z
+      .enum(["interior", "exterior", "interior_exterior"])
+      .nullable()
+      .optional(),
+    relationshipName: z.string().trim().min(1).max(200).optional(),
+  }),
+  z.object({
+    kind: z.literal("composite"),
+    placeAId: uuidSchema,
+    placeBId: uuidSchema,
+    groupName: z.string().trim().min(1).max(200),
+  }),
+])
+
+export type SubmitLinkPlaceRelationshipContributionData = z.infer<
+  typeof submitLinkPlaceRelationshipContributionSchema
+>
