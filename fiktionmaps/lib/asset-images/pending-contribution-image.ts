@@ -108,13 +108,14 @@ export async function promotePendingContributionPhotoToAssetImages(
   entityType: Extract<ContributionEntityType, "place" | "fiction">,
   entityId: string,
   role: PendingContributionImageRole,
-  paths: { xs?: string; sm?: string; lg?: string },
+  paths: { xs?: string; sm?: string; lg?: string; xl?: string },
   focus: ImageFocus = DEFAULT_IMAGE_FOCUS,
 ): Promise<{ success: true } | { success: false; error: string }> {
   const pairs: { variant: ImageVariant; from: string }[] = []
   if (paths.xs?.trim()) pairs.push({ variant: "xs", from: paths.xs })
   if (paths.sm?.trim()) pairs.push({ variant: "sm", from: paths.sm })
   if (paths.lg?.trim()) pairs.push({ variant: "lg", from: paths.lg })
+  if (paths.xl?.trim()) pairs.push({ variant: "xl", from: paths.xl })
   if (pairs.length === 0) {
     return { success: false, error: "No paths to promote" }
   }

@@ -11,7 +11,7 @@ export type ContributionPendingImageRole = "avatar" | "hero" | "cover" | "banner
 /** @deprecated Use ContributionPendingImageRole */
 export type PlaceContributionPendingImageRole = Extract<ContributionPendingImageRole, "avatar" | "hero">
 
-export type ContributionPendingImageVariant = "xs" | "sm" | "lg"
+export type ContributionPendingImageVariant = "xs" | "sm" | "lg" | "xl"
 
 export interface ContributionPendingImage {
   id: string
@@ -104,7 +104,7 @@ export interface FictionContributorScopeEntry extends FictionContributorProfile 
   fppAwarded: number
 }
 
-/** Staff feed row: a create_fiction contribution on a fiction entity plus submitter profile. */
+/** Staff feed row: a create_fiction / add_photo / add_credits contribution on a fiction entity plus submitter profile. */
 export interface FictionContributionFeedItem extends Contribution {
   contributor: FictionContributorProfile
   /** Draft fiction title when the row is readable under RLS (staff). */
@@ -112,6 +112,12 @@ export interface FictionContributionFeedItem extends Contribution {
   /** Cover thumbnail URL (`asset_images` cover sm) when present. */
   fictionCoverUrl: string | null
   pendingImagesByRole: ContributionPendingImagesByRole | null
+  /** Proposed credit for `add_credits` (staging; one contribution = one person+role). */
+  proposedCredit: {
+    personId: string
+    personName: string | null
+    role: string
+  } | null
 }
 
 /** Same as FictionContributorProfile plus first approved contribution timestamp for this entity (deduped per user). */
@@ -177,6 +183,29 @@ export interface PlaceContributionFeedItem extends Contribution {
   fictionTitle: string | null
   fictionId: string | null
   pendingImagesByRole: ContributionPendingImagesByRole | null
+  /** Proposed link for `link_place_relationship` (staging). */
+  proposedPlaceRelationship: ContributionPendingPlaceRelationship | null
+}
+
+export type ContributionPendingPlaceRelationshipKind = "shared_clone" | "composite"
+
+export type ContributionPendingPlaceRelationship = {
+  kind: ContributionPendingPlaceRelationshipKind
+  sourcePlaceId: string | null
+  targetFictionId: string | null
+  placeName: string | null
+  description: string | null
+  relationKind: string | null
+  shootEnvironment: string | null
+  relationshipName: string | null
+  placeAId: string | null
+  placeBId: string | null
+  groupName: string | null
+  /** Display helpers resolved for staff UI. */
+  sourcePlaceName?: string | null
+  targetFictionTitle?: string | null
+  placeAName?: string | null
+  placeBName?: string | null
 }
 
 /** Staff feed row: an add_scene / add_place_to_scene contribution plus scene snapshots. */
@@ -218,7 +247,12 @@ export type StaffCreateContributionsFeedPageResult = {
 export function isPlaceContributionFeedItem(
   item: StaffCreateContributionFeedItem,
 ): item is PlaceContributionFeedItem {
-  return item.entityType === "place" && (item.type === "create_place" || item.type === "add_photo")
+  return (
+    item.entityType === "place" &&
+    (item.type === "create_place" ||
+      item.type === "add_photo" ||
+      item.type === "link_place_relationship")
+  )
 }
 
 export function isPlaceAddPhotoContribution(item: Contribution): boolean {
@@ -232,7 +266,10 @@ export function isFictionAddPhotoContribution(item: Contribution): boolean {
 export function isFictionContributionFeedItem(
   item: StaffCreateContributionFeedItem,
 ): item is FictionContributionFeedItem {
-  return item.entityType === "fiction" && (item.type === "create_fiction" || item.type === "add_photo")
+  return (
+    item.entityType === "fiction" &&
+    (item.type === "create_fiction" || item.type === "add_photo" || item.type === "add_credits")
+  )
 }
 
 export function isFictionCreateContributionFeedItem(item: FictionContributionFeedItem): boolean {
@@ -250,4 +287,12 @@ export function isSceneContributionFeedItem(
 
 export function isAddPlaceToSceneContribution(item: Contribution): boolean {
   return item.entityType === "scene" && item.type === "add_place_to_scene"
+}
+
+export function isAddCreditsContribution(item: Contribution): boolean {
+  return item.entityType === "fiction" && item.type === "add_credits"
+}
+
+export function isLinkPlaceRelationshipContribution(item: Contribution): boolean {
+  return item.entityType === "place" && item.type === "link_place_relationship"
 }

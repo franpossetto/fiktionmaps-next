@@ -1,5 +1,8 @@
 import { isUuidString } from "@/lib/validation/primitives"
-import type { PlacesRepositoryPort } from "@/src/places/domain/place.repository"
+import type {
+  PlaceAvatarVariant,
+  PlacesRepositoryPort,
+} from "@/src/places/domain/place.repository"
 import type { Place } from "@/src/places/domain/place.entity"
 
 /** Public fiction place URL segment: slug or legacy place UUID (no redirect). Active + approved only. */
@@ -7,7 +10,7 @@ export async function resolvePlaceForFictionPathUseCase(
   fictionId: string,
   segment: string,
   repo: PlacesRepositoryPort,
-  avatarVariant: "sm" | "lg" = "lg",
+  avatarVariant: PlaceAvatarVariant = "xl",
 ): Promise<Place | null> {
   const raw = segment.trim()
   if (!raw) return null

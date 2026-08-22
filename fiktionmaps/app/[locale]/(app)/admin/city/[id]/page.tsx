@@ -12,7 +12,7 @@ export default async function AdminCityEditPage({ params }: AdminCityEditPagePro
   if (!city) notFound()
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-7xl min-w-0 flex-col overflow-y-auto bg-background px-5 text-foreground">
       <CityEditView initialCity={city} />
     </div>
   )

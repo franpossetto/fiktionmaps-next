@@ -5,14 +5,16 @@ import { useRouter } from "@/i18n/navigation"
 import { ChevronRight, ImagePlus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { WizardShell } from "@/components/admin/wizard-shell"
-import { CurrentAssetFormatBadge } from "@/components/admin/current-asset-format-badge"
+import { AssetVariantFormatChecklist } from "@/components/admin/asset-variant-format-checklist"
 import { ImageCodecCompare } from "@/components/admin/image-codec-compare"
+import { ImageCodecLab } from "@/components/admin/image-codec-lab"
 import { ImageFocusPicker } from "@/components/ui/image-focus-picker"
 import {
   DEFAULT_IMAGE_FOCUS,
   type ImageFocus,
 } from "@/lib/asset-images/image-focus"
 import type { ImageVariant } from "@/lib/asset-images/variant-sizes"
+import type { AssetRoleFormatInventory } from "@/src/asset-images/domain/asset-image.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import { uploadFictionImageAction } from "@/src/fictions/infrastructure/next/fiction.actions"
 import {
@@ -22,6 +24,7 @@ import {
 import { cn } from "@/lib/utils"
 
 type PhotoRole = "cover" | "banner"
+type ImproveMode = "improve" | "lab"
 
 const WIZARD_STEPS = [
   { title: "Choose image", description: "Cover or hero" },
@@ -31,11 +34,19 @@ const WIZARD_STEPS = [
 
 type FictionImprovePhotoViewProps = {
   fiction: FictionWithMedia
+  inventories: {
+    cover: AssetRoleFormatInventory
+    banner: AssetRoleFormatInventory
+  }
 }
 
-export function FictionImprovePhotoView({ fiction }: FictionImprovePhotoViewProps) {
+export function FictionImprovePhotoView({
+  fiction,
+  inventories,
+}: FictionImprovePhotoViewProps) {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
+  const [mode, setMode] = useState<ImproveMode>("improve")
   const [step, setStep] = useState(0)
   const [role, setRole] = useState<PhotoRole | null>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -48,7 +59,9 @@ export function FictionImprovePhotoView({ fiction }: FictionImprovePhotoViewProp
   const [uploadError, setUploadError] = useState<string | null>(null)
 
   const compareVariants = useMemo((): readonly ImageVariant[] => {
-    return role === "banner" ? (["lg"] as const) : (["xs", "sm", "lg"] as const)
+    return role === "banner"
+      ? (["lg", "xl"] as const)
+      : (["xs", "sm", "lg", "xl"] as const)
   }, [role])
 
   useEffect(() => {
@@ -81,6 +94,8 @@ export function FictionImprovePhotoView({ fiction }: FictionImprovePhotoViewProp
 
   const aspectRatio = role === "banner" ? "21 / 9" : "2 / 3"
   const roleLabel = role === "banner" ? "Hero" : "Cover"
+  const activeInventory =
+    role === "cover" ? inventories.cover : role === "banner" ? inventories.banner : null
 
   const resetFileState = () => {
     setFile(null)
@@ -172,13 +187,42 @@ export function FictionImprovePhotoView({ fiction }: FictionImprovePhotoViewProp
     <WizardShell
       title="Improve photo"
       subtitle={`${fiction.title} · replace cover or hero as AVIF`}
-      steps={[...WIZARD_STEPS]}
+      steps={mode === "improve" ? [...WIZARD_STEPS] : []}
       currentStep={step}
-      onBack={handleBack}
-      backLabel={step === 0 ? "← Back to edit" : "← Back"}
+      onBack={mode === "lab" ? () => setMode("improve") : handleBack}
+      backLabel={
+        mode === "lab" ? "← Back to improve" : step === 0 ? "← Back to edit" : "← Back"
+      }
       onCancel={exit}
       cancelLabel="Cancel"
     >
+      <div className="mb-6 flex flex-wrap gap-2">
+        {(
+          [
+            { id: "improve" as const, label: "Improve" },
+            { id: "lab" as const, label: "Lab" },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setMode(tab.id)}
+            className={cn(
+              "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+              mode === tab.id
+                ? "border-foreground bg-foreground text-background"
+                : "border-border bg-card/50 text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {mode === "lab" ? <ImageCodecLab /> : null}
+
+      {mode === "improve" ? (
+        <>
       <input
         ref={inputRef}
         type="file"
@@ -241,7 +285,11 @@ export function FictionImprovePhotoView({ fiction }: FictionImprovePhotoViewProp
                   <div className="min-w-0 space-y-1">
                     <p className="font-semibold text-foreground">{option.title}</p>
                     <p className="text-xs text-muted-foreground">{option.hint}</p>
-                    <CurrentAssetFormatBadge url={option.url} />
+                    <AssetVariantFormatChecklist
+                      inventory={
+                        option.id === "cover" ? inventories.cover : inventories.banner
+                      }
+                    />
                   </div>
                   <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground group-hover:text-foreground" />
                 </div>
@@ -281,7 +329,9 @@ export function FictionImprovePhotoView({ fiction }: FictionImprovePhotoViewProp
                         }}
                       />
                     </div>
-                    <CurrentAssetFormatBadge url={currentUrl} />
+                    {activeInventory ? (
+                      <AssetVariantFormatChecklist inventory={activeInventory} />
+                    ) : null}
                   </div>
                 ) : (
                   <div className="mx-auto flex aspect-[2/3] w-full max-w-[220px] items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
@@ -334,7 +384,9 @@ export function FictionImprovePhotoView({ fiction }: FictionImprovePhotoViewProp
                         }}
                       />
                     </div>
-                    <CurrentAssetFormatBadge url={currentUrl} />
+                    {activeInventory ? (
+                      <AssetVariantFormatChecklist inventory={activeInventory} />
+                    ) : null}
                   </div>
                 ) : (
                   <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
@@ -393,7 +445,7 @@ export function FictionImprovePhotoView({ fiction }: FictionImprovePhotoViewProp
           <div>
             <h2 className="mb-1 text-lg font-bold text-foreground">Compare codecs</h2>
             <p className="text-sm text-muted-foreground">
-              AVIF q48 (upload) vs WebP reference. Previews at real pixel size.
+              AVIF q60 (upload) vs WebP reference. Previews at real pixel size.
             </p>
           </div>
 
@@ -440,6 +492,8 @@ export function FictionImprovePhotoView({ fiction }: FictionImprovePhotoViewProp
             </Button>
           </div>
         </div>
+      ) : null}
+        </>
       ) : null}
     </WizardShell>
   )

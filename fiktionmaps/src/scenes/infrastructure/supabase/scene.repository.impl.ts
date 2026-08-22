@@ -445,6 +445,7 @@ async function fetchScenesWithVideoForPlaceIds(
       sceneQuote: r.quote ?? undefined,
       visitTip: undefined,
       sceneTitle: r.title?.trim() || null,
+      relationKind: "filmed" as const,
     }
   })
 }

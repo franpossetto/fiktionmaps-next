@@ -1,5 +1,6 @@
 import { validateImageFile } from "@/lib/asset-images/image-variant-service"
 import { uploadPendingContributionImage } from "@/lib/asset-images/pending-contribution-image"
+import { BANNER_UPLOAD_VARIANTS } from "@/lib/asset-images/variant-sizes"
 import { approveContributionUseCase } from "@/src/contributions/application/approve-contribution.usecase"
 import { replacePendingAddPhotoImagesUseCase } from "@/src/contributions/application/replace-pending-add-photo-images.usecase"
 import {
@@ -80,7 +81,8 @@ export async function submitFictionAddPhotoContributionUseCase(
         contributionId: ownPending.contributionId,
         role: input.targetRole,
         file: input.file,
-        variants: input.targetRole === FICTION_BANNER_ASSET_ROLE ? ["lg"] : undefined,
+        variants:
+          input.targetRole === FICTION_BANNER_ASSET_ROLE ? BANNER_UPLOAD_VARIANTS : undefined,
         focus: input.focus,
       },
       contributionsRepo,
@@ -128,14 +130,15 @@ export async function submitFictionAddPhotoContributionUseCase(
     const xs = uploaded.paths.xs
     const sm = uploaded.paths.sm
     const lg = uploaded.paths.lg
-    if (!sm || !lg) {
+    const xl = uploaded.paths.xl
+    if (!sm || !lg || !xl) {
       return { success: false, error: "Failed to save pending cover variants" }
     }
 
     const linked = await contributionsRepo.insertPendingContributionImages({
       contributionId: created.contributionId,
       role: FICTION_COVER_ASSET_ROLE,
-      paths: { xs, sm, lg },
+      paths: { xs, sm, lg, xl },
       focus: input.focus,
     })
     if (!linked) {
@@ -155,21 +158,22 @@ export async function submitFictionAddPhotoContributionUseCase(
     created.contributionId,
     FICTION_BANNER_ASSET_ROLE,
     input.file,
-    ["lg"],
+    BANNER_UPLOAD_VARIANTS,
   )
   if (!uploaded.success) {
     return { success: false, error: uploaded.error }
   }
 
   const lg = uploaded.paths.lg
-  if (!lg) {
-    return { success: false, error: "Failed to save pending hero variant" }
+  const xl = uploaded.paths.xl
+  if (!lg || !xl) {
+    return { success: false, error: "Failed to save pending hero variants" }
   }
 
   const linked = await contributionsRepo.insertPendingContributionImages({
     contributionId: created.contributionId,
     role: FICTION_BANNER_ASSET_ROLE,
-    paths: { lg },
+    paths: { lg, xl },
     focus: input.focus,
   })
   if (!linked) {

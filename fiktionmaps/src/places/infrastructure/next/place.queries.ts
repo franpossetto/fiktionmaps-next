@@ -92,11 +92,11 @@ export async function resolvePlaceForFictionPathCached(fictionId: string, segmen
   try {
     return await unstable_cache(
       async () => {
-        const place = await resolvePlaceForFictionPathUseCase(fictionId, segment, anonRepo, "lg")
+        const place = await resolvePlaceForFictionPathUseCase(fictionId, segment, anonRepo, "xl")
         if (!place) throw new Error("PLACE_RESOLVE_MISS")
         return place
       },
-      CacheKeys.place(`resolve:${key}:lg:active:v2`),
+      CacheKeys.place(`resolve:${key}:xl:active:v1`),
       { ...CacheConfig.medium, tags: ["places", `fiction-${fictionId}`] },
     )()
   } catch (e) {
@@ -124,7 +124,7 @@ export async function getPlaceLocationByIdForStaffSession(placeId: string): Prom
   const staff = await getIsUserStaff(user.id)
   if (!staff) return null
   const repo = createPlacesSupabaseAdapter(async () => supabase)
-  return getPlaceByIdUseCase(placeId, repo, "lg")
+  return getPlaceByIdUseCase(placeId, repo, "xl")
 }
 
 export function getFictionPlacesCached(fictionId: string) {

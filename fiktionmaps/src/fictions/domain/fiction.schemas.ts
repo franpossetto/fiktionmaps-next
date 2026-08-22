@@ -19,6 +19,8 @@ export const createFictionFormSchema = z.object({
   active: z.boolean(),
   duration_sec: z.number().nullable(),
   slug: slugField,
+  /** Denormalized primary credit (director/author); set on INSERT so contributors don't need UPDATE. */
+  author: z.string().trim().nullable().optional(),
   status: fictionRowStatusSchema.optional(),
   created_by: z.string().uuid().optional(),
   original_language: fictionLanguageCodeSchema,

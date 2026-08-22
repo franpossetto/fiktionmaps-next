@@ -94,14 +94,15 @@ export async function submitPlaceAddPhotoContributionUseCase(
   const xsPath = uploaded.paths.xs
   const smPath = uploaded.paths.sm
   const lgPath = uploaded.paths.lg
-  if (!smPath || !lgPath) {
+  const xlPath = uploaded.paths.xl
+  if (!smPath || !lgPath || !xlPath) {
     return { success: false, error: "Failed to save pending photo variants" }
   }
 
   const linked = await contributionsRepo.insertPendingContributionImages({
     contributionId: created.contributionId,
     role: PLACE_PHOTO_ASSET_ROLE,
-    paths: { xs: xsPath, sm: smPath, lg: lgPath },
+    paths: { xs: xsPath, sm: smPath, lg: lgPath, xl: xlPath },
     focus: input.focus,
   })
   if (!linked) {

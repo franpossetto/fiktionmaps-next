@@ -264,6 +264,7 @@ export function createFictionsSupabaseAdapter(
         active: data.active ?? true,
         duration_sec: data.duration_sec ?? null,
         slug: data.slug ?? null,
+        ...(data.author != null ? { author: data.author } : {}),
         ...(data.status != null ? { status: data.status } : {}),
         ...(data.created_by != null ? { created_by: data.created_by } : {}),
         ...(data.original_language != null ? { original_language: data.original_language } : {}),

@@ -3,7 +3,7 @@ import type { Database } from "@/supabase/database.types"
 import { createClient } from "@/lib/supabase/server"
 import type { PersonsRepositoryPort } from "@/src/persons/domain/person.repository"
 import type { Person, FictionPerson } from "@/src/persons/domain/person.entity"
-import type { CreatePersonData, FictionPersonEntry } from "@/src/persons/domain/person.schemas"
+import type { CreatePersonData, FictionPersonEntry, UpdatePersonData } from "@/src/persons/domain/person.schemas"
 
 export function createPersonsSupabaseAdapter(
   getSupabase: () => Promise<SupabaseClient<Database>>
@@ -21,10 +21,12 @@ export function createPersonsSupabaseAdapter(
 
     async search(query: string): Promise<Person[]> {
       const supabase = await getSupabase()
+      const escaped = query.trim().replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_")
+      if (!escaped) return []
       const { data, error } = await supabase
         .from("persons")
         .select("*")
-        .ilike("name", `%${query}%`)
+        .ilike("name", `%${escaped}%`)
         .order("name")
         .limit(20)
       if (error) throw new Error(error.message)
@@ -99,6 +101,27 @@ export function createPersonsSupabaseAdapter(
       return row as Person
     },
 
+    async update(id: string, data: UpdatePersonData): Promise<Person | null> {
+      const supabase = await getSupabase()
+      const payload: Database["public"]["Tables"]["persons"]["Update"] = {
+        name: data.name,
+        bio: data.bio ?? null,
+        birth_year: data.birth_year ?? null,
+        nationality: data.nationality ?? null,
+      }
+      if (data.photo_url !== undefined) {
+        payload.photo_url = data.photo_url
+      }
+      const { data: row, error } = await supabase
+        .from("persons")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single()
+      if (error || !row) return null
+      return row as Person
+    },
+
     async delete(id: string): Promise<boolean> {
       const supabase = await getSupabase()
       const { data, error } = await supabase
@@ -114,17 +137,50 @@ export function createPersonsSupabaseAdapter(
       const supabase = await getSupabase()
       const { data, error } = await supabase
         .from("fiction_persons")
-        .select("id, person_id, role, sort_order, persons(name)")
+        .select("id, person_id, role, sort_order, persons(name, photo_url)")
         .eq("fiction_id", fictionId)
         .order("sort_order")
       if (error) throw new Error(error.message)
-      return (data ?? []).map((row) => ({
-        id: row.id,
-        person_id: row.person_id,
-        name: (row.persons as { name: string } | null)?.name ?? "",
-        role: row.role,
-        sort_order: row.sort_order,
-      }))
+
+      const rows = data ?? []
+      const personIds = [...new Set(rows.map((r) => r.person_id).filter(Boolean))]
+      const thumbByPersonId = new Map<string, string>()
+      if (personIds.length > 0) {
+        const { data: assets } = await supabase
+          .from("asset_images")
+          .select("entity_id, url, variant")
+          .eq("entity_type", "person")
+          .eq("role", "avatar")
+          .in("variant", ["xs", "sm"])
+          .in("entity_id", personIds)
+        for (const asset of assets ?? []) {
+          if (asset.variant === "xs" && asset.entity_id && asset.url) {
+            thumbByPersonId.set(asset.entity_id, asset.url)
+          }
+        }
+        for (const asset of assets ?? []) {
+          if (
+            asset.variant === "sm" &&
+            asset.entity_id &&
+            asset.url &&
+            !thumbByPersonId.has(asset.entity_id)
+          ) {
+            thumbByPersonId.set(asset.entity_id, asset.url)
+          }
+        }
+      }
+
+      return rows.map((row) => {
+        const person = row.persons as { name: string; photo_url: string | null } | null
+        return {
+          id: row.id,
+          person_id: row.person_id,
+          name: person?.name ?? "",
+          role: row.role,
+          sort_order: row.sort_order,
+          photo_url: thumbByPersonId.get(row.person_id) ?? person?.photo_url ?? null,
+        }
+      })
     },
 
     async setForFiction(fictionId: string, entries: FictionPersonEntry[]): Promise<void> {

@@ -42,6 +42,8 @@ const stepVariants = {
 
 export interface SceneContributeWizardProps {
   initialFictions: FictionWithMedia[]
+  /** Deep link from a place page: fiction + place already picked, starts on the video step. */
+  prefill?: { fictionId: string; place: Place } | null
 }
 
 type Draft = {
@@ -81,11 +83,14 @@ function emptyDraft(): Draft {
   }
 }
 
-export function SceneContributeWizard({ initialFictions }: SceneContributeWizardProps) {
+export function SceneContributeWizard({
+  initialFictions,
+  prefill = null,
+}: SceneContributeWizardProps) {
   const t = useTranslations("Contribute.scene")
   const tVal = useTranslations("Contribute.validation")
 
-  const [step, setStep] = useState<SceneContributeFormStep>(1)
+  const [step, setStep] = useState<SceneContributeFormStep>(prefill ? 4 : 1)
   const [done, setDone] = useState<{
     variant: "pending" | "approved"
     title: string
@@ -93,7 +98,11 @@ export function SceneContributeWizard({ initialFictions }: SceneContributeWizard
     sceneHref: string
   } | null>(null)
 
-  const [draft, setDraft] = useState<Draft>(emptyDraft)
+  const [draft, setDraft] = useState<Draft>(() =>
+    prefill
+      ? { ...emptyDraft(), fictionId: prefill.fictionId, places: [prefill.place] }
+      : emptyDraft(),
+  )
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)

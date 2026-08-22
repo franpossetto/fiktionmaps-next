@@ -350,6 +350,7 @@ export async function createContributorPlaceWithImageAction(
       description: parsed.data.description,
       isLandmark: parsed.data.isLandmark,
       locationType: parsed.data.locationType ?? null,
+      relationKind: parsed.data.relationKind,
       shootEnvironment: parsed.data.shootEnvironment ?? null,
       streetViewReference: parsed.data.streetViewReference ?? null,
       status,

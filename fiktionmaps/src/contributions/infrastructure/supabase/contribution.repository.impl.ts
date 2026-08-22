@@ -2,6 +2,8 @@ import { cache } from "react"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type {
   ContributionPendingImageRow,
+  ContributionPendingFictionPersonRow,
+  ContributionPendingPlaceRelationshipRow,
   ContributionPendingScenePlaceRow,
   ContributionRow,
   Database,
@@ -35,7 +37,9 @@ import type {
   AdminContributionsListPageInput,
   AdminContributionsListPageResult,
   ContributionsRepositoryPort,
+  InsertContributionPendingFictionPersonInput,
   InsertContributionPendingImagesInput,
+  InsertContributionPendingPlaceRelationshipInput,
   InsertContributionPendingScenePlaceInput,
 } from "@/src/contributions/domain/contribution.repository"
 import type {
@@ -50,7 +54,13 @@ import {
 import {
   pendingImagesRowsToByRole,
   type ContributionPendingImage,
+  type ContributionPendingPlaceRelationship,
 } from "@/src/contributions/domain/contribution.entity"
+import { clonePlaceToFictionUseCase } from "@/src/place-relationships/application/clone-place-to-fiction.usecase"
+import { createPlaceRelationshipUseCase } from "@/src/place-relationships/application/create-place-relationship.usecase"
+import { createPlaceRelationshipsSupabaseAdapter } from "@/src/place-relationships/infrastructure/supabase/place-relationship.repository.impl"
+import { createPlacesSupabaseAdapter } from "@/src/places/infrastructure/supabase/place.repository.impl"
+import { parsePlaceRelationKind } from "@/src/places/domain/place-relation-kind"
 
 function mapRow(row: ContributionRow): Contribution {
   return {
@@ -396,6 +406,7 @@ function mapFictionFeedItem(
     fictionTitle: null,
     fictionCoverUrl: null,
     pendingImagesByRole: null,
+    proposedCredit: null,
   }
 }
 
@@ -419,6 +430,7 @@ function mapPlaceFeedItem(
     fictionTitle: null,
     fictionId: null,
     pendingImagesByRole: null,
+    proposedPlaceRelationship: null,
   }
 }
 
@@ -472,6 +484,51 @@ async function listPendingScenePlacesForContributionIds(
     map.set(row.contribution_id, list)
   }
   return map
+}
+
+async function listPendingFictionPersonsForContributionIds(
+  supabase: SupabaseClient<Database>,
+  contributionIds: string[],
+): Promise<Map<string, ContributionPendingFictionPersonRow[]>> {
+  const unique = [...new Set(contributionIds)].filter(Boolean)
+  const map = new Map<string, ContributionPendingFictionPersonRow[]>()
+  if (unique.length === 0) return map
+
+  const { data, error } = await supabase
+    .from("contribution_pending_fiction_persons")
+    .select("*")
+    .in("contribution_id", unique)
+    .order("created_at", { ascending: true })
+
+  if (error) {
+    console.error("[contributions repo] listPendingFictionPersonsForContributionIds:", error.message)
+    return map
+  }
+
+  for (const row of (data ?? []) as ContributionPendingFictionPersonRow[]) {
+    const list = map.get(row.contribution_id) ?? []
+    list.push(row)
+    map.set(row.contribution_id, list)
+  }
+  return map
+}
+
+async function personNamesByIds(
+  supabase: SupabaseClient<Database>,
+  personIds: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(personIds)].filter(Boolean)
+  if (unique.length === 0) return new Map()
+  const { data, error } = await supabase.from("persons").select("id, name").in("id", unique)
+  if (error) {
+    console.error("[contributions repo] personNamesByIds:", error.message)
+    return new Map()
+  }
+  const m = new Map<string, string>()
+  for (const row of data ?? []) {
+    m.set(row.id, row.name)
+  }
+  return m
 }
 
 function mapPendingImageRow(row: ContributionPendingImageRow): ContributionPendingImage {
@@ -720,11 +777,90 @@ async function enrichFictionFeedItem(
       ? await listPendingImagesForContributionIds(supabase, [base.id])
       : new Map<string, ContributionPendingImage[]>()
   const pendingRows = pendingMap.get(base.id) ?? []
+
+  let proposedCredit: FictionContributionFeedItem["proposedCredit"] = null
+  if (base.type === "add_credits") {
+    const pendingCredits = await listPendingFictionPersonsForContributionIds(supabase, [base.id])
+    const creditRow = (pendingCredits.get(base.id) ?? [])[0]
+    if (creditRow) {
+      const names = await personNamesByIds(supabase, [creditRow.person_id])
+      proposedCredit = {
+        personId: creditRow.person_id,
+        personName: names.get(creditRow.person_id) ?? null,
+        role: creditRow.role,
+      }
+    }
+  }
+
   return {
     ...base,
     fictionTitle: titles.get(base.entityId) ?? null,
     fictionCoverUrl: covers.get(base.entityId) ?? null,
     pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
+    proposedCredit,
+  }
+}
+
+async function listPendingPlaceRelationshipsForContributionIds(
+  supabase: SupabaseClient<Database>,
+  contributionIds: string[],
+): Promise<Map<string, ContributionPendingPlaceRelationshipRow>> {
+  const unique = [...new Set(contributionIds)].filter(Boolean)
+  const map = new Map<string, ContributionPendingPlaceRelationshipRow>()
+  if (unique.length === 0) return map
+
+  const { data, error } = await supabase
+    .from("contribution_pending_place_relationships")
+    .select("*")
+    .in("contribution_id", unique)
+
+  if (error) {
+    console.error(
+      "[contributions repo] listPendingPlaceRelationshipsForContributionIds:",
+      error.message,
+    )
+    return map
+  }
+
+  for (const row of (data ?? []) as ContributionPendingPlaceRelationshipRow[]) {
+    map.set(row.contribution_id, row)
+  }
+  return map
+}
+
+async function mapPendingPlaceRelationshipForStaff(
+  supabase: SupabaseClient<Database>,
+  row: ContributionPendingPlaceRelationshipRow,
+): Promise<ContributionPendingPlaceRelationship> {
+  const placeIds = [row.source_place_id, row.place_a_id, row.place_b_id].filter(
+    (id): id is string => Boolean(id),
+  )
+  const fictionIds = row.target_fiction_id ? [row.target_fiction_id] : []
+  const [placeMeta, fictionTitles] = await Promise.all([
+    placeMetaByIds(supabase, placeIds),
+    fictionTitlesByIds(supabase, fictionIds),
+  ])
+
+  return {
+    kind: row.kind,
+    sourcePlaceId: row.source_place_id,
+    targetFictionId: row.target_fiction_id,
+    placeName: row.place_name,
+    description: row.description,
+    relationKind: row.relation_kind,
+    shootEnvironment: row.shoot_environment,
+    relationshipName: row.relationship_name,
+    placeAId: row.place_a_id,
+    placeBId: row.place_b_id,
+    groupName: row.group_name,
+    sourcePlaceName: row.source_place_id
+      ? (placeMeta.get(row.source_place_id)?.name ?? null)
+      : null,
+    targetFictionTitle: row.target_fiction_id
+      ? (fictionTitles.get(row.target_fiction_id) ?? null)
+      : null,
+    placeAName: row.place_a_id ? (placeMeta.get(row.place_a_id)?.name ?? null) : null,
+    placeBName: row.place_b_id ? (placeMeta.get(row.place_b_id)?.name ?? null) : null,
   }
 }
 
@@ -744,6 +880,16 @@ async function enrichPlaceFeedItem(
       ? await listPendingImagesForContributionIds(supabase, [base.id])
       : new Map<string, ContributionPendingImage[]>()
   const pendingRows = pendingMap.get(base.id) ?? []
+
+  let proposedPlaceRelationship: ContributionPendingPlaceRelationship | null = null
+  if (base.type === "link_place_relationship") {
+    const pendingRel = await listPendingPlaceRelationshipsForContributionIds(supabase, [base.id])
+    const row = pendingRel.get(base.id)
+    if (row) {
+      proposedPlaceRelationship = await mapPendingPlaceRelationshipForStaff(supabase, row)
+    }
+  }
+
   return {
     ...base,
     placeName: placeMetaRow?.name ?? null,
@@ -751,6 +897,7 @@ async function enrichPlaceFeedItem(
     fictionId: fid,
     fictionTitle: fid ? (fictionTitles.get(fid) ?? null) : null,
     pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
+    proposedPlaceRelationship,
   }
 }
 
@@ -831,7 +978,7 @@ export function createContributionsSupabaseAdapter(
           { count: "exact" },
         )
         .eq("entity_type", "fiction")
-        .in("type", ["create_fiction", "add_photo"])
+        .in("type", ["create_fiction", "add_photo", "add_credits"])
 
       if (userIdFilter) q = q.eq("user_id", userIdFilter)
 
@@ -864,18 +1011,32 @@ export function createContributionsSupabaseAdapter(
         fictionCoverThumbByIds(supabase, items.map((i) => i.entityId)),
       ])
       const fictionAddPhotoIds = items.filter((i) => i.type === "add_photo").map((i) => i.id)
-      const pendingByContribution = await listPendingImagesForContributionIds(
-        supabase,
-        fictionAddPhotoIds,
+      const addCreditsIds = items.filter((i) => i.type === "add_credits").map((i) => i.id)
+      const [pendingByContribution, pendingFictionPersons] = await Promise.all([
+        listPendingImagesForContributionIds(supabase, fictionAddPhotoIds),
+        listPendingFictionPersonsForContributionIds(supabase, addCreditsIds),
+      ])
+      const proposedPersonIds = [...pendingFictionPersons.values()].flatMap((rows) =>
+        rows.map((r) => r.person_id),
       )
+      const proposedPersonNames = await personNamesByIds(supabase, proposedPersonIds)
 
       const withMedia = items.map((i) => {
         const pendingRows = pendingByContribution.get(i.id) ?? []
+        const creditRow =
+          i.type === "add_credits" ? (pendingFictionPersons.get(i.id) ?? [])[0] : undefined
         return {
           ...i,
           fictionTitle: titles.get(i.entityId) ?? null,
           fictionCoverUrl: covers.get(i.entityId) ?? null,
           pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
+          proposedCredit: creditRow
+            ? {
+                personId: creditRow.person_id,
+                personName: proposedPersonNames.get(creditRow.person_id) ?? null,
+                role: creditRow.role,
+              }
+            : null,
         }
       })
 
@@ -908,13 +1069,21 @@ export function createContributionsSupabaseAdapter(
         )
 
       if (kind === "fiction") {
-        q = q.eq("entity_type", "fiction").in("type", ["create_fiction", "add_photo"])
+        q = q.eq("entity_type", "fiction").in("type", ["create_fiction", "add_photo", "add_credits"])
       } else if (kind === "place") {
-        q = q.eq("entity_type", "place").in("type", ["create_place", "add_photo"])
+        q = q
+          .eq("entity_type", "place")
+          .in("type", ["create_place", "add_photo", "link_place_relationship"])
       } else if (kind === "scene") {
         q = q.eq("entity_type", "scene").in("type", ["add_scene", "add_place_to_scene"])
       } else {
-        q = q.in("type", ["create_fiction", "create_place", "add_photo"])
+        q = q.in("type", [
+          "create_fiction",
+          "create_place",
+          "add_photo",
+          "add_credits",
+          "link_place_relationship",
+        ])
       }
 
       if (userIdFilter) q = q.eq("user_id", userIdFilter)
@@ -943,7 +1112,12 @@ export function createContributionsSupabaseAdapter(
       const sceneItems: SceneContributionFeedItem[] = []
 
       for (const row of (data ?? []) as Row[]) {
-        if (row.entity_type === "place" && (row.type === "create_place" || row.type === "add_photo")) {
+        if (
+          row.entity_type === "place" &&
+          (row.type === "create_place" ||
+            row.type === "add_photo" ||
+            row.type === "link_place_relationship")
+        ) {
           const item = mapPlaceFeedItem(row, row.profiles)
           if (item) placeItems.push(item)
         } else if (
@@ -954,7 +1128,7 @@ export function createContributionsSupabaseAdapter(
           if (item) sceneItems.push(item)
         } else if (
           row.entity_type === "fiction" &&
-          (row.type === "create_fiction" || row.type === "add_photo")
+          (row.type === "create_fiction" || row.type === "add_photo" || row.type === "add_credits")
         ) {
           const item = mapFictionFeedItem(row, row.profiles)
           if (item) fictionItems.push(item)
@@ -965,16 +1139,31 @@ export function createContributionsSupabaseAdapter(
       const pendingScenePlaces = await listPendingScenePlacesForContributionIds(supabase, addPlaceToSceneIds)
       const proposedPlaceIds = [...pendingScenePlaces.values()].flatMap((rows) => rows.map((r) => r.place_id))
 
-      const [fictionTitles, fictionCovers, placeMeta, placeAvatars, sceneMeta, proposedPlaceMeta, proposedPlaceAvatars] =
-        await Promise.all([
-          fictionTitlesByIds(supabase, fictionItems.map((i) => i.entityId)),
-          fictionCoverThumbByIds(supabase, fictionItems.map((i) => i.entityId)),
-          placeMetaByIds(supabase, placeItems.map((i) => i.entityId)),
-          placeAvatarThumbByIds(supabase, placeItems.map((i) => i.entityId)),
-          sceneMetaByIds(supabase, sceneItems.map((i) => i.entityId)),
-          placeMetaByIds(supabase, proposedPlaceIds),
-          placeAvatarThumbByIds(supabase, proposedPlaceIds),
-        ])
+      const addCreditsIds = fictionItems.filter((i) => i.type === "add_credits").map((i) => i.id)
+      const pendingFictionPersons = await listPendingFictionPersonsForContributionIds(supabase, addCreditsIds)
+      const proposedPersonIds = [...pendingFictionPersons.values()].flatMap((rows) =>
+        rows.map((r) => r.person_id),
+      )
+
+      const [
+        fictionTitles,
+        fictionCovers,
+        placeMeta,
+        placeAvatars,
+        sceneMeta,
+        proposedPlaceMeta,
+        proposedPlaceAvatars,
+        proposedPersonNames,
+      ] = await Promise.all([
+        fictionTitlesByIds(supabase, fictionItems.map((i) => i.entityId)),
+        fictionCoverThumbByIds(supabase, fictionItems.map((i) => i.entityId)),
+        placeMetaByIds(supabase, placeItems.map((i) => i.entityId)),
+        placeAvatarThumbByIds(supabase, placeItems.map((i) => i.entityId)),
+        sceneMetaByIds(supabase, sceneItems.map((i) => i.entityId)),
+        placeMetaByIds(supabase, proposedPlaceIds),
+        placeAvatarThumbByIds(supabase, proposedPlaceIds),
+        personNamesByIds(supabase, proposedPersonIds),
+      ])
 
       const fictionIdsForPlaces = [...new Set(placeItems.map((i) => placeMeta.get(i.entityId)?.fictionId).filter(Boolean) as string[])]
       const fictionIdsForScenes = [...new Set(sceneItems.map((i) => sceneMeta.get(i.entityId)?.fictionId).filter(Boolean) as string[])]
@@ -992,27 +1181,49 @@ export function createContributionsSupabaseAdapter(
 
       const enrichedFiction = fictionItems.map((i) => {
         const pendingRows = pendingByContribution.get(i.id) ?? []
+        const creditRow =
+          i.type === "add_credits" ? (pendingFictionPersons.get(i.id) ?? [])[0] : undefined
         return {
           ...i,
           fictionTitle: fictionTitles.get(i.entityId) ?? null,
           fictionCoverUrl: fictionCovers.get(i.entityId) ?? null,
           pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
+          proposedCredit: creditRow
+            ? {
+                personId: creditRow.person_id,
+                personName: proposedPersonNames.get(creditRow.person_id) ?? null,
+                role: creditRow.role,
+              }
+            : null,
         }
       })
 
-      const enrichedPlace = placeItems.map((i) => {
-        const meta = placeMeta.get(i.entityId)
-        const fid = meta?.fictionId ?? null
-        const pendingRows = pendingByContribution.get(i.id) ?? []
-        return {
-          ...i,
-          placeName: meta?.name ?? null,
-          placeAvatarUrl: placeAvatars.get(i.entityId) ?? null,
-          fictionId: fid,
-          fictionTitle: fid ? (parentFictionTitles.get(fid) ?? null) : null,
-          pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
-        }
-      })
+      const enrichedPlace = await Promise.all(
+        placeItems.map(async (i) => {
+          const meta = placeMeta.get(i.entityId)
+          const fid = meta?.fictionId ?? null
+          const pendingRows = pendingByContribution.get(i.id) ?? []
+          let proposedPlaceRelationship: ContributionPendingPlaceRelationship | null = null
+          if (i.type === "link_place_relationship") {
+            const pendingRel = await listPendingPlaceRelationshipsForContributionIds(supabase, [
+              i.id,
+            ])
+            const row = pendingRel.get(i.id)
+            if (row) {
+              proposedPlaceRelationship = await mapPendingPlaceRelationshipForStaff(supabase, row)
+            }
+          }
+          return {
+            ...i,
+            placeName: meta?.name ?? null,
+            placeAvatarUrl: placeAvatars.get(i.entityId) ?? null,
+            fictionId: fid,
+            fictionTitle: fid ? (parentFictionTitles.get(fid) ?? null) : null,
+            pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
+            proposedPlaceRelationship,
+          }
+        }),
+      )
 
       const enrichedScene = sceneItems.map((i) => {
         const meta = sceneMeta.get(i.entityId)
@@ -1108,6 +1319,16 @@ export function createContributionsSupabaseAdapter(
           focus_y: focusY,
         })
       }
+      if (input.paths.xl?.trim()) {
+        rows.push({
+          contribution_id: input.contributionId,
+          role: input.role,
+          variant: "xl",
+          storage_path: input.paths.xl,
+          focus_x: focusX,
+          focus_y: focusY,
+        })
+      }
       if (rows.length === 0) return false
 
       const { error } = await supabase.from("contribution_pending_images").insert(rows)
@@ -1133,6 +1354,58 @@ export function createContributionsSupabaseAdapter(
       return true
     },
 
+    async insertPendingFictionPerson(
+      input: InsertContributionPendingFictionPersonInput,
+    ): Promise<boolean> {
+      const supabase = await getSupabase()
+      const { error } = await supabase.from("contribution_pending_fiction_persons").insert({
+        contribution_id: input.contributionId,
+        person_id: input.personId,
+        role: input.role,
+        sort_order: input.sortOrder ?? 0,
+      })
+      if (error) {
+        console.error("[contributions repo] insertPendingFictionPerson:", error.message)
+        return false
+      }
+      return true
+    },
+
+    async insertPendingPlaceRelationship(
+      input: InsertContributionPendingPlaceRelationshipInput,
+    ): Promise<boolean> {
+      const supabase = await getSupabase()
+      const row =
+        input.kind === "shared_clone"
+          ? {
+              contribution_id: input.contributionId,
+              kind: "shared_clone" as const,
+              source_place_id: input.sourcePlaceId,
+              target_fiction_id: input.targetFictionId,
+              place_name: input.placeName,
+              description: input.description,
+              relation_kind: parsePlaceRelationKind(input.relationKind),
+              shoot_environment: input.shootEnvironment ?? null,
+              relationship_name: input.relationshipName ?? input.placeName,
+            }
+          : {
+              contribution_id: input.contributionId,
+              kind: "composite" as const,
+              place_a_id: input.placeAId,
+              place_b_id: input.placeBId,
+              group_name: input.groupName,
+            }
+
+      const { error } = await supabase
+        .from("contribution_pending_place_relationships")
+        .insert(row)
+      if (error) {
+        console.error("[contributions repo] insertPendingPlaceRelationship:", error.message)
+        return false
+      }
+      return true
+    },
+
     countPendingAddPlaceToScene: cache(async (sceneId: string, placeId: string): Promise<number> => {
       const supabase = await getSupabase()
       const { data, error } = await supabase
@@ -1149,6 +1422,78 @@ export function createContributionsSupabaseAdapter(
         return 0
       }
       return data?.length ?? 0
+    }),
+
+    countPendingAddCredits: cache(
+      async (fictionId: string, personId: string, role: string): Promise<number> => {
+        const supabase = await getSupabase()
+        const { data, error } = await supabase
+          .from("contributions")
+          .select("id, contribution_pending_fiction_persons!inner(person_id, role)")
+          .eq("entity_type", "fiction")
+          .eq("entity_id", fictionId)
+          .eq("type", "add_credits")
+          .eq("status", "pending")
+          .eq("contribution_pending_fiction_persons.person_id", personId)
+          .eq("contribution_pending_fiction_persons.role", role)
+
+        if (error) {
+          console.error("[contributions repo] countPendingAddCredits:", error.message)
+          return 0
+        }
+        return data?.length ?? 0
+      },
+    ),
+
+    countPendingSharedClone: cache(
+      async (sourcePlaceId: string, targetFictionId: string): Promise<number> => {
+        const supabase = await getSupabase()
+        const { data, error } = await supabase
+          .from("contributions")
+          .select(
+            "id, contribution_pending_place_relationships!inner(source_place_id, target_fiction_id, kind)",
+          )
+          .eq("type", "link_place_relationship")
+          .eq("status", "pending")
+          .eq("contribution_pending_place_relationships.kind", "shared_clone")
+          .eq("contribution_pending_place_relationships.source_place_id", sourcePlaceId)
+          .eq("contribution_pending_place_relationships.target_fiction_id", targetFictionId)
+
+        if (error) {
+          console.error("[contributions repo] countPendingSharedClone:", error.message)
+          return 0
+        }
+        return data?.length ?? 0
+      },
+    ),
+
+    countPendingComposite: cache(async (placeAId: string, placeBId: string): Promise<number> => {
+      const supabase = await getSupabase()
+      const { data, error } = await supabase
+        .from("contributions")
+        .select(
+          "id, contribution_pending_place_relationships!inner(place_a_id, place_b_id, kind)",
+        )
+        .eq("type", "link_place_relationship")
+        .eq("status", "pending")
+        .eq("contribution_pending_place_relationships.kind", "composite")
+
+      if (error) {
+        console.error("[contributions repo] countPendingComposite:", error.message)
+        return 0
+      }
+
+      return (data ?? []).filter((row) => {
+        const pending = Array.isArray(row.contribution_pending_place_relationships)
+          ? row.contribution_pending_place_relationships[0]
+          : row.contribution_pending_place_relationships
+        if (!pending) return false
+        const a = pending.place_a_id
+        const b = pending.place_b_id
+        return (
+          (a === placeAId && b === placeBId) || (a === placeBId && b === placeAId)
+        )
+      }).length
     }),
 
     async listPendingImagesByContributionId(contributionId: string): Promise<ContributionPendingImage[]> {
@@ -1488,6 +1833,34 @@ export function createContributionsSupabaseAdapter(
         }
       }
 
+      if (row.type === "add_credits") {
+        const { error: pendingDelErr } = await supabase
+          .from("contribution_pending_fiction_persons")
+          .delete()
+          .eq("contribution_id", id)
+        if (pendingDelErr) {
+          console.error(
+            "[contributions repo] deletePendingOrRejected fiction persons:",
+            pendingDelErr.message,
+          )
+          return null
+        }
+      }
+
+      if (row.type === "link_place_relationship") {
+        const { error: pendingDelErr } = await supabase
+          .from("contribution_pending_place_relationships")
+          .delete()
+          .eq("contribution_id", id)
+        if (pendingDelErr) {
+          console.error(
+            "[contributions repo] deletePendingOrRejected place relationships:",
+            pendingDelErr.message,
+          )
+          return null
+        }
+      }
+
       const { error: deleteErr } = await supabase.from("contributions").delete().eq("id", id)
       if (deleteErr) {
         console.error("[contributions repo] deletePendingOrRejected:", deleteErr.message)
@@ -1743,7 +2116,9 @@ export function createContributionsSupabaseAdapter(
         type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
         const row = data as Row
         if (row.entity_type !== "fiction") return null
-        if (row.type !== "create_fiction" && row.type !== "add_photo") return null
+        if (row.type !== "create_fiction" && row.type !== "add_photo" && row.type !== "add_credits") {
+          return null
+        }
         const base = mapFictionFeedItem(row, row.profiles)
         if (!base) return null
         return enrichFictionFeedItem(supabase, base)
@@ -1778,7 +2153,13 @@ export function createContributionsSupabaseAdapter(
         type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
         const row = data as Row
         if (row.entity_type !== "place") return null
-        if (row.type !== "create_place" && row.type !== "add_photo") return null
+        if (
+          row.type !== "create_place" &&
+          row.type !== "add_photo" &&
+          row.type !== "link_place_relationship"
+        ) {
+          return null
+        }
         const base = mapPlaceFeedItem(row, row.profiles)
         if (!base) return null
         return enrichPlaceFeedItem(supabase, base)
@@ -1815,14 +2196,19 @@ export function createContributionsSupabaseAdapter(
 
         if (
           row.entity_type === "fiction" &&
-          (row.type === "create_fiction" || row.type === "add_photo")
+          (row.type === "create_fiction" || row.type === "add_photo" || row.type === "add_credits")
         ) {
           const base = mapFictionFeedItem(row, row.profiles)
           if (!base) return null
           return enrichFictionFeedItem(supabase, base)
         }
 
-        if (row.entity_type === "place" && (row.type === "create_place" || row.type === "add_photo")) {
+        if (
+          row.entity_type === "place" &&
+          (row.type === "create_place" ||
+            row.type === "add_photo" ||
+            row.type === "link_place_relationship")
+        ) {
           const base = mapPlaceFeedItem(row, row.profiles)
           if (!base) return null
           return enrichPlaceFeedItem(supabase, base)
@@ -1922,6 +2308,7 @@ export function createContributionsSupabaseAdapter(
               xs: avatar.xs,
               sm: avatar.sm,
               lg: avatar.lg,
+              xl: avatar.xl,
             },
             { x: focusRow?.focusX ?? 50, y: focusRow?.focusY ?? 50 },
           )
@@ -1949,6 +2336,7 @@ export function createContributionsSupabaseAdapter(
                 xs: cover!.xs,
                 sm: cover!.sm!,
                 lg: cover!.lg!,
+                xl: cover!.xl,
               },
               { x: focusRow?.focusX ?? 50, y: focusRow?.focusY ?? 50 },
             )
@@ -1965,6 +2353,7 @@ export function createContributionsSupabaseAdapter(
               "banner",
               {
                 lg: banner!.lg!,
+                xl: banner!.xl,
               },
               { x: focusRow?.focusX ?? 50, y: focusRow?.focusY ?? 50 },
             )
@@ -2023,6 +2412,103 @@ export function createContributionsSupabaseAdapter(
           sortOrder += 1
         }
         // Keep staging rows after approve so staff detail/feed can still show proposed places.
+      }
+
+      if (contributionType === "add_credits" && entityType === "fiction") {
+        const pendingMap = await listPendingFictionPersonsForContributionIds(supabase, [input.id])
+        const pendingRows = pendingMap.get(input.id) ?? []
+        if (pendingRows.length === 0) {
+          console.error("[contributions repo] approve add_credits missing pending person")
+          return false
+        }
+
+        for (const pending of pendingRows) {
+          const { error: linkErr } = await supabase.from("fiction_persons").upsert(
+            {
+              fiction_id: entityId,
+              person_id: pending.person_id,
+              role: pending.role,
+              sort_order: pending.sort_order,
+            },
+            { onConflict: "fiction_id,person_id,role" },
+          )
+          if (linkErr) {
+            console.error("[contributions repo] approve add_credits link:", linkErr.message)
+            return false
+          }
+        }
+        // Keep staging rows after approve so staff detail/feed can still show proposed credit.
+      }
+
+      if (contributionType === "link_place_relationship" && entityType === "place") {
+        const pendingMap = await listPendingPlaceRelationshipsForContributionIds(supabase, [
+          input.id,
+        ])
+        const staging = pendingMap.get(input.id)
+        if (!staging) {
+          console.error(
+            "[contributions repo] approve link_place_relationship missing pending payload",
+          )
+          return false
+        }
+
+        const places = createPlacesSupabaseAdapter(async () => supabase)
+        const relationships = createPlaceRelationshipsSupabaseAdapter(async () => supabase)
+
+        try {
+          if (staging.kind === "shared_clone") {
+            if (
+              !staging.source_place_id ||
+              !staging.target_fiction_id ||
+              !staging.place_name ||
+              !staging.description
+            ) {
+              console.error(
+                "[contributions repo] approve link_place_relationship incomplete shared_clone",
+              )
+              return false
+            }
+            await clonePlaceToFictionUseCase(
+              {
+                sourcePlaceId: staging.source_place_id,
+                targetFictionId: staging.target_fiction_id,
+                placeName: staging.place_name,
+                description: staging.description,
+                relationKind: parsePlaceRelationKind(staging.relation_kind),
+                shootEnvironment: staging.shoot_environment,
+                relationshipName: staging.relationship_name ?? staging.place_name,
+              },
+              {
+                places,
+                relationships,
+                status: "approved",
+                createdBy: authorId,
+              },
+            )
+          } else {
+            if (!staging.place_a_id || !staging.place_b_id || !staging.group_name) {
+              console.error(
+                "[contributions repo] approve link_place_relationship incomplete composite",
+              )
+              return false
+            }
+            await createPlaceRelationshipUseCase(
+              {
+                type: "composite",
+                name: staging.group_name,
+                placeIds: [staging.place_a_id, staging.place_b_id],
+              },
+              { places, relationships },
+            )
+          }
+        } catch (e) {
+          console.error(
+            "[contributions repo] approve link_place_relationship apply:",
+            e instanceof Error ? e.message : e,
+          )
+          return false
+        }
+        // Keep staging rows after approve for staff detail/feed.
       }
 
       const { error: contribErr } = await supabase
@@ -2140,6 +2626,36 @@ export function createContributionsSupabaseAdapter(
         if (pendingDelErr) {
           console.error(
             "[contributions repo] reject add_place_to_scene delete pending:",
+            pendingDelErr.message,
+          )
+          return false
+        }
+      }
+
+      if (contributionType === "add_credits") {
+        const { error: pendingDelErr } = await supabase
+          .from("contribution_pending_fiction_persons")
+          .delete()
+          .eq("contribution_id", input.id)
+
+        if (pendingDelErr) {
+          console.error(
+            "[contributions repo] reject add_credits delete pending:",
+            pendingDelErr.message,
+          )
+          return false
+        }
+      }
+
+      if (contributionType === "link_place_relationship") {
+        const { error: pendingDelErr } = await supabase
+          .from("contribution_pending_place_relationships")
+          .delete()
+          .eq("contribution_id", input.id)
+
+        if (pendingDelErr) {
+          console.error(
+            "[contributions repo] reject link_place_relationship delete pending:",
             pendingDelErr.message,
           )
           return false

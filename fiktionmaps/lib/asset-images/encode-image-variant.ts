@@ -13,6 +13,11 @@ export type EncodeImageVariantOptions = {
   quality?: number
   /** Override default AVIF effort (ignored for webp). */
   effort?: number
+  /**
+   * Max width override. `null` = no resize (keep source pixels).
+   * Omit to use VARIANT_SIZES[variant].
+   */
+  maxWidth?: number | null
 }
 
 export type EncodedImageVariant = {
@@ -22,6 +27,8 @@ export type EncodedImageVariant = {
   width: number
   height: number
   quality: number
+  /** AVIF effort used; null for WebP. */
+  effort: number | null
 }
 
 /**
@@ -33,19 +40,26 @@ export async function encodeImageVariant(
   codec: ImageCodec,
   options?: EncodeImageVariantOptions,
 ): Promise<EncodedImageVariant> {
-  const width = VARIANT_SIZES[variant]
-  const pipeline = sharp(buffer).resize(width, null, { withoutEnlargement: true })
+  const maxWidth =
+    options && "maxWidth" in options ? options.maxWidth : VARIANT_SIZES[variant]
+
+  let pipeline = sharp(buffer)
+  if (maxWidth != null) {
+    pipeline = pipeline.resize(maxWidth, null, { withoutEnlargement: true })
+  }
 
   const quality =
     options?.quality ??
     (codec === "webp" ? VARIANT_WEBP_QUALITY[variant] : VARIANT_AVIF_QUALITY[variant])
+
+  const effort = codec === "avif" ? (options?.effort ?? VARIANT_AVIF_EFFORT) : null
 
   const encoded =
     codec === "webp"
       ? pipeline.webp({ quality })
       : pipeline.avif({
           quality,
-          effort: options?.effort ?? VARIANT_AVIF_EFFORT,
+          effort: effort ?? VARIANT_AVIF_EFFORT,
         })
 
   const { data, info } = await encoded.toBuffer({ resolveWithObject: true })
@@ -57,5 +71,6 @@ export async function encodeImageVariant(
     width: info.width,
     height: info.height,
     quality,
+    effort,
   }
 }

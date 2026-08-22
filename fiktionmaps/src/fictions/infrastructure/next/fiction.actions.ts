@@ -43,7 +43,10 @@ import type { NavSearchScope } from "@/src/fictions/domain/nav-search-scope"
 import { resolvePlaceForFictionPathCached } from "@/src/places/infrastructure/next/place.queries"
 import { parseImageFocusFromFormData } from "@/lib/asset-images/image-focus"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
-import { THUMB_UPLOAD_VARIANTS } from "@/lib/asset-images/variant-sizes"
+import {
+  BANNER_UPLOAD_VARIANTS,
+  THUMB_UPLOAD_VARIANTS,
+} from "@/lib/asset-images/variant-sizes"
 import {
   getFictionByIdCached,
   getFictionBySlugCached,
@@ -151,6 +154,7 @@ export async function linkFictionPrimaryCreditAction(
     updateTag("fictions")
     return { success: true }
   } catch (e) {
+    console.error("[linkFictionPrimaryCreditAction]", e)
     return { success: false, error: e instanceof Error ? e.message : "Failed to link credit" }
   }
 }
@@ -251,7 +255,7 @@ async function createFictionWithImagesFromParsed(
         entityType: "fiction",
         entityId: fiction.id,
         role: "banner",
-        variants: ["lg"],
+        variants: BANNER_UPLOAD_VARIANTS,
         file: bannerFile,
         replace: true,
         focus: parseImageFocusFromFormData(formData, "banner"),
@@ -297,7 +301,7 @@ export async function uploadFictionImageAction(
   const validationError = validateImageFile(file)
   if (validationError) return { success: false, error: validationError }
 
-  const variants = role === "cover" ? THUMB_UPLOAD_VARIANTS : (["lg"] as const)
+  const variants = role === "cover" ? THUMB_UPLOAD_VARIANTS : BANNER_UPLOAD_VARIANTS
   const result = await uploadEntityImage({
     entityType: "fiction",
     entityId: fictionId,
@@ -319,10 +323,10 @@ export async function uploadFictionImageAction(
     return {
       success: true,
       coverImage: result.urls.sm,
-      coverImageLarge: result.urls.lg,
+      coverImageLarge: result.urls.xl ?? result.urls.lg,
     }
   }
-  return { success: true, bannerImage: result.urls.lg }
+  return { success: true, bannerImage: result.urls.xl ?? result.urls.lg }
 }
 
 export async function updateFictionAction(id: string, formData: FormData): Promise<UpdateFictionResult> {

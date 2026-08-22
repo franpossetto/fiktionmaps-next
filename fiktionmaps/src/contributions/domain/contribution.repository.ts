@@ -28,7 +28,7 @@ import type {
 export type InsertContributionPendingImagesInput = {
   contributionId: string
   role: ContributionPendingImageRole
-  paths: { xs?: string; sm?: string; lg?: string }
+  paths: { xs?: string; sm?: string; lg?: string; xl?: string }
   focus?: { x: number; y: number }
 }
 
@@ -48,6 +48,40 @@ export type ContributionPendingScenePlace = {
   startSecond: number | null
   endSecond: number | null
 }
+
+export type InsertContributionPendingFictionPersonInput = {
+  contributionId: string
+  personId: string
+  role: string
+  sortOrder?: number
+}
+
+export type ContributionPendingFictionPerson = {
+  contributionId: string
+  personId: string
+  role: string
+  sortOrder: number
+}
+
+export type InsertContributionPendingPlaceRelationshipInput =
+  | {
+      contributionId: string
+      kind: "shared_clone"
+      sourcePlaceId: string
+      targetFictionId: string
+      placeName: string
+      description: string
+      relationKind?: string | null
+      shootEnvironment?: "interior" | "exterior" | "interior_exterior" | null
+      relationshipName?: string | null
+    }
+  | {
+      contributionId: string
+      kind: "composite"
+      placeAId: string
+      placeBId: string
+      groupName: string
+    }
 
 export type AdminContributionsListPageInput = {
   statusTab: "pending" | "rejected" | "approved"
@@ -78,6 +112,10 @@ export interface ContributionsRepositoryPort {
   create(input: CreateContributionInput): Promise<{ contributionId: string } | null>
   insertPendingContributionImages(input: InsertContributionPendingImagesInput): Promise<boolean>
   insertPendingScenePlace(input: InsertContributionPendingScenePlaceInput): Promise<boolean>
+  insertPendingFictionPerson(input: InsertContributionPendingFictionPersonInput): Promise<boolean>
+  insertPendingPlaceRelationship(
+    input: InsertContributionPendingPlaceRelationshipInput,
+  ): Promise<boolean>
   countPendingAddPhotoByFiction(fictionId: string): Promise<number>
   countPendingAddPhotoByFictionAndRole(
     fictionId: string,
@@ -99,6 +137,12 @@ export interface ContributionsRepositoryPort {
   countPendingAddPhotoByPlace(placeId: string): Promise<number>
   /** Pending add_place_to_scene rows for the same scene + place pair. */
   countPendingAddPlaceToScene(sceneId: string, placeId: string): Promise<number>
+  /** Pending add_credits rows for the same fiction + person + role. */
+  countPendingAddCredits(fictionId: string, personId: string, role: string): Promise<number>
+  /** Pending link_place_relationship for the same shared clone source+target. */
+  countPendingSharedClone(sourcePlaceId: string, targetFictionId: string): Promise<number>
+  /** Pending link_place_relationship composite for the same unordered place pair. */
+  countPendingComposite(placeAId: string, placeBId: string): Promise<number>
   getById(id: string): Promise<Contribution | null>
   getByUser(userId: string): Promise<Contribution[]>
   /** Contributions for the profile page with entity / parent labels resolved. */

@@ -2,12 +2,17 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "@/i18n/navigation"
-import { Users, Plus, MoreVertical, Trash2, Search, Loader2 } from "lucide-react"
+import { Users, Plus, MoreVertical, Trash2, Search, Loader2, Pencil } from "lucide-react"
 import type { Person } from "@/src/persons/domain/person.entity"
 import { FICTION_PERSON_ROLES } from "@/src/persons/domain/person.entity"
 import { Button } from "@/components/ui/button"
 import { FormField } from "./form-field"
-import { createPersonAction, deletePersonAction } from "@/src/persons/infrastructure/next/person.actions"
+import {
+  createPersonAction,
+  deletePersonAction,
+  updatePersonAction,
+  uploadPersonImageAction,
+} from "@/src/persons/infrastructure/next/person.actions"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -26,11 +31,14 @@ import {
 import { cn } from "@/lib/utils"
 
 type ViewMode = "cards" | "table"
+type WorkflowStep = "list" | "create" | "edit"
 
 interface PersonsTabProps {
   initialPersons?: Person[]
   viewMode?: ViewMode
 }
+
+const emptyForm = { name: "", bio: "", nationality: "", birth_year: "" }
 
 const inputClass = cn(
   "w-full rounded-lg border border-border bg-card px-4 py-2 text-foreground placeholder:text-muted-foreground outline-none transition-all",
@@ -40,9 +48,12 @@ const inputClass = cn(
 export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabProps) {
   const router = useRouter()
   const [persons, setPersons] = useState<Person[]>(initialPersons ?? [])
-  const [showForm, setShowForm] = useState(false)
+  const [workflowStep, setWorkflowStep] = useState<WorkflowStep>("list")
+  const [editingPerson, setEditingPerson] = useState<Person | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
-  const [formData, setFormData] = useState({ name: "", bio: "", nationality: "", birth_year: "" })
+  const [formData, setFormData] = useState(emptyForm)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -54,17 +65,43 @@ export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabPro
     setPersons(initialPersons ?? [])
   }, [initialPersons])
 
-  const resetForm = () => setFormData({ name: "", bio: "", nationality: "", birth_year: "" })
+  useEffect(() => {
+    if (!photoFile) return
+    const url = URL.createObjectURL(photoFile)
+    setPhotoPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [photoFile])
 
-  const openForm = () => {
-    resetForm()
+  const openCreateForm = () => {
+    setEditingPerson(null)
+    setFormData(emptyForm)
+    setPhotoFile(null)
+    setPhotoPreview(null)
     setErrors({})
     setSubmitError(null)
-    setShowForm(true)
+    setWorkflowStep("create")
+  }
+
+  const openEditForm = (person: Person) => {
+    setEditingPerson(person)
+    setFormData({
+      name: person.name,
+      bio: person.bio ?? "",
+      nationality: person.nationality ?? "",
+      birth_year: person.birth_year != null ? String(person.birth_year) : "",
+    })
+    setPhotoFile(null)
+    setPhotoPreview(person.photo_url)
+    setErrors({})
+    setSubmitError(null)
+    setWorkflowStep("edit")
   }
 
   const closeForm = () => {
-    setShowForm(false)
+    setWorkflowStep("list")
+    setEditingPerson(null)
+    setPhotoFile(null)
+    setPhotoPreview(null)
     setErrors({})
     setSubmitError(null)
   }
@@ -81,25 +118,77 @@ export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabPro
     return Object.keys(newErrors).length === 0
   }
 
+  const personPayload = () => ({
+    name: formData.name.trim(),
+    bio: formData.bio.trim() || null,
+    nationality: formData.nationality.trim() || null,
+    birth_year: formData.birth_year ? parseInt(formData.birth_year, 10) : null,
+  })
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateForm()) return
     setSubmitting(true)
     setSubmitError(null)
-    const result = await createPersonAction({
-      name: formData.name.trim(),
-      bio: formData.bio.trim() || undefined,
-      nationality: formData.nationality.trim() || undefined,
-      birth_year: formData.birth_year ? parseInt(formData.birth_year, 10) : null,
-    })
-    setSubmitting(false)
-    if (result.success) {
+    const payload = personPayload()
+
+    if (workflowStep === "edit" && editingPerson) {
+      const result = await updatePersonAction(editingPerson.id, payload)
+      if (!result.success) {
+        setSubmitting(false)
+        setSubmitError(result.error)
+        return
+      }
+      let nextPerson = result.person
+      if (photoFile) {
+        const fd = new FormData()
+        fd.set("file", photoFile)
+        const upload = await uploadPersonImageAction(editingPerson.id, fd)
+        if (!upload.success) {
+          setSubmitting(false)
+          setSubmitError(upload.error)
+          return
+        }
+        nextPerson = { ...nextPerson, photo_url: upload.photoUrl }
+      }
+      setSubmitting(false)
       closeForm()
-      setPersons((prev) => [...prev, result.person].sort((a, b) => a.name.localeCompare(b.name)))
+      setPersons((prev) =>
+        prev
+          .map((p) => (p.id === nextPerson.id ? nextPerson : p))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      )
       router.refresh()
-    } else {
-      setSubmitError(result.error)
+      return
     }
+
+    const result = await createPersonAction({
+      name: payload.name,
+      bio: payload.bio ?? undefined,
+      nationality: payload.nationality ?? undefined,
+      birth_year: payload.birth_year,
+    })
+    if (!result.success) {
+      setSubmitting(false)
+      setSubmitError(result.error)
+      return
+    }
+    let nextPerson = result.person
+    if (photoFile) {
+      const fd = new FormData()
+      fd.set("file", photoFile)
+      const upload = await uploadPersonImageAction(result.person.id, fd)
+      if (!upload.success) {
+        setSubmitting(false)
+        setSubmitError(upload.error)
+        return
+      }
+      nextPerson = { ...nextPerson, photo_url: upload.photoUrl }
+    }
+    setSubmitting(false)
+    closeForm()
+    setPersons((prev) => [...prev, nextPerson].sort((a, b) => a.name.localeCompare(b.name)))
+    router.refresh()
   }
 
   const openDeleteModal = (e: React.MouseEvent, person: Person) => {
@@ -132,7 +221,8 @@ export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabPro
     (p.nationality ?? "").toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  if (showForm) {
+  if (workflowStep === "create" || workflowStep === "edit") {
+    const isEdit = workflowStep === "edit"
     return (
       <>
         <div className="fixed inset-0 bottom-[70px] md:bottom-0 md:left-[60px] z-[3000] bg-background flex flex-col overflow-y-auto">
@@ -144,13 +234,17 @@ export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabPro
             >
               ← Back to People
             </button>
-            <h2 className="text-2xl font-bold text-foreground">Create Person</h2>
+            <h2 className="text-2xl font-bold text-foreground">
+              {isEdit ? "Edit Person" : "Create Person"}
+            </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Add a real-world person to the catalog. You can link them to fictions with a role from the fiction edit view.
+              {isEdit
+                ? "Update catalog details for this person. Fiction roles are managed from the fiction edit view."
+                : "Add a real-world person to the catalog. You can link them to fictions with a role from the fiction edit view."}
             </p>
           </div>
 
-          <form id="person-create-form" onSubmit={handleSubmit} className="flex-1 px-4 sm:px-6 pb-28 space-y-6 max-w-2xl">
+          <form id="person-form" onSubmit={handleSubmit} className="flex-1 px-4 sm:px-6 pb-28 space-y-6 max-w-2xl">
             {submitError && (
               <p className="text-sm text-red-500 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-2">
                 {submitError}
@@ -166,6 +260,32 @@ export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabPro
                 className={inputClass}
                 autoFocus
               />
+            </FormField>
+
+            <FormField label="Photo">
+              <div className="flex items-center gap-4">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border border-border bg-muted/40">
+                  {photoPreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={photoPreview} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                      No photo
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground"
+                    onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Uploads xs / sm / lg / xl variants. Leave empty to keep the current photo.
+                  </p>
+                </div>
+              </div>
             </FormField>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -224,7 +344,7 @@ export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabPro
             </Button>
             <Button
               type="submit"
-              form="person-create-form"
+              form="person-form"
               variant="cta"
               disabled={submitting}
               className="gap-2 rounded-xl px-6"
@@ -232,8 +352,10 @@ export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabPro
               {submitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating…
+                  {isEdit ? "Saving…" : "Creating…"}
                 </>
+              ) : isEdit ? (
+                "Save Changes"
               ) : (
                 "Create Person"
               )}
@@ -257,7 +379,7 @@ export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabPro
               Authors, directors, actors, and other people linked to fictions.
             </p>
           </div>
-          <Button onClick={openForm} variant="cta" className="gap-2">
+          <Button onClick={openCreateForm} variant="cta" className="gap-2">
             <Plus className="h-4 w-4" />
             Create Person
           </Button>
@@ -285,17 +407,35 @@ export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabPro
                 className="group rounded-xl border border-border bg-card/30 hover:border-foreground/30 hover:bg-card/50 transition-all p-4 space-y-2"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-foreground truncate">{person.name}</h3>
-                    {(person.nationality || person.birth_year) && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {[person.nationality, person.birth_year].filter(Boolean).join(" · ")}
-                      </p>
-                    )}
-                    {person.bio && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{person.bio}</p>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openEditForm(person)}
+                    className="flex-1 min-w-0 text-left"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full border border-border/60 bg-muted/40">
+                        {person.photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={person.photo_url} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-muted-foreground">
+                            {person.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-foreground truncate">{person.name}</h3>
+                        {(person.nationality || person.birth_year) && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {[person.nationality, person.birth_year].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
+                        {person.bio && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{person.bio}</p>
+                        )}
+                      </div>
+                    </div>
+                  </button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
@@ -307,6 +447,10 @@ export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabPro
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEditForm(person)}>
+                        <Pencil className="h-3 w-3" />
+                        Edit
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={(e) => openDeleteModal(e as React.MouseEvent, person)}
                         className="text-red-600 focus:text-red-600"
@@ -337,7 +481,11 @@ export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabPro
             </thead>
             <tbody>
               {filtered.map((person) => (
-                <tr key={person.id} className="border-b border-border last:border-b-0">
+                <tr
+                  key={person.id}
+                  className="border-b border-border last:border-b-0 hover:bg-muted/20 cursor-pointer"
+                  onClick={() => openEditForm(person)}
+                >
                   <td className="py-3 px-4 font-medium text-foreground">{person.name}</td>
                   <td className="py-3 px-4 text-sm text-muted-foreground">{person.nationality ?? "—"}</td>
                   <td className="py-3 px-4 text-sm text-muted-foreground">{person.birth_year ?? "—"}</td>
@@ -353,6 +501,10 @@ export function PersonsTab({ initialPersons, viewMode = "cards" }: PersonsTabPro
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEditForm(person)}>
+                          <Pencil className="h-3 w-3" />
+                          Edit
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={(e) => openDeleteModal(e as React.MouseEvent, person)}
                           className="text-red-600 focus:text-red-600"

@@ -23,20 +23,27 @@ export type PlaceImageRoleUrls = {
   hero: string | null
 }
 
+/** sm = lists; lg = map side panel; xl = place page. */
+export type PlaceAvatarVariant = "sm" | "lg" | "xl"
+
 export interface PlacesRepositoryPort {
   /** Fiction IDs with at least one approved, active place (contributor photo picker). */
   listFictionIdsWithApprovedPlaces(): Promise<string[]>
   /** Approved and active place row exists (photo contributions). */
   isApprovedActivePlace(placeId: string): Promise<boolean>
-  getPlaceImageUrlsByRole(placeId: string, variant?: "sm" | "lg"): Promise<PlaceImageRoleUrls>
+  getPlaceImageUrlsByRole(placeId: string, variant?: "sm" | "lg" | "xl"): Promise<PlaceImageRoleUrls>
   listAllPlaces(): Promise<Place[]>
   /** Count of approved + active places in the public catalog. */
   countApprovedActive(): Promise<number>
   getCountsByFictionIds(fictionIds: string[]): Promise<Record<string, number>>
-  getById(placeId: string, avatarVariant?: "sm" | "lg"): Promise<Place | null>
+  getById(placeId: string, avatarVariant?: PlaceAvatarVariant): Promise<Place | null>
   /** Batch fetch by place ids (order not guaranteed). */
-  getByIds(placeIds: string[], avatarVariant?: "sm" | "lg"): Promise<Place[]>
-  getByFictionIdAndSlug(fictionId: string, slug: string, avatarVariant?: "sm" | "lg"): Promise<Place | null>
+  getByIds(placeIds: string[], avatarVariant?: PlaceAvatarVariant): Promise<Place[]>
+  getByFictionIdAndSlug(
+    fictionId: string,
+    slug: string,
+    avatarVariant?: PlaceAvatarVariant,
+  ): Promise<Place | null>
   listSlugsByFictionId(fictionId: string): Promise<string[]>
   getByFictionId(fictionId: string): Promise<Place[]>
   listApprovedByFictionId(fictionId: string): Promise<Place[]>

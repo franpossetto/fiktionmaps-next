@@ -1,7 +1,6 @@
-import Image from "next/image"
-import { MapPin } from "lucide-react"
 import { getTranslations } from "next-intl/server"
 import { Link } from "@/i18n/navigation"
+import { MapPin } from "lucide-react"
 import { TopContributorsSection } from "@/components/contributions/top-contributors-section"
 import { FictionInterestTags } from "@/components/fictions/fiction-interest-tags"
 import type { City } from "@/src/cities/domain/city.entity"

@@ -166,7 +166,14 @@ export function FictionEditView({ initialFiction }: FictionEditViewProps) {
     if (persons.some((p) => p.person_id === person.id && p.role === newPersonRole)) return
     setPersons((prev) => [
       ...prev,
-      { id: `tmp-${person.id}-${newPersonRole}`, person_id: person.id, name: person.name, role: newPersonRole, sort_order: prev.length },
+      {
+        id: `tmp-${person.id}-${newPersonRole}`,
+        person_id: person.id,
+        name: person.name,
+        role: newPersonRole,
+        sort_order: prev.length,
+        photo_url: person.photo_url,
+      },
     ])
     setPersonSearch("")
     setPersonSearchResults([])

@@ -3,13 +3,17 @@
 import { revalidatePath, updateTag } from "next/cache"
 import { uuidSchema } from "@/lib/validation/primitives"
 import { zodErrorMessage } from "@/lib/validation/http"
-import { createPersonSchema, fictionPersonEntrySchema } from "@/src/persons/domain/person.schemas"
+import { parseImageFocusFromFormData } from "@/lib/asset-images/image-focus"
+import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
+import { PERSON_AVATAR_UPLOAD_VARIANTS } from "@/lib/asset-images/variant-sizes"
+import { createPersonSchema, fictionPersonEntrySchema, updatePersonSchema } from "@/src/persons/domain/person.schemas"
 import { supabaseRepositoryAdapter as personsRepo } from "@/src/persons/infrastructure/supabase/person.repository.impl"
 import { deletePerson } from "@/src/persons/application/delete-person.usecase"
 import { searchPersons } from "@/src/persons/application/search-persons.usecase"
 import { listCreditCandidatesForContribute } from "@/src/persons/application/list-credit-candidates-for-contribute.usecase"
 import { FICTION_PERSON_ROLES } from "@/src/persons/domain/person.entity"
 import { createPerson } from "@/src/persons/application/create-person.usecase"
+import { updatePerson } from "@/src/persons/application/update-person.usecase"
 import { resolveOrCreatePerson } from "@/src/persons/application/resolve-or-create-person.usecase"
 import { getFictionPersons } from "@/src/persons/application/get-fiction-persons.usecase"
 import { setFictionPersons } from "@/src/persons/application/set-fiction-persons.usecase"
@@ -18,20 +22,24 @@ import type {
   SearchPersonsResult,
   ListDirectorCandidatesResult,
   CreatePersonResult,
+  UpdatePersonResult,
   ResolveOrCreatePersonResult,
   DeletePersonResult,
   GetFictionPersonsResult,
   SetFictionPersonsResult,
+  UploadPersonImageResult,
 } from "./person.actions.types"
 
 export type {
   SearchPersonsResult,
   ListDirectorCandidatesResult,
   CreatePersonResult,
+  UpdatePersonResult,
   ResolveOrCreatePersonResult,
   DeletePersonResult,
   GetFictionPersonsResult,
   SetFictionPersonsResult,
+  UploadPersonImageResult,
 } from "./person.actions.types"
 
 export async function deletePersonAction(id: string): Promise<DeletePersonResult> {
@@ -93,10 +101,72 @@ export async function createPersonAction(
   try {
     const person = await createPerson(parsed.data, personsRepo)
     if (!person) return { success: false, error: "Failed to create person" }
+    revalidatePath("/admin")
+    updateTag("persons")
     return { success: true, person }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Create failed" }
   }
+}
+
+export async function updatePersonAction(
+  id: string,
+  data: { name: string; bio?: string | null; nationality?: string | null; birth_year?: number | null }
+): Promise<UpdatePersonResult> {
+  const parsedId = uuidSchema.safeParse(id)
+  if (!parsedId.success) {
+    return { success: false, error: "Invalid id" }
+  }
+  const parsed = updatePersonSchema.safeParse(data)
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+  try {
+    const person = await updatePerson(parsedId.data, parsed.data, personsRepo)
+    if (!person) return { success: false, error: "Failed to update person" }
+    revalidatePath("/admin")
+    updateTag("persons")
+    return { success: true, person }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Update failed" }
+  }
+}
+
+export async function uploadPersonImageAction(
+  personId: string,
+  formData: FormData,
+): Promise<UploadPersonImageResult> {
+  const parsedId = uuidSchema.safeParse(personId)
+  if (!parsedId.success) return { success: false, error: "Invalid person id" }
+
+  const file = formData.get("file")
+  if (!(file instanceof File) || file.size === 0) {
+    return { success: false, error: "No file provided" }
+  }
+  const validationError = validateImageFile(file)
+  if (validationError) return { success: false, error: validationError }
+
+  const person = await personsRepo.getById(parsedId.data)
+  if (!person) return { success: false, error: "Person not found" }
+
+  const result = await uploadEntityImage({
+    entityType: "person",
+    entityId: parsedId.data,
+    role: "avatar",
+    variants: PERSON_AVATAR_UPLOAD_VARIANTS,
+    file,
+    replace: true,
+    focus: parseImageFocusFromFormData(formData),
+    codec: "avif",
+  })
+  if (!result.success) return result
+
+  const photoUrl = result.urls.sm ?? result.urls.xs ?? result.urls.lg ?? null
+  if (photoUrl) {
+    await personsRepo.update(parsedId.data, { name: person.name, photo_url: photoUrl })
+  }
+
+  revalidatePath("/admin")
+  updateTag("persons")
+  return { success: true, photoUrl: photoUrl ?? "" }
 }
 
 export async function resolveOrCreatePersonAction(name: string): Promise<ResolveOrCreatePersonResult> {
@@ -147,5 +217,6 @@ export async function setFictionPersonsAction(
 
   revalidatePath(`/admin/fiction/${fictionId}`)
   updateTag("fictions")
+  updateTag("persons")
   return { success: true }
 }

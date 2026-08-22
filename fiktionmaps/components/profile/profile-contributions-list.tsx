@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Pencil,
   Sparkles,
+  Users,
 } from "lucide-react"
 import { useLocale, useTranslations } from "next-intl"
 import { Link } from "@/i18n/navigation"
@@ -40,6 +41,10 @@ function typeIcon(type: ContributionType): LucideIcon {
     case "add_photo":
       return ImageIcon
     case "add_place_to_scene":
+      return Link2
+    case "add_credits":
+      return Users
+    case "link_place_relationship":
       return Link2
     case "enrich_entity":
       return Sparkles

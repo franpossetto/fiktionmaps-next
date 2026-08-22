@@ -9,8 +9,10 @@ import {
 import { getInterestCatalogCached } from "@/src/interests/infrastructure/next/interest.queries"
 import { getFictionLikeCountsCached } from "@/src/fiction-likes/infrastructure/next/fiction-likes.queries"
 import { getFictionPlacesCached } from "@/src/places/infrastructure/next/place.queries"
+import { getCompositeGroupsForFictionPlacesCached } from "@/src/place-relationships/infrastructure/next/place-relationship.queries"
 import { getAllCitiesCached } from "@/src/cities/infrastructure/next/city.queries"
 import { getFictionContributorsCached } from "@/src/contributions/infrastructure/next/contribution.queries"
+import { getFictionPersonsCached } from "@/src/persons/infrastructure/next/person.queries"
 import { getCurrentUserHasLikedFiction } from "@/src/users/infrastructure/next/user.queries"
 import { getSiteUrl } from "@/lib/site"
 import { FictionDetail } from "@/components/fictions/fiction-detail"
@@ -158,6 +160,7 @@ export default async function FictionSlugPage({ params }: Props) {
     fictionInterestIds,
     interestCatalog,
     fictionContributors,
+    fictionCredits,
     sidebarSummary,
     initialLiked,
   ] = await Promise.all([
@@ -167,9 +170,15 @@ export default async function FictionSlugPage({ params }: Props) {
     getFictionInterestsCached(fiction.id),
     getInterestCatalogCached(locale),
     getFictionContributorsCached(fiction.id),
+    getFictionPersonsCached(fiction.id),
     getFictionSidebarSummaryText(fiction, locale),
     getCurrentUserHasLikedFiction(fiction.id),
   ])
+
+  const compositeGroups = await getCompositeGroupsForFictionPlacesCached(
+    fiction.id,
+    initialPlaces.map((p) => p.id),
+  )
 
   const labelByInterestId = new Map(interestCatalog.map((i) => [i.id, i.label]))
   const fictionInterestTags = fictionInterestIds.flatMap((id) => {
@@ -211,9 +220,11 @@ export default async function FictionSlugPage({ params }: Props) {
           fiction={fiction}
           initialPlaces={initialPlaces}
           initialCities={fictionCitiesOrdered}
+          compositeGroups={compositeGroups}
           initialLikeCount={initialLikeCount}
           initialLiked={initialLiked}
           fictionInterestTags={fictionInterestTags}
+          credits={fictionCredits}
           recommendationsSlot={
             <Suspense fallback={<FictionDetailRecommendationsFallback />}>
               <FictionDetailRecommendations

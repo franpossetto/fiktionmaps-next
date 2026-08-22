@@ -10,10 +10,10 @@ function formatBytes(bytes: number): string {
 }
 
 const VARIANT_HINT: Record<ImageVariant, string> = {
-  xs: "chips / pins",
+  xs: "pins",
   sm: "lists",
-  lg: "detail",
-  xl: "large",
+  lg: "map panel",
+  xl: "page",
 }
 
 type ImageCodecCompareProps = {
@@ -43,7 +43,10 @@ function NativeSizePreview({
         />
       </div>
       <p className="text-xs text-muted-foreground">
-        {item.width}×{item.height}px · {formatBytes(item.byteLength)}
+        {item.width}×{item.height}px
+      </p>
+      <p className="font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+        {formatBytes(item.byteLength)}
       </p>
     </div>
   )
@@ -54,7 +57,7 @@ export function ImageCodecCompare({ previews, variants }: ImageCodecCompareProps
     <div className="space-y-8">
       <div className="grid grid-cols-2 gap-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         <span>WebP (ref)</span>
-        <span>AVIF q48</span>
+        <span>AVIF q60</span>
       </div>
 
       {variants.map((variant) => {

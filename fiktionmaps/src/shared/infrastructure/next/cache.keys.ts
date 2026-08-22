@@ -10,6 +10,7 @@ export const CacheKeys = {
     entityId,
   ],
   fictionContributors: (fictionId: string) => ["contribution", "fiction-contributors-fpp", fictionId],
+  fictionPersons: (fictionId: string) => ["person", "fiction-persons", fictionId],
   placeContributorsDetail: (placeId: string) => ["contribution", "place-contributors-detail", placeId],
   topContributors: (limit: number) => ["top-contributors", String(limit)],
   fiction:  (id: string) => ["fiction", id],

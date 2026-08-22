@@ -671,6 +671,9 @@ export interface PlaceLocationMapProps {
   placeName?: string
   previewUrl?: string | null
   className?: string
+  /** When false, pan/zoom stay enabled but map clicks are ignored (default). */
+  pinEditMode?: boolean
+  onMapClick?: (position: { lat: number; lng: number }) => void
   onMapReady?: (ctrl: MapControlHandle) => void
 }
 
@@ -682,6 +685,8 @@ export function PlaceLocationMap({
   placeName,
   previewUrl,
   className = "h-full w-full",
+  pinEditMode = false,
+  onMapClick,
   onMapReady,
 }: PlaceLocationMapProps) {
   const mapControlRef = useRef<MapControlHandle | null>(null)
@@ -700,10 +705,12 @@ export function PlaceLocationMap({
         id={mapId}
         mapKey={mapKey}
         defaultCenter={safeCenter}
+        center={hasPin ? safeCenter : undefined}
         defaultZoom={PLACE_LOCATION_DEFAULT_ZOOM}
         minZoom={PLACE_LOCATION_MIN_ZOOM}
         maxZoom={PLACE_LOCATION_MAX_ZOOM}
         className={className}
+        onClick={pinEditMode ? onMapClick : undefined}
         onMapReady={(ctrl) => {
           mapControlRef.current = ctrl
           setMapReady(true)

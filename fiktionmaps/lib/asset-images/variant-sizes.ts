@@ -1,9 +1,12 @@
 /** Max width in pixels for each image variant (cover, avatar, banner). */
 export const VARIANT_SIZES = {
-  /** Chips + map pins (~20–64 CSS px at 2x/3x). */
+  /** Map pins (~20–64 CSS px at 2x/3x). */
   xs: 256,
+  /** Lists / compact UI. */
   sm: 300,
+  /** Map side panel hero. */
   lg: 800,
+  /** Fiction / place detail pages. */
   xl: 1200,
 } as const
 
@@ -19,22 +22,31 @@ export const VARIANT_WEBP_QUALITY: Record<ImageVariant, number> = {
 
 /**
  * AVIF quality per variant (sharp 0–100; not 1:1 with WebP).
- * Calibrated at 48 for all sizes.
+ * Calibrated at 60 for all sizes (lab: detail vs size).
  */
 export const VARIANT_AVIF_QUALITY: Record<ImageVariant, number> = {
-  xs: 48,
-  sm: 48,
-  lg: 48,
-  xl: 48,
+  xs: 60,
+  sm: 60,
+  lg: 60,
+  xl: 60,
 }
 
 /** sharp AVIF encode effort (0–9). Higher = slower + often smaller. */
-export const VARIANT_AVIF_EFFORT = 6
+export const VARIANT_AVIF_EFFORT = 9
 
 export type ImageCodec = "webp" | "avif"
 
-/** Default set for cover / avatar style assets. */
-export const THUMB_UPLOAD_VARIANTS = ["xs", "sm", "lg"] as const satisfies readonly ImageVariant[]
+/** Default set for cover / place avatar assets (pins → page). */
+export const THUMB_UPLOAD_VARIANTS = ["xs", "sm", "lg", "xl"] as const satisfies readonly ImageVariant[]
+
+/**
+ * Person headshots (credits list → admin card).
+ * Uses the existing ladder (no `md`); four sizes: xs / sm / lg / xl.
+ */
+export const PERSON_AVATAR_UPLOAD_VARIANTS = ["xs", "sm", "lg", "xl"] as const satisfies readonly ImageVariant[]
+
+/** Wide fiction hero / banner (map panel lg + page xl). */
+export const BANNER_UPLOAD_VARIANTS = ["lg", "xl"] as const satisfies readonly ImageVariant[]
 
 export const ASSET_IMAGES_BUCKET = "asset-images"
 

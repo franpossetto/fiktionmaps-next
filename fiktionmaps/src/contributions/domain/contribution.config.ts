@@ -19,6 +19,8 @@ export const CONTRIBUTION_FPP: Record<ContributionType, number> = {
   add_scene: 8,
   add_photo: 3,
   add_place_to_scene: 1,
+  add_credits: 1,
+  link_place_relationship: 1,
   enrich_entity: 3,
   correct_data: 3,
   mark_inaccessible: 3,

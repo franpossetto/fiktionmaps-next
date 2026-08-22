@@ -18,6 +18,8 @@ import type { ContributorProfileWithDate } from "@/src/contributions/domain/cont
 import { FictionDetailSectionHeading } from "@/components/fictions/fiction-detail-section-heading"
 import { PlaceContributorsByline } from "@/components/fictions/place-contributors-byline"
 import { PlaceShootEnvironmentBadge } from "@/components/places/place-shoot-environment-badge"
+import { PlaceRelationKindBadge } from "@/components/places/place-relation-kind-badge"
+import { PlaceContributeQuestions } from "@/components/places/place-contribute-questions"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
 import { cn } from "@/lib/utils"
 import { ScenePreviewThumb } from "@/components/scenes/scene-preview-thumb"
@@ -98,6 +100,7 @@ export interface FictionPlaceDetailViewProps {
   placeContributors?: ContributorProfileWithDate[]
   /** Deferred RSC slots (public place page). */
   contributorsSlot?: ReactNode
+  relationshipsSlot?: ReactNode
   scenesSlot?: ReactNode
   /** Contribute wizard: same layout, no navigation away from the flow. */
   previewMode?: boolean
@@ -112,6 +115,7 @@ export function FictionPlaceDetailView({
   scenes = [],
   placeContributors = [],
   contributorsSlot,
+  relationshipsSlot,
   scenesSlot,
   previewMode = false,
 }: FictionPlaceDetailViewProps) {
@@ -255,6 +259,7 @@ export function FictionPlaceDetailView({
                     {city.country ? `, ${city.country}` : ""}
                   </span>
                 ) : null}
+                <PlaceRelationKindBadge value={place.relationKind} />
                 {place.shootEnvironment ? (
                   <PlaceShootEnvironmentBadge value={place.shootEnvironment} />
                 ) : null}
@@ -265,6 +270,7 @@ export function FictionPlaceDetailView({
                   fictionName: fiction.title,
                 })}
               </h1>
+              {relationshipsSlot}
               <div className="relative aspect-[21/9] overflow-hidden rounded-xl border border-border/60">
                 <Image
                   src={heroSrc}
@@ -352,6 +358,10 @@ export function FictionPlaceDetailView({
           ) : null}
 
           {scenesNode}
+
+          {previewMode ? null : (
+            <PlaceContributeQuestions fictionId={fiction.id} placeId={place.id} />
+          )}
         </article>
       </div>
     </main>

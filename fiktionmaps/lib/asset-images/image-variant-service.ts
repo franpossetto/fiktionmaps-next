@@ -15,7 +15,7 @@ import {
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
 
-export type EntityType = "fiction" | "city" | "location" | "scene" | "profile" | "place"
+export type EntityType = "fiction" | "city" | "location" | "scene" | "profile" | "place" | "person"
 export type ImageRole = "cover" | "banner" | "avatar" | "hero"
 
 export interface UploadImageOptions {

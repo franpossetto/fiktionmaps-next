@@ -9,6 +9,8 @@
 | `add_scene` | `scene` | New scene tied to a place on the map |
 | `add_photo` | `fiction` / `place` | Replace the cover on a published fiction or the photo on a place |
 | `add_place_to_scene` | `scene` | Link one existing place to an existing scene (same fiction); 1 FPP each |
+| `add_credits` | `fiction` | Link one person + role to a published fiction; 1 FPP |
+| `link_place_relationship` | `place` | Propose a place relationship: shared clone-to-fiction, or composite of two same-fiction places; 1 FPP |
 | `enrich_entity` | `fiction` / `place` | Extra context on an existing page |
 | `correct_data` | `fiction` / `place` | Fix titles, coordinates, or facts |
 | `mark_inaccessible` | `place` | Spot closed or no longer visitable |
@@ -45,5 +47,17 @@ Currently, the following types are considered create operations:
 wizard may submit several places at once (one contribution each). On approve it inserts into
 `scene_places` from `contribution_pending_scene_places` staging (like `add_photo` promotes pending
 images). The scene row’s `status` / `active` are left unchanged.
+
+`add_credits` is **not** a create type. One contribution = one `(person, role)` on a fiction. On
+approve it upserts into `fiction_persons` from `contribution_pending_fiction_persons` staging
+without replacing other credits and without updating denormalized `fictions.author` (primary credit
+stays on create-fiction flow). The fiction row’s `status` / `active` are left unchanged.
+
+`link_place_relationship` is **not** a create type. Staging lives in
+`contribution_pending_place_relationships` (`shared_clone` | `composite`). On approve:
+- `shared_clone` clones location+place into the target fiction and joins/creates a `shared` group
+  (no photo; contributor uploads later).
+- `composite` creates a `composite` group for two same-fiction places.
+Remove-member is admin-only and is not a contribution. Merge of distinct `shared` groups remains blocked.
 
 This is implemented in `src/contributions/infrastructure/supabase/contribution.repository.impl.ts`.

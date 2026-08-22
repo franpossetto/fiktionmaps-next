@@ -35,6 +35,8 @@ const stepVariants = {
 
 type PlacePhotoContributeWizardProps = {
   initialFictions: FictionWithMedia[]
+  /** Deep link from a place page: fiction + place already picked, starts on the upload step. */
+  prefill?: { fictionId: string; place: Place } | null
 }
 
 function stepTitle(step: number, t: ReturnType<typeof useTranslations<"Contribute.photo">>): string {
@@ -67,13 +69,16 @@ function stepDescription(step: number, t: ReturnType<typeof useTranslations<"Con
   }
 }
 
-export function PlacePhotoContributeWizard({ initialFictions }: PlacePhotoContributeWizardProps) {
+export function PlacePhotoContributeWizard({
+  initialFictions,
+  prefill = null,
+}: PlacePhotoContributeWizardProps) {
   const t = useTranslations("Contribute.photo")
   const tPlace = useTranslations("Contribute.place")
   const tVal = useTranslations("Contribute.validation")
-  const [step, setStep] = useState(1)
-  const [fictionId, setFictionId] = useState("")
-  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null)
+  const [step, setStep] = useState(prefill ? 3 : 1)
+  const [fictionId, setFictionId] = useState(prefill?.fictionId ?? "")
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(prefill?.place ?? null)
   const [placeContext, setPlaceContext] = useState<PlacePhotoContributeContext | null>(null)
   const [contextLoading, setContextLoading] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -141,13 +146,19 @@ export function PlacePhotoContributeWizard({ initialFictions }: PlacePhotoContri
     [fictionId, imageFile, photoDims, placeId, t, tVal],
   )
 
+  /** Shortcut from a place page skips the fiction (1) and place (2) steps. */
+  const visibleSteps = prefill ? [3, 4] : [1, 2, 3, 4]
+  const stepIndex = Math.max(0, visibleSteps.indexOf(step))
+
   function handleBack() {
-    if (step > 1) setStep((s) => s - 1)
+    const previous = visibleSteps[stepIndex - 1]
+    if (previous) setStep(previous)
   }
 
   function handleNext() {
     if (!validateStep(step)) return
-    if (step < TOTAL_STEPS) setStep((s) => s + 1)
+    const next = visibleSteps[stepIndex + 1]
+    if (next) setStep(next)
   }
 
   async function handlePhotoFile(file: File) {
@@ -224,11 +235,11 @@ export function PlacePhotoContributeWizard({ initialFictions }: PlacePhotoContri
   return (
     <FictionContributeLayout leftAside={null} rightAside={null} mainColumnScroll={false}>
       <ContributionWizardShell
-        stepIndex={step - 1}
-        totalSteps={TOTAL_STEPS}
+        stepIndex={stepIndex}
+        totalSteps={visibleSteps.length}
         contentMaxWidthClassName="max-w-lg"
         footerNav={{
-          showBack: step > 1,
+          showBack: stepIndex > 0,
           onBack: handleBack,
           isLastStep: step === TOTAL_STEPS,
           onNext: handleNext,
@@ -239,7 +250,7 @@ export function PlacePhotoContributeWizard({ initialFictions }: PlacePhotoContri
           showTrailingArrow: step < TOTAL_STEPS,
         }}
       >
-        {step === 1 ? (
+        {stepIndex === 0 ? (
           <div className="mb-6 rounded-lg border border-border/60 bg-muted/20 px-4 py-3.5 text-sm text-muted-foreground">
             {t("fppHint", { count: fpp })}
           </div>
@@ -249,8 +260,8 @@ export function PlacePhotoContributeWizard({ initialFictions }: PlacePhotoContri
           title={stepTitle(step, t)}
           description={stepDescription(step, t)}
           badge="required"
-          stepNumber={step}
-          totalSteps={TOTAL_STEPS}
+          stepNumber={stepIndex + 1}
+          totalSteps={visibleSteps.length}
           variant="minimal"
         />
 

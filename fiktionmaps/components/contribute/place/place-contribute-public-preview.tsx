@@ -75,6 +75,7 @@ export function PlaceContributePublicPreview({
       videoUrl: "",
       description: description.trim(),
       sceneDescription: "",
+      relationKind: "filmed",
       shootEnvironment: shootEnvironment ?? null,
     }
   }, [

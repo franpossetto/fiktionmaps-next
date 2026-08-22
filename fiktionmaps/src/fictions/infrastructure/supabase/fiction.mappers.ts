@@ -17,15 +17,19 @@ export function mapAssetImagesToFiction(
   const base = fiction as unknown as FictionWithMedia
   let coverImageThumb: string | null = null
   let coverImage: string | null = null
-  let coverImageLarge: string | null = null
-  let bannerImage: string | null = null
+  let coverImageLg: string | null = null
+  let coverImageXl: string | null = null
+  let bannerImageLg: string | null = null
+  let bannerImageXl: string | null = null
   let coverFocus: { x: number; y: number } | null = null
   let bannerFocus: { x: number; y: number } | null = null
   for (const r of rows) {
     if (r.role === "cover" && r.variant === "xs") coverImageThumb = r.url
     if (r.role === "cover" && r.variant === "sm") coverImage = r.url
-    if (r.role === "cover" && r.variant === "lg") coverImageLarge = r.url
-    if (r.role === "banner" && r.variant === "lg") bannerImage = r.url
+    if (r.role === "cover" && r.variant === "lg") coverImageLg = r.url
+    if (r.role === "cover" && r.variant === "xl") coverImageXl = r.url
+    if (r.role === "banner" && r.variant === "lg") bannerImageLg = r.url
+    if (r.role === "banner" && r.variant === "xl") bannerImageXl = r.url
     if (r.role === "cover" && coverFocus == null && (r.focus_x != null || r.focus_y != null)) {
       coverFocus = normalizeImageFocus(r.focus_x, r.focus_y)
     }
@@ -33,6 +37,9 @@ export function mapAssetImagesToFiction(
       bannerFocus = normalizeImageFocus(r.focus_x, r.focus_y)
     }
   }
+  // Page heroes prefer xl; fall back to lg for assets not yet reprocessed.
+  const coverImageLarge = coverImageXl ?? coverImageLg
+  const bannerImage = bannerImageXl ?? bannerImageLg
   return {
     ...base,
     coverImageThumb: coverImageThumb ?? undefined,

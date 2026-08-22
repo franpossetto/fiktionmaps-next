@@ -1,14 +1,17 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Plus, Edit2, Trash2, Search, MapPin, ImagePlus } from "lucide-react"
+import { Plus, Edit2, Trash2, Search, MapPin, ImagePlus, CopyPlus, Link2 } from "lucide-react"
 import { useRouter } from "@/i18n/navigation"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 import type { Place } from "@/src/places/domain/place.entity"
+import { parsePlaceRelationKind } from "@/src/places/domain/place-relation-kind"
 import { parsePlaceShootEnvironment } from "@/src/places/domain/place-shoot-environment"
 import { Button } from "@/components/ui/button"
 import { PlaceCreateView, type PlaceFormData } from "./place-create-view"
+import { PlaceCloneToFictionView } from "./place-clone-to-fiction-view"
+import { PlaceRelationshipsPanel } from "./place-relationships-panel"
 import { uploadPlaceImageAction } from "@/src/places/infrastructure/next/place.actions"
 import {
   createPlaceAction,
@@ -17,7 +20,7 @@ import {
   getAllPlacesAction,
 } from "@/src/places/infrastructure/next/place.actions"
 
-type WorkflowStep = "list" | "create" | "edit"
+type WorkflowStep = "list" | "create" | "edit" | "clone" | "relationships"
 
 interface LocationsTabProps {
   initialPlaces?: Place[]
@@ -27,8 +30,8 @@ interface LocationsTabProps {
 
 export function LocationsTab({ initialPlaces, initialFictions = [], initialCities = [] }: LocationsTabProps) {
   const router = useRouter()
-  const [cities, setCities] = useState<City[]>(initialCities)
-  const [fictions, setFictions] = useState<Fiction[]>(initialFictions)
+  const [cities] = useState<City[]>(initialCities)
+  const [fictions] = useState<Fiction[]>(initialFictions)
   const [places, setPlaces] = useState<Place[]>(initialPlaces ?? [])
   const [workflowStep, setWorkflowStep] = useState<WorkflowStep>("list")
   const [editingLocation, setEditingLocation] = useState<Place | null>(null)
@@ -53,8 +56,15 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
     formattedAddress: "",
     cityId: defaultCity?.id ?? "",
     locationType: "",
+    relationKind: "filmed",
     shootEnvironment: "",
     isLandmark: false,
+  }
+
+  const backToList = () => {
+    setWorkflowStep("list")
+    setEditingLocation(null)
+    setSubmitError(null)
   }
 
   const handleEditSubmit = async (placeId: string, data: PlaceFormData) => {
@@ -70,6 +80,7 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
       description: data.description,
       isLandmark: data.isLandmark,
       locationType: data.locationType || null,
+      relationKind: parsePlaceRelationKind(data.relationKind),
       shootEnvironment: parsePlaceShootEnvironment(data.shootEnvironment),
     })
     if (!result.success) {
@@ -83,8 +94,7 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
     }
     const list = await getAllPlacesAction()
     setPlaces(list)
-    setWorkflowStep("list")
-    setEditingLocation(null)
+    backToList()
   }
 
   const handleCreateSubmit = async (data: PlaceFormData) => {
@@ -100,6 +110,7 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
       description: data.description,
       isLandmark: data.isLandmark,
       locationType: data.locationType || null,
+      relationKind: parsePlaceRelationKind(data.relationKind),
       shootEnvironment: parsePlaceShootEnvironment(data.shootEnvironment),
     })
     if (!result.success) {
@@ -114,7 +125,6 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
         setSubmitError(uploadResult.error ?? "Place created but image upload failed")
       }
     }
-    // Refetch list so new place shows with image (or placeholder)
     setPlaces(await getAllPlacesAction())
     setWorkflowStep("list")
   }
@@ -172,6 +182,7 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
       latitude: editingLocation.location.lat,
       longitude: editingLocation.location.lng,
       locationType: editingLocation.location.locationType ?? "",
+      relationKind: editingLocation.relationKind,
       shootEnvironment: editingLocation.shootEnvironment ?? "",
       isLandmark: editingLocation.location.isLandmark ?? false,
     }
@@ -186,13 +197,34 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
             ? editingLocation.image
             : null
         }
-        onBack={() => {
-          setWorkflowStep("list")
-          setEditingLocation(null)
-          setSubmitError(null)
-        }}
+        onBack={backToList}
         onSubmit={(data) => handleEditSubmit(editingLocation.id, data)}
         submitError={submitError}
+      />
+    )
+  }
+
+  if (workflowStep === "clone" && editingLocation) {
+    return (
+      <PlaceCloneToFictionView
+        sourcePlace={editingLocation}
+        fictions={fictions}
+        onBack={backToList}
+        onSuccess={(nextPlaces) => {
+          setPlaces(nextPlaces)
+          backToList()
+        }}
+      />
+    )
+  }
+
+  if (workflowStep === "relationships" && editingLocation) {
+    return (
+      <PlaceRelationshipsPanel
+        place={editingLocation}
+        places={places}
+        fictions={fictions}
+        onBack={backToList}
       />
     )
   }
@@ -241,6 +273,8 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
         </div>
       </div>
 
+      {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredPlaces.map((loc) => {
           const fiction = fictions.find((f) => f.id === loc.fictionId)
@@ -285,13 +319,37 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
                   </button>
                   <button
                     type="button"
+                    onClick={() => {
+                      setEditingLocation(loc)
+                      setWorkflowStep("clone")
+                      setSubmitError(null)
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors"
+                  >
+                    <CopyPlus className="h-3 w-3" />
+                    Other fiction
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingLocation(loc)
+                      setWorkflowStep("relationships")
+                      setSubmitError(null)
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors"
+                  >
+                    <Link2 className="h-3 w-3" />
+                    Links
+                  </button>
+                  <button
+                    type="button"
                     onClick={() =>
                       router.push(`/admin/place/${loc.id}/improve-photo`)
                     }
                     className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors"
                   >
                     <ImagePlus className="h-3 w-3" />
-                    Improve photo
+                    Photo
                   </button>
                   <button
                     type="button"
