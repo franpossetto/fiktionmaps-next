@@ -18,6 +18,9 @@ const ENFORCE_CANONICAL_HOST = process.env.VERCEL_ENV
   ? process.env.VERCEL_ENV === "production"
   : process.env.NODE_ENV === "production"
 
+/** Cap Auth work in Edge so a hung Supabase call cannot trigger MIDDLEWARE_INVOCATION_TIMEOUT (~25s). */
+const AUTH_TIMEOUT_MS = 2500
+
 const PROTECTED_PATHS = [
   "/profile",
   "/settings",
@@ -63,6 +66,35 @@ function isValidSupabaseUrl(url: string | undefined): url is string {
   }
 }
 
+/** Supabase SSR session cookies: `sb-<ref>-auth-token` (+ chunk suffixes). */
+function hasSupabaseAuthCookie(request: NextRequest): boolean {
+  return request.cookies
+    .getAll()
+    .some(({ name }) => name.startsWith("sb-") && name.includes("auth-token"))
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | "timeout"> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<"timeout">((resolve) => {
+        timer = setTimeout(() => resolve("timeout"), ms)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+function redirectToLogin(request: NextRequest, pathname: string): NextResponse {
+  const loginUrl = request.nextUrl.clone()
+  const locale = getLocaleFromPathname(pathname)
+  loginUrl.pathname = `/${locale}/login`
+  loginUrl.searchParams.set("redirectTo", pathname)
+  return NextResponse.redirect(loginUrl)
+}
+
 export async function middleware(request: NextRequest) {
   if (ENFORCE_CANONICAL_HOST) {
     const hostHeader = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? ""
@@ -87,15 +119,21 @@ export async function middleware(request: NextRequest) {
     }
     return response
   }
-  
 
   const pathname = request.nextUrl.pathname
   const pathWithoutLocale = pathnameWithoutLocale(pathname)
+  const protectedPath = isProtected(pathWithoutLocale)
+  const hasAuthCookie = hasSupabaseAuthCookie(request)
+
+  // Public + anonymous: no Auth work (avoids edge hangs on /en, /contributors, etc.).
+  if (!protectedPath && !hasAuthCookie) {
+    return response
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  let user: { id: string } | null = null
+  let authenticated = false
   if (isValidSupabaseUrl(supabaseUrl) && supabaseAnonKey) {
     const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
       cookies: {
@@ -110,18 +148,23 @@ export async function middleware(request: NextRequest) {
         },
       },
     })
-    const {
-      data: { user: sessionUser },
-    } = await supabase.auth.getUser()
-    user = sessionUser
+
+    // Prefer getClaims (local JWT verify + refresh when asymmetric keys) over getUser (always network).
+    const claimsResult = await withTimeout(supabase.auth.getClaims(), AUTH_TIMEOUT_MS)
+
+    if (claimsResult === "timeout") {
+      // Protected: fail-closed. Public with cookies: fail-open so the page still loads.
+      if (protectedPath) {
+        return redirectToLogin(request, pathname)
+      }
+      return response
+    }
+
+    authenticated = Boolean(claimsResult.data?.claims?.sub)
   }
 
-  if (isProtected(pathWithoutLocale) && !user) {
-    const loginUrl = request.nextUrl.clone()
-    const locale = getLocaleFromPathname(pathname)
-    loginUrl.pathname = `/${locale}/login`
-    loginUrl.searchParams.set("redirectTo", pathname)
-    return NextResponse.redirect(loginUrl)
+  if (protectedPath && !authenticated) {
+    return redirectToLogin(request, pathname)
   }
 
   return response
@@ -130,4 +173,3 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ["/((?!api|trpc|_next|_vercel|.*\\..*).*)"],
 }
-

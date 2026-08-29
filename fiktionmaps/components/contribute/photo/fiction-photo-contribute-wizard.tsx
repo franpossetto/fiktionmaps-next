@@ -181,9 +181,10 @@ export function FictionPhotoContributeWizard({ target, initialFictions }: Fictio
         setErrors({ submit: res.error })
         return
       }
+      // Keep the local blob for the done screen. After auto-approve, pending
+      // storage is promoted and deleted, so `res.previewUrl` 404s.
       setDoneVariant(res.autoApproved ? "approved" : "pending")
-      setDonePreview(res.previewUrl)
-      if (photoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(photoPreviewUrl)
+      setDonePreview(photoPreviewUrl)
     } finally {
       setSubmitting(false)
     }

@@ -50,7 +50,19 @@ function MapSkeleton() {
   )
 }
 
-/** Load Mapbox only when the directions block nears the viewport. */
+function nearestScrollRoot(el: HTMLElement): Element | null {
+  const tagged = el.closest("[data-detail-main-scroll]")
+  if (tagged instanceof Element) return tagged
+  let node: HTMLElement | null = el.parentElement
+  while (node && node !== document.body) {
+    const { overflowY } = getComputedStyle(node)
+    if (overflowY === "auto" || overflowY === "scroll") return node
+    node = node.parentElement
+  }
+  return null
+}
+
+/** Load Mapbox when the directions block is near the (inner) scroll viewport. */
 function LazyFictionPlaceDirectionsMap(props: ComponentProps<typeof FictionPlaceDirectionsMap>) {
   const ref = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
@@ -58,17 +70,33 @@ function LazyFictionPlaceDirectionsMap(props: ComponentProps<typeof FictionPlace
   useEffect(() => {
     const el = ref.current
     if (!el || visible) return
+
+    const reveal = () => setVisible(true)
+    const root = nearestScrollRoot(el)
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
-          setVisible(true)
+          reveal()
           io.disconnect()
         }
       },
-      { rootMargin: "240px 0px" },
+      { root, rootMargin: "240px 0px" },
     )
     io.observe(el)
-    return () => io.disconnect()
+
+    const rect = el.getBoundingClientRect()
+    const rootRect = root?.getBoundingClientRect()
+    const alreadyVisible = rootRect
+      ? rect.bottom > rootRect.top - 240 && rect.top < rootRect.bottom + 240
+      : rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight + 240
+    if (alreadyVisible) reveal()
+
+    // Soft nav can miss the first IO callback while layout settles.
+    const fallback = window.setTimeout(reveal, 250)
+    return () => {
+      io.disconnect()
+      window.clearTimeout(fallback)
+    }
   }, [visible])
 
   return <div ref={ref}>{visible ? <FictionPlaceDirectionsMap {...props} /> : <MapSkeleton />}</div>
