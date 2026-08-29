@@ -8,24 +8,21 @@ import { isUuidString, uuidSchema } from "@/lib/validation/primitives"
 import { createClient } from "@/lib/supabase/server"
 import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
 import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/ensure-user-is-moderator.usecase"
-import { createContributionAction } from "@/src/contributions/infrastructure/next/contribution.actions"
 import { profilesReaderSupabaseAdapter } from "@/src/contributions/infrastructure/supabase/profiles-reader.supabase"
+import { supabaseRepositoryAdapter as contributionsRepo } from "@/src/contributions/infrastructure/supabase/contribution.repository.impl"
 import { supabaseRepositoryAdapter as fictionsRepo } from "@/src/fictions/infrastructure/supabase/fiction.repository.impl"
 import { supabaseRepositoryAdapter as fictionInterestsRepo } from "@/src/fiction-interests/infrastructure/supabase/fiction-interests.repository.impl"
 import { supabaseRepositoryAdapter as fictionExternalIdsRepo } from "@/src/fiction-external-ids/infrastructure/supabase/fiction-external-ids.repository.impl"
 import { supabaseRepositoryAdapter as personsRepo } from "@/src/persons/infrastructure/supabase/person.repository.impl"
 import { resolveOrCreatePerson } from "@/src/persons/application/resolve-or-create-person.usecase"
 import { linkFictionPrimaryCreditUseCase } from "@/src/fictions/application/link-fiction-primary-credit.usecase"
-import { FICTION_EXTERNAL_ID_PROVIDER } from "@/src/fiction-external-ids/domain/fiction-external-id.entity"
-import { upsertFictionExternalIdUseCase } from "@/src/fiction-external-ids/application/upsert-fiction-external-id.usecase"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
-import type { CreateFictionData } from "@/src/fictions/domain/fiction.schemas"
 import {
   parseCreateFictionFormData,
   parseImdbIdFromFormData,
   parseUpdateFictionFormData,
 } from "./fiction.form-parsers"
-import { createFictionUseCase } from "@/src/fictions/application/create-fiction.usecase"
+import { createFictionWithMediaUseCase } from "@/src/fictions/application/create-fiction-with-media.usecase"
 import { updateFictionUseCase } from "@/src/fictions/application/update-fiction.usecase"
 import { deleteFictionUseCase } from "@/src/fictions/application/delete-fiction.usecase"
 import { findFictionDuplicateForContributeUseCase } from "@/src/fictions/application/find-fiction-duplicate-for-contribute.usecase"
@@ -70,11 +67,6 @@ import type {
   CheckFictionDuplicateForContributeResult,
   LinkFictionPrimaryCreditResult,
 } from "./fiction.actions.types"
-
-const CREATE_FICTION_CONTRIBUTION = {
-  type: "create_fiction" as const,
-  entityType: "fiction" as const,
-}
 
 const checkFictionDuplicateForContributeBodySchema = z.object({
   title: z.string().trim().min(1),
@@ -159,42 +151,6 @@ export async function linkFictionPrimaryCreditAction(
   }
 }
 
-async function recordCreateFictionContribution(
-  fictionId: string,
-  logContext: string,
-): Promise<boolean | undefined> {
-  const payload = { ...CREATE_FICTION_CONTRIBUTION, entityId: fictionId }
-  try {
-    const res = await createContributionAction(payload)
-    if (!res.success) {
-      console.error(`[${logContext}] createContributionAction failed`, {
-        ...payload,
-        error: res.error,
-      })
-      return undefined
-    }
-    return res.autoApproved
-  } catch (err) {
-    console.error(`[${logContext}] createContributionAction threw`, {
-      ...payload,
-      error: err instanceof Error ? err.message : String(err),
-    })
-    return undefined
-  }
-}
-
-async function persistImdbExternalIdFromFormData(
-  fictionId: string,
-  imdbId: string,
-): Promise<void> {
-  await upsertFictionExternalIdUseCase(
-    fictionId,
-    FICTION_EXTERNAL_ID_PROVIDER.IMDB,
-    imdbId,
-    fictionExternalIdsRepo,
-  )
-}
-
 function parseCreateFictionFormDataWithImdb(formData: FormData) {
   const parsed = parseCreateFictionFormData(formData)
   if (!parsed.success) return { success: false as const, error: zodErrorMessage(parsed.error) }
@@ -203,78 +159,33 @@ function parseCreateFictionFormDataWithImdb(formData: FormData) {
   return { success: true as const, data: parsed.data, imdbId: imdbParsed.data }
 }
 
-async function createFictionWithImagesFromParsed(
+function optionalCreateImageFromFormData(
   formData: FormData,
-  data: CreateFictionData,
-  imdbId: string | null,
-  logTag: string,
-): Promise<{ fiction: FictionWithMedia; contributionAutoApproved?: boolean } | null> {
-  const fiction = await createFictionUseCase(data, fictionsRepo)
-  if (!fiction) return null
+  fileKey: string,
+  focusPrefix: string,
+): { file: File; focus: { x: number; y: number } } | null {
+  const file = formData.get(fileKey)
+  if (!(file instanceof File) || file.size === 0) return null
+  if (validateImageFile(file)) return null
+  return { file, focus: parseImageFocusFromFormData(formData, focusPrefix) }
+}
 
-  if (imdbId) {
-    try {
-      await persistImdbExternalIdFromFormData(fiction.id, imdbId)
-    } catch {
-      return null
-    }
-  }
-
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  let contributionAutoApproved: boolean | undefined
-  if (user) {
-    contributionAutoApproved = await recordCreateFictionContribution(fiction.id, logTag)
-  }
-
-  const coverFile = formData.get("coverFile")
-  const bannerFile = formData.get("bannerFile")
-
-  if (coverFile instanceof File && coverFile.size > 0) {
-    const validationError = validateImageFile(coverFile)
-    if (!validationError) {
-      await uploadEntityImage({
-        entityType: "fiction",
-        entityId: fiction.id,
-        role: "cover",
-        variants: THUMB_UPLOAD_VARIANTS,
-        file: coverFile,
-        replace: true,
-        focus: parseImageFocusFromFormData(formData, "cover"),
-        codec: "avif",
-      })
-    }
-  }
-  if (bannerFile instanceof File && bannerFile.size > 0) {
-    const validationError = validateImageFile(bannerFile)
-    if (!validationError) {
-      await uploadEntityImage({
-        entityType: "fiction",
-        entityId: fiction.id,
-        role: "banner",
-        variants: BANNER_UPLOAD_VARIANTS,
-        file: bannerFile,
-        replace: true,
-        focus: parseImageFocusFromFormData(formData, "banner"),
-        codec: "avif",
-      })
-    }
-  }
-
-  revalidatePath("/admin")
-  updateTag("fictions")
-
-  const out: {
-    fiction: FictionWithMedia
-    contributionAutoApproved?: boolean
-  } = { fiction }
-  if (typeof contributionAutoApproved === "boolean") {
-    out.contributionAutoApproved = contributionAutoApproved
-  }
-  return out
+async function uploadFictionCreateImage(input: {
+  fictionId: string
+  role: "cover" | "banner"
+  file: File
+  focus: { x: number; y: number }
+}): Promise<void> {
+  await uploadEntityImage({
+    entityType: "fiction",
+    entityId: input.fictionId,
+    role: input.role,
+    variants: input.role === "cover" ? THUMB_UPLOAD_VARIANTS : BANNER_UPLOAD_VARIANTS,
+    file: input.file,
+    replace: true,
+    focus: input.focus,
+    codec: "avif",
+  })
 }
 
 export type {
@@ -358,56 +269,8 @@ export async function updateFictionAction(id: string, formData: FormData): Promi
   return { success: true, fiction }
 }
 
-export async function createFictionAction(formData: FormData): Promise<CreateFictionResult> {
-  const parsed = parseCreateFictionFormDataWithImdb(formData)
-  if (!parsed.success) return { success: false, error: parsed.error }
-
-  const fiction = await createFictionUseCase(parsed.data, fictionsRepo)
-  if (!fiction) return { success: false, error: "Failed to create fiction" }
-
-  if (parsed.imdbId) {
-    try {
-      await persistImdbExternalIdFromFormData(fiction.id, parsed.imdbId)
-    } catch (e) {
-      return { success: false, error: e instanceof Error ? e.message : "Failed to save external id" }
-    }
-  }
-
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  let contributionAutoApproved: boolean | undefined
-  if (user) {
-    contributionAutoApproved = await recordCreateFictionContribution(fiction.id, "createFictionAction")
-  }
-
-  revalidatePath("/admin")
-  updateTag("fictions")
-  if (typeof contributionAutoApproved === "boolean") {
-    return { success: true, fiction, contributionAutoApproved }
-  }
-  return { success: true, fiction }
-}
-
+/** Admin and contribute: server sets status, created_by and active from session (client cannot override). */
 export async function createFictionWithImagesAction(formData: FormData): Promise<CreateFictionResult> {
-  const parsed = parseCreateFictionFormDataWithImdb(formData)
-  if (!parsed.success) return { success: false, error: parsed.error }
-
-  const out = await createFictionWithImagesFromParsed(
-    formData,
-    parsed.data,
-    parsed.imdbId,
-    "createFictionWithImagesAction",
-  )
-  if (!out) return { success: false, error: "Failed to create fiction" }
-
-  if (typeof out.contributionAutoApproved === "boolean") {
-    return { success: true, fiction: out.fiction, contributionAutoApproved: out.contributionAutoApproved }
-  }
-  return { success: true, fiction: out.fiction }
-}
-
-/** Contributor flow: server sets fiction status, created_by and active from session (client cannot override). */
-export async function createContributorFictionWithImagesAction(formData: FormData): Promise<CreateFictionResult> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -436,18 +299,35 @@ export async function createContributorFictionWithImagesAction(formData: FormDat
   const parsed = parseCreateFictionFormDataWithImdb(fd)
   if (!parsed.success) return { success: false, error: parsed.error }
 
-  const out = await createFictionWithImagesFromParsed(
-    fd,
-    parsed.data,
-    parsed.imdbId,
-    "createContributorFictionWithImagesAction",
+  const result = await createFictionWithMediaUseCase(
+    {
+      userId: user.id,
+      autoApproveContribution: isStaffModerator,
+      data: parsed.data,
+      imdbId: parsed.imdbId,
+      cover: optionalCreateImageFromFormData(fd, "coverFile", "cover"),
+      banner: optionalCreateImageFromFormData(fd, "bannerFile", "banner"),
+    },
+    {
+      fictionsRepo,
+      fictionExternalIdsRepo,
+      contributionsRepo,
+      uploadFictionImage: uploadFictionCreateImage,
+    },
   )
-  if (!out) return { success: false, error: "Failed to create fiction" }
+  if (!result.success) return result
 
-  if (typeof out.contributionAutoApproved === "boolean") {
-    return { success: true, fiction: out.fiction, contributionAutoApproved: out.contributionAutoApproved }
+  revalidatePath("/admin")
+  revalidatePath("/contributions")
+  updateTag("fictions")
+  updateTag(`fiction-${result.fiction.id}`)
+  updateTag("contributions")
+  if (result.contributionAutoApproved) updateTag("profiles")
+
+  if (typeof result.contributionAutoApproved === "boolean") {
+    return { success: true, fiction: result.fiction, contributionAutoApproved: result.contributionAutoApproved }
   }
-  return { success: true, fiction: out.fiction }
+  return { success: true, fiction: result.fiction }
 }
 
 export async function deleteFictionAction(id: string): Promise<DeleteFictionResult> {

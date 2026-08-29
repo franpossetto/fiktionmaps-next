@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { getTranslations } from "next-intl/server"
-import { getAllFictionsCached } from "@/src/fictions/infrastructure/next/fiction.queries"
+import { getActiveFictionsCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { getFictionLikeCountsCached } from "@/src/fiction-likes/infrastructure/next/fiction-likes.queries"
 import { getPlaceCountsByFictionIdsCached } from "@/src/places/infrastructure/next/place.queries"
 import { FictionCatalog } from "@/components/fictions/fiction-catalog"
@@ -42,8 +42,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function FictionsPage() {
-  const all = await getAllFictionsCached()
-  const fictions = all.filter((f) => f.active)
+  const fictions = await getActiveFictionsCached()
   const allIds = fictions.map((f) => f.id)
 
   const [likeCounts, placeCounts] = await Promise.all([

@@ -22,7 +22,7 @@ import {
 import { generateSlug } from "@/src/fictions/domain/fiction-slug"
 import {
   checkFictionDuplicateForContributeAction,
-  createContributorFictionWithImagesAction,
+  createFictionWithImagesAction,
   linkFictionPrimaryCreditAction,
   setFictionInterestsAction,
 } from "@/src/fictions/infrastructure/next/fiction.actions"
@@ -793,7 +793,7 @@ export function FictionContributeWizard({ initialInterests }: FictionContributeW
       fd.set("bannerFocusY", String(bannerFocus.y))
     }
 
-    const createRes = await createContributorFictionWithImagesAction(fd)
+    const createRes = await createFictionWithImagesAction(fd)
     if (!createRes.success) {
       setSubmitError(createRes.error)
       setSubmitting(false)
