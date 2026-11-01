@@ -72,7 +72,7 @@ function Field({
 /* ------------------------------------------------------------------ */
 /*  Auth Page                                                           */
 /* ------------------------------------------------------------------ */
-export function AuthPage() {
+export function AuthPage({ afterLogin = "/map" }: { afterLogin?: string }) {
   const t = useTranslations("Auth")
   const tCommon = useTranslations("Common")
   const locale = useLocale()
@@ -90,9 +90,9 @@ export function AuthPage() {
     if (user && needsOnboarding) {
       router.replace("/onboarding")
     } else if (user) {
-      router.replace("/map")
+      router.replace(afterLogin)
     }
-  }, [user, needsOnboarding, router])
+  }, [user, needsOnboarding, router, afterLogin])
 
   const resetForm = () => {
     setEmail("")
