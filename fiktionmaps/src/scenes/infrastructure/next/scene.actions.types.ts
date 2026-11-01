@@ -22,6 +22,10 @@ export type LinkScenePlaceResult =
   | { success: true; scenePlace: ScenePlace }
   | { success: false; error: string }
 
+export type UnlinkScenePlaceResult =
+  | { success: true }
+  | { success: false; error: string }
+
 export type CreateContributorSceneResult =
   | {
       success: true

@@ -614,6 +614,22 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
     return mapScenePlaceRow(inserted as ScenePlaceRow)
   },
 
+  async unlinkPlace(sceneId: string, placeId: string): Promise<boolean> {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from("scene_places")
+      .delete()
+      .eq("scene_id", sceneId)
+      .eq("place_id", placeId)
+      .select("id")
+
+    if (error) {
+      console.error("[scenes repo] unlinkPlace:", error.message)
+      return false
+    }
+    return (data?.length ?? 0) > 0
+  },
+
   async delete(id: string): Promise<boolean> {
     const supabase = await createClient()
     const { data: existing } = await supabase

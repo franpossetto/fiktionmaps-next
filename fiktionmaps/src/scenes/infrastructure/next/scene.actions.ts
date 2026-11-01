@@ -19,6 +19,7 @@ import {
   createSceneBodySchema,
   linkScenePlaceBodySchema,
   patchSceneBodySchema,
+  unlinkScenePlaceBodySchema,
 } from "@/src/scenes/domain/scene.schemas"
 import type { Scene } from "@/src/scenes/domain/scene.entity"
 import type { City } from "@/src/cities/domain/city.entity"
@@ -31,6 +32,7 @@ import { createContributorSceneUseCase } from "@/src/scenes/application/create-c
 import { updateSceneUseCase } from "@/src/scenes/application/update-scene.usecase"
 import { deleteSceneUseCase } from "@/src/scenes/application/delete-scene.usecase"
 import { linkScenePlaceUseCase } from "@/src/scenes/application/link-scene-place.usecase"
+import { unlinkScenePlaceUseCase } from "@/src/scenes/application/unlink-scene-place.usecase"
 import { listScenesInCityUseCase } from "@/src/scenes/application/list-scenes-in-city.usecase"
 import { getCitiesWithScenesUseCase } from "@/src/scenes/application/get-cities-with-scenes.usecase"
 import type {
@@ -38,6 +40,7 @@ import type {
   UpdateSceneResult,
   DeleteSceneResult,
   LinkScenePlaceResult,
+  UnlinkScenePlaceResult,
   ListScenesQueryInput,
   CreateContributorSceneResult,
 } from "./scene.actions.types"
@@ -52,6 +55,7 @@ export type {
   UpdateSceneResult,
   DeleteSceneResult,
   LinkScenePlaceResult,
+  UnlinkScenePlaceResult,
   ListScenesQueryInput,
   CreateContributorSceneResult,
 } from "./scene.actions.types"
@@ -170,11 +174,39 @@ export async function linkScenePlaceAction(body: unknown): Promise<LinkScenePlac
       scenesRepo: scenesSupabaseAdapter,
     })
     updateTag("scenes")
+    updateTag(`scene-${parsed.data.sceneId}`)
     updateTag("places")
     updateTag(`place-${parsed.data.placeId}`)
     return { success: true, scenePlace }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed to link place" }
+  }
+}
+
+export async function unlinkScenePlaceAction(body: unknown): Promise<UnlinkScenePlaceResult> {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { success: false, error: "Unauthorized" }
+
+  const isStaffModerator = await ensureUserIsModeratorUseCase(
+    user.id,
+    profilesReaderSupabaseAdapter,
+    MODERATOR_ROLES,
+  )
+  if (!isStaffModerator) return { success: false, error: "Unauthorized" }
+
+  const parsed = unlinkScenePlaceBodySchema.safeParse(body)
+  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
+
+  try {
+    await unlinkScenePlaceUseCase(parsed.data, { scenesRepo: scenesSupabaseAdapter })
+    updateTag("scenes")
+    updateTag(`scene-${parsed.data.sceneId}`)
+    updateTag("places")
+    updateTag(`place-${parsed.data.placeId}`)
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed to unlink place" }
   }
 }
 
