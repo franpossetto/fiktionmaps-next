@@ -5,7 +5,9 @@ import { getTranslations } from "next-intl/server"
 import { getFictionBySlugCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { resolvePlaceForFictionPathCached } from "@/src/places/infrastructure/next/place.queries"
 import { getCityByIdCached } from "@/src/cities/infrastructure/next/city.queries"
+import { getSessionUserId } from "@/lib/auth/auth.service"
 import { getSiteUrl } from "@/lib/site"
+import { isPlaceWishlistedForSession } from "@/src/place-wishlists/infrastructure/next/place-wishlist.queries"
 import { FictionPlaceDetailView } from "@/components/fictions/fiction-place-detail-view"
 import {
   PlaceDetailContributors,
@@ -90,10 +92,12 @@ export default async function FictionPlaceUnderSlugPage({ params }: Props) {
   const fictionSlug = fiction.slug.trim()
 
   // Critical path only: city + sidebar copy. Scenes/contributors stream via Suspense.
-  const [city, sidebarSummary] = await Promise.all([
+  const [city, sidebarSummary, sessionUserId] = await Promise.all([
     cityId ? getCityByIdCached(cityId) : Promise.resolve(null),
     getFictionSidebarSummaryText(fiction, locale),
+    getSessionUserId(),
   ])
+  const initialWishlisted = sessionUserId ? await isPlaceWishlistedForSession(place.id) : false
 
   const baseMapParams = new URLSearchParams({
     fiction: fiction.id,
@@ -111,6 +115,7 @@ export default async function FictionPlaceUnderSlugPage({ params }: Props) {
         place={place}
         city={city ?? undefined}
         exploreMapHref={exploreMapHref}
+        initialWishlisted={initialWishlisted}
         contributorsSlot={
           <Suspense fallback={<PlaceDetailContributorsFallback />}>
             <PlaceDetailContributors placeId={place.id} />

@@ -26,6 +26,8 @@ import {
   ProfileContributionsHeatmap,
 } from "./profile-contributions-heatmap"
 import { ProfileLikedFictions } from "./profile-liked-fictions"
+import { ProfilePlaceWishlist } from "./profile-place-wishlist"
+import type { PlaceWishlistItem } from "@/src/place-wishlists/domain/place-wishlist.entity"
 import { ProfileInterests, type ProfileInterestTag } from "./profile-interests"
 import { ProfileMetaAside } from "./profile-meta-aside"
 import { ProfileStatsAside } from "./profile-stats-aside"
@@ -35,10 +37,11 @@ interface UserProfileProps {
   initialCities?: City[]
   initialHomes?: UserHome[]
   initialContributions?: ProfileContributionItem[]
-  initialLikedFictions?: FictionWithMedia[]
-  initialInterests?: ProfileInterestTag[]
   contributionsTotalCount?: number
   contributionActivity?: ProfileContributionItem[]
+  initialLikedFictions?: FictionWithMedia[]
+  initialPlaceWishlist?: PlaceWishlistItem[]
+  initialInterests?: ProfileInterestTag[]
   interestCatalog?: InterestCatalogItem[]
   /** Defaults to true (own `/profile` shortcut). */
   isOwnProfile?: boolean
@@ -57,11 +60,12 @@ export function UserProfileComponent({
   initialCities,
   initialHomes,
   initialContributions,
-  initialLikedFictions,
-  initialInterests,
-  interestCatalog,
   contributionsTotalCount,
   contributionActivity,
+  initialLikedFictions,
+  initialPlaceWishlist,
+  initialInterests,
+  interestCatalog,
   isOwnProfile = true,
 }: UserProfileProps) {
   const { user, setAvatarPreference } = useAuth()
@@ -71,11 +75,11 @@ export function UserProfileComponent({
     profile,
   )
   const contributions = initialContributions ?? []
+  const activity = contributionActivity ?? contributions
   const likedFictions = initialLikedFictions ?? []
   const [interests, setInterests] = useState(initialInterests ?? [])
   const catalog = interestCatalog ?? []
   const [selectedContributionDateKey, setSelectedContributionDateKey] = useState<string | null>(null)
-  const activity = contributionActivity ?? contributions
   const [selectedContributionId, setSelectedContributionId] = useState<string | null>(null)
 
   const refetchProfile = useCallback(() => {
@@ -282,6 +286,12 @@ export function UserProfileComponent({
                 setSelectedContributionDateKey(contributionActivityDateKey(item.createdAt))
               }}
             />
+            {isOwnProfile ? (
+              <ProfilePlaceWishlist
+                items={initialPlaceWishlist ?? []}
+                username={loadedProfile?.username ?? profile?.username ?? null}
+              />
+            ) : null}
             <ProfileLikedFictions fictions={likedFictions} />
           </div>
 

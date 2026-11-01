@@ -1943,10 +1943,10 @@
     "cityIntroManyFictionsPrefix": "Algunas de las historias rodadas o ambientadas en {city} incluyen",
     "cityIntroAnd": "y"
   },
-  "Pco2": {
+  "FictionStory": {
     "storyView": "Story view",
     "closeStory": "Cerrar",
-    "metaTitle": "{title} · artículo en cards (POC)",
+    "metaTitle": "{title} · historia de ficción",
     "notFoundTitle": "Ficción no encontrada",
     "carouselLabel": "Cards de la historia",
     "previous": "Card anterior",

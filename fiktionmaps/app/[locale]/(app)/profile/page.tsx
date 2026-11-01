@@ -5,6 +5,7 @@ import { getCurrentUserProfileAction } from "@/src/users/infrastructure/next/use
 import { getUserHomesAction } from "@/src/homes/infrastructure/next/home.actions"
 import { getCurrentUserContributionsProfileData } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { getLikedFictionsForUserCached } from "@/src/fiction-likes/infrastructure/next/fiction-likes.queries"
+import { listPlaceWishlistItemsForCurrentUser } from "@/src/place-wishlists/infrastructure/next/place-wishlist.queries"
 import { getUserInterestTagsForSession } from "@/src/user-interests/infrastructure/next/user-interests.queries"
 import { getInterestCatalogCached } from "@/src/interests/infrastructure/next/interest.queries"
 import { publicUserProfilePath } from "@/lib/users/public-profile-path"
@@ -35,9 +36,10 @@ export default async function ProfilePage({
     redirect({ href: publicUserProfilePath(username), locale })
   }
 
-  const likedFictions = profileRes.data?.id
-    ? await getLikedFictionsForUserCached(profileRes.data.id)
-    : []
+  const [likedFictions, placeWishlist] = await Promise.all([
+    profileRes.data?.id ? getLikedFictionsForUserCached(profileRes.data.id) : Promise.resolve([]),
+    listPlaceWishlistItemsForCurrentUser(),
+  ])
   const interests = profileRes.data?.id
     ? await getUserInterestTagsForSession(profileRes.data.id, locale)
     : []
@@ -53,6 +55,7 @@ export default async function ProfilePage({
       contributionsTotalCount={contributionsData.preview.totalCount}
       contributionActivity={contributionsData.activity}
       initialLikedFictions={likedFictions}
+      initialPlaceWishlist={placeWishlist}
       initialInterests={interests}
       interestCatalog={interestCatalog}
     />

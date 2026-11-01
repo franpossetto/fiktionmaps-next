@@ -75,6 +75,18 @@ export function getPlaceLocationsByIdsCached(placeIds: string[]): Promise<Place[
   )()
 }
 
+/** Full-bleed avatars (xl → lg → sm) for vertical / detail surfaces. */
+export function getPlaceLocationsByIdsXlCached(placeIds: string[]): Promise<Place[]> {
+  const unique = [...new Set(placeIds.filter(Boolean))]
+  if (unique.length === 0) return Promise.resolve([])
+  const key = unique.slice().sort().join(",")
+  return unstable_cache(
+    () => getPlacesByIdsUseCase(unique, anonRepo, "xl"),
+    CacheKeys.place(`batch:${key}:xl`),
+    { ...CacheConfig.medium, tags: ["places"] },
+  )()
+}
+
 export function getPlaceLocationByIdDetailCached(placeId: string) {
   return unstable_cache(
     () => getPlaceByIdUseCase(placeId, anonRepo, "lg"),
@@ -130,7 +142,7 @@ export async function getPlaceLocationByIdForStaffSession(placeId: string): Prom
 export function getFictionPlacesCached(fictionId: string) {
   return unstable_cache(
     () => getFictionPlacesUseCase(fictionId, anonRepo),
-    CacheKeys.fiction(`places:${fictionId}:approved`),
+    CacheKeys.fiction(`places:${fictionId}:approved:xs`),
     { ...CacheConfig.long, tags: ["places", "fictions", `fiction-${fictionId}`] }
   )()
 }

@@ -13,8 +13,8 @@ import { FictionDetailLikeButton } from "@/components/fictions/fiction-detail-li
 import { PlaceWishlistToggle } from "@/components/places/place-wishlist-toggle"
 import { FictionDetailRecentTracker } from "@/components/fictions/fiction-detail-recent-tracker"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
-import { FictionStoryView } from "@/components/fictions/pco2/fiction-story-view"
-import type { Pco2Card } from "@/components/fictions/pco2/build-pco2-cards"
+import { FictionStoryView } from "@/components/fictions/story/fiction-story-view"
+import type { FictionStoryCard } from "@/components/fictions/story/build-fiction-story-cards"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Place } from "@/src/places/domain/place.entity"
@@ -39,7 +39,7 @@ export interface FictionDetailProps {
   /** Deferred recommendations (Suspense slot) rendered after places list. */
   recommendationsSlot?: ReactNode
   /** Phone / story deck opened from the "Story view" button. */
-  storyCards?: Pco2Card[]
+  storyCards?: FictionStoryCard[]
 }
 
 /** Server Component: hero + copy + places SSR; likes are client islands. */
