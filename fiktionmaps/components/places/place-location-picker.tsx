@@ -15,11 +15,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { City } from "@/src/cities/domain/city.entity"
+import { haversineDistance } from "@/lib/geo/haversine"
 
 const SEARCH_BOX_URL = "https://api.mapbox.com/search/searchbox/v1"
 const GEOCODING_URL = "https://api.mapbox.com/geocoding/v5/mapbox.places"
 export const PLACE_LOCATION_DEFAULT_CENTER = { lat: 48.8566, lng: 2.3522 }
 export const PLACE_LOCATION_DEFAULT_ZOOM = 10
+export const PLACE_LOCATION_PIN_ZOOM = 16
 export const PLACE_LOCATION_MIN_ZOOM = 0
 export const PLACE_LOCATION_MAX_ZOOM = 22
 export const PLACE_LOCATION_FLY_DURATION = 1200
@@ -209,6 +211,12 @@ export const LOCATION_TYPE_OPTIONS = [
   { value: "other", label: "Other" },
 ] as const
 
+export function coerceLocationType(raw: string | null | undefined): string {
+  if (!raw?.trim()) return ""
+  const normalized = raw.trim().toLowerCase()
+  return LOCATION_TYPE_OPTIONS.some((opt) => opt.value === normalized) ? normalized : raw.trim()
+}
+
 /** @deprecated Use MapboxSearchType[] instead */
 export type PlaceAddressMode = "place" | "street"
 
@@ -227,24 +235,78 @@ function newSessionToken(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-/** Resolve city_id from Mapbox context (place name + country) by matching our cities. */
+const CITY_MATCH_MAX_M = 100_000
+
+function cityNameMatches(cityName: string, candidate: string): boolean {
+  if (!candidate) return false
+  if (cityName === candidate) return true
+  const city = cityName.toLowerCase()
+  const other = candidate.toLowerCase()
+  return other.includes(city) || city.includes(other)
+}
+
+/** Nearest catalog city within `maxMeters`, or empty if none are close enough. */
+export function nearestCityId(
+  lat: number,
+  lng: number,
+  cities: City[],
+  maxMeters = CITY_MATCH_MAX_M,
+): string {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return ""
+  let bestId = ""
+  let best = Infinity
+  for (const city of cities) {
+    if (!Number.isFinite(city.lat) || !Number.isFinite(city.lng)) continue
+    const distance = haversineDistance(lat, lng, city.lat, city.lng)
+    if (distance < best) {
+      best = distance
+      bestId = city.id
+    }
+  }
+  return best <= maxMeters ? bestId : ""
+}
+
+/**
+ * Prefer the stored city when it still matches the pin.
+ * Otherwise pick the nearest catalog city so a Paris pin is not shown as Arezzo.
+ */
+export function cityIdForPlaceCoords(
+  storedCityId: string,
+  lat: number,
+  lng: number,
+  cities: City[],
+): string {
+  const stored = cities.find((city) => city.id === storedCityId)
+  if (stored && Number.isFinite(lat) && Number.isFinite(lng)) {
+    const distance = haversineDistance(lat, lng, stored.lat, stored.lng)
+    if (distance <= CITY_MATCH_MAX_M) return stored.id
+  }
+  return nearestCityId(lat, lng, cities) || storedCityId
+}
+
+/** Resolve city_id from Mapbox context, then by coordinates. Never falls back to cities[0]. */
 export function resolveCityId(
   context: Array<{ id: string; text: string }> | undefined,
   placeName: string,
   cities: City[],
+  coords?: { lat: number; lng: number },
 ): string {
   const countryContext = context?.find((c) => c.id.startsWith("country."))
   const regionContext = context?.find((c) => c.id.startsWith("region.") || c.id.startsWith("place."))
-  const country = countryContext?.text ?? ""
+  const country = countryContext?.text?.trim() ?? ""
   const regionOrPlace = regionContext?.text ?? placeName.split(",")[0]?.trim() ?? ""
 
-  for (const city of cities) {
-    if (city.country !== country) continue
-    if (city.name === regionOrPlace) return city.id
-    if (regionOrPlace.toLowerCase().includes(city.name.toLowerCase())) return city.id
-    if (city.name.toLowerCase().includes(regionOrPlace.toLowerCase())) return city.id
+  if (country) {
+    for (const city of cities) {
+      if (city.country.trim().toLowerCase() !== country.toLowerCase()) continue
+      if (cityNameMatches(city.name, regionOrPlace)) return city.id
+    }
   }
-  return cities[0]?.id ?? ""
+  for (const city of cities) {
+    if (cityNameMatches(city.name, regionOrPlace)) return city.id
+  }
+  if (coords) return nearestCityId(coords.lat, coords.lng, cities)
+  return ""
 }
 
 function MapboxSearchTypeFilter({
@@ -691,6 +753,7 @@ export function PlaceLocationMap({
 }: PlaceLocationMapProps) {
   const mapControlRef = useRef<MapControlHandle | null>(null)
   const [mapReady, setMapReady] = useState(false)
+  const lastFlownRef = useRef({ lat: latitude, lng: longitude })
 
   const safeCenter =
     Number.isFinite(latitude) && Number.isFinite(longitude)
@@ -699,14 +762,21 @@ export function PlaceLocationMap({
 
   const hasPin = Number.isFinite(latitude) && Number.isFinite(longitude)
 
+  useEffect(() => {
+    if (!mapReady || !hasPin) return
+    const prev = lastFlownRef.current
+    if (prev.lat === latitude && prev.lng === longitude) return
+    lastFlownRef.current = { lat: latitude, lng: longitude }
+    flyMapToLocation(mapControlRef.current, latitude, longitude, PLACE_LOCATION_PIN_ZOOM)
+  }, [hasPin, latitude, longitude, mapReady])
+
   return (
     <MapProvider libraries={[]}>
       <MapContainer
         id={mapId}
         mapKey={mapKey}
         defaultCenter={safeCenter}
-        center={hasPin ? safeCenter : undefined}
-        defaultZoom={PLACE_LOCATION_DEFAULT_ZOOM}
+        defaultZoom={hasPin ? PLACE_LOCATION_PIN_ZOOM : PLACE_LOCATION_DEFAULT_ZOOM}
         minZoom={PLACE_LOCATION_MIN_ZOOM}
         maxZoom={PLACE_LOCATION_MAX_ZOOM}
         className={className}
@@ -749,7 +819,7 @@ export function flyMapToLocation(
   ctrl: MapControlHandle | null,
   lat: number,
   lng: number,
-  zoom = 15,
+  zoom = PLACE_LOCATION_PIN_ZOOM,
 ): void {
   ctrl?.flyTo({
     center: { lat, lng },

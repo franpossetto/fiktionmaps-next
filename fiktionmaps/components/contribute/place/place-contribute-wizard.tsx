@@ -333,7 +333,10 @@ export function PlaceContributeWizard({
       text: string
       context?: Array<{ id: string; text: string }>
     }) => {
-      const cityId = resolveCityId(result.context, result.place_name, initialCities)
+      const cityId = resolveCityId(result.context, result.place_name, initialCities, {
+        lat: result.lat,
+        lng: result.lng,
+      })
       const suggested = result.text || result.place_name.split(",")[0]?.trim() || ""
       setDraft((prev) => ({
         ...prev,

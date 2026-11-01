@@ -14,17 +14,11 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { FormField } from "./form-field"
 import { LocationImageCropper } from "./location-image-cropper"
 import {
   LOCATION_TYPE_OPTIONS,
+  coerceLocationType,
   PLACE_LOCATION_DEFAULT_CENTER,
   DEFAULT_MAPBOX_SEARCH_TYPES,
   PlaceAddressSearchWithFilters,
@@ -42,6 +36,16 @@ import type { PlaceRelationKind } from "@/src/places/domain/place-relation-kind"
 import { cn } from "@/lib/utils"
 
 const PLACE_MAP_ID = "admin-place-map"
+
+const SELECT_CLASS =
+  "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+
+function selectValueIn(value: string, ids: Iterable<string>): string {
+  for (const id of ids) {
+    if (id === value) return value
+  }
+  return ""
+}
 
 export type { PlaceFormData } from "@/components/places/place-form-data"
 export { LOCATION_TYPE_OPTIONS } from "@/components/places/place-location-picker"
@@ -93,7 +97,10 @@ export function PlaceCreateView({
 }: PlaceCreateViewProps) {
   const tPlaces = useTranslations("Places")
   const isEdit = !!placeId
-  const [formData, setFormData] = useState<PlaceFormData>(initialFormData)
+  const [formData, setFormData] = useState<PlaceFormData>(() => ({
+    ...initialFormData,
+    locationType: coerceLocationType(initialFormData.locationType),
+  }))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [crop, setCrop] = useState({ x: 0, y: 0, scale: 1 })
@@ -133,7 +140,7 @@ export function PlaceCreateView({
     setManualLat(formatCoord(coords.lat))
     setManualLng(formatCoord(coords.lng))
     setManualCoordsError(false)
-    flyMapToLocation(mapControlRef.current, coords.lat, coords.lng, 17)
+    flyMapToLocation(mapControlRef.current, coords.lat, coords.lng)
   }, [])
 
   const handleAddressSelect = useCallback(
@@ -144,7 +151,10 @@ export function PlaceCreateView({
       text: string
       context?: Array<{ id: string; text: string }>
     }) => {
-      const cityId = resolveCityId(result.context, result.place_name, cities)
+      const cityId = resolveCityId(result.context, result.place_name, cities, {
+        lat: result.lat,
+        lng: result.lng,
+      })
       const suggestedName =
         result.text || result.place_name.split(",")[0]?.trim() || "Place"
       setFormData((prev) => ({
@@ -201,6 +211,33 @@ export function PlaceCreateView({
     }
     applyCoords(coords)
   }, [applyCoords, manualLat, manualLng])
+
+  const handleCityChange = useCallback(
+    (cityId: string) => {
+      if (!cityId) {
+        setFormData((p) => ({ ...p, cityId: "" }))
+        return
+      }
+      if (formData.cityId === cityId) return
+      const city = cities.find((c) => c.id === cityId)
+      if (!city) return
+      if (!Number.isFinite(city.lat) || !Number.isFinite(city.lng)) {
+        setFormData((p) => ({ ...p, cityId }))
+        return
+      }
+      setFormData((p) => ({
+        ...p,
+        cityId,
+        latitude: city.lat,
+        longitude: city.lng,
+      }))
+      setManualLat(formatCoord(city.lat))
+      setManualLng(formatCoord(city.lng))
+      setManualCoordsError(false)
+      flyMapToLocation(mapControlRef.current, city.lat, city.lng)
+    },
+    [cities, formData.cityId],
+  )
 
   const handleManualAddressChange = useCallback((value: string) => {
     setFormData((prev) => ({
@@ -284,21 +321,21 @@ export function PlaceCreateView({
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <FormField label="Fiction" required error={errors.fictionId}>
-              <Select
-                value={formData.fictionId || undefined}
-                onValueChange={(v) => setFormData((p) => ({ ...p, fictionId: v }))}
+              <select
+                value={selectValueIn(formData.fictionId, fictions.map((f) => f.id))}
+                onChange={(e) => setFormData((p) => ({ ...p, fictionId: e.target.value }))}
+                className={SELECT_CLASS}
               >
-                <SelectTrigger className="h-10 w-full rounded-lg">
-                  <SelectValue placeholder="Select fiction" />
-                </SelectTrigger>
-                <SelectContent className="z-[10000]">
-                  {fictions.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
-                      {f.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <option value="">Select fiction</option>
+                {fictions.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.title}
+                  </option>
+                ))}
+                {formData.fictionId && !fictions.some((f) => f.id === formData.fictionId) ? (
+                  <option value={formData.fictionId}>{formData.fictionId}</option>
+                ) : null}
+              </select>
             </FormField>
 
             <div className="flex items-center gap-2 pt-1">
@@ -440,80 +477,76 @@ export function PlaceCreateView({
 
             {isEdit ? (
               <FormField label="City">
-                <Select
-                  value={formData.cityId || undefined}
-                  onValueChange={(v) => setFormData((p) => ({ ...p, cityId: v }))}
+                <select
+                  value={selectValueIn(formData.cityId, cities.map((c) => c.id))}
+                  onChange={(e) => handleCityChange(e.target.value)}
+                  className={SELECT_CLASS}
                 >
-                  <SelectTrigger className="h-10 w-full rounded-lg">
-                    <SelectValue placeholder="Select city" />
-                  </SelectTrigger>
-                  <SelectContent className="z-[10000]">
-                    {cities.map((city) => (
-                      <SelectItem key={city.id} value={city.id}>
-                        {city.name}, {city.country}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <option value="">Select city</option>
+                  {cities.map((city) => (
+                    <option key={city.id} value={city.id}>
+                      {city.name}, {city.country}
+                    </option>
+                  ))}
+                  {formData.cityId && !cities.some((c) => c.id === formData.cityId) ? (
+                    <option value={formData.cityId}>{formData.cityId}</option>
+                  ) : null}
+                </select>
               </FormField>
             ) : null}
 
             <FormField label="Location type">
-              <Select
-                value={formData.locationType || undefined}
-                onValueChange={(v) => setFormData((p) => ({ ...p, locationType: v }))}
+              <select
+                value={formData.locationType}
+                onChange={(e) => setFormData((p) => ({ ...p, locationType: e.target.value }))}
+                className={SELECT_CLASS}
               >
-                <SelectTrigger className="h-10 w-full rounded-lg">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent className="z-[10000]">
-                  {LOCATION_TYPE_OPTIONS.filter((opt) => opt.value).map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                {LOCATION_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value || "none"} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+                {formData.locationType &&
+                !LOCATION_TYPE_OPTIONS.some((opt) => opt.value === formData.locationType) ? (
+                  <option value={formData.locationType}>{formData.locationType}</option>
+                ) : null}
+              </select>
             </FormField>
 
             <FormField label={tPlaces("fieldRelationKind")}>
-              <Select
-                value={formData.relationKind || undefined}
-                onValueChange={(v) =>
-                  setFormData((p) => ({ ...p, relationKind: v as PlaceRelationKind }))
+              <select
+                value={formData.relationKind}
+                onChange={(e) =>
+                  setFormData((p) => ({ ...p, relationKind: e.target.value as PlaceRelationKind }))
                 }
+                className={SELECT_CLASS}
               >
-                <SelectTrigger className="h-10 w-full rounded-lg">
-                  <SelectValue placeholder="—" />
-                </SelectTrigger>
-                <SelectContent className="z-[10000]">
-                  {RELATION_KIND_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {tPlaces(opt.labelKey)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                {RELATION_KIND_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {tPlaces(opt.labelKey)}
+                  </option>
+                ))}
+              </select>
             </FormField>
 
             <FormField label={tPlaces("fieldShootEnvironment")}>
-              <Select
-                value={formData.shootEnvironment || undefined}
-                onValueChange={(v) =>
-                  setFormData((p) => ({ ...p, shootEnvironment: v as PlaceShootEnvironment }))
+              <select
+                value={formData.shootEnvironment}
+                onChange={(e) =>
+                  setFormData((p) => ({
+                    ...p,
+                    shootEnvironment: e.target.value as PlaceShootEnvironment,
+                  }))
                 }
+                className={SELECT_CLASS}
               >
-                <SelectTrigger className="h-10 w-full rounded-lg">
-                  <SelectValue placeholder="—" />
-                </SelectTrigger>
-                <SelectContent className="z-[10000]">
-                  {SHOOT_ENVIRONMENT_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {tPlaces(opt.labelKey)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <option value="">—</option>
+                {SHOOT_ENVIRONMENT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {tPlaces(opt.labelKey)}
+                  </option>
+                ))}
+              </select>
             </FormField>
 
             <FormField label="Location name" required error={errors.locationName}>
@@ -606,18 +639,18 @@ export function PlaceCreateView({
             </p>
             <div className="space-y-2">
               <label className="block text-sm font-medium text-foreground">City</label>
-              <Select value={confirmCityId || undefined} onValueChange={(v) => setConfirmCityId(v)}>
-                <SelectTrigger className="h-10 w-full rounded-lg">
-                  <SelectValue placeholder="Select city" />
-                </SelectTrigger>
-                <SelectContent className="z-[10000]">
-                  {cities.map((city) => (
-                    <SelectItem key={city.id} value={city.id}>
-                      {city.name}, {city.country}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                value={confirmCityId}
+                onChange={(e) => setConfirmCityId(e.target.value)}
+                className={SELECT_CLASS}
+              >
+                <option value="">Select city</option>
+                {cities.map((city) => (
+                  <option key={city.id} value={city.id}>
+                    {city.name}, {city.country}
+                  </option>
+                ))}
+              </select>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setConfirmOpen(false)}>

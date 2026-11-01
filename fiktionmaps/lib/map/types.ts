@@ -39,6 +39,12 @@ export interface MapContainerProps {
   minZoom?: number
   maxZoom?: number
   interactive?: boolean
+  /** Wheel / trackpad zoom. Defaults to `interactive`. */
+  scrollZoom?: boolean
+  /** Double-click zoom. Defaults to `interactive`. */
+  doubleClickZoom?: boolean
+  /** Pinch zoom (and two-finger rotate). Defaults to `interactive`. */
+  touchZoomRotate?: boolean
   colorScheme?: "dark" | "light"
   /** When set, map uses this style (day, dawn, dusk, night); overrides colorScheme for the actual Mapbox style URL */
   mapStyle?: "day" | "dawn" | "dusk" | "night"
