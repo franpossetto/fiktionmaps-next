@@ -99,6 +99,13 @@
 
 @layer components {
   /**
+   * Long-form fiction/place/scene body copy. Titles stay on the sans stack.
+   */
+  .article-body {
+    @apply font-article text-base leading-8 text-foreground;
+  }
+
+  /**
    * Fiction rails: margin | left rail | main | right rail | margin.
    * Higher fr on outer margins than on rails so width squeezes margins first, then rails; main uses minmax(min(720px,100%),1fr).
    */

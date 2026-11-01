@@ -24,6 +24,12 @@ export interface AppDetailRailsShellProps {
    *    `position: sticky` to pin it during scroll.
    */
   scrollMode?: "main" | "page"
+  /**
+   * Below the right-rail breakpoint, also render `rightAside` under the main column.
+   * Set `false` when the main column is a full-height surface (e.g. a reel) that
+   * should not share vertical space with a stacked copy of the rail.
+   */
+  stackRightAsideOnNarrow?: boolean
 }
 
 /**
@@ -55,6 +61,7 @@ export function AppDetailRailsShell({
   mainAndRightOnly = false,
   mainColumnScroll = true,
   scrollMode = "main",
+  stackRightAsideOnNarrow = true,
 }: AppDetailRailsShellProps) {
   const isPageScroll = scrollMode === "page"
   const gridCols = mainAndRightOnly ? RAILS_GRID_COLUMNS_MAIN_RIGHT_ONLY : RAILS_GRID_COLUMNS
@@ -86,7 +93,7 @@ export function AppDetailRailsShell({
         {isPageScroll ? (
           <div className="min-w-0 border-x border-border/50 max-lg:min-h-full @[1200px]/rails:border-x-0">
             {children}
-            {rightAside && (
+            {rightAside && stackRightAsideOnNarrow && (
               <div className="border-t border-border/50 p-5 @[1600px]/rails:hidden">
                 {rightAside}
               </div>
@@ -98,7 +105,7 @@ export function AppDetailRailsShell({
             className={cn("min-h-0 h-full min-w-0 bg-background", mainOverflowClass)}
           >
             {children}
-            {rightAside && (
+            {rightAside && stackRightAsideOnNarrow && (
               <div className="border-t border-border/50 p-5 @[1600px]/rails:hidden">
                 {rightAside}
               </div>

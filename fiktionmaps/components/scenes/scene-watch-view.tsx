@@ -106,7 +106,7 @@ export function SceneWatchView({
             </div>
 
             {currentWatchScene.description ? (
-              <p className="max-w-[75ch] text-base leading-8 text-muted-foreground">
+              <p className="article-body">
                 {currentWatchScene.description}
               </p>
             ) : null}
