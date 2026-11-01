@@ -18,6 +18,7 @@ import type { Place } from "@/src/places/domain/place.entity"
 import { uploadPlaceImageAction } from "@/src/places/infrastructure/next/place.actions"
 import {
   previewImageCodecsAction,
+  repairMissingAssetVariantsAction,
   type ImageCodecPreviewVariant,
 } from "@/src/asset-images/infrastructure/next/asset-image.actions"
 import { cn } from "@/lib/utils"
@@ -58,6 +59,11 @@ export function PlaceImprovePhotoView({ place, inventory }: PlaceImprovePhotoVie
   const [previews, setPreviews] = useState<ImageCodecPreviewVariant[] | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [repairing, setRepairing] = useState(false)
+  const [repairError, setRepairError] = useState<string | null>(null)
+
+  const missingVariants = inventory.variants.filter((item) => !item.hasRow || item.objectMissing)
+  const canRepair = missingVariants.length > 0
 
   const placeLabel = place.name?.trim() || place.location.name || "Place"
   const currentUrl = isRealPlaceImage(place.image) ? place.image : null
@@ -128,6 +134,27 @@ export function PlaceImprovePhotoView({ place, inventory }: PlaceImprovePhotoVie
     }
     router.push("/admin?tab=locations")
     router.refresh()
+  }
+
+  const handleRepair = async () => {
+    setRepairing(true)
+    setRepairError(null)
+    try {
+      const result = await repairMissingAssetVariantsAction({
+        entityType: "place",
+        entityId: place.id,
+        role: "avatar",
+      })
+      if (!result.success) {
+        setRepairError(result.error ?? "Repair failed")
+        return
+      }
+      router.refresh()
+    } catch (err) {
+      setRepairError(err instanceof Error ? err.message : "Repair failed")
+    } finally {
+      setRepairing(false)
+    }
   }
 
   const handleBack = () => {
@@ -214,6 +241,32 @@ export function PlaceImprovePhotoView({ place, inventory }: PlaceImprovePhotoVie
                     />
                   </div>
                   <AssetVariantFormatChecklist inventory={inventory} />
+                  {canRepair ? (
+                    <div className="space-y-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={repairing}
+                        onClick={handleRepair}
+                        className="w-full gap-2"
+                      >
+                        {repairing ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Repairing…
+                          </>
+                        ) : (
+                          `Repair missing (${missingVariants.map((item) => item.variant).join(", ")})`
+                        )}
+                      </Button>
+                      {repairError ? (
+                        <p className="text-xs text-destructive" role="alert">
+                          {repairError}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="mx-auto flex aspect-[3/2] w-full max-w-[320px] items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
