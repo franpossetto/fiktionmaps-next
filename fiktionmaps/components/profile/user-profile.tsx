@@ -37,6 +37,8 @@ interface UserProfileProps {
   initialContributions?: ProfileContributionItem[]
   initialLikedFictions?: FictionWithMedia[]
   initialInterests?: ProfileInterestTag[]
+  contributionsTotalCount?: number
+  contributionActivity?: ProfileContributionItem[]
   interestCatalog?: InterestCatalogItem[]
   /** Defaults to true (own `/profile` shortcut). */
   isOwnProfile?: boolean
@@ -58,6 +60,8 @@ export function UserProfileComponent({
   initialLikedFictions,
   initialInterests,
   interestCatalog,
+  contributionsTotalCount,
+  contributionActivity,
   isOwnProfile = true,
 }: UserProfileProps) {
   const { user, setAvatarPreference } = useAuth()
@@ -71,6 +75,7 @@ export function UserProfileComponent({
   const [interests, setInterests] = useState(initialInterests ?? [])
   const catalog = interestCatalog ?? []
   const [selectedContributionDateKey, setSelectedContributionDateKey] = useState<string | null>(null)
+  const activity = contributionActivity ?? contributions
   const [selectedContributionId, setSelectedContributionId] = useState<string | null>(null)
 
   const refetchProfile = useCallback(() => {
@@ -197,7 +202,7 @@ export function UserProfileComponent({
   const displayName = activeProfile.username || user?.name || user?.email?.split("@")[0] || ""
   const role: UserRole = activeProfile.role
   const fppTotal = activeProfile.fppTotal
-  const approvedContributionCount = contributions.filter((c) => c.status === "approved").length
+  const approvedContributionCount = activity.filter((c) => c.status === "approved").length
   const joinYear = activeProfile.joinedDate
     ? new Date(activeProfile.joinedDate).getFullYear()
     : new Date().getFullYear()
@@ -258,7 +263,7 @@ export function UserProfileComponent({
 
           <div className="space-y-8">
             <ProfileContributionsHeatmap
-              contributions={contributions}
+              contributions={activity}
               selectedDateKey={selectedContributionDateKey}
               onSelectedDateKeyChange={(dateKey) => {
                 setSelectedContributionDateKey(dateKey)
@@ -267,7 +272,9 @@ export function UserProfileComponent({
               showContributeCta={isOwnProfile}
             />
             <ProfileContributionsList
-              contributions={contributions}
+              previewItems={contributions}
+              totalCount={contributionsTotalCount ?? contributions.length}
+              profileUserId={activeProfile.id}
               isOwnProfile={isOwnProfile}
               selectedContributionId={selectedContributionId}
               onSelectContribution={(item) => {

@@ -4,6 +4,7 @@ import type { Place } from "@/src/places/domain/place.entity"
 import type { MapBbox } from "@/lib/validation/map-query"
 import type { CreatePlaceRepoInput, UpdatePlaceData } from "./place.schemas"
 import type { SitemapPlaceEntry } from "@/src/places/domain/place-sitemap.entity"
+import type { SuggestedPlace } from "@/src/places/domain/suggested-place.entity"
 
 export type GetClustersInBboxInput = {
   bbox: MapBbox
@@ -33,6 +34,8 @@ export interface PlacesRepositoryPort {
   isApprovedActivePlace(placeId: string): Promise<boolean>
   getPlaceImageUrlsByRole(placeId: string, variant?: "sm" | "lg" | "xl"): Promise<PlaceImageRoleUrls>
   listAllPlaces(): Promise<Place[]>
+  /** Approved + active catalog cards for wishlist empty-state suggestions. */
+  listSuggestedApprovedActive(limit: number): Promise<SuggestedPlace[]>
   /** Count of approved + active places in the public catalog. */
   countApprovedActive(): Promise<number>
   getCountsByFictionIds(fictionIds: string[]): Promise<Record<string, number>>

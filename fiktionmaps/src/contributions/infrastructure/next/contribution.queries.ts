@@ -6,7 +6,7 @@ import { createAnonymousClient, createClient } from "@/lib/supabase/server"
 import type { Database } from "@/supabase/database.types"
 import { getContributionByIdUseCase } from "@/src/contributions/application/get-contribution-by-id.usecase"
 import { getContributionsByUserUseCase } from "@/src/contributions/application/get-contributions-by-user.usecase"
-import { getProfileContributionsByUserUseCase } from "@/src/contributions/application/get-profile-contributions-by-user.usecase"
+import { listProfileContributionsPageUseCase } from "@/src/contributions/application/list-profile-contributions-page.usecase"
 import { getApprovedByEntityUseCase } from "@/src/contributions/application/get-approved-by-entity.usecase"
 import { getFictionContributorsUseCase } from "@/src/contributions/application/get-fiction-contributors.usecase"
 import { getContributorsFirstContributionByEntityUseCase } from "@/src/contributions/application/get-contributors-first-contribution-by-entity.usecase"
@@ -17,6 +17,7 @@ import { getStaffCreateContributionsFeedPageUseCase } from "@/src/contributions/
 import { getContributorModerationContextUseCase } from "@/src/contributions/application/get-contributor-moderation-context.usecase"
 import { getTopContributorsUseCase } from "@/src/contributions/application/get-top-contributors.usecase"
 import {
+  PROFILE_CONTRIBUTIONS_PAGE_SIZE,
   STAFF_FICTION_CONTRIBUTIONS_FEED_PAGE_SIZE,
 } from "@/src/contributions/domain/contribution.config"
 import type {
@@ -35,6 +36,10 @@ import type {
   StaffFictionContributionsFeedStatusTab,
   TopContributorProfile,
 } from "@/src/contributions/domain/contribution.entity"
+import type {
+  ContributionsRepositoryPort,
+  ProfileContributionsPageResult,
+} from "@/src/contributions/domain/contribution.repository"
 import {
   createContributionsSupabaseAdapter,
   supabaseRepositoryAdapter as contributionsCookieRepo,
@@ -73,40 +78,94 @@ export function getContributionsByUserCached(userId: string) {
   )()
 }
 
-/**
- * Current user's contributions for the profile page (with entity labels).
- * Request-scoped. Uses module-level repo singletons only — never construct a
- * fresh `createContributionsSupabaseAdapter()` per call (React `cache()` inside
- * the factory must stay stable at module scope).
- */
-export const getCurrentUserContributions = cache(async (): Promise<ProfileContributionItem[]> => {
-  const userId = await getSessionUserId()
-  if (!userId) return []
-  return getProfileContributionsForViewer(userId)
-})
+export type ProfileContributionsProfileData = {
+  preview: ProfileContributionsPageResult
+  activity: ProfileContributionItem[]
+}
+
+function toActivityItems(rows: Contribution[]): ProfileContributionItem[] {
+  return rows.map((row) => ({ ...row, entityLabel: null, parentLabel: null }))
+}
+
+async function loadProfileContributionsProfileData(
+  profileUserId: string,
+  repo: ContributionsRepositoryPort,
+): Promise<ProfileContributionsProfileData> {
+  const [preview, rows] = await Promise.all([
+    listProfileContributionsPageUseCase(
+      {
+        userId: profileUserId,
+        limit: PROFILE_CONTRIBUTIONS_PAGE_SIZE,
+        offset: 0,
+      },
+      repo,
+    ),
+    getContributionsByUserUseCase(profileUserId, repo),
+  ])
+  return { preview, activity: toActivityItems(rows) }
+}
 
 /**
- * Contributions visible to the current session for a profile page.
+ * Preview (first page, labeled) + activity (all rows, no entity labels) for a profile.
  * Own profile or staff: all statuses (cookie RLS). Other viewers: approved only.
  */
-export const getProfileContributionsForViewer = cache(
-  async (profileUserId: string): Promise<ProfileContributionItem[]> => {
+export const getProfileContributionsProfileData = cache(
+  async (profileUserId: string): Promise<ProfileContributionsProfileData> => {
+    const empty: ProfileContributionsProfileData = {
+      preview: { items: [], totalCount: 0 },
+      activity: [],
+    }
     const sessionUserId = await getSessionUserId()
-    if (!sessionUserId) return []
+    if (!sessionUserId) return empty
 
     const isOwnProfile = sessionUserId === profileUserId
     const isStaff = !isOwnProfile ? await getIsUserStaff(sessionUserId) : false
 
     if (isOwnProfile || isStaff) {
-      const rows = await getProfileContributionsByUserUseCase(
-        profileUserId,
-        contributionsCookieRepo,
-      )
-      // Own profile: if the session client returns nothing, fall back to public approved.
-      if (rows.length > 0 || isStaff) return rows
+      const data = await loadProfileContributionsProfileData(profileUserId, contributionsCookieRepo)
+      if (data.preview.totalCount > 0 || data.activity.length > 0 || isStaff) return data
     }
 
-    return getProfileContributionsByUserUseCase(profileUserId, anonRepo)
+    return loadProfileContributionsProfileData(profileUserId, anonRepo)
+  },
+)
+
+export const getCurrentUserContributionsProfileData = cache(
+  async (): Promise<ProfileContributionsProfileData> => {
+    const userId = await getSessionUserId()
+    if (!userId) return { preview: { items: [], totalCount: 0 }, activity: [] }
+    return getProfileContributionsProfileData(userId)
+  },
+)
+
+/**
+ * One labeled page for the profile “see all” dialog.
+ * Same visibility rules as `getProfileContributionsProfileData`.
+ */
+export const getProfileContributionsPageForViewer = cache(
+  async (
+    profileUserId: string,
+    page: number,
+  ): Promise<ProfileContributionsPageResult> => {
+    const sessionUserId = await getSessionUserId()
+    if (!sessionUserId) return { items: [], totalCount: 0 }
+
+    const safePage = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1
+    const input = {
+      userId: profileUserId,
+      limit: PROFILE_CONTRIBUTIONS_PAGE_SIZE,
+      offset: (safePage - 1) * PROFILE_CONTRIBUTIONS_PAGE_SIZE,
+    }
+
+    const isOwnProfile = sessionUserId === profileUserId
+    const isStaff = !isOwnProfile ? await getIsUserStaff(sessionUserId) : false
+
+    if (isOwnProfile || isStaff) {
+      const pageResult = await listProfileContributionsPageUseCase(input, contributionsCookieRepo)
+      if (pageResult.totalCount > 0 || isStaff) return pageResult
+    }
+
+    return listProfileContributionsPageUseCase(input, anonRepo)
   },
 )
 

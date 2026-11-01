@@ -865,6 +865,39 @@ export type Database = {
           },
         ]
       }
+      place_wishlists: {
+        Row: {
+          user_id: string
+          place_id: string
+          created_at: string
+        }
+        Insert: {
+          user_id: string
+          place_id: string
+          created_at?: string
+        }
+        Update: {
+          user_id?: string
+          place_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_wishlists_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "place_wishlists_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_homes: {
         Row: {
           id: string
@@ -1798,6 +1831,10 @@ export type UserInterestUpdate = TablesUpdate<"user_interests">
 export type FictionLikeRow = Tables<"fiction_likes">
 export type FictionLikeInsert = TablesInsert<"fiction_likes">
 export type FictionLikeUpdate = TablesUpdate<"fiction_likes">
+
+export type PlaceWishlistRow = Tables<"place_wishlists">
+export type PlaceWishlistInsert = TablesInsert<"place_wishlists">
+export type PlaceWishlistUpdate = TablesUpdate<"place_wishlists">
 
 export type PersonRow = Tables<"persons">
 export type PersonInsert = TablesInsert<"persons">

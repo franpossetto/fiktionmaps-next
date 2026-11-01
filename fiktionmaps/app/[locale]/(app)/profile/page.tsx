@@ -3,7 +3,7 @@ import { redirect } from "@/i18n/navigation"
 import { getAllCitiesCached } from "@/src/cities/infrastructure/next/city.queries"
 import { getCurrentUserProfileAction } from "@/src/users/infrastructure/next/user.actions"
 import { getUserHomesAction } from "@/src/homes/infrastructure/next/home.actions"
-import { getCurrentUserContributions } from "@/src/contributions/infrastructure/next/contribution.queries"
+import { getCurrentUserContributionsProfileData } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { getLikedFictionsForUserCached } from "@/src/fiction-likes/infrastructure/next/fiction-likes.queries"
 import { getUserInterestTagsForSession } from "@/src/user-interests/infrastructure/next/user-interests.queries"
 import { getInterestCatalogCached } from "@/src/interests/infrastructure/next/interest.queries"
@@ -23,11 +23,11 @@ export default async function ProfilePage({
   params: Promise<{ locale: string }>
 }) {
   const { locale } = await params
-  const [cities, profileRes, homesRes, contributions] = await Promise.all([
+  const [cities, profileRes, homesRes, contributionsData] = await Promise.all([
     getAllCitiesCached(),
     getCurrentUserProfileAction(),
     getUserHomesAction(),
-    getCurrentUserContributions(),
+    getCurrentUserContributionsProfileData(),
   ])
 
   const username = profileRes.data?.username?.trim()
@@ -49,7 +49,9 @@ export default async function ProfilePage({
       isOwnProfile
       initialCities={cities}
       initialHomes={homesRes.data ?? []}
-      initialContributions={contributions}
+      initialContributions={contributionsData.preview.items}
+      contributionsTotalCount={contributionsData.preview.totalCount}
+      contributionActivity={contributionsData.activity}
       initialLikedFictions={likedFictions}
       initialInterests={interests}
       interestCatalog={interestCatalog}

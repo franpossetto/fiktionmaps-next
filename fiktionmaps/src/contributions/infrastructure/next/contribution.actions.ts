@@ -45,11 +45,13 @@ import { scenesSupabaseAdapter as scenesRepo } from "@/src/scenes/infrastructure
 import { supabaseRepositoryAdapter as contributionsRepo } from "@/src/contributions/infrastructure/supabase/contribution.repository.impl"
 import { supabaseRepositoryAdapter as personsRepo } from "@/src/persons/infrastructure/supabase/person.repository.impl"
 import { profilesReaderSupabaseAdapter } from "@/src/contributions/infrastructure/supabase/profiles-reader.supabase"
+import { getProfileContributionsPageForViewer } from "@/src/contributions/infrastructure/next/contribution.queries"
 import type {
   ApproveContributionResult,
   CreateContributionResult,
   DeleteContributionResult,
   ListAdminContributionsResult,
+  ListProfileContributionsPageActionResult,
   RejectContributionResult,
   GetFictionScopeContributorContributionsResult,
 } from "./contribution.actions.types"
@@ -60,9 +62,21 @@ export type {
   CreateContributionResult,
   DeleteContributionResult,
   ListAdminContributionsResult,
+  ListProfileContributionsPageActionResult,
   RejectContributionResult,
   GetFictionScopeContributorContributionsResult,
 } from "./contribution.actions.types"
+
+export async function listProfileContributionsPageAction(
+  profileUserId: string,
+  page: number,
+): Promise<ListProfileContributionsPageActionResult> {
+  const parsed = uuidSchema.safeParse(profileUserId)
+  if (!parsed.success) return { success: false, error: "Invalid profile" }
+
+  const result = await getProfileContributionsPageForViewer(parsed.data, page)
+  return { success: true, items: result.items, totalCount: result.totalCount }
+}
 
 const usersRepo = createUsersSupabaseAdapter(createClient)
 

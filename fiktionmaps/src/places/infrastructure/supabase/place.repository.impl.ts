@@ -16,6 +16,7 @@ import type {
 import type { MapCluster } from "@/src/places/domain/map-cluster.entity"
 import { WORLD_MAX_CLUSTERS, WORLD_MAX_PLACES } from "@/lib/map/world-map"
 import type { SitemapPlaceEntry } from "@/src/places/domain/place-sitemap.entity"
+import type { SuggestedPlace } from "@/src/places/domain/suggested-place.entity"
 import {
   type StreetViewReference,
   LOCATION_VIEW_REFERENCE_PROVIDER,
@@ -31,10 +32,13 @@ import {
 
 type PlaceAvatarAsset = { url: string; focus: ImageFocus }
 
-/** Prefer xs over sm for place avatar thumbs. */
+type PlaceAvatarThumbVariant = "xs" | "sm" | "lg"
+
+/** Default and fiction-list order is pin-sized (xs → sm). Pass `["lg", "sm", "xs"]` when a larger file is needed. */
 async function loadPlaceAvatarThumbs(
   supabase: SupabaseClient<Database>,
   placeIds: string[],
+  prefer: readonly PlaceAvatarThumbVariant[] = ["xs", "sm"],
 ): Promise<Map<string, PlaceAvatarAsset>> {
   const map = new Map<string, PlaceAvatarAsset>()
   if (placeIds.length === 0) return map
@@ -43,18 +47,11 @@ async function loadPlaceAvatarThumbs(
     .select("entity_id, url, variant, focus_x, focus_y")
     .eq("entity_type", "place")
     .eq("role", "avatar")
-    .in("variant", ["xs", "sm"])
+    .in("variant", [...prefer])
     .in("entity_id", placeIds)
-  for (const r of data ?? []) {
-    if (r.variant === "xs" && r.entity_id && r.url) {
-      map.set(r.entity_id as string, {
-        url: r.url as string,
-        focus: normalizeImageFocus(r.focus_x, r.focus_y),
-      })
-    }
-  }
-  for (const r of data ?? []) {
-    if (r.variant === "sm" && r.entity_id && r.url && !map.has(r.entity_id as string)) {
+  for (const variant of prefer) {
+    for (const r of data ?? []) {
+      if (r.variant !== variant || !r.entity_id || !r.url || map.has(r.entity_id as string)) continue
       map.set(r.entity_id as string, {
         url: r.url as string,
         focus: normalizeImageFocus(r.focus_x, r.focus_y),
@@ -368,6 +365,99 @@ export function createPlacesSupabaseAdapter(
       return mapPlaceRowsToPlaces(places, avatarByPlaceId)
     }),
 
+    listSuggestedApprovedActive: cache(async (limit: number): Promise<SuggestedPlace[]> => {
+      const supabase = await getSupabase()
+      const safeLimit = Math.max(1, Math.min(40, Math.floor(limit)))
+      const { data, error } = await supabase
+        .from("places")
+        .select(
+          `
+          id,
+          name,
+          slug,
+          fiction_id,
+          fictions!inner ( id, title, slug, status, active ),
+          locations!inner ( city_id )
+        `,
+        )
+        .eq("status", "approved")
+        .eq("active", true)
+        .order("created_at", { ascending: false })
+        .limit(safeLimit)
+
+      if (error) {
+        console.error("[places repo] listSuggestedApprovedActive:", error.message)
+        return []
+      }
+
+      type SuggestedRow = {
+        id: string
+        name: string | null
+        slug: string | null
+        fiction_id: string | null
+        fictions:
+          | {
+              id: string | null
+              title: string | null
+              slug: string | null
+              status: string | null
+              active: boolean | null
+            }
+          | {
+              id: string | null
+              title: string | null
+              slug: string | null
+              status: string | null
+              active: boolean | null
+            }[]
+        locations:
+          | { city_id: string | null }
+          | { city_id: string | null }[]
+      }
+
+      const rows = ((data ?? []) as SuggestedRow[]).filter((row) => {
+        const fiction = Array.isArray(row.fictions) ? row.fictions[0] : row.fictions
+        return fiction?.status === "approved" && fiction.active !== false
+      })
+      const firstOrSelf = <T,>(value: T | T[] | null | undefined): T | undefined => {
+        if (!value) return undefined
+        return Array.isArray(value) ? value[0] : value
+      }
+
+      const cityIds = [
+        ...new Set(
+          rows
+            .map((row) => firstOrSelf(row.locations)?.city_id ?? undefined)
+            .filter((id): id is string => !!id),
+        ),
+      ]
+      const placeIds = rows.map((row) => row.id).filter(Boolean)
+
+      const [citiesRes, avatarByPlaceId] = await Promise.all([
+        cityIds.length
+          ? supabase.from("cities").select("id, name").in("id", cityIds)
+          : Promise.resolve({ data: [] as { id: string; name: string }[], error: null }),
+        loadPlaceAvatarThumbs(supabase, placeIds),
+      ])
+
+      const cityById = new Map((citiesRes.data ?? []).map((c) => [c.id, c.name]))
+
+      return rows.map((row) => {
+        const fiction = firstOrSelf(row.fictions)
+        const cityId = firstOrSelf(row.locations)?.city_id ?? undefined
+        return {
+          placeId: row.id,
+          placeSlug: row.slug ?? row.id,
+          placeName: row.name?.trim() || "Unknown place",
+          placeImage: avatarByPlaceId.get(row.id)?.url ?? null,
+          fictionId: row.fiction_id ?? fiction?.id ?? "",
+          fictionSlug: fiction?.slug ?? "",
+          fictionTitle: fiction?.title ?? "",
+          cityName: cityId ? cityById.get(cityId) ?? null : null,
+        }
+      })
+    }),
+
     getCountsByFictionIds: cache(async (fictionIds: string[]): Promise<Record<string, number>> => {
       if (fictionIds.length === 0) return {}
       const supabase = await getSupabase()
@@ -412,7 +502,7 @@ export function createPlacesSupabaseAdapter(
       if (error || !placeRows) return []
       const places = placeRows as Record<string, unknown>[]
       const placeIds = places.map((p) => p.id as string).filter(Boolean)
-      const avatarByPlaceId = await loadPlaceAvatarThumbs(supabase, placeIds)
+      const avatarByPlaceId = await loadPlaceAvatarThumbs(supabase, placeIds, ["xs", "sm"])
       return mapPlaceRowsToPlaces(places, avatarByPlaceId)
     }),
 

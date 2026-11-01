@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation"
 import { getSessionUserId } from "@/lib/auth/auth.service"
 import type { City } from "@/src/cities/domain/city.entity"
 import { getAllCitiesCached } from "@/src/cities/infrastructure/next/city.queries"
-import { getProfileContributionsForViewer } from "@/src/contributions/infrastructure/next/contribution.queries"
+import { getProfileContributionsProfileData } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { getLikedFictionsForUserCached } from "@/src/fiction-likes/infrastructure/next/fiction-likes.queries"
 import type { UserHome } from "@/src/homes/domain/home.entity"
 import { getUserHomesAction } from "@/src/homes/infrastructure/next/home.actions"
@@ -40,9 +40,9 @@ export default async function UserPublicProfilePage({ params }: PageProps) {
   if (!profile) notFound()
 
   const isOwnProfile = profile.id === sessionUserId
-  const [contributions, homesRes, cities, likedFictions, interests, interestCatalog] =
+  const [contributionsData, homesRes, cities, likedFictions, interests, interestCatalog] =
     await Promise.all([
-      getProfileContributionsForViewer(profile.id),
+      getProfileContributionsProfileData(profile.id),
       isOwnProfile
         ? getUserHomesAction()
         : Promise.resolve({ data: [] as UserHome[], error: null }),
@@ -58,7 +58,9 @@ export default async function UserPublicProfilePage({ params }: PageProps) {
       isOwnProfile={isOwnProfile}
       initialCities={cities}
       initialHomes={homesRes.data ?? []}
-      initialContributions={contributions}
+      initialContributions={contributionsData.preview.items}
+      contributionsTotalCount={contributionsData.preview.totalCount}
+      contributionActivity={contributionsData.activity}
       initialLikedFictions={likedFictions}
       initialInterests={interests}
       interestCatalog={interestCatalog}

@@ -10,9 +10,11 @@ import { FictionDetailSectionHeading } from "@/components/fictions/fiction-detai
 import { FictionDetailCredits } from "@/components/fictions/fiction-detail-credits"
 import { FictionInterestTags, type FictionInterestTagItem } from "@/components/fictions/fiction-interest-tags"
 import { FictionDetailLikeButton } from "@/components/fictions/fiction-detail-like-button"
-import { FictionDetailPlaceLikeButton } from "@/components/fictions/fiction-detail-place-like-button"
+import { PlaceWishlistToggle } from "@/components/places/place-wishlist-toggle"
 import { FictionDetailRecentTracker } from "@/components/fictions/fiction-detail-recent-tracker"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
+import { FictionStoryView } from "@/components/fictions/pco2/fiction-story-view"
+import type { Pco2Card } from "@/components/fictions/pco2/build-pco2-cards"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Place } from "@/src/places/domain/place.entity"
@@ -29,11 +31,15 @@ export interface FictionDetailProps {
   initialLikeCount: number
   /** From RSC session when available. */
   initialLiked?: boolean
+  /** Place IDs on the current user's wishlist. */
+  wishlistedPlaceIds?: string[]
   /** Shown in main column below `xl` (right rail is `xl`+ only). */
   fictionInterestTags?: FictionInterestTagItem[]
   credits?: FictionPerson[]
   /** Deferred recommendations (Suspense slot) rendered after places list. */
   recommendationsSlot?: ReactNode
+  /** Phone / story deck opened from the "Story view" button. */
+  storyCards?: Pco2Card[]
 }
 
 /** Server Component: hero + copy + places SSR; likes are client islands. */
@@ -44,14 +50,17 @@ export async function FictionDetail({
   compositeGroups = [],
   initialLikeCount,
   initialLiked = false,
+  wishlistedPlaceIds = [],
   fictionInterestTags = [],
   credits = [],
   recommendationsSlot,
+  storyCards,
 }: FictionDetailProps) {
   const t = await getTranslations("Fictions")
   const tMeta = await getTranslations("Metadata")
   const format = await getFormatter()
 
+  const wishlisted = new Set(wishlistedPlaceIds)
   const cityById = new Map(initialCities.map((city) => [city.id, city]))
   const locationRows = initialPlaces.map((location, index) => ({
     index: index + 1,
@@ -128,13 +137,22 @@ export async function FictionDetail({
             </p>
           </div>
         </Link>
-        <div className="hidden shrink-0 items-center gap-2 sm:flex">
-          <Button asChild size="sm" variant="outline" className="h-9 border-border bg-background px-3 text-sm shadow-none">
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className="hidden h-9 border-border bg-background px-3 text-sm shadow-none sm:inline-flex"
+          >
             <a href={googleMapsHref} target="_blank" rel="noopener noreferrer">
               {t("mapsShort")}
             </a>
           </Button>
-          <FictionDetailPlaceLikeButton placeId={location.id} />
+          <PlaceWishlistToggle
+            placeId={location.id}
+            initialWishlisted={wishlisted.has(location.id)}
+            variant="icon"
+          />
         </div>
       </div>
     )
@@ -157,10 +175,10 @@ export async function FictionDetail({
         </div>
         <ul className="mt-3 space-y-3">
           {rows.map(({ location, city }) => (
-            <li key={location.id}>
+            <li key={location.id} className="flex items-center gap-2">
               <Link
                 href={`/fictions/${pathSlug}/places/${location.slug}`}
-                className="group/sub flex min-w-0 items-center gap-2 rounded-lg outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:gap-4"
+                className="group/sub flex min-w-0 flex-1 items-center gap-2 rounded-lg outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:gap-4"
               >
                 <div className="relative h-14 w-18 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted/30 sm:h-18 sm:w-24">
                   <Image
@@ -186,6 +204,11 @@ export async function FictionDetail({
                   ) : null}
                 </div>
               </Link>
+              <PlaceWishlistToggle
+                placeId={location.id}
+                initialWishlisted={wishlisted.has(location.id)}
+                variant="icon"
+              />
             </li>
           ))}
         </ul>
@@ -242,6 +265,7 @@ export async function FictionDetail({
             ]}
           />
           <div className="flex items-center gap-2">
+            {storyCards && storyCards.length > 0 ? <FictionStoryView cards={storyCards} /> : null}
             <FictionDetailLikeButton
               fictionId={fiction.id}
               initialLikeCount={initialLikeCount}
@@ -288,7 +312,7 @@ export async function FictionDetail({
               />
             </div>
             {fiction.description && (
-              <p className="max-w-[75ch] text-base leading-8 text-muted-foreground">{fiction.description}</p>
+              <p className="article-body">{fiction.description}</p>
             )}
             <FictionInterestTags tags={fictionInterestTags} className="@[1500px]/rails:hidden border-t border-border/60 pt-6" />
 
