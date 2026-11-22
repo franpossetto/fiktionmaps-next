@@ -90,7 +90,11 @@ export function PlaceContributeDoneView({
         </Button>
       ) : (
         <Button asChild variant={isApproved ? "outline" : "default"} className={mapButtonClass}>
-          <Link href={returnHref ?? "/map"}>{label}</Link>
+          {returnHref?.startsWith("http") ? (
+            <a href={returnHref}>{label}</a>
+          ) : (
+            <Link href={returnHref ?? "/map"}>{label}</Link>
+          )}
         </Button>
       )}
     </motion.div>
