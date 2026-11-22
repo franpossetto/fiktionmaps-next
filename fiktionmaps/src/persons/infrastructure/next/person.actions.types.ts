@@ -16,10 +16,6 @@ export type UpdatePersonResult =
   | { success: true; person: Person }
   | { success: false; error: string }
 
-export type ResolveOrCreatePersonResult =
-  | { success: true; person: Person }
-  | { success: false; error: string }
-
 export type DeletePersonResult =
   | { success: true }
   | { success: false; error: string }

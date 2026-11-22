@@ -25,10 +25,7 @@ import {
   getFictionPlacesCached,
   getPlaceLocationByIdCached,
   getPlaceLocationByIdDetailCached,
-  listCityIdsWithPlacesCached,
   listMapSearchCatalogCached,
-  listPlacesInBboxForFictionIds,
-  listMapPlacesInBboxCached,
   listMapClustersInBboxCached,
 } from "./place.queries"
 import { getMapLocationPanelUseCase } from "@/src/places/application/get-map-location-panel.usecase"
@@ -38,10 +35,7 @@ import { getPlaceContributorsWithDatesCached } from "@/src/contributions/infrast
 import type { MapSearchCatalog } from "@/src/places/domain/map-search-catalog.entity"
 import type { MapCluster } from "@/src/places/domain/map-cluster.entity"
 import type { Place } from "@/src/places/domain/place.entity"
-import {
-  WORLD_MAX_CLUSTERS,
-  WORLD_MAX_PLACES,
-} from "@/lib/map/world-map"
+import { WORLD_MAX_CLUSTERS } from "@/lib/map/world-map"
 import type { CreatePlaceData, UpdatePlaceData } from "@/src/places/domain/place.schemas"
 import { getFictionByIdCached } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { getCityByIdUseCase } from "@/src/cities/application/get-city-by-id.usecase"
@@ -151,12 +145,6 @@ export async function getPlaceLocationAction(placeId: string): Promise<Place | n
   return getPlaceLocationByIdCached(placeId)
 }
 
-/** Full place row with large avatar (same as fiction place detail page). */
-export async function getPlaceLocationDetailAction(placeId: string): Promise<Place | null> {
-  if (!uuidSchema.safeParse(placeId).success) return null
-  return getPlaceLocationByIdDetailCached(placeId)
-}
-
 /** Map sidebar: detail + scenes + contributors in one round-trip (uuid-validated). */
 export async function getMapLocationPanelAction(placeId: string): Promise<MapLocationPanel> {
   if (!uuidSchema.safeParse(placeId).success) {
@@ -194,23 +182,6 @@ export async function getCityPlacesAction(cityId: string): Promise<Place[]> {
   return getCityPlacesCached(cityId)
 }
 
-export async function getPlacesInBboxAction(fictionIds: string[], bbox: MapBbox): Promise<Place[]> {
-  const { west, south, east, north } = bbox
-  if (![west, south, east, north].every((n) => Number.isFinite(n))) return []
-  return listPlacesInBboxForFictionIds(fictionIds, bbox)
-}
-
-/** Free-world detail zoom: places in viewport (optional fiction filter, hard cap). */
-export async function getMapPlacesInBboxAction(
-  bbox: MapBbox,
-  fictionIds?: string[] | null,
-  limit: number = WORLD_MAX_PLACES,
-): Promise<Place[]> {
-  const { west, south, east, north } = bbox
-  if (![west, south, east, north].every((n) => Number.isFinite(n))) return []
-  return listMapPlacesInBboxCached(bbox, fictionIds, limit)
-}
-
 /** Free-world low zoom: server grid clusters. */
 export async function getMapClustersInBboxAction(
   bbox: MapBbox,
@@ -221,11 +192,6 @@ export async function getMapClustersInBboxAction(
   const { west, south, east, north } = bbox
   if (![west, south, east, north, zoom].every((n) => Number.isFinite(n))) return []
   return listMapClustersInBboxCached(bbox, zoom, fictionIds, maxClusters)
-}
-
-/** City IDs that have at least one place (map city picker: disable others). */
-export async function getCityIdsWithPlacesAction(): Promise<string[]> {
-  return listCityIdsWithPlacesCached()
 }
 
 /** Fiction × city pairs and cities with places (map unified search). */

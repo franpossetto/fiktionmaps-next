@@ -18,7 +18,6 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { revalidatePath, updateTag } from "next/cache"
 import { ensureAssetImageXsUseCase } from "@/src/asset-images/application/ensure-asset-image-xs.usecase"
 import { repairMissingAssetVariantsUseCase } from "@/src/asset-images/application/repair-missing-asset-variants.usecase"
-import { updateAssetImageFocusUseCase } from "@/src/asset-images/application/update-asset-image-focus.usecase"
 import { createAssetImagesSupabaseAdapter } from "@/src/asset-images/infrastructure/supabase/asset-image.repository.impl"
 import { probePublicAssetUrl } from "@/src/asset-images/infrastructure/next/probe-public-asset-url"
 import { isUserAdminUseCase } from "@/src/users/application/is-user-admin.usecase"
@@ -119,37 +118,6 @@ export async function repairMissingAssetVariantsAction(input: {
   }
 
   return result
-}
-
-const updateFocusSchema = z.object({
-  entityType: z.enum(["fiction", "city", "location", "scene", "profile", "place", "person"]),
-  entityId: z.string().uuid(),
-  role: z.enum(["cover", "banner", "avatar", "hero"]),
-  focusX: z.number().min(0).max(100),
-  focusY: z.number().min(0).max(100),
-})
-
-export type UpdateAssetImageFocusActionResult =
-  | { success: true; focus: { x: number; y: number } }
-  | { success: false; error: string }
-
-export async function updateAssetImageFocusAction(input: {
-  entityType: EntityType
-  entityId: string
-  role: ImageRole
-  focusX: number
-  focusY: number
-}): Promise<UpdateAssetImageFocusActionResult> {
-  const parsed = updateFocusSchema.safeParse(input)
-  if (!parsed.success) {
-    return { success: false, error: "Invalid input" }
-  }
-  return updateAssetImageFocusUseCase({
-    entityType: parsed.data.entityType,
-    entityId: parsed.data.entityId,
-    role: parsed.data.role,
-    focus: { x: parsed.data.focusX, y: parsed.data.focusY },
-  })
 }
 
 export type ImageCodecPreviewVariant = {

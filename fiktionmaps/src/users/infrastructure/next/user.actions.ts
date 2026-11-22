@@ -16,7 +16,6 @@ import { updateProfilePersonalInfoUseCase } from "@/src/users/application/update
 import type { UpdatePersonalInfoData } from "@/src/users/domain/user.dtos"
 import { getUserFictionLikesUseCase } from "@/src/fiction-likes/application/get-user-fiction-likes.usecase"
 import { toggleFictionLikeUseCase } from "@/src/fiction-likes/application/toggle-fiction-like.usecase"
-import { getUserInterestIdsUseCase } from "@/src/user-interests/application/get-user-interest-ids.usecase"
 import { setUserInterestsUseCase } from "@/src/user-interests/application/set-user-interests.usecase"
 import { getSessionAccount } from "@/src/users/infrastructure/next/user.queries"
 import { uploadEntityImage, validateImageFile } from "@/lib/asset-images/image-variant-service"
@@ -281,18 +280,6 @@ export async function toggleFictionLikeAction(fictionId: string): Promise<Toggle
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed to toggle like" }
   }
-}
-
-/** Interest ids for the current user (same as former GET /api/user-interests). */
-export async function getMyInterestIdsAction(): Promise<string[]> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-  if (authError || !user) return []
-
-  return getUserInterestIdsUseCase(user.id, createUserInterestsSupabaseAdapter(createClient))
 }
 
 export type SetMyInterestsResult =

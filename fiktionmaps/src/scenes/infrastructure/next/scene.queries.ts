@@ -8,7 +8,6 @@ import {
 import { getSceneByIdUseCase } from "@/src/scenes/application/get-scene-by-id.usecase"
 import { getCitiesWithScenesUseCase } from "@/src/scenes/application/get-cities-with-scenes.usecase"
 import { getCityFictionsWithScenesUseCase } from "@/src/scenes/application/get-city-fictions-with-scenes.usecase"
-import { getSceneCountsByFictionIdsUseCase } from "@/src/scenes/application/get-scene-counts-by-fiction-ids.usecase"
 import { listScenesUseCase } from "@/src/scenes/application/list-scenes.usecase"
 import { listFictionScenesForContributeUseCase } from "@/src/scenes/application/list-fiction-scenes-for-contribute.usecase"
 import { CacheKeys } from "@/src/shared/infrastructure/next/cache.keys"
@@ -32,14 +31,6 @@ export function getSceneByIdCached(id: string): Promise<Scene | null> {
   )()
 }
 
-/** Uncached fictions-with-scenes-in-city (same as cached viewer list, without cache). */
-export async function getCityFictionsWithScenesUncached(cityId: string) {
-  return getCityFictionsWithScenesUseCase(cityId, {
-    listFictionIdsWithScenesInCity: (cid) => cookieRepo.listFictionIdsWithScenesInCity(cid),
-    getFictionsByIds: (ids) => fictionsRepoPublic.getByIds(ids),
-  })
-}
-
 /** Cities that have at least one active scene with video (viewer-aligned). */
 export const getCitiesWithScenesForViewer = unstable_cache(
   async () => getCitiesWithScenesUseCase(null, cookieRepo),
@@ -56,17 +47,6 @@ export function getCityFictionsWithScenesForViewer(cityId: string) {
       }),
     ["city-fictions-with-scenes", cityId],
     { revalidate: 60, tags: ["cities", "fictions", "scenes"] },
-  )()
-}
-
-/** Active scene counts per fiction id, batched in a single query (public read). */
-export function getSceneCountsByFictionIdsCached(fictionIds: string[]): Promise<Record<string, number>> {
-  if (fictionIds.length === 0) return Promise.resolve({})
-  const key = fictionIds.slice().sort().join(",")
-  return unstable_cache(
-    () => getSceneCountsByFictionIdsUseCase(fictionIds, cookieRepo),
-    CacheKeys.scene(`counts:${key}`),
-    { ...CacheConfig.short, tags: ["scenes"] },
   )()
 }
 
@@ -105,11 +85,6 @@ export function getFictionScenesForContributeCached(fictionId: string): Promise<
     CacheKeys.scene(`fiction-contribute:${fictionId}`),
     { ...CacheConfig.medium, tags: ["scenes", `fiction-${fictionId}`] },
   )()
-}
-
-/** @deprecated Prefer `getScenesForFictionCached` on public pages. */
-export async function getScenesForFiction(fictionId: string): Promise<Scene[]> {
-  return getScenesForFictionCached(fictionId)
 }
 
 /** All scenes with video in a city, grouped with their fiction slugs for linking. */

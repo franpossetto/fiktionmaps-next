@@ -2,7 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/supabase/database.types"
 import type { UserHome, CreateHomeData, UpdateHomeData } from "@/src/homes/domain/home.entity"
 import type { HomesRepositoryPort } from "@/src/homes/domain/home.repository"
-import { createClient } from "@/lib/supabase/server"
 
 function toUserHome(row: {
   id: string
@@ -88,5 +87,3 @@ export function createHomesSupabaseAdapter(
     },
   }
 }
-
-export const homesSupabaseAdapter = createHomesSupabaseAdapter(createClient)

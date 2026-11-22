@@ -1,14 +1,6 @@
 export const CacheKeys = {
   checkin:  (id: string) => ["checkin", id],
   city:     (id: string) => ["city", id],
-  contribution:       (id: string) => ["contribution", id],
-  contributionUser:   (userId: string) => ["contribution", "user", userId],
-  contributionEntity: (entityType: string, entityId: string) => [
-    "contribution",
-    "entity",
-    entityType,
-    entityId,
-  ],
   fictionContributors: (fictionId: string) => ["contribution", "fiction-contributors-fpp", fictionId],
   fictionPersons: (fictionId: string) => ["person", "fiction-persons", fictionId],
   placeContributorsDetail: (placeId: string) => ["contribution", "place-contributors-detail", placeId],

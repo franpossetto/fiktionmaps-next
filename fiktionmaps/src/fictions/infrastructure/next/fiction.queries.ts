@@ -3,8 +3,6 @@ import { createAnonymousClient, createClient } from "@/lib/supabase/server"
 import { createFictionsSupabaseAdapter } from "@/src/fictions/infrastructure/supabase/fiction.repository.impl"
 import { createFictionInterestsSupabaseAdapter } from "@/src/fiction-interests/infrastructure/supabase/fiction-interests.repository.impl"
 import { createFictionLikesSupabaseAdapter } from "@/src/fiction-likes/infrastructure/supabase/fiction-likes.repository.impl"
-import { createUserInterestsSupabaseAdapter } from "@/src/user-interests/infrastructure/supabase/user-interests.repository.impl"
-import { createCitiesSupabaseAdapter } from "@/src/cities/infrastructure/supabase/city.repository.impl"
 import { createPlacesSupabaseAdapter } from "@/src/places/infrastructure/supabase/place.repository.impl"
 import { getAllFictionsUseCase } from "@/src/fictions/application/get-all-fictions.usecase"
 import { getActiveFictionsUseCase } from "@/src/fictions/application/get-active-fictions.usecase"
@@ -13,8 +11,6 @@ import { getFictionByIdUseCase } from "@/src/fictions/application/get-fiction-by
 import { getFictionWithCatalogExternalIdsForStaffUseCase } from "@/src/fictions/application/get-fiction-with-catalog-external-ids-for-staff.usecase"
 import { createFictionExternalIdsSupabaseAdapter } from "@/src/fiction-external-ids/infrastructure/supabase/fiction-external-ids.repository.impl"
 import { getFictionBySlugUseCase } from "@/src/fictions/application/get-fiction-by-slug.usecase"
-import { getFictionsByIdsUseCase } from "@/src/fictions/application/get-fictions-by-ids.usecase"
-import { getFictionCitiesUseCase } from "@/src/fictions/application/get-fiction-cities.usecase"
 import {
   getFictionDetailRecommendationsUseCase,
   type GetFictionDetailRecommendationsInput,
@@ -31,7 +27,6 @@ const anon = () => Promise.resolve(createAnonymousClient())
 const fictionsRepo = createFictionsSupabaseAdapter(anon)
 const fictionInterestsRepo = createFictionInterestsSupabaseAdapter(anon)
 const fictionLikesRepo = createFictionLikesSupabaseAdapter(anon)
-const citiesRepo = createCitiesSupabaseAdapter(anon)
 const placesRepo = createPlacesSupabaseAdapter(anon)
 
 export function getAllFictionsCached() {
@@ -90,23 +85,6 @@ export function getFictionBySlugCached(slug: string) {
   )()
 }
 
-export function getFictionsByIdsCached(ids: string[]) {
-  const key = ids.slice().sort().join(",")
-  return unstable_cache(
-    () => getFictionsByIdsUseCase(ids, fictionsRepo),
-    CacheKeys.fiction(`ids:${key}`),
-    { ...CacheConfig.long, tags: ["fictions"] }
-  )()
-}
-
-export function getFictionCitiesCached(fictionId: string) {
-  return unstable_cache(
-    () => getFictionCitiesUseCase(fictionId, { locationsRepo: placesRepo, citiesRepo }),
-    CacheKeys.fiction(`cities:${fictionId}`),
-    { ...CacheConfig.long, tags: ["fictions", "cities", `fiction-${fictionId}`] }
-  )()
-}
-
 /** Interest ids linked to this fiction (`fiction_interests`). */
 export function getFictionInterestsCached(fictionId: string) {
   return unstable_cache(
@@ -134,13 +112,4 @@ export async function getFictionLikeCountsByIds(fictionIds: string[]): Promise<R
   const validIds = fictionIds.filter((id) => isUuidString(id))
   if (validIds.length === 0) return {}
   return getFictionLikeCountsUseCase(validIds, fictionLikesRepo)
-}
-
-/** Builds the deps object for the recommendation use case (composition root). */
-export function loadRecommendedFictionsDeps() {
-  return {
-    userInterestsRepo: createUserInterestsSupabaseAdapter(anon),
-    fictionInterestsRepo,
-    fictionsRepo,
-  }
 }

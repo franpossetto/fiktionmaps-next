@@ -26,7 +26,6 @@ import type { City } from "@/src/cities/domain/city.entity"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import { listScenesUseCase } from "@/src/scenes/application/list-scenes.usecase"
-import { getSceneByIdUseCase } from "@/src/scenes/application/get-scene-by-id.usecase"
 import { createSceneUseCase } from "@/src/scenes/application/create-scene.usecase"
 import { createContributorSceneUseCase } from "@/src/scenes/application/create-contributor-scene.usecase"
 import { updateSceneUseCase } from "@/src/scenes/application/update-scene.usecase"
@@ -87,11 +86,6 @@ export async function listScenesAction(query: ListScenesQueryInput = {}): Promis
 export async function listFictionScenesForContributeAction(fictionId: string): Promise<Scene[]> {
   if (!uuidSchema.safeParse(fictionId).success) return []
   return getFictionScenesForContributeCached(fictionId)
-}
-
-export async function getSceneByIdAction(sceneId: string): Promise<Scene | null> {
-  if (!uuidSchema.safeParse(sceneId).success) return null
-  return getSceneByIdUseCase(sceneId, scenesSupabaseAdapter)
 }
 
 export async function createSceneAction(body: unknown): Promise<CreateSceneResult> {

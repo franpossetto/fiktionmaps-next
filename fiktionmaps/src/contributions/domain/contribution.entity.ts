@@ -29,12 +29,6 @@ export type ContributionPendingImagesByRole = Partial<
   Record<ContributionPendingImageRole, Partial<Record<ContributionPendingImageVariant, string>>>
 >
 
-/** @deprecated Single-role snapshot; use ContributionPendingImagesByRole. */
-export type ContributionPendingImagesSnapshot = {
-  role: ContributionPendingImageRole
-  paths: Partial<Record<ContributionPendingImageVariant, string>>
-}
-
 export function pendingImagesRowsToByRole(rows: ContributionPendingImage[]): ContributionPendingImagesByRole | null {
   if (rows.length === 0) return null
   const byRole: ContributionPendingImagesByRole = {}
@@ -52,16 +46,6 @@ export function getPendingPathsForRole(
 ): Partial<Record<ContributionPendingImageVariant, string>> | null {
   const paths = byRole?.[role]
   return paths && Object.keys(paths).length > 0 ? paths : null
-}
-
-/** @deprecated Use pendingImagesRowsToByRole */
-export function pendingImagesToSnapshot(rows: ContributionPendingImage[]): ContributionPendingImagesSnapshot | null {
-  const byRole = pendingImagesRowsToByRole(rows)
-  if (!byRole) return null
-  const role = (Object.keys(byRole)[0] ?? null) as ContributionPendingImageRole | null
-  if (!role) return null
-  const paths = byRole[role]
-  return paths ? { role, paths } : null
 }
 
 export interface Contribution {
@@ -163,18 +147,6 @@ export type StaffFictionContributionsFeedStatusTab = "all" | "pending" | "approv
 /** Staff `/contributions` feed filter for create_fiction vs create_place vs add_scene. */
 export type StaffContributionsFeedKind = "fiction" | "place" | "scene" | "all"
 
-export type StaffFictionContributionsFeedPageInput = {
-  userIdFilter?: string
-  statusTab: StaffFictionContributionsFeedStatusTab
-  limit: number
-  offset: number
-}
-
-export type StaffFictionContributionsFeedPageResult = {
-  items: FictionContributionFeedItem[]
-  totalCount: number
-}
-
 /** Staff feed row: a create_place contribution plus submitter and place/fiction snapshots. */
 export interface PlaceContributionFeedItem extends Contribution {
   contributor: FictionContributorProfile
@@ -270,10 +242,6 @@ export function isFictionContributionFeedItem(
     item.entityType === "fiction" &&
     (item.type === "create_fiction" || item.type === "add_photo" || item.type === "add_credits")
   )
-}
-
-export function isFictionCreateContributionFeedItem(item: FictionContributionFeedItem): boolean {
-  return item.type === "create_fiction"
 }
 
 export function isSceneContributionFeedItem(

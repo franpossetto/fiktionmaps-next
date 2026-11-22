@@ -1,5 +1,4 @@
-import type { Fiction, FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
-import type { FictionDetailRecommendationReason } from "@/src/fictions/application/get-fiction-detail-recommendations.usecase"
+import type { Fiction } from "@/src/fictions/domain/fiction.entity"
 
 export type FictionDuplicateSummaryForContribute = {
   id: string
@@ -47,12 +46,4 @@ export type SetFictionInterestsResult =
 
 export type LinkFictionPrimaryCreditResult =
   | { success: true }
-  | { success: false; error: string }
-
-export type GetRecommendedFictionsResult =
-  | { success: true; fictions: FictionWithMedia[] }
-  | { success: false; error: string }
-
-export type GetFictionDetailRecommendationsResult =
-  | { success: true; fictions: FictionWithMedia[]; reason: FictionDetailRecommendationReason }
   | { success: false; error: string }

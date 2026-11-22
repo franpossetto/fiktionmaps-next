@@ -1,6 +1,5 @@
 import { cache } from "react"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { createClient } from "@/lib/supabase/server"
 import type { Database, Tables } from "@/supabase/database.types"
 import type { Profile } from "@/src/users/domain/user.entity"
 import type { UsersRepositoryPort } from "@/src/users/domain/user.repository"
@@ -131,5 +130,3 @@ export function createUsersSupabaseAdapter(
     }),
   }
 }
-
-export const usersSupabaseAdapter = createUsersSupabaseAdapter(createClient)
