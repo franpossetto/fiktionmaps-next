@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache"
+import { SupabaseNetworkError } from "@/lib/supabase/fetch"
 import { fictionsRepoPublic } from "@/src/shared/infrastructure/supabase/anon-repos"
 import {
   scenesRepoPublic,
@@ -70,12 +71,17 @@ export function getSceneCountsByFictionIdsCached(fictionIds: string[]): Promise<
 }
 
 /** Active scenes for a place — public anon cache. */
-export function getScenesForPlaceCached(placeId: string): Promise<Scene[]> {
-  return unstable_cache(
-    () => listScenesUseCase({ placeId, active: true }, scenesRepoPublic),
-    CacheKeys.scene(`place:${placeId}`),
-    { ...CacheConfig.medium, tags: ["scenes", `place-${placeId}`] },
-  )()
+export async function getScenesForPlaceCached(placeId: string): Promise<Scene[]> {
+  try {
+    return await unstable_cache(
+      () => listScenesUseCase({ placeId, active: true }, scenesRepoPublic),
+      CacheKeys.scene(`place:${placeId}:v2`),
+      { ...CacheConfig.medium, tags: ["scenes", `place-${placeId}`] },
+    )()
+  } catch (error) {
+    if (error instanceof SupabaseNetworkError) return []
+    throw error
+  }
 }
 
 /** @deprecated Prefer `getScenesForPlaceCached` on public pages. */

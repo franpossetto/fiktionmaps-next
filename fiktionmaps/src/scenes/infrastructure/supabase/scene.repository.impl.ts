@@ -2,6 +2,7 @@ import {
   ASSET_VIDEOS_BUCKET,
   tryParseStoragePathFromVideoUrl,
 } from "@/lib/asset-videos/asset-videos-bucket"
+import { supabaseFetchFailureLog, throwIfSupabaseFetchFailed } from "@/lib/supabase/fetch"
 import { createAnonymousClient, createClient } from "@/lib/supabase/server"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Place } from "@/src/places/domain/place.entity"
@@ -213,7 +214,8 @@ async function fetchSceneIdsForPlace(
     .select("scene_id")
     .eq("place_id", placeId)
   if (error) {
-    console.error("[scenes repo] scene ids for place:", error.message)
+    console.error("[scenes repo] scene ids for place:", supabaseFetchFailureLog(error))
+    throwIfSupabaseFetchFailed(error)
     return null
   }
   return [...new Set((data ?? []).map((r) => r.scene_id as string).filter(Boolean))]

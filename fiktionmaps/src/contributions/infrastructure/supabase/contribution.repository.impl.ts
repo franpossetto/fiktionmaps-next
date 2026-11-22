@@ -8,6 +8,7 @@ import type {
   ContributionRow,
   Database,
 } from "@/supabase/database.types"
+import { supabaseFetchFailureLog, throwIfSupabaseFetchFailed } from "@/lib/supabase/fetch"
 import { createClient } from "@/lib/supabase/server"
 import {
   CONTRIBUTION_FPP,
@@ -2053,7 +2054,11 @@ export function createContributionsSupabaseAdapter(
           .order("created_at", { ascending: true })
 
         if (error) {
-          console.error("[contributions repo] listApprovedContributorProfilesFirstContributionAt:", error.message)
+          console.error(
+            "[contributions repo] listApprovedContributorProfilesFirstContributionAt:",
+            supabaseFetchFailureLog(error),
+          )
+          throwIfSupabaseFetchFailed(error)
           return []
         }
 
