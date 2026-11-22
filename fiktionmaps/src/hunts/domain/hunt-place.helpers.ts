@@ -108,10 +108,6 @@ export function isAddressOverridden(reviewed: HuntPlaceReviewed): boolean {
   return false
 }
 
-export function isStreetViewOverridden(reviewed: HuntPlaceReviewed): boolean {
-  return reviewed.overrides?.street_view_reference !== undefined
-}
-
 export function isShootEnvironmentOverridden(reviewed: HuntPlaceReviewed): boolean {
   const { overrides, extracted } = reviewed
   if (!overrides) return false
@@ -119,10 +115,6 @@ export function isShootEnvironmentOverridden(reviewed: HuntPlaceReviewed): boole
     overrides.shoot_environment !== undefined &&
     overrides.shoot_environment !== extracted.shoot_environment
   )
-}
-
-export function hasAnyOverrides(reviewed: HuntPlaceReviewed): boolean {
-  return Boolean(reviewed.overrides && Object.keys(reviewed.overrides).length > 0)
 }
 
 export function toReviewedPlace(extracted: HuntPlace): HuntPlaceReviewed {
@@ -154,10 +146,6 @@ export function clearPlaceOverrides(
     ...reviewed,
     overrides: cleanOverrides(reviewed.extracted, next),
   }
-}
-
-export function clearAllPlaceOverrides(reviewed: HuntPlaceReviewed): HuntPlaceReviewed {
-  return { ...reviewed, overrides: undefined }
 }
 
 /**
@@ -198,8 +186,4 @@ export function normalizeHuntPayload(payload: unknown): HuntPayload {
   }
   const places = Array.isArray(payload.places) ? payload.places.map(normalizeHuntPlace) : []
   return { places }
-}
-
-export function huntPlaceFromExtracted(extracted: HuntPlaceExtracted): HuntPlaceReviewed {
-  return { extracted, overrides: undefined }
 }

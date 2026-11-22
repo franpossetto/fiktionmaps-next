@@ -4,7 +4,7 @@ import { revalidatePath, updateTag } from "next/cache"
 import { z } from "zod"
 import { zodErrorMessage } from "@/lib/validation/http"
 import { interestIdsBodySchema } from "@/lib/validation/api-payloads"
-import { isUuidString, uuidSchema } from "@/lib/validation/primitives"
+import { uuidSchema } from "@/lib/validation/primitives"
 import { createClient } from "@/lib/supabase/server"
 import { MODERATOR_ROLES } from "@/src/contributions/domain/contribution.config"
 import { ensureUserIsModeratorUseCase } from "@/src/contributions/application/ensure-user-is-moderator.usecase"
@@ -29,7 +29,6 @@ import { findFictionDuplicateForContributeUseCase } from "@/src/fictions/applica
 import { resolveContributorFictionCreateDefaults } from "@/src/fictions/application/resolve-contributor-fiction-create-defaults.usecase"
 import { getFictionInterestsUseCase } from "@/src/fiction-interests/application/get-fiction-interests.usecase"
 import { setFictionInterestsUseCase } from "@/src/fiction-interests/application/set-fiction-interests.usecase"
-import { getRecommendedFictionsUseCase } from "@/src/fictions/application/get-recommended-fictions.usecase"
 import { resolveNavSearchScopeUseCase } from "@/src/fictions/application/resolve-nav-search-scope.usecase"
 import {
   getFictionPhotoContributeContextUseCase,
@@ -47,13 +46,9 @@ import {
 import {
   getFictionByIdCached,
   getFictionBySlugCached,
-  getFictionCitiesCached,
-  getFictionDetailRecommendations,
   getFictionLikeCountsByIds,
   getActiveFictionsCached,
-  loadRecommendedFictionsDeps,
 } from "./fiction.queries"
-import type { City } from "@/src/cities/domain/city.entity"
 import type {
   CreateFictionResult,
   UpdateFictionResult,
@@ -62,8 +57,6 @@ import type {
   UploadFictionImageResult,
   GetFictionInterestsResult,
   SetFictionInterestsResult,
-  GetRecommendedFictionsResult,
-  GetFictionDetailRecommendationsResult,
   CheckFictionDuplicateForContributeResult,
   LinkFictionPrimaryCreditResult,
 } from "./fiction.actions.types"
@@ -196,8 +189,6 @@ export type {
   UploadFictionImageResult,
   GetFictionInterestsResult,
   SetFictionInterestsResult,
-  GetRecommendedFictionsResult,
-  GetFictionDetailRecommendationsResult,
 } from "./fiction.actions.types"
 
 export async function uploadFictionImageAction(
@@ -405,20 +396,6 @@ export async function getActiveFictionsAction(): Promise<FictionWithMedia[]> {
   return getActiveFictionsCached()
 }
 
-/** Public read: resolve an active fiction from URL slug segment. */
-export async function resolvePublicFictionFromSlugAction(
-  slug: string,
-): Promise<FictionWithMedia | null> {
-  const raw = slug.trim()
-  if (!raw || isUuidString(raw)) return null
-  const fiction = await getFictionBySlugCached(raw)
-  if (!fiction?.active) return null
-  return fiction
-}
-
-/** @deprecated Use resolvePublicFictionFromSlugAction */
-export const resolvePublicFictionFromSlugOrIdAction = resolvePublicFictionFromSlugAction
-
 /** Top nav: global search vs chip scoped to current fiction / place page. */
 export async function getNavSearchScopeAction(pathname: string): Promise<NavSearchScope> {
   const route = parseFictionAppRoute(pathname)
@@ -428,11 +405,6 @@ export async function getNavSearchScopeAction(pathname: string): Promise<NavSear
     resolvePlaceForFictionPath: (fictionId, segment) =>
       resolvePlaceForFictionPathCached(fictionId, segment),
   })
-}
-
-export async function getFictionCitiesAction(fictionId: string): Promise<City[]> {
-  if (!uuidSchema.safeParse(fictionId).success) return []
-  return getFictionCitiesCached(fictionId)
 }
 
 export async function setFictionInterestsAction(fictionId: string, interestIds: string[]): Promise<SetFictionInterestsResult> {
@@ -457,43 +429,6 @@ export async function setFictionInterestsAction(fictionId: string, interestIds: 
   revalidatePath(`/admin/fiction/${fictionId}`)
   updateTag("fictions")
   return { success: true }
-}
-
-export async function getRecommendedFictionsAction(limit?: number): Promise<GetRecommendedFictionsResult> {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { success: false, error: "Unauthorized" }
-
-  const lim = limit != null && Number.isFinite(limit) ? Math.max(1, Math.min(50, Math.floor(Number(limit)))) : 12
-
-  try {
-    const fictions = await getRecommendedFictionsUseCase(user.id, lim, loadRecommendedFictionsDeps())
-    return { success: true, fictions }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Failed to load recommendations" }
-  }
-}
-
-/** Public read: same pipeline as fiction detail (city → interests → random). Loads places if not passed. */
-export async function getFictionDetailRecommendationsAction(
-  fictionId: string,
-  interestIds: string[]
-): Promise<GetFictionDetailRecommendationsResult> {
-  if (!uuidSchema.safeParse(fictionId).success) {
-    return { success: false, error: "Invalid fictionId" }
-  }
-  const parsed = interestIdsBodySchema.safeParse({ interestIds })
-  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
-
-  try {
-    const { fictions, reason } = await getFictionDetailRecommendations({
-      fictionId,
-      interestIds: parsed.data.interestIds,
-    })
-    return { success: true, fictions, reason }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Failed to load recommendations" }
-  }
 }
 
 export type { FictionPhotoContributeContext } from "@/src/fictions/application/get-fiction-photo-contribute-context.usecase"

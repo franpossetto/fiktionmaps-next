@@ -4,10 +4,8 @@ import { revalidatePath, updateTag } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { uuidSchema } from "@/lib/validation/primitives"
 import { zodErrorMessage } from "@/lib/validation/http"
-import type { ContributorProfileWithDate } from "@/src/contributions/domain/contribution.entity"
 import { getFictionScopeContributorContributionsUseCase } from "@/src/contributions/application/get-fiction-scope-contributor-contributions.usecase"
 import { getContributorEntityScopeCountsUseCase } from "@/src/contributions/application/get-contributor-entity-scope-counts.usecase"
-import { getPlaceContributorsWithDatesCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { approveContributionUseCase } from "@/src/contributions/application/approve-contribution.usecase"
 import { createContributionUseCase } from "@/src/contributions/application/create-contribution.usecase"
 import { deleteContributionUseCase } from "@/src/contributions/application/delete-contribution.usecase"
@@ -81,13 +79,6 @@ export async function listProfileContributionsPageAction(
 const usersRepo = createUsersSupabaseAdapter(createClient)
 
 const ADMIN_CONTRIBUTIONS_PAGE_SIZE = 50
-
-export async function getPlaceContributorsAction(
-  placeId: string,
-): Promise<ContributorProfileWithDate[]> {
-  if (!uuidSchema.safeParse(placeId).success) return []
-  return getPlaceContributorsWithDatesCached(placeId)
-}
 
 async function revalidateContributionEntityTags(entityType: ContributionEntityType, entityId: string) {
   switch (entityType) {

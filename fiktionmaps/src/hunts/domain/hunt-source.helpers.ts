@@ -6,7 +6,3 @@ export function normalizeHuntSourceUrl(url: string): string {
     return url.trim().toLowerCase()
   }
 }
-
-export function normalizeHuntContextLabel(label: string): string {
-  return label.trim().toLowerCase().replace(/\s+/g, " ")
-}

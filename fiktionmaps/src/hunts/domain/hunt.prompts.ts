@@ -1,5 +1,3 @@
-import type { Place } from "@/src/places/domain/place.entity"
-
 /**
  * Prompt for extracting filming locations from clean Markdown content (Jina Reader output).
  * Uses the LLM's training knowledge to enrich missing fields for recognized landmarks.
@@ -74,34 +72,4 @@ Tasks:
 
 Reply ONLY with valid JSON:
 { "name": "", "address": "", "city": "", "country": "", "is_landmark": false, "address_source": "knowledge|unknown", "shoot_environment": "interior|exterior|interior_exterior|null" }`
-}
-
-/**
- * Prompt for semantic duplicate detection against existing DB places.
- */
-export function buildDeduplicationPrompt(
-  candidate: { name: string; city: string; country: string; address: string },
-  existingPlaces: Place[],
-): string {
-  const existingList = existingPlaces
-    .map((p) => `- id: ${p.id}, name: ${p.name}`)
-    .join("\n")
-
-  return `You are a location deduplication assistant.
-
-Candidate place:
-- name: ${candidate.name}
-- city: ${candidate.city}
-- country: ${candidate.country}
-- address: ${candidate.address || "unknown"}
-
-Existing places in the database:
-${existingList}
-
-Does the candidate refer to the same real-world location as any place in the list?
-Consider: name variations, abbreviations, alternate spellings, landmarks vs street addresses for the same spot.
-
-Reply ONLY with valid JSON:
-{ "duplicate_of": "<uuid>" }   ← if it matches an existing place
-{ "duplicate_of": null }        ← if it is a new place`
 }

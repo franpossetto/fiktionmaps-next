@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
-import { createServiceClient } from "@/lib/supabase/service"
 import type { Database, Json } from "@/supabase/database.types"
 import type {
   EmailBatch,
@@ -330,8 +329,3 @@ export function createEmailsSupabaseAdapter(getSupabase: GetSupabase): EmailsRep
 
 /** Session-scoped adapter (admin JWT + RLS). */
 export const emailsSupabaseAdapter = createEmailsSupabaseAdapter(createClient)
-
-/** Service-role adapter for dispatch persistence (bypasses RLS). */
-export function createEmailsServiceAdapter(): EmailsRepositoryPort {
-  return createEmailsSupabaseAdapter(() => createServiceClient())
-}

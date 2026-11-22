@@ -51,7 +51,7 @@ After promotion the user must **reload or sign in again** for the client (`AuthP
 |---|---|---|
 | Type | `UserRole` | `src/users/domain/user.dtos.ts` |
 | Staff set | `STAFF_ROLES` | `src/users/domain/user.roles.ts` |
-| Contributor set | `CONTRIBUTOR_ROLES` | `src/users/domain/user.roles.ts` |
+| Contributor check | `isContributorUserRole` | `src/users/domain/user.roles.ts` |
 | Staff guard | `getIsUserStaff` | `src/users/infrastructure/next/user.queries.ts` |
 | Contributor guard | `getIsUserContributor` | `src/users/infrastructure/next/user.queries.ts` |
 | DB constraint | `profiles_role_check` | `supabase/migrations/051_profiles_role_contributor.sql` |

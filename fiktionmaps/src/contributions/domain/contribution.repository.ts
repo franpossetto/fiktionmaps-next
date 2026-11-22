@@ -5,16 +5,11 @@ import type {
   ContributionType,
   ContributorEntityScopeCounts,
   ContributorProfileWithDate,
-  FictionContributionFeedItem,
-  FictionContributorProfile,
   FictionContributorScopeEntry,
   FictionScopeContributorContributionItem,
-  PlaceContributionFeedItem,
   ProfileContributionItem,
   StaffCreateContributionsFeedPageInput,
   StaffCreateContributionsFeedPageResult,
-  StaffFictionContributionsFeedPageInput,
-  StaffFictionContributionsFeedPageResult,
   TopContributorProfile,
   StaffCreateContributionFeedItem,
 } from "./contribution.entity"
@@ -156,8 +151,6 @@ export interface ContributionsRepositoryPort {
   countPendingComposite(placeAId: string, placeBId: string): Promise<number>
   getById(id: string): Promise<Contribution | null>
   getByUser(userId: string): Promise<Contribution[]>
-  /** Contributions for the profile page with entity / parent labels resolved. */
-  listProfileContributionsByUser(userId: string): Promise<ProfileContributionItem[]>
   /** Paginated profile contributions with labels (preview + “see all” dialog). */
   listProfileContributionsPage(
     input: ProfileContributionsPageInput,
@@ -176,12 +169,6 @@ export interface ContributionsRepositoryPort {
   countApprovedFictionAndPlaceScopesByUser(userId: string): Promise<ContributorEntityScopeCounts>
   /** Sum of `fpp_awarded` for approved contributions (legacy; prefer profiles.fpp_total). */
   sumApprovedFppAwardedByUser(userId: string): Promise<number>
-  getApprovedByEntity(entityType: ContributionEntityType, entityId: string): Promise<Contribution[]>
-  /** One row per approved contribution; callers dedupe by profile id. */
-  listApprovedProfilesForEntity(
-    entityType: ContributionEntityType,
-    entityId: string,
-  ): Promise<FictionContributorProfile[]>
   /** One row per approved contribution on the fiction and its places; callers aggregate FPP by profile id. */
   listApprovedContributorProfilesForFictionScope(fictionId: string): Promise<FictionContributorScopeEntry[]>
   /** One row per user; contributedAt = earliest approved contribution for this entity. */
@@ -194,20 +181,14 @@ export interface ContributionsRepositoryPort {
     fictionId: string,
     userId: string,
   ): Promise<FictionScopeContributorContributionItem[]>
-  getPending(): Promise<Contribution[]>
   /**
    * Staff feed: tab "all" = pending + approved; tab "rejected" = solo rejected.
    * Paginación server-side; orden en "all": pendientes primero, luego aprobados
    * (`ORDER BY status DESC, created_at DESC`); un solo status solo por `created_at` DESC.
    */
-  listFictionCreateContributionsStaffReviewFeedPage(
-    input: StaffFictionContributionsFeedPageInput,
-  ): Promise<StaffFictionContributionsFeedPageResult>
   listCreateContributionsStaffReviewFeedPage(
     input: StaffCreateContributionsFeedPageInput,
   ): Promise<StaffCreateContributionsFeedPageResult>
-  getFictionCreateContributionWithContributorById(id: string): Promise<FictionContributionFeedItem | null>
-  getPlaceCreateContributionWithContributorById(id: string): Promise<PlaceContributionFeedItem | null>
   /** Single lookup for staff detail (create_fiction | create_place | add_photo). */
   getCreateContributionFeedItemById(id: string): Promise<StaffCreateContributionFeedItem | null>
   approve(input: ApproveContributionInput): Promise<boolean>

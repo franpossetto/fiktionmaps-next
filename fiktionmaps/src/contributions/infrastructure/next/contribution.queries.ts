@@ -5,15 +5,11 @@ import { unstable_cache } from "next/cache"
 import { getSessionUserId } from "@/lib/auth/auth.service"
 import { createAnonymousClient, createClient } from "@/lib/supabase/server"
 import type { Database } from "@/supabase/database.types"
-import { getContributionByIdUseCase } from "@/src/contributions/application/get-contribution-by-id.usecase"
 import { getContributionsByUserUseCase } from "@/src/contributions/application/get-contributions-by-user.usecase"
 import { listProfileContributionsPageUseCase } from "@/src/contributions/application/list-profile-contributions-page.usecase"
-import { getApprovedByEntityUseCase } from "@/src/contributions/application/get-approved-by-entity.usecase"
 import { getFictionContributorsUseCase } from "@/src/contributions/application/get-fiction-contributors.usecase"
 import { getContributorsFirstContributionByEntityUseCase } from "@/src/contributions/application/get-contributors-first-contribution-by-entity.usecase"
-import { getPendingContributionsUseCase } from "@/src/contributions/application/get-pending-contributions.usecase"
 import { getStaffContributionDetailUseCase } from "@/src/contributions/application/get-staff-contribution-detail.usecase"
-import { getStaffFictionContributionsFeedPageUseCase } from "@/src/contributions/application/get-staff-fiction-contributions-feed-page.usecase"
 import { getStaffCreateContributionsFeedPageUseCase } from "@/src/contributions/application/get-staff-create-contributions-feed-page.usecase"
 import { getContributorModerationContextUseCase } from "@/src/contributions/application/get-contributor-moderation-context.usecase"
 import { getTopContributorsUseCase } from "@/src/contributions/application/get-top-contributors.usecase"
@@ -23,17 +19,13 @@ import {
 } from "@/src/contributions/domain/contribution.config"
 import type {
   Contribution,
-  ContributionEntityType,
   ContributorModerationContext,
   ContributorProfileWithDate,
-  FictionContributionFeedItem,
   FictionContributorRankedProfile,
-  PlaceContributionFeedItem,
   ProfileContributionItem,
   StaffContributionsFeedKind,
   StaffCreateContributionFeedItem,
   StaffCreateContributionsFeedPageResult,
-  StaffFictionContributionsFeedPageResult,
   StaffFictionContributionsFeedStatusTab,
   TopContributorProfile,
 } from "@/src/contributions/domain/contribution.entity"
@@ -68,15 +60,6 @@ const getStaffContributionsSession = cache(async (): Promise<StaffContributionsS
 
 function staffContributionsRepo(session: StaffContributionsSession) {
   return createContributionsSupabaseAdapter(async () => session.supabase)
-}
-
-/** Caller must ensure userId matches the authenticated session (or rely on RLS). */
-export function getContributionsByUserCached(userId: string) {
-  return unstable_cache(
-    () => getContributionsByUserUseCase(userId, anonRepo),
-    CacheKeys.contributionUser(userId),
-    { ...CacheConfig.medium, tags: ["contributions", `contributions-user-${userId}`] },
-  )()
 }
 
 export type ProfileContributionsProfileData = {
@@ -170,25 +153,6 @@ export const getProfileContributionsPageForViewer = cache(
   },
 )
 
-export function getContributionByIdCached(id: string) {
-  return unstable_cache(
-    () => getContributionByIdUseCase(id, anonRepo),
-    CacheKeys.contribution(id),
-    { ...CacheConfig.medium, tags: ["contributions", `contribution-${id}`] },
-  )()
-}
-
-export function getApprovedByEntityCached(entityType: ContributionEntityType, entityId: string) {
-  return unstable_cache(
-    () => getApprovedByEntityUseCase(entityType, entityId, anonRepo),
-    CacheKeys.contributionEntity(entityType, entityId),
-    {
-      ...CacheConfig.medium,
-      tags: ["contributions", `${entityType}-${entityId}`],
-    },
-  )()
-}
-
 export function getFictionContributorsCached(fictionId: string): Promise<FictionContributorRankedProfile[]> {
   return unstable_cache(
     () => getFictionContributorsUseCase(fictionId, anonRepo),
@@ -210,16 +174,6 @@ export async function getPlaceContributorsWithDatesCached(
     if (error instanceof SupabaseNetworkError) return []
     throw error
   }
-}
-
-/**
- * Pending contributions for the current Supabase session.
- * Caller must invoke from a trusted server boundary (staff-only pages). Requires admin or moderator JWT.
- */
-export async function getPendingContributionsForStaffSession(): Promise<Contribution[]> {
-  const session = await getStaffContributionsSession()
-  if (!session) return []
-  return getPendingContributionsUseCase(staffContributionsRepo(session))
 }
 
 /** create_fiction / create_place staff queue (paginated); staff session only. */
@@ -247,29 +201,6 @@ export async function getCreateContributionsFeedPageForStaffSession(options: {
   )
 }
 
-/** @deprecated Prefer getCreateContributionsFeedPageForStaffSession with kind "fiction". */
-export async function getFictionContributionsFeedPageForStaffSession(options: {
-  page: number
-  statusTab: StaffFictionContributionsFeedStatusTab
-  submitterUserId: string
-}): Promise<StaffFictionContributionsFeedPageResult> {
-  const session = await getStaffContributionsSession()
-  if (!session) return { items: [], totalCount: 0 }
-
-  const pageSize = STAFF_FICTION_CONTRIBUTIONS_FEED_PAGE_SIZE
-  const safePage = Number.isFinite(options.page) && options.page >= 1 ? Math.floor(options.page) : 1
-  const offset = (safePage - 1) * pageSize
-  return getStaffFictionContributionsFeedPageUseCase(
-    {
-      userIdFilter: options.submitterUserId.trim() || undefined,
-      statusTab: options.statusTab,
-      limit: pageSize,
-      offset,
-    },
-    staffContributionsRepo(session),
-  )
-}
-
 /** Single DB lookup for staff detail (fiction or place contribution). */
 export async function getStaffContributionDetailForStaffSession(
   id: string,
@@ -277,24 +208,6 @@ export async function getStaffContributionDetailForStaffSession(
   const session = await getStaffContributionsSession()
   if (!session) return null
   return getStaffContributionDetailUseCase(id, staffContributionsRepo(session))
-}
-
-export async function getFictionContributionDetailForStaffSession(
-  id: string,
-): Promise<FictionContributionFeedItem | null> {
-  const item = await getStaffContributionDetailForStaffSession(id)
-  if (!item || item.entityType !== "fiction") return null
-  if (item.type !== "create_fiction" && item.type !== "add_photo") return null
-  return item as FictionContributionFeedItem
-}
-
-export async function getPlaceContributionDetailForStaffSession(
-  id: string,
-): Promise<PlaceContributionFeedItem | null> {
-  const item = await getStaffContributionDetailForStaffSession(id)
-  if (!item || item.entityType !== "place") return null
-  if (item.type !== "create_place" && item.type !== "add_photo") return null
-  return item as PlaceContributionFeedItem
 }
 
 /** Submitter activity + FPP from profiles.fpp_total; staff session only. */

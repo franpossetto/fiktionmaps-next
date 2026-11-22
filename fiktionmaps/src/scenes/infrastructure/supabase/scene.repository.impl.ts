@@ -6,7 +6,7 @@ import { supabaseFetchFailureLog, throwIfSupabaseFetchFailed } from "@/lib/supab
 import { createAnonymousClient, createClient } from "@/lib/supabase/server"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Place } from "@/src/places/domain/place.entity"
-import type { ProfileScenePreview, Scene, ScenePlace } from "@/src/scenes/domain/scene.entity"
+import type { Scene, ScenePlace } from "@/src/scenes/domain/scene.entity"
 import type { CreateSceneData, LinkScenePlaceData, UpdateSceneData } from "@/src/scenes/domain/scene.schemas"
 import type { SceneListFilters, ScenesRepositoryPort } from "@/src/scenes/domain/scene.repository"
 import type { z } from "zod"
@@ -653,27 +653,6 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
     return true
   },
 
-  async countByFictionIds(fictionIds: string[]): Promise<Record<string, number>> {
-    if (fictionIds.length === 0) return {}
-    const supabase = createAnonymousClient()
-    const { data, error } = await supabase
-      .from("scenes")
-      .select("fiction_id")
-      .in("fiction_id", fictionIds)
-      .eq("active", true)
-    if (error) {
-      console.error("[scenes repo] countByFictionIds:", error.message)
-      return {}
-    }
-    const counts: Record<string, number> = {}
-    for (const id of fictionIds) counts[id] = 0
-    for (const r of data ?? []) {
-      const id = (r as { fiction_id?: string }).fiction_id
-      if (id) counts[id] = (counts[id] ?? 0) + 1
-    }
-    return counts
-  },
-
   async listCitiesWithActiveScenes(fictionIds: string[] | null): Promise<City[]> {
     const supabase = createAnonymousClient()
 
@@ -828,62 +807,6 @@ export const scenesSupabaseAdapter: ScenesRepositoryPort = {
     if (placeIds.length === 0) return []
 
     return fetchScenesWithVideoForPlaceIds(supabase, fictionIds, placeIds)
-  },
-
-  async getScenesCreatedByUserId(userId: string): Promise<ProfileScenePreview[]> {
-    try {
-      const supabase = await createClient()
-      const { data: scenes, error } = await supabase
-        .from("scenes")
-        .select("id, title, fiction_id, fictions ( title, slug )")
-        .eq("active", true)
-        .eq("created_by", userId)
-        .order("created_at", { ascending: false })
-        .limit(5)
-
-      if (error || !scenes?.length) return []
-
-      const sceneIds = scenes.map((s) => s.id)
-      const { data: imgs } = await supabase
-        .from("asset_images")
-        .select("entity_id, role, variant, url")
-        .eq("entity_type", "scene")
-        .in("entity_id", sceneIds)
-
-      const byScene = new Map<string, ImgRow[]>()
-      for (const row of imgs ?? []) {
-        const r = row as ImgRow
-        const list = byScene.get(r.entity_id) ?? []
-        list.push(r)
-        byScene.set(r.entity_id, list)
-      }
-
-      return scenes.flatMap((s) => {
-        const fictions = (s as { fictions?: unknown }).fictions
-        const fictionTitle =
-          fictions && typeof fictions === "object" && "title" in fictions
-            ? String((fictions as { title?: string }).title ?? "")
-            : ""
-        const fictionSlug =
-          fictions && typeof fictions === "object" && "slug" in fictions
-            ? ((fictions as { slug?: string | null }).slug ?? null)
-            : null
-        const fictionId = (s as { fiction_id?: string }).fiction_id
-        if (!fictionId) return []
-        return [
-          {
-            id: s.id,
-            fictionId,
-            fictionSlug,
-            title: s.title,
-            fictionTitle,
-            imageUrl: pickThumb(byScene.get(s.id) ?? []),
-          },
-        ]
-      })
-    } catch {
-      return []
-    }
   },
 }
 

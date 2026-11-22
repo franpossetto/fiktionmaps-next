@@ -21,7 +21,6 @@ import type {
   ContributionType,
   ContributorProfileWithDate,
   FictionContributionFeedItem,
-  FictionContributorProfile,
   FictionContributorScopeEntry,
   FictionScopeContributorContributionItem,
   PlaceContributionFeedItem,
@@ -30,7 +29,6 @@ import type {
   StaffContributionsFeedKind,
   StaffCreateContributionFeedItem,
   StaffCreateContributionsFeedPageResult,
-  StaffFictionContributionsFeedPageResult,
   StaffFictionContributionsFeedStatusTab,
   TopContributorProfile,
 } from "@/src/contributions/domain/contribution.entity"
@@ -96,22 +94,6 @@ type ProfileContributionRow = {
   type: ContributionType
   fpp_awarded: number | null
   profiles: ProfileEmbed | ProfileEmbed[] | null
-}
-
-function mapProfileContributionRows(rows: ProfileContributionRow[]): FictionContributorProfile[] {
-  const out: FictionContributorProfile[] = []
-  for (const row of rows) {
-    const raw = row.profiles
-    const prof = Array.isArray(raw) ? raw[0] : raw
-    if (!prof?.id) continue
-    out.push({
-      id: prof.id,
-      username: prof.username,
-      fullName: prof.full_name,
-      avatarUrl: prof.avatar_url,
-    })
-  }
-  return out
 }
 
 function mapFictionScopeContributionRows(rows: ProfileContributionRow[]): FictionContributorScopeEntry[] {
@@ -359,36 +341,6 @@ async function listApprovedContributionsForUserInFictionScopeInternal(
             : fictionTitle,
     }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-}
-
-async function listApprovedProfileRowsForEntity(
-  supabase: SupabaseClient<Database>,
-  entityType: ContributionEntityType,
-  entityId: string,
-): Promise<FictionContributorProfile[]> {
-  const { data, error } = await supabase
-    .from("contributions")
-    .select(
-      `
-      user_id,
-      profiles!contributions_user_id_fkey (
-        id,
-        username,
-        full_name,
-        avatar_url
-      )
-    `,
-    )
-    .eq("entity_type", entityType)
-    .eq("entity_id", entityId)
-    .eq("status", "approved")
-
-  if (error) {
-    console.error("[contributions repo] listApprovedProfileRowsForEntity:", error.message)
-    return []
-  }
-
-  return mapProfileContributionRows((data ?? []) as unknown as ProfileContributionRow[])
 }
 
 function mapFictionFeedItem(
@@ -958,95 +910,6 @@ function entityTable(entityType: ContributionEntityType): "fictions" | "places" 
 export function createContributionsSupabaseAdapter(
   getSupabase: () => Promise<SupabaseClient<Database>>,
 ): ContributionsRepositoryPort {
-  const listFictionCreateContributionsStaffReviewFeedPageCached = cache(
-    async (
-      userIdFilter: string | undefined,
-      statusTab: StaffFictionContributionsFeedStatusTab,
-      limit: number,
-      offset: number,
-    ): Promise<StaffFictionContributionsFeedPageResult> => {
-      const supabase = await getSupabase()
-      let q = supabase
-        .from("contributions")
-        .select(
-          `
-          *,
-          profiles!contributions_user_id_fkey (
-            id,
-            username,
-            full_name,
-            avatar_url
-          )
-        `,
-          { count: "exact" },
-        )
-        .eq("entity_type", "fiction")
-        .in("type", ["create_fiction", "add_photo", "add_credits"])
-
-      if (userIdFilter) q = q.eq("user_id", userIdFilter)
-
-      if (statusTab === "all") {
-        q = q.in("status", ["pending", "approved"])
-        q = q.order("status", { ascending: false }).order("created_at", { ascending: false })
-      } else {
-        q = q.eq("status", statusTab).order("created_at", { ascending: false })
-      }
-
-      const safeLimit = Math.max(1, limit)
-      const from = Math.max(0, offset)
-      const to = from + safeLimit - 1
-
-      const { data, error, count } = await q.range(from, to)
-
-      if (error) {
-        console.error("[contributions repo] listFictionCreateContributionsStaffReviewFeedPage:", error.message)
-        return { items: [], totalCount: 0 }
-      }
-
-      type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
-      const items: FictionContributionFeedItem[] = []
-      for (const row of (data ?? []) as Row[]) {
-        const item = mapFictionFeedItem(row, row.profiles)
-        if (item) items.push(item)
-      }
-      const [titles, covers] = await Promise.all([
-        fictionTitlesByIds(supabase, items.map((i) => i.entityId)),
-        fictionCoverThumbByIds(supabase, items.map((i) => i.entityId)),
-      ])
-      const fictionAddPhotoIds = items.filter((i) => i.type === "add_photo").map((i) => i.id)
-      const addCreditsIds = items.filter((i) => i.type === "add_credits").map((i) => i.id)
-      const [pendingByContribution, pendingFictionPersons] = await Promise.all([
-        listPendingImagesForContributionIds(supabase, fictionAddPhotoIds),
-        listPendingFictionPersonsForContributionIds(supabase, addCreditsIds),
-      ])
-      const proposedPersonIds = [...pendingFictionPersons.values()].flatMap((rows) =>
-        rows.map((r) => r.person_id),
-      )
-      const proposedPersonNames = await personNamesByIds(supabase, proposedPersonIds)
-
-      const withMedia = items.map((i) => {
-        const pendingRows = pendingByContribution.get(i.id) ?? []
-        const creditRow =
-          i.type === "add_credits" ? (pendingFictionPersons.get(i.id) ?? [])[0] : undefined
-        return {
-          ...i,
-          fictionTitle: titles.get(i.entityId) ?? null,
-          fictionCoverUrl: covers.get(i.entityId) ?? null,
-          pendingImagesByRole: pendingImagesRowsToByRole(pendingRows),
-          proposedCredit: creditRow
-            ? {
-                personId: creditRow.person_id,
-                personName: proposedPersonNames.get(creditRow.person_id) ?? null,
-                role: creditRow.role,
-              }
-            : null,
-        }
-      })
-
-      return { items: withMedia, totalCount: count ?? 0 }
-    },
-  )
-
   const listCreateContributionsStaffReviewFeedPageCached = cache(
     async (
       kind: StaffContributionsFeedKind,
@@ -1675,24 +1538,6 @@ export function createContributionsSupabaseAdapter(
       return (data as ContributionRow[] | null)?.map(mapRow) ?? []
     }),
 
-    listProfileContributionsByUser: cache(async (userId: string): Promise<ProfileContributionItem[]> => {
-      const supabase = await getSupabase()
-      const { data, error } = await supabase
-        .from("contributions")
-        .select(
-          "id, user_id, type, entity_type, entity_id, status, moderator_id, moderator_note, fpp_awarded, created_at, updated_at",
-        )
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-
-      if (error) {
-        console.error("[contributions repo] listProfileContributionsByUser error:", error.message, error)
-        return []
-      }
-      const rows = (data as ContributionRow[] | null)?.map(mapRow) ?? []
-      return enrichContributionsWithEntityLabels(supabase, rows)
-    }),
-
     listProfileContributionsPage: cache(
       async (input: ProfileContributionsPageInput): Promise<ProfileContributionsPageResult> => {
         const supabase = await getSupabase()
@@ -1977,35 +1822,6 @@ export function createContributionsSupabaseAdapter(
       return sum
     }),
 
-    getApprovedByEntity: cache(
-      async (entityType: ContributionEntityType, entityId: string): Promise<Contribution[]> => {
-        const supabase = await getSupabase()
-        const { data, error } = await supabase
-          .from("contributions")
-          .select("*")
-          .eq("entity_type", entityType)
-          .eq("entity_id", entityId)
-          .eq("status", "approved")
-          .order("created_at", { ascending: false })
-
-        if (error) {
-          console.error("[contributions repo] getApprovedByEntity error:", error.message)
-          return []
-        }
-        return (data as ContributionRow[] | null)?.map(mapRow) ?? []
-      },
-    ),
-
-    listApprovedProfilesForEntity: cache(
-      async (
-        entityType: ContributionEntityType,
-        entityId: string,
-      ): Promise<FictionContributorProfile[]> => {
-        const supabase = await getSupabase()
-        return listApprovedProfileRowsForEntity(supabase, entityType, entityId)
-      },
-    ),
-
     listApprovedContributorProfilesForFictionScope: cache(
       async (fictionId: string): Promise<FictionContributorScopeEntry[]> => {
         const supabase = await getSupabase()
@@ -2087,31 +1903,6 @@ export function createContributionsSupabaseAdapter(
         return out
     }),
 
-    getPending: cache(async (): Promise<Contribution[]> => {
-      const supabase = await getSupabase()
-      const { data, error } = await supabase
-        .from("contributions")
-        .select("*")
-        .eq("status", "pending")
-        .order("created_at", { ascending: true })
-
-      if (error) {
-        console.error("[contributions repo] getPending error:", error.message)
-        return []
-      }
-      return (data as ContributionRow[] | null)?.map(mapRow) ?? []
-    }),
-
-    listFictionCreateContributionsStaffReviewFeedPage(input) {
-      const uid = input.userIdFilter?.trim()
-      return listFictionCreateContributionsStaffReviewFeedPageCached(
-        uid || undefined,
-        input.statusTab,
-        input.limit,
-        input.offset,
-      )
-    },
-
     listCreateContributionsStaffReviewFeedPage(input) {
       const uid = input.userIdFilter?.trim()
       return listCreateContributionsStaffReviewFeedPageCached(
@@ -2122,84 +1913,6 @@ export function createContributionsSupabaseAdapter(
         input.offset,
       )
     },
-
-    getFictionCreateContributionWithContributorById: cache(
-      async (id: string): Promise<FictionContributionFeedItem | null> => {
-        const supabase = await getSupabase()
-        const { data, error } = await supabase
-          .from("contributions")
-          .select(
-            `
-          *,
-          profiles!contributions_user_id_fkey (
-            id,
-            username,
-            full_name,
-            avatar_url
-          )
-        `,
-          )
-          .eq("id", id)
-          .maybeSingle()
-
-        if (error) {
-          console.error("[contributions repo] getFictionCreateContributionWithContributorById:", error.message)
-          return null
-        }
-        if (!data) return null
-
-        type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
-        const row = data as Row
-        if (row.entity_type !== "fiction") return null
-        if (row.type !== "create_fiction" && row.type !== "add_photo" && row.type !== "add_credits") {
-          return null
-        }
-        const base = mapFictionFeedItem(row, row.profiles)
-        if (!base) return null
-        return enrichFictionFeedItem(supabase, base)
-      },
-    ),
-
-    getPlaceCreateContributionWithContributorById: cache(
-      async (id: string): Promise<PlaceContributionFeedItem | null> => {
-        const supabase = await getSupabase()
-        const { data, error } = await supabase
-          .from("contributions")
-          .select(
-            `
-          *,
-          profiles!contributions_user_id_fkey (
-            id,
-            username,
-            full_name,
-            avatar_url
-          )
-        `,
-          )
-          .eq("id", id)
-          .maybeSingle()
-
-        if (error) {
-          console.error("[contributions repo] getPlaceCreateContributionWithContributorById:", error.message)
-          return null
-        }
-        if (!data) return null
-
-        type Row = ContributionRow & { profiles: ProfileEmbed | ProfileEmbed[] | null }
-        const row = data as Row
-        if (row.entity_type !== "place") return null
-        if (
-          row.type !== "create_place" &&
-          row.type !== "add_photo" &&
-          row.type !== "link_place_relationship"
-        ) {
-          return null
-        }
-        const base = mapPlaceFeedItem(row, row.profiles)
-        if (!base) return null
-        return enrichPlaceFeedItem(supabase, base)
-      },
-    ),
 
     getCreateContributionFeedItemById: cache(
       async (id: string): Promise<StaffCreateContributionFeedItem | null> => {

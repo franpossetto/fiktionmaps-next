@@ -14,7 +14,6 @@ import { listCreditCandidatesForContribute } from "@/src/persons/application/lis
 import { FICTION_PERSON_ROLES } from "@/src/persons/domain/person.entity"
 import { createPerson } from "@/src/persons/application/create-person.usecase"
 import { updatePerson } from "@/src/persons/application/update-person.usecase"
-import { resolveOrCreatePerson } from "@/src/persons/application/resolve-or-create-person.usecase"
 import { getFictionPersons } from "@/src/persons/application/get-fiction-persons.usecase"
 import { setFictionPersons } from "@/src/persons/application/set-fiction-persons.usecase"
 import { z } from "zod"
@@ -23,7 +22,6 @@ import type {
   ListDirectorCandidatesResult,
   CreatePersonResult,
   UpdatePersonResult,
-  ResolveOrCreatePersonResult,
   DeletePersonResult,
   GetFictionPersonsResult,
   SetFictionPersonsResult,
@@ -35,7 +33,6 @@ export type {
   ListDirectorCandidatesResult,
   CreatePersonResult,
   UpdatePersonResult,
-  ResolveOrCreatePersonResult,
   DeletePersonResult,
   GetFictionPersonsResult,
   SetFictionPersonsResult,
@@ -68,10 +65,6 @@ export async function searchPersonsAction(query: string): Promise<SearchPersonsR
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Search failed" }
   }
-}
-
-export async function listDirectorCandidatesAction(nameQuery: string): Promise<ListDirectorCandidatesResult> {
-  return listCreditCandidatesAction("director", nameQuery)
 }
 
 export async function listCreditCandidatesAction(
@@ -167,18 +160,6 @@ export async function uploadPersonImageAction(
   revalidatePath("/admin")
   updateTag("persons")
   return { success: true, photoUrl: photoUrl ?? "" }
-}
-
-export async function resolveOrCreatePersonAction(name: string): Promise<ResolveOrCreatePersonResult> {
-  const parsed = z.string().trim().min(1).safeParse(name)
-  if (!parsed.success) return { success: false, error: zodErrorMessage(parsed.error) }
-  try {
-    const person = await resolveOrCreatePerson(parsed.data, personsRepo)
-    if (!person) return { success: false, error: "Failed to resolve person" }
-    return { success: true, person }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Failed to resolve person" }
-  }
 }
 
 export async function getFictionPersonsAction(fictionId: string): Promise<GetFictionPersonsResult> {
