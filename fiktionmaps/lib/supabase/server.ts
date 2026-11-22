@@ -2,6 +2,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import type { Database } from "../../supabase/database.types"
+import { supabaseFetch } from "@/lib/supabase/fetch"
 
 function getSupabaseEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -28,7 +29,9 @@ function getSupabaseEnv() {
  */
 export function createAnonymousClient() {
   const { url, key } = getSupabaseEnv()
-  return createSupabaseClient<Database>(url, key)
+  return createSupabaseClient<Database>(url, key, {
+    global: { fetch: supabaseFetch },
+  })
 }
 
 export async function createClient() {
@@ -39,6 +42,7 @@ export async function createClient() {
     url,
     key,
     {
+      global: { fetch: supabaseFetch },
       cookies: {
         getAll() {
           return cookieStore.getAll()

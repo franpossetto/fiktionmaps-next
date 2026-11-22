@@ -19,6 +19,9 @@ export function MapboxContainer({
   minZoom,
   maxZoom,
   interactive = true,
+  scrollZoom,
+  doubleClickZoom,
+  touchZoomRotate,
   colorScheme = "dark",
   mapStyle,
   className,
@@ -67,11 +70,12 @@ export function MapboxContainer({
     [onMapReady],
   )
 
-  // When center prop is provided (e.g. minimap), keep map view in sync with it
+  // When center prop is provided (e.g. minimap), keep map view in sync with it.
+  // Re-apply after load so a change that landed before onLoad is not dropped.
   useEffect(() => {
-    if (!controlledCenter || !mapRef.current) return
+    if (!mapLoaded || !controlledCenter || !mapRef.current) return
     mapRef.current.setCenter([controlledCenter.lng, controlledCenter.lat])
-  }, [controlledCenter?.lat, controlledCenter?.lng])
+  }, [controlledCenter?.lat, controlledCenter?.lng, mapLoaded])
 
   /**
    * Apply zoom limits via the Mapbox GL API — never as ReactMapGL props.
@@ -114,11 +118,11 @@ export function MapboxContainer({
         mapStyle={style}
         mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
         interactive={interactive}
-        scrollZoom={interactive}
+        scrollZoom={scrollZoom ?? interactive}
         dragPan={interactive}
         dragRotate={interactive}
-        doubleClickZoom={interactive}
-        touchZoomRotate={interactive}
+        doubleClickZoom={doubleClickZoom ?? interactive}
+        touchZoomRotate={touchZoomRotate ?? interactive}
         keyboard={interactive}
         onLoad={onLoad}
         onClick={

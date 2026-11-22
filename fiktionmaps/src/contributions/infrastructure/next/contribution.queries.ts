@@ -1,4 +1,5 @@
 import { cache } from "react"
+import { SupabaseNetworkError } from "@/lib/supabase/fetch"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { unstable_cache } from "next/cache"
 import { getSessionUserId } from "@/lib/auth/auth.service"
@@ -196,12 +197,19 @@ export function getFictionContributorsCached(fictionId: string): Promise<Fiction
   )()
 }
 
-export function getPlaceContributorsWithDatesCached(placeId: string): Promise<ContributorProfileWithDate[]> {
-  return unstable_cache(
-    () => getContributorsFirstContributionByEntityUseCase("place", placeId, anonRepo),
-    CacheKeys.placeContributorsDetail(placeId),
-    { ...CacheConfig.medium, tags: ["contributions"] },
-  )()
+export async function getPlaceContributorsWithDatesCached(
+  placeId: string,
+): Promise<ContributorProfileWithDate[]> {
+  try {
+    return await unstable_cache(
+      () => getContributorsFirstContributionByEntityUseCase("place", placeId, anonRepo),
+      [...CacheKeys.placeContributorsDetail(placeId), "v2"],
+      { ...CacheConfig.medium, tags: ["contributions"] },
+    )()
+  } catch (error) {
+    if (error instanceof SupabaseNetworkError) return []
+    throw error
+  }
 }
 
 /**

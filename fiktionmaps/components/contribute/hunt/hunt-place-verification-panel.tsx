@@ -526,7 +526,7 @@ export function HuntPlaceVerificationPanel({
           ) : null}
         </div>
         {description ? (
-          <p className="max-w-[75ch] text-base leading-8 text-muted-foreground">{description}</p>
+          <p className="article-body">{description}</p>
         ) : null}
       </div>
 

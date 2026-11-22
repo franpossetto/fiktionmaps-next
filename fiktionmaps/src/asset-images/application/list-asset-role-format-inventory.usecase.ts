@@ -3,6 +3,12 @@ import type { ImageVariant } from "@/lib/asset-images/variant-sizes"
 import type { AssetRoleFormatInventory } from "@/src/asset-images/domain/asset-image.entity"
 import type { AssetImagesRepositoryPort } from "@/src/asset-images/domain/asset-image.repository"
 
+export type ProbePublicAssetUrl = (url: string) => Promise<{
+  reachable: boolean
+  missing: boolean
+  byteLength: number | null
+}>
+
 export type ListAssetRoleFormatInventoryInput = {
   entityType: string
   entityId: string
@@ -10,22 +16,10 @@ export type ListAssetRoleFormatInventoryInput = {
   expectedVariants: readonly ImageVariant[]
 }
 
-async function fetchUrlByteLength(url: string): Promise<number | null> {
-  try {
-    const res = await fetch(url, { method: "HEAD", cache: "no-store" })
-    if (!res.ok) return null
-    const raw = res.headers.get("content-length")
-    if (!raw) return null
-    const n = Number(raw)
-    return Number.isFinite(n) && n >= 0 ? n : null
-  } catch {
-    return null
-  }
-}
-
 export async function listAssetRoleFormatInventoryUseCase(
   input: ListAssetRoleFormatInventoryInput,
   repo: AssetImagesRepositoryPort,
+  probePublicAssetUrl: ProbePublicAssetUrl,
 ): Promise<AssetRoleFormatInventory> {
   const rows = await repo.listByEntityRole(input.entityType, input.entityId, input.role)
   const byVariant = new Map<string, string>()
@@ -36,16 +30,22 @@ export async function listAssetRoleFormatInventoryUseCase(
   const variants = await Promise.all(
     input.expectedVariants.map(async (variant) => {
       const url = byVariant.get(variant)?.trim() || null
-      const present = Boolean(url)
+      const hasRow = Boolean(url)
+      const probe = url
+        ? await probePublicAssetUrl(url)
+        : { reachable: false, missing: false, byteLength: null }
+      const present = hasRow && probe.reachable
       const format = detectAssetImageFormatFromUrl(url)
-      const byteLength = url ? await fetchUrlByteLength(url) : null
       return {
         variant,
+        hasRow,
         present,
+        objectMissing: hasRow && probe.missing,
+        probeFailed: hasRow && !probe.reachable && !probe.missing,
         format,
         ok: present && format === "avif",
         url,
-        byteLength,
+        byteLength: present ? probe.byteLength : null,
       }
     }),
   )

@@ -10,6 +10,7 @@ import { parsePlaceRelationKind } from "@/src/places/domain/place-relation-kind"
 import { parsePlaceShootEnvironment } from "@/src/places/domain/place-shoot-environment"
 import { Button } from "@/components/ui/button"
 import { PlaceCreateView, type PlaceFormData } from "./place-create-view"
+import { cityIdForPlaceCoords, coerceLocationType } from "@/components/places/place-location-picker"
 import { PlaceCloneToFictionView } from "./place-clone-to-fiction-view"
 import { PlaceRelationshipsPanel } from "./place-relationships-panel"
 import { uploadPlaceImageAction } from "@/src/places/infrastructure/next/place.actions"
@@ -173,7 +174,12 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
   if (workflowStep === "edit" && editingLocation) {
     const editInitialFormData: PlaceFormData = {
       fictionId: editingLocation.fictionId,
-      cityId: editingLocation.location.cityId,
+      cityId: cityIdForPlaceCoords(
+        editingLocation.location.cityId,
+        editingLocation.location.lat,
+        editingLocation.location.lng,
+        cities,
+      ),
       locationName: editingLocation.location.name ?? "",
       placeName: editingLocation.name ?? "",
       address: editingLocation.location.address ?? "",
@@ -181,7 +187,7 @@ export function LocationsTab({ initialPlaces, initialFictions = [], initialCitie
       description: editingLocation.description ?? "",
       latitude: editingLocation.location.lat,
       longitude: editingLocation.location.lng,
-      locationType: editingLocation.location.locationType ?? "",
+      locationType: coerceLocationType(editingLocation.location.locationType),
       relationKind: editingLocation.relationKind,
       shootEnvironment: editingLocation.shootEnvironment ?? "",
       isLandmark: editingLocation.location.isLandmark ?? false,
