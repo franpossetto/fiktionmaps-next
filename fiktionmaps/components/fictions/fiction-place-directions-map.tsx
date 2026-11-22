@@ -34,9 +34,15 @@ function DirectionsMapResize({ mapId }: { mapId: string }) {
     }
 
     resize()
+    const raf = requestAnimationFrame(resize)
+    const later = window.setTimeout(resize, 120)
     const observer = new ResizeObserver(() => resize())
     observer.observe(container)
-    return () => observer.disconnect()
+    return () => {
+      cancelAnimationFrame(raf)
+      window.clearTimeout(later)
+      observer.disconnect()
+    }
   }, [mapLoaded, mapRef])
 
   return null

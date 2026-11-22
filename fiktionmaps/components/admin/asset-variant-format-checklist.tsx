@@ -35,6 +35,20 @@ export function AssetVariantFormatChecklist({
     <div className={cn("space-y-1", className)}>
       <ul className="space-y-0.5 font-mono text-[11px] leading-snug">
         {inventory.variants.map((item) => {
+          if (item.objectMissing) {
+            return (
+              <li key={item.variant} className="text-amber-700 dark:text-amber-400">
+                — {item.variant} file missing
+              </li>
+            )
+          }
+          if (item.probeFailed) {
+            return (
+              <li key={item.variant} className="text-muted-foreground">
+                ? {item.variant} could not be checked
+              </li>
+            )
+          }
           if (!item.present) {
             return (
               <li key={item.variant} className="text-amber-700 dark:text-amber-400">

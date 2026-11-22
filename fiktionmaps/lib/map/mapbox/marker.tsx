@@ -7,6 +7,7 @@ export function MapboxMarker({
   position,
   anchor = "bottom",
   onClick,
+  zIndex,
   children,
 }: MarkerProps) {
   return (
@@ -15,6 +16,7 @@ export function MapboxMarker({
       latitude={position.lat}
       onClick={onClick ? (e) => { e.originalEvent.stopPropagation(); onClick() } : undefined}
       anchor={anchor}
+      style={zIndex != null ? { zIndex } : undefined}
     >
       {children}
     </Marker>

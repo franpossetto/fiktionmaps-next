@@ -4,6 +4,7 @@ import {
   THUMB_UPLOAD_VARIANTS,
 } from "@/lib/asset-images/variant-sizes"
 import { listAssetRoleFormatInventoryUseCase } from "@/src/asset-images/application/list-asset-role-format-inventory.usecase"
+import { probePublicAssetUrl } from "@/src/asset-images/infrastructure/next/probe-public-asset-url"
 import type { AssetRoleFormatInventory } from "@/src/asset-images/domain/asset-image.entity"
 import { createAssetImagesSupabaseAdapter } from "@/src/asset-images/infrastructure/supabase/asset-image.repository.impl"
 
@@ -21,6 +22,7 @@ export async function getFictionImprovePhotoInventories(
         expectedVariants: THUMB_UPLOAD_VARIANTS,
       },
       assetImagesRepo,
+      probePublicAssetUrl,
     ),
     listAssetRoleFormatInventoryUseCase(
       {
@@ -30,6 +32,7 @@ export async function getFictionImprovePhotoInventories(
         expectedVariants: BANNER_UPLOAD_VARIANTS,
       },
       assetImagesRepo,
+      probePublicAssetUrl,
     ),
   ])
   return { cover, banner }
@@ -44,7 +47,8 @@ export async function getPlaceImprovePhotoInventory(
       entityId: placeId,
       role: "avatar",
       expectedVariants: THUMB_UPLOAD_VARIANTS,
-    },
-    assetImagesRepo,
+      },
+      assetImagesRepo,
+      probePublicAssetUrl,
   )
 }

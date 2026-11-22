@@ -192,7 +192,7 @@ export function HuntPlaceReviewDetail({
           <p className="rounded-xl border border-border/60 bg-muted/30 px-4 py-6 text-sm text-muted-foreground">
             {t("noCoords")}
           </p>
-          <p className="max-w-[75ch] text-base leading-8 text-muted-foreground">{description}</p>
+          <p className="article-body">{description}</p>
         </div>
       )}
 

@@ -1,6 +1,6 @@
 import React from "react"
 import type { Metadata, Viewport } from "next"
-import { Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google"
+import { Plus_Jakarta_Sans, Source_Serif_4, Space_Grotesk } from "next/font/google"
 import { getSiteUrl } from "@/lib/site"
 
 import "./globals.css"
@@ -10,6 +10,10 @@ const _plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta-sans",
 })
 const _spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk" })
+const _sourceSerif = Source_Serif_4({
+  subsets: ["latin"],
+  variable: "--font-source-serif",
+})
 const SITE_URL = getSiteUrl()
 const GOOGLE_SITE_VERIFICATION = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim()
 
@@ -94,7 +98,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${_plusJakartaSans.variable} ${_spaceGrotesk.variable} font-sans antialiased overflow-hidden`}
+        className={`${_plusJakartaSans.variable} ${_spaceGrotesk.variable} ${_sourceSerif.variable} font-sans antialiased overflow-hidden`}
       >
         {children}
       </body>

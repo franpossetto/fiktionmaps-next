@@ -1,4 +1,8 @@
-import type { FictionScopeContributorContributionItem, ContributorEntityScopeCounts } from "@/src/contributions/domain/contribution.entity"
+import type {
+  FictionScopeContributorContributionItem,
+  ContributorEntityScopeCounts,
+  ProfileContributionItem,
+} from "@/src/contributions/domain/contribution.entity"
 import type { AdminContributionsListPageResult } from "@/src/contributions/domain/contribution.repository"
 
 export type CreateContributionResult =
@@ -23,4 +27,8 @@ export type ListAdminContributionsResult =
 
 export type GetFictionScopeContributorContributionsResult =
   | { success: true; items: FictionScopeContributorContributionItem[]; scopeCounts: ContributorEntityScopeCounts }
+  | { success: false; error: string }
+
+export type ListProfileContributionsPageActionResult =
+  | { success: true; items: ProfileContributionItem[]; totalCount: number }
   | { success: false; error: string }

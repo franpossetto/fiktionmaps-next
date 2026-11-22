@@ -6,9 +6,9 @@ import { Link, useRouter } from "@/i18n/navigation"
 import { ArrowLeft, CheckCircle2, Loader2, RefreshCw } from "lucide-react"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { Place } from "@/src/places/domain/place.entity"
-import type { Scene } from "@/src/scenes/domain/scene.entity"
-import { primaryScenePlace } from "@/src/scenes/domain/scene.helpers"
+import type { Scene, ScenePlace } from "@/src/scenes/domain/scene.entity"
 import { uploadSceneVideoPair } from "@/lib/asset-videos/upload-scene-videos"
+import { ScenePlacesEditor } from "./scene-places-editor"
 import { SCENE_VIDEO_MAX_BYTES } from "@/components/contribute/scene/scene-contribute-video-schema"
 import { buildTimecodeLabel, parseTimecodeLabel, type TimecodeParts } from "@/lib/scenes/scene-timecode"
 import { Button } from "@/components/ui/button"
@@ -20,7 +20,6 @@ interface SceneFormData {
   title: string
   description: string
   fictionId: string
-  placeId: string
   timecode: TimecodeParts
   quote: string
   season: string
@@ -36,7 +35,6 @@ function sceneToForm(scene: Scene): SceneFormData {
     title: scene.title,
     description: scene.description,
     fictionId: scene.fictionId,
-    placeId: primaryScenePlace(scene)?.placeId ?? "",
     timecode: parseTimecodeLabel(scene.timestamp),
     quote: scene.quote ?? "",
     season: scene.season != null ? String(scene.season) : "",
@@ -57,9 +55,10 @@ export interface SceneEditViewProps {
 export function SceneEditView({ initialScene, fictions: initialFictions = [], places: initialPlaces = [] }: SceneEditViewProps) {
   const t = useTranslations("Scenes")
   const router = useRouter()
-  const [fictions, setFictions] = useState<FictionWithMedia[]>(initialFictions)
+  const fictions = initialFictions
   const [places] = useState<Place[]>(initialPlaces)
   const [formData, setFormData] = useState<SceneFormData>(() => sceneToForm(initialScene))
+  const [linkedPlaces, setLinkedPlaces] = useState<ScenePlace[]>(() => initialScene.places)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -84,10 +83,15 @@ export function SceneEditView({ initialScene, fictions: initialFictions = [], pl
     () => fictions.find((f) => f.id === formData.fictionId),
     [fictions, formData.fictionId],
   )
-  const selectedPlace = useMemo(
-    () => places.find((p) => p.placeId === formData.placeId),
-    [places, formData.placeId],
-  )
+  const linkedPlaceLabel = useMemo(() => {
+    if (linkedPlaces.length === 0) return t("scenePlacesEmpty")
+    return linkedPlaces
+      .map((link) => {
+        const place = places.find((item) => item.placeId === link.placeId)
+        return place?.name || place?.location.name || link.placeId
+      })
+      .join(" · ")
+  }, [linkedPlaces, places, t])
   const isTv = selectedFiction?.type === "tv-series"
   const videoPreviewSrc = pendingVideoPreviewUrl ?? initialScene.videoUrl ?? null
   const timecodeDisplay = useMemo(() => buildTimecodeLabel(formData.timecode), [formData.timecode])
@@ -245,14 +249,18 @@ export function SceneEditView({ initialScene, fictions: initialFictions = [], pl
               <CheckCircle2 className="h-4 w-4 shrink-0 text-foreground" />
               <span className="text-xs font-medium text-foreground">Fiction: {selectedFiction?.title ?? "…"}</span>
             </div>
-            <div className="flex items-center gap-2 rounded-lg border border-foreground/30 bg-foreground/10 p-3">
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-foreground" />
-              <span className="text-xs font-medium text-foreground">
-                Place: {selectedPlace?.name ?? selectedPlace?.location.name ?? "…"}
-              </span>
-            </div>
           </div>
         </div>
+
+        <ScenePlacesEditor
+          sceneId={initialScene.id}
+          fictionId={formData.fictionId}
+          linkedPlaces={linkedPlaces}
+          places={places}
+          disabled={saving || videoProcessing}
+          onLinkedChange={setLinkedPlaces}
+          onError={setError}
+        />
 
         <div>
           <p className="mb-2 text-xs font-medium text-muted-foreground">{t("videoUpload")}</p>
@@ -279,9 +287,7 @@ export function SceneEditView({ initialScene, fictions: initialFictions = [], pl
                   {formData.title.trim() || initialScene.title}
                 </h3>
                 <p className="truncate text-sm text-muted-foreground">{selectedFiction?.title ?? "…"}</p>
-                <p className="truncate text-sm text-muted-foreground">
-                  {selectedPlace?.name ?? selectedPlace?.location.name ?? "…"}
-                </p>
+                <p className="truncate text-sm text-muted-foreground">{linkedPlaceLabel}</p>
                 {timecodeDisplay ? (
                   <p className="font-mono text-xs text-muted-foreground/90">{timecodeDisplay}</p>
                 ) : null}

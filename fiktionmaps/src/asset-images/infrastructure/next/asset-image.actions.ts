@@ -8,18 +8,32 @@ import {
   type ImageRole,
 } from "@/lib/asset-images/image-variant-service"
 import {
+  THUMB_UPLOAD_VARIANTS,
   VARIANT_AVIF_EFFORT,
   VARIANT_SIZES,
   type ImageVariant,
 } from "@/lib/asset-images/variant-sizes"
 import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/service"
+import { revalidatePath, updateTag } from "next/cache"
 import { ensureAssetImageXsUseCase } from "@/src/asset-images/application/ensure-asset-image-xs.usecase"
+import { repairMissingAssetVariantsUseCase } from "@/src/asset-images/application/repair-missing-asset-variants.usecase"
 import { updateAssetImageFocusUseCase } from "@/src/asset-images/application/update-asset-image-focus.usecase"
+import { createAssetImagesSupabaseAdapter } from "@/src/asset-images/infrastructure/supabase/asset-image.repository.impl"
+import { probePublicAssetUrl } from "@/src/asset-images/infrastructure/next/probe-public-asset-url"
 import { isUserAdminUseCase } from "@/src/users/application/is-user-admin.usecase"
 import { createUsersSupabaseAdapter } from "@/src/users/infrastructure/supabase/user.repository.impl"
 import sharp from "sharp"
 
 const usersRepo = createUsersSupabaseAdapter(createClient)
+
+function createAssetImageRepairRepository() {
+  const getSupabase = async () =>
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+      ? createServiceClient()
+      : createClient()
+  return createAssetImagesSupabaseAdapter(getSupabase)
+}
 
 const ensureXsSchema = z.object({
   entityType: z.enum(["fiction", "city", "location", "scene", "profile", "place", "person"]),
@@ -44,6 +58,66 @@ export async function ensureAssetImageXsAction(input: {
   if (!result.success) {
     console.error("[ensureAssetImageXsAction]", parsed.data, result.error)
   }
+  return result
+}
+
+const repairMissingSchema = z.object({
+  entityType: z.enum(["fiction", "city", "location", "scene", "profile", "place", "person"]),
+  entityId: z.string().uuid(),
+  role: z.enum(["cover", "banner", "avatar", "hero"]),
+})
+
+export type RepairMissingAssetVariantsActionResult =
+  | { success: true; repaired: ImageVariant[] }
+  | { success: false; error: string }
+
+export async function repairMissingAssetVariantsAction(input: {
+  entityType: EntityType
+  entityId: string
+  role: ImageRole
+}): Promise<RepairMissingAssetVariantsActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const isAdmin = await isUserAdminUseCase(user.id, usersRepo)
+  if (!isAdmin) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  const parsed = repairMissingSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, error: "Invalid input" }
+  }
+
+  const result = await repairMissingAssetVariantsUseCase(
+    {
+      entityType: parsed.data.entityType,
+      entityId: parsed.data.entityId,
+      role: parsed.data.role,
+      expectedVariants: THUMB_UPLOAD_VARIANTS,
+    },
+    createAssetImageRepairRepository(),
+    probePublicAssetUrl,
+  )
+
+  if (!result.success) {
+    console.error("[repairMissingAssetVariantsAction]", parsed.data, result.error)
+    return result
+  }
+
+  if (parsed.data.entityType === "place") {
+    revalidatePath(`/admin/place/${parsed.data.entityId}/improve-photo`)
+    revalidatePath("/admin")
+    updateTag("places")
+    updateTag(`place-${parsed.data.entityId}`)
+  }
+
   return result
 }
 

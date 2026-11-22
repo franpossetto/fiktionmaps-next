@@ -3,8 +3,9 @@ import { redirect } from "@/i18n/navigation"
 import { getAllCitiesCached } from "@/src/cities/infrastructure/next/city.queries"
 import { getCurrentUserProfileAction } from "@/src/users/infrastructure/next/user.actions"
 import { getUserHomesAction } from "@/src/homes/infrastructure/next/home.actions"
-import { getCurrentUserContributions } from "@/src/contributions/infrastructure/next/contribution.queries"
+import { getCurrentUserContributionsProfileData } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { getLikedFictionsForUserCached } from "@/src/fiction-likes/infrastructure/next/fiction-likes.queries"
+import { listPlaceWishlistItemsForCurrentUser } from "@/src/place-wishlists/infrastructure/next/place-wishlist.queries"
 import { getUserInterestTagsForSession } from "@/src/user-interests/infrastructure/next/user-interests.queries"
 import { getInterestCatalogCached } from "@/src/interests/infrastructure/next/interest.queries"
 import { publicUserProfilePath } from "@/lib/users/public-profile-path"
@@ -23,11 +24,11 @@ export default async function ProfilePage({
   params: Promise<{ locale: string }>
 }) {
   const { locale } = await params
-  const [cities, profileRes, homesRes, contributions] = await Promise.all([
+  const [cities, profileRes, homesRes, contributionsData] = await Promise.all([
     getAllCitiesCached(),
     getCurrentUserProfileAction(),
     getUserHomesAction(),
-    getCurrentUserContributions(),
+    getCurrentUserContributionsProfileData(),
   ])
 
   const username = profileRes.data?.username?.trim()
@@ -35,9 +36,10 @@ export default async function ProfilePage({
     redirect({ href: publicUserProfilePath(username), locale })
   }
 
-  const likedFictions = profileRes.data?.id
-    ? await getLikedFictionsForUserCached(profileRes.data.id)
-    : []
+  const [likedFictions, placeWishlist] = await Promise.all([
+    profileRes.data?.id ? getLikedFictionsForUserCached(profileRes.data.id) : Promise.resolve([]),
+    listPlaceWishlistItemsForCurrentUser(),
+  ])
   const interests = profileRes.data?.id
     ? await getUserInterestTagsForSession(profileRes.data.id, locale)
     : []
@@ -49,8 +51,11 @@ export default async function ProfilePage({
       isOwnProfile
       initialCities={cities}
       initialHomes={homesRes.data ?? []}
-      initialContributions={contributions}
+      initialContributions={contributionsData.preview.items}
+      contributionsTotalCount={contributionsData.preview.totalCount}
+      contributionActivity={contributionsData.activity}
       initialLikedFictions={likedFictions}
+      initialPlaceWishlist={placeWishlist}
       initialInterests={interests}
       interestCatalog={interestCatalog}
     />

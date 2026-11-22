@@ -31,6 +31,9 @@ export interface ScenesRepositoryPort {
   /** Links one place to a scene. `sortOrder` is assigned server-side (`max(sortOrder) + 1`). */
   linkPlace(input: LinkScenePlaceData & { createdBy: string | null }): Promise<ScenePlace | null>
 
+  /** Removes one place link. False when the row was not deleted. */
+  unlinkPlace(sceneId: string, placeId: string): Promise<boolean>
+
   listCitiesWithActiveScenes(fictionIds: string[] | null): Promise<City[]>
 
   listFictionIdsWithScenesInCity(cityId: string): Promise<string[]>

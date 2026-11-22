@@ -20,6 +20,7 @@ import { PlaceContributorsByline } from "@/components/fictions/place-contributor
 import { PlaceShootEnvironmentBadge } from "@/components/places/place-shoot-environment-badge"
 import { PlaceRelationKindBadge } from "@/components/places/place-relation-kind-badge"
 import { PlaceContributeQuestions } from "@/components/places/place-contribute-questions"
+import { PlaceWishlistToggle } from "@/components/places/place-wishlist-toggle"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
 import { cn } from "@/lib/utils"
 import { ScenePreviewThumb } from "@/components/scenes/scene-preview-thumb"
@@ -50,7 +51,19 @@ function MapSkeleton() {
   )
 }
 
-/** Load Mapbox only when the directions block nears the viewport. */
+function nearestScrollRoot(el: HTMLElement): Element | null {
+  const tagged = el.closest("[data-detail-main-scroll]")
+  if (tagged instanceof Element) return tagged
+  let node: HTMLElement | null = el.parentElement
+  while (node && node !== document.body) {
+    const { overflowY } = getComputedStyle(node)
+    if (overflowY === "auto" || overflowY === "scroll") return node
+    node = node.parentElement
+  }
+  return null
+}
+
+/** Load Mapbox when the directions block is near the (inner) scroll viewport. */
 function LazyFictionPlaceDirectionsMap(props: ComponentProps<typeof FictionPlaceDirectionsMap>) {
   const ref = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
@@ -58,17 +71,33 @@ function LazyFictionPlaceDirectionsMap(props: ComponentProps<typeof FictionPlace
   useEffect(() => {
     const el = ref.current
     if (!el || visible) return
+
+    const reveal = () => setVisible(true)
+    const root = nearestScrollRoot(el)
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
-          setVisible(true)
+          reveal()
           io.disconnect()
         }
       },
-      { rootMargin: "240px 0px" },
+      { root, rootMargin: "240px 0px" },
     )
     io.observe(el)
-    return () => io.disconnect()
+
+    const rect = el.getBoundingClientRect()
+    const rootRect = root?.getBoundingClientRect()
+    const alreadyVisible = rootRect
+      ? rect.bottom > rootRect.top - 240 && rect.top < rootRect.bottom + 240
+      : rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight + 240
+    if (alreadyVisible) reveal()
+
+    // Soft nav can miss the first IO callback while layout settles.
+    const fallback = window.setTimeout(reveal, 250)
+    return () => {
+      io.disconnect()
+      window.clearTimeout(fallback)
+    }
   }, [visible])
 
   return <div ref={ref}>{visible ? <FictionPlaceDirectionsMap {...props} /> : <MapSkeleton />}</div>
@@ -104,6 +133,7 @@ export interface FictionPlaceDetailViewProps {
   scenesSlot?: ReactNode
   /** Contribute wizard: same layout, no navigation away from the flow. */
   previewMode?: boolean
+  initialWishlisted?: boolean
 }
 
 export function FictionPlaceDetailView({
@@ -118,6 +148,7 @@ export function FictionPlaceDetailView({
   relationshipsSlot,
   scenesSlot,
   previewMode = false,
+  initialWishlisted = false,
 }: FictionPlaceDetailViewProps) {
   const t = useTranslations("Fictions")
   const tMeta = useTranslations("Metadata")
@@ -283,7 +314,7 @@ export function FictionPlaceDetailView({
                 />
               </div>
               {place.description ? (
-                <p className="max-w-[75ch] text-base leading-8 text-muted-foreground">{place.description}</p>
+                <p className="article-body">{place.description}</p>
               ) : null}
             </header>
 
@@ -296,31 +327,42 @@ export function FictionPlaceDetailView({
             ) : null}
           </div>
 
+          {!showDirectionsSection && !previewMode ? (
+            <div className="flex justify-end border-b border-border/60 pb-6">
+              <PlaceWishlistToggle placeId={place.id} initialWishlisted={initialWishlisted} />
+            </div>
+          ) : null}
+
           {showDirectionsSection ? (
             <section className="space-y-4 border-b border-border/60 pb-10" aria-labelledby="place-directions-heading">
               <FictionDetailSectionHeading
                 id="place-directions-heading"
                 title={t("placeDetailDirectionsHeading")}
                 trailing={
-                  previewMode ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled
-                      className="pointer-events-none h-9 shrink-0 border-border bg-background px-3 text-sm opacity-80 shadow-none"
-                    >
-                      <Compass className="h-4 w-4" />
-                      <span>{t("placeDetailGoToMap")}</span>
-                    </Button>
-                  ) : (
-                    <Button asChild size="sm" variant="outline" className="h-9 shrink-0 border-border bg-background px-3 text-sm shadow-none">
-                      <Link href={exploreMapHref}>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    {!previewMode ? (
+                      <PlaceWishlistToggle placeId={place.id} initialWishlisted={initialWishlisted} />
+                    ) : null}
+                    {previewMode ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled
+                        className="pointer-events-none h-9 shrink-0 border-border bg-background px-3 text-sm opacity-80 shadow-none"
+                      >
                         <Compass className="h-4 w-4" />
                         <span>{t("placeDetailGoToMap")}</span>
-                      </Link>
-                    </Button>
-                  )
+                      </Button>
+                    ) : (
+                      <Button asChild size="sm" variant="outline" className="h-9 shrink-0 border-border bg-background px-3 text-sm shadow-none">
+                        <Link href={exploreMapHref}>
+                          <Compass className="h-4 w-4" />
+                          <span>{t("placeDetailGoToMap")}</span>
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
                 }
               />
               {coordsOk ? (

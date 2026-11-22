@@ -108,6 +108,17 @@ export type AdminContributionsListPageResult = {
   totalCount: number
 }
 
+export type ProfileContributionsPageInput = {
+  userId: string
+  limit: number
+  offset: number
+}
+
+export type ProfileContributionsPageResult = {
+  items: ProfileContributionItem[]
+  totalCount: number
+}
+
 export interface ContributionsRepositoryPort {
   create(input: CreateContributionInput): Promise<{ contributionId: string } | null>
   insertPendingContributionImages(input: InsertContributionPendingImagesInput): Promise<boolean>
@@ -147,6 +158,10 @@ export interface ContributionsRepositoryPort {
   getByUser(userId: string): Promise<Contribution[]>
   /** Contributions for the profile page with entity / parent labels resolved. */
   listProfileContributionsByUser(userId: string): Promise<ProfileContributionItem[]>
+  /** Paginated profile contributions with labels (preview + “see all” dialog). */
+  listProfileContributionsPage(
+    input: ProfileContributionsPageInput,
+  ): Promise<ProfileContributionsPageResult>
   /** Approved contributions only (pending/rejected do not count). */
   countByUser(userId: string): Promise<number>
   listAdminContributionsPage(

@@ -26,6 +26,8 @@ import {
   ProfileContributionsHeatmap,
 } from "./profile-contributions-heatmap"
 import { ProfileLikedFictions } from "./profile-liked-fictions"
+import { ProfilePlaceWishlist } from "./profile-place-wishlist"
+import type { PlaceWishlistItem } from "@/src/place-wishlists/domain/place-wishlist.entity"
 import { ProfileInterests, type ProfileInterestTag } from "./profile-interests"
 import { ProfileMetaAside } from "./profile-meta-aside"
 import { ProfileStatsAside } from "./profile-stats-aside"
@@ -35,7 +37,10 @@ interface UserProfileProps {
   initialCities?: City[]
   initialHomes?: UserHome[]
   initialContributions?: ProfileContributionItem[]
+  contributionsTotalCount?: number
+  contributionActivity?: ProfileContributionItem[]
   initialLikedFictions?: FictionWithMedia[]
+  initialPlaceWishlist?: PlaceWishlistItem[]
   initialInterests?: ProfileInterestTag[]
   interestCatalog?: InterestCatalogItem[]
   /** Defaults to true (own `/profile` shortcut). */
@@ -55,7 +60,10 @@ export function UserProfileComponent({
   initialCities,
   initialHomes,
   initialContributions,
+  contributionsTotalCount,
+  contributionActivity,
   initialLikedFictions,
+  initialPlaceWishlist,
   initialInterests,
   interestCatalog,
   isOwnProfile = true,
@@ -67,6 +75,7 @@ export function UserProfileComponent({
     profile,
   )
   const contributions = initialContributions ?? []
+  const activity = contributionActivity ?? contributions
   const likedFictions = initialLikedFictions ?? []
   const [interests, setInterests] = useState(initialInterests ?? [])
   const catalog = interestCatalog ?? []
@@ -197,7 +206,7 @@ export function UserProfileComponent({
   const displayName = activeProfile.username || user?.name || user?.email?.split("@")[0] || ""
   const role: UserRole = activeProfile.role
   const fppTotal = activeProfile.fppTotal
-  const approvedContributionCount = contributions.filter((c) => c.status === "approved").length
+  const approvedContributionCount = activity.filter((c) => c.status === "approved").length
   const joinYear = activeProfile.joinedDate
     ? new Date(activeProfile.joinedDate).getFullYear()
     : new Date().getFullYear()
@@ -258,7 +267,7 @@ export function UserProfileComponent({
 
           <div className="space-y-8">
             <ProfileContributionsHeatmap
-              contributions={contributions}
+              contributions={activity}
               selectedDateKey={selectedContributionDateKey}
               onSelectedDateKeyChange={(dateKey) => {
                 setSelectedContributionDateKey(dateKey)
@@ -267,7 +276,9 @@ export function UserProfileComponent({
               showContributeCta={isOwnProfile}
             />
             <ProfileContributionsList
-              contributions={contributions}
+              previewItems={contributions}
+              totalCount={contributionsTotalCount ?? contributions.length}
+              profileUserId={activeProfile.id}
               isOwnProfile={isOwnProfile}
               selectedContributionId={selectedContributionId}
               onSelectContribution={(item) => {
@@ -275,6 +286,12 @@ export function UserProfileComponent({
                 setSelectedContributionDateKey(contributionActivityDateKey(item.createdAt))
               }}
             />
+            {isOwnProfile ? (
+              <ProfilePlaceWishlist
+                items={initialPlaceWishlist ?? []}
+                username={loadedProfile?.username ?? profile?.username ?? null}
+              />
+            ) : null}
             <ProfileLikedFictions fictions={likedFictions} />
           </div>
 

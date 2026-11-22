@@ -203,9 +203,9 @@ export function PlacePhotoContributeWizard({
         setErrors({ submit: res.error })
         return
       }
+      // Keep the local blob for the done screen. After auto-approve, pending
+      // storage is promoted and deleted, so `res.previewUrl` 404s.
       setDoneVariant(res.autoApproved ? "approved" : "pending")
-      if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl)
-      setPreviewUrl(res.previewUrl)
     } finally {
       setSubmitting(false)
     }

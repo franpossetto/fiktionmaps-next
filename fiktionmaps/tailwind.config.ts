@@ -13,6 +13,7 @@ const config = {
     extend: {
       fontFamily: {
         sans: ['var(--font-plus-jakarta-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        article: ['var(--font-source-serif)', 'Georgia', 'ui-serif', 'serif'],
       },
       colors: {
         background: 'hsl(var(--background))',

@@ -8,6 +8,7 @@ import type {
   ContributionRow,
   Database,
 } from "@/supabase/database.types"
+import { supabaseFetchFailureLog, throwIfSupabaseFetchFailed } from "@/lib/supabase/fetch"
 import { createClient } from "@/lib/supabase/server"
 import {
   CONTRIBUTION_FPP,
@@ -41,6 +42,8 @@ import type {
   InsertContributionPendingImagesInput,
   InsertContributionPendingPlaceRelationshipInput,
   InsertContributionPendingScenePlaceInput,
+  ProfileContributionsPageInput,
+  ProfileContributionsPageResult,
 } from "@/src/contributions/domain/contribution.repository"
 import type {
   ApproveContributionInput,
@@ -1690,6 +1693,34 @@ export function createContributionsSupabaseAdapter(
       return enrichContributionsWithEntityLabels(supabase, rows)
     }),
 
+    listProfileContributionsPage: cache(
+      async (input: ProfileContributionsPageInput): Promise<ProfileContributionsPageResult> => {
+        const supabase = await getSupabase()
+        const safeLimit = Math.max(1, input.limit)
+        const from = Math.max(0, input.offset)
+        const to = from + safeLimit - 1
+
+        const { data, error, count } = await supabase
+          .from("contributions")
+          .select(
+            "id, user_id, type, entity_type, entity_id, status, moderator_id, moderator_note, fpp_awarded, created_at, updated_at",
+            { count: "exact" },
+          )
+          .eq("user_id", input.userId)
+          .order("created_at", { ascending: false })
+          .range(from, to)
+
+        if (error) {
+          console.error("[contributions repo] listProfileContributionsPage error:", error.message, error)
+          return { items: [], totalCount: 0 }
+        }
+
+        const rows = (data as ContributionRow[] | null)?.map(mapRow) ?? []
+        const items = await enrichContributionsWithEntityLabels(supabase, rows)
+        return { items, totalCount: count ?? 0 }
+      },
+    ),
+
     countByUser: cache(async (userId: string): Promise<number> => {
       const supabase = await getSupabase()
       const { count, error } = await supabase
@@ -2023,7 +2054,11 @@ export function createContributionsSupabaseAdapter(
           .order("created_at", { ascending: true })
 
         if (error) {
-          console.error("[contributions repo] listApprovedContributorProfilesFirstContributionAt:", error.message)
+          console.error(
+            "[contributions repo] listApprovedContributorProfilesFirstContributionAt:",
+            supabaseFetchFailureLog(error),
+          )
+          throwIfSupabaseFetchFailed(error)
           return []
         }
 

@@ -145,3 +145,11 @@ export const linkScenePlaceBodySchema = z
   })
 
 export type LinkScenePlaceData = z.infer<typeof linkScenePlaceBodySchema>
+
+/** unlinkScenePlaceAction body. Removes one place link from a scene. */
+export const unlinkScenePlaceBodySchema = z.object({
+  sceneId: z.string().trim().uuid(),
+  placeId: z.string().trim().uuid(),
+})
+
+export type UnlinkScenePlaceData = z.infer<typeof unlinkScenePlaceBodySchema>
