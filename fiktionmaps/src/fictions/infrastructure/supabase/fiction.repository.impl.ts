@@ -3,7 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { ASSET_IMAGES_BUCKET } from "@/lib/asset-images/variant-sizes"
 import type { Database } from "@/supabase/database.types"
-import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import type { Fiction, FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
+import { ilikeContainsPattern } from "@/src/shared/infrastructure/supabase/ilike"
 import type { CreateFictionData, UpdateFictionData } from "@/src/fictions/domain/fiction.schemas"
 import { mapAssetImagesToFiction, type AssetImageRow } from "./fiction.mappers"
 import type {
@@ -252,6 +253,47 @@ export function createFictionsSupabaseAdapter(
       }
       return count ?? 0
     }),
+
+    async searchApprovedActiveByTitle(query, limit): Promise<Fiction[]> {
+      const pattern = ilikeContainsPattern(query)
+      if (!pattern) return []
+      const supabase = await getSupabase()
+      const safeLimit = Math.min(20, Math.max(1, Math.floor(Number.isFinite(limit) ? limit : 20)))
+      const { data, error } = await supabase
+        .from("fictions")
+        .select("*")
+        .eq("status", "approved")
+        .eq("active", true)
+        .ilike("title", pattern)
+        .order("title")
+        .limit(safeLimit)
+      if (error || !data) {
+        if (error) console.error("[fictions repo] searchApprovedActiveByTitle:", error.message)
+        return []
+      }
+      const fictions: Fiction[] = []
+      for (const row of data) {
+        if (row.type !== "movie" && row.type !== "book" && row.type !== "tv-series") continue
+        fictions.push({
+          id: row.id,
+          title: row.title,
+          type: row.type,
+          year: row.year,
+          author: row.author,
+          genre: row.genre,
+          description: row.description,
+          active: row.active,
+          created_by: row.created_by,
+          slug: row.slug,
+          duration_sec: row.duration_sec,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          original_language: row.original_language,
+          content_language: row.content_language,
+        })
+      }
+      return fictions
+    },
 
     async create(data: CreateFictionData): Promise<FictionWithMedia | null> {
       const supabase = await getSupabase()

@@ -20,6 +20,8 @@ export interface FictionsRepositoryPort {
   listApprovedActive(): Promise<FictionWithMedia[]>
   /** Count of approved + active fictions in the public catalog. */
   countApprovedActive(): Promise<number>
+  /** Approved + active fictions whose title matches. At most `limit` rows. */
+  searchApprovedActiveByTitle(query: string, limit: number): Promise<Fiction[]>
   create(data: CreateFictionData): Promise<FictionWithMedia | null>
   update(id: string, data: UpdateFictionData): Promise<FictionWithMedia | null>
   delete(id: string): Promise<boolean>

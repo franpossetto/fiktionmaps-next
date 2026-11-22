@@ -240,6 +240,7 @@ async function listScenesWithClient(
   if (filters.fictionId) q = q.eq("fiction_id", filters.fictionId)
   if (sceneIdsForPlace) q = q.in("id", sceneIdsForPlace)
   if (filters.active !== undefined) q = q.eq("active", filters.active)
+  if (filters.status) q = q.eq("status", filters.status)
 
   const { data, error } = await q
     .order("sort_order", { ascending: true })

@@ -4,6 +4,7 @@ import type { Place } from "@/src/places/domain/place.entity"
 import type { MapBbox } from "@/lib/validation/map-query"
 import type { CreatePlaceRepoInput, UpdatePlaceData } from "./place.schemas"
 import type { SitemapPlaceEntry } from "@/src/places/domain/place-sitemap.entity"
+import type { PublicCatalogPlaceMatch } from "@/src/places/domain/public-catalog-search"
 import type { SuggestedPlace } from "@/src/places/domain/suggested-place.entity"
 
 export type GetClustersInBboxInput = {
@@ -65,4 +66,14 @@ export interface PlacesRepositoryPort {
   update(placeId: string, data: UpdatePlaceData): Promise<boolean>
   delete(placeId: string): Promise<boolean>
   listActivePlacesForSitemap(): Promise<SitemapPlaceEntry[]>
+  /**
+   * Approved + active places whose name matches, joined to an approved + active fiction
+   * and a city. At most `limit` rows.
+   */
+  searchApprovedActiveByName(query: string, limit: number): Promise<PublicCatalogPlaceMatch[]>
+  /**
+   * Approved + active places in a city whose name matches, joined to an approved + active fiction.
+   * Rows are places (and carry their fiction); a city with no visible place is absent.
+   */
+  searchApprovedActiveByCityName(query: string, limit: number): Promise<PublicCatalogPlaceMatch[]>
 }
