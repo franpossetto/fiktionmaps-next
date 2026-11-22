@@ -11,6 +11,8 @@ export interface SceneListFilters {
   fictionId?: string
   placeId?: string
   active?: boolean
+  /** When set, the query filters `scenes.status`. The `Scene` entity does not carry status. */
+  status?: "pending" | "approved" | "rejected"
 }
 
 export interface ScenesRepositoryPort {

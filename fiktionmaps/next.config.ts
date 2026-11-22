@@ -16,6 +16,8 @@ function supabaseImageHost(): string | null {
 const supabaseHost = supabaseImageHost()
 
 const nextConfig: NextConfig = {
+  // The SDK's optional transports break when Next bundles them into the route.
+  serverExternalPackages: ["@modelcontextprotocol/sdk"],
   // Server Actions default body limit is 1MB; image uploads via FormData need more headroom.
   experimental: {
     serverActions: {

@@ -16,7 +16,10 @@ import type {
 import type { MapCluster } from "@/src/places/domain/map-cluster.entity"
 import { WORLD_MAX_CLUSTERS, WORLD_MAX_PLACES } from "@/lib/map/world-map"
 import type { SitemapPlaceEntry } from "@/src/places/domain/place-sitemap.entity"
+import type { PublicCatalogPlaceMatch } from "@/src/places/domain/public-catalog-search"
 import type { SuggestedPlace } from "@/src/places/domain/suggested-place.entity"
+import type { Fiction } from "@/src/fictions/domain/fiction.entity"
+import { ilikeContainsPattern } from "@/src/shared/infrastructure/supabase/ilike"
 import {
   type StreetViewReference,
   LOCATION_VIEW_REFERENCE_PROVIDER,
@@ -245,6 +248,122 @@ function mapPlaceRowsToPlaces(
       shootEnvironment,
     }
   })
+}
+
+const PUBLIC_PLACE_SEARCH_SELECT = `
+  id, name, slug, description,
+  fictions!inner ( id, title, slug, year, type, description, status, active ),
+  locations!inner ( latitude, longitude, cities!inner ( name, country ) )
+`
+
+function clampSearchLimit(limit: number): number {
+  if (!Number.isFinite(limit)) return 20
+  return Math.min(20, Math.max(1, Math.floor(limit)))
+}
+
+function asFictionType(value: string | null | undefined): Fiction["type"] | null {
+  if (value === "movie" || value === "book" || value === "tv-series") return value
+  return null
+}
+
+function firstEmbed<T>(value: T | T[] | null | undefined): T | null {
+  if (value == null) return null
+  return Array.isArray(value) ? (value[0] ?? null) : value
+}
+
+type PublicPlaceSearchFiction = {
+  id: string | null
+  title: string | null
+  slug: string | null
+  year: number | null
+  type: string | null
+  description: string | null
+  status: string | null
+  active: boolean | null
+}
+
+type PublicPlaceSearchCity = { name: string | null; country: string | null }
+
+type PublicPlaceSearchRow = {
+  id: string
+  name: string | null
+  slug: string | null
+  description: string | null
+  fictions: PublicPlaceSearchFiction | PublicPlaceSearchFiction[] | null
+  locations:
+    | {
+        latitude: number | null
+        longitude: number | null
+        cities: PublicPlaceSearchCity | PublicPlaceSearchCity[] | null
+      }
+    | {
+        latitude: number | null
+        longitude: number | null
+        cities: PublicPlaceSearchCity | PublicPlaceSearchCity[] | null
+      }[]
+    | null
+}
+
+function mapPublicPlaceSearchRows(rows: PublicPlaceSearchRow[]): PublicCatalogPlaceMatch[] {
+  const matches: PublicCatalogPlaceMatch[] = []
+  for (const row of rows) {
+    const fiction = firstEmbed(row.fictions)
+    const location = firstEmbed(row.locations)
+    const city = firstEmbed(location?.cities)
+    const fictionType = asFictionType(fiction?.type)
+    if (!row.id || !fiction?.id || !fiction.title || !fiction.slug || fictionType == null) continue
+    if (fiction.status !== "approved" || fiction.active !== true) continue
+    if (!city?.name || !city.country) continue
+    const lat = location?.latitude
+    const lng = location?.longitude
+    matches.push({
+      placeId: row.id,
+      placeName: row.name?.trim() || "Place",
+      placeSlug: row.slug?.trim() || row.id,
+      description: row.description?.trim() ?? "",
+      lat: typeof lat === "number" && Number.isFinite(lat) ? lat : null,
+      lng: typeof lng === "number" && Number.isFinite(lng) ? lng : null,
+      cityName: city.name,
+      country: city.country,
+      fictionId: fiction.id,
+      fictionTitle: fiction.title,
+      fictionSlug: fiction.slug,
+      fictionYear: typeof fiction.year === "number" ? fiction.year : 0,
+      fictionType,
+      fictionDescription: fiction.description?.trim() ?? "",
+    })
+  }
+  return matches
+}
+
+async function searchPublicPlaces(
+  getSupabase: () => Promise<SupabaseClient<Database>>,
+  match: "name" | "city",
+  query: string,
+  limit: number,
+): Promise<PublicCatalogPlaceMatch[]> {
+  const pattern = ilikeContainsPattern(query)
+  if (!pattern) return []
+  const supabase = await getSupabase()
+  let request = supabase
+    .from("places")
+    .select(PUBLIC_PLACE_SEARCH_SELECT)
+    .eq("status", "approved")
+    .eq("active", true)
+    .eq("fictions.status", "approved")
+    .eq("fictions.active", true)
+    .limit(clampSearchLimit(limit))
+
+  // City lives on the locations embed, so the filter path is `locations.cities.name`.
+  request =
+    match === "name" ? request.ilike("name", pattern) : request.ilike("locations.cities.name", pattern)
+
+  const { data, error } = await request
+  if (error) {
+    console.error(`[places repo] searchApprovedActiveBy${match === "name" ? "Name" : "CityName"}:`, error.message)
+    return []
+  }
+  return mapPublicPlaceSearchRows((data ?? []) as PublicPlaceSearchRow[])
 }
 
 export function createPlacesSupabaseAdapter(
@@ -986,6 +1105,14 @@ export function createPlacesSupabaseAdapter(
         })
         .filter((e): e is SitemapPlaceEntry => e != null)
     }),
+
+    async searchApprovedActiveByName(query, limit): Promise<PublicCatalogPlaceMatch[]> {
+      return searchPublicPlaces(getSupabase, "name", query, limit)
+    },
+
+    async searchApprovedActiveByCityName(query, limit): Promise<PublicCatalogPlaceMatch[]> {
+      return searchPublicPlaces(getSupabase, "city", query, limit)
+    },
 
     async create(data: CreatePlaceRepoInput): Promise<{ placeId: string; slug: string } | null> {
       const supabase = await getSupabase()
