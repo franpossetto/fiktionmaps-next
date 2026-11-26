@@ -7,19 +7,15 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { FictionDetailPlacesEmpty } from "@/components/fictions/fiction-detail-places-empty"
 import { FictionDetailSectionHeading } from "@/components/fictions/fiction-detail-section-heading"
-import { FictionDetailCredits } from "@/components/fictions/fiction-detail-credits"
 import { FictionInterestTags, type FictionInterestTagItem } from "@/components/fictions/fiction-interest-tags"
 import { FictionDetailLikeButton } from "@/components/fictions/fiction-detail-like-button"
 import { PlaceWishlistToggle } from "@/components/places/place-wishlist-toggle"
 import { FictionDetailRecentTracker } from "@/components/fictions/fiction-detail-recent-tracker"
 import { PageBreadcrumb } from "@/components/navigation/page-breadcrumb"
-import { FictionStoryView } from "@/components/fictions/story/fiction-story-view"
-import type { FictionStoryCard } from "@/components/fictions/story/build-fiction-story-cards"
 import type { FictionWithMedia } from "@/src/fictions/domain/fiction.entity"
 import type { City } from "@/src/cities/domain/city.entity"
 import type { Place } from "@/src/places/domain/place.entity"
 import type { PlaceRelationship } from "@/src/place-relationships/domain/place-relationship.entity"
-import type { FictionPerson } from "@/src/persons/domain/person.entity"
 import type { ReactNode } from "react"
 
 export interface FictionDetailProps {
@@ -35,11 +31,12 @@ export interface FictionDetailProps {
   wishlistedPlaceIds?: string[]
   /** Shown in main column below `xl` (right rail is `xl`+ only). */
   fictionInterestTags?: FictionInterestTagItem[]
-  credits?: FictionPerson[]
+  /** Deferred credits (Suspense slot). */
+  creditsSlot?: ReactNode
   /** Deferred recommendations (Suspense slot) rendered after places list. */
   recommendationsSlot?: ReactNode
-  /** Phone / story deck opened from the "Story view" button. */
-  storyCards?: FictionStoryCard[]
+  /** Deferred story view button (Suspense slot) in the header actions. */
+  storySlot?: ReactNode
 }
 
 /** Server Component: hero + copy + places SSR; likes are client islands. */
@@ -52,9 +49,9 @@ export async function FictionDetail({
   initialLiked = false,
   wishlistedPlaceIds = [],
   fictionInterestTags = [],
-  credits = [],
+  creditsSlot,
   recommendationsSlot,
-  storyCards,
+  storySlot,
 }: FictionDetailProps) {
   const t = await getTranslations("Fictions")
   const tMeta = await getTranslations("Metadata")
@@ -265,7 +262,7 @@ export async function FictionDetail({
             ]}
           />
           <div className="flex items-center gap-2">
-            {storyCards && storyCards.length > 0 ? <FictionStoryView cards={storyCards} /> : null}
+            {storySlot}
             <FictionDetailLikeButton
               fictionId={fiction.id}
               initialLikeCount={initialLikeCount}
@@ -365,7 +362,7 @@ export async function FictionDetail({
 
           {recommendationsSlot}
 
-          <FictionDetailCredits credits={credits} fictionTitle={fiction.title} />
+          {creditsSlot}
         </article>
       </div>
     </main>

@@ -46,6 +46,17 @@ export async function getFictionContributorsUseCase(
   return aggregateFictionContributorScopeEntries(rows)
 }
 
+/** Ranked contributors across many fiction scopes (city detail), one batched repo read. */
+export async function getContributorsForFictionIdsUseCase(
+  fictionIds: string[],
+  repo: ContributionsRepositoryPort,
+): Promise<FictionContributorRankedProfile[]> {
+  const unique = [...new Set(fictionIds.filter(Boolean))]
+  if (unique.length === 0) return []
+  const rows = await repo.listApprovedContributorProfilesForFictionScopes(unique)
+  return aggregateFictionContributorScopeEntries(rows)
+}
+
 export function mergeFictionContributorRankedProfiles(
   lists: FictionContributorRankedProfile[][],
 ): FictionContributorRankedProfile[] {

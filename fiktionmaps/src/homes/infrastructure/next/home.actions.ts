@@ -1,7 +1,6 @@
 "use server"
 
 import { cache } from "react"
-import { updateTag } from "next/cache"
 import { getSessionUserId } from "@/lib/auth/auth.service"
 import { createClient } from "@/lib/supabase/server"
 import { createHomesSupabaseAdapter } from "@/src/homes/infrastructure/supabase/home.repository.impl"
@@ -45,7 +44,6 @@ export async function addHomeAction(data: CreateHomeData): Promise<HomesResult<U
     if (!userId) return { data: null, error: "Not authenticated" }
     const home = await addHomeUseCase(userId, data, getRepo())
     if (!home) return { data: null, error: "Failed to add home" }
-    updateTag(`user-homes-${userId}`)
     return { data: home, error: null }
   } catch (e) {
     return {
@@ -57,10 +55,8 @@ export async function addHomeAction(data: CreateHomeData): Promise<HomesResult<U
 
 export async function deleteHomeAction(homeId: string): Promise<HomesResult<true>> {
   try {
-    const userId = await getSessionUserId()
     const ok = await getRepo().delete(homeId)
     if (!ok) return { data: null, error: "Failed to delete home" }
-    if (userId) updateTag(`user-homes-${userId}`)
     return { data: true, error: null }
   } catch (e) {
     return {

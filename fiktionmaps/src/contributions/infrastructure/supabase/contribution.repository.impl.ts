@@ -145,6 +145,28 @@ async function listApprovedScopeRowsForEntity(
   return mapFictionScopeContributionRows((data ?? []) as ProfileContributionRow[])
 }
 
+async function listApprovedScopeRowsForEntityIds(
+  supabase: SupabaseClient<Database>,
+  entityType: ContributionEntityType,
+  entityIds: string[],
+): Promise<FictionContributorScopeEntry[]> {
+  if (entityIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from("contributions")
+    .select(FICTION_SCOPE_CONTRIBUTION_SELECT)
+    .eq("entity_type", entityType)
+    .in("entity_id", entityIds)
+    .eq("status", "approved")
+
+  if (error) {
+    console.error("[contributions repo] listApprovedScopeRowsForEntityIds:", error.message)
+    return []
+  }
+
+  return mapFictionScopeContributionRows((data ?? []) as ProfileContributionRow[])
+}
+
 async function listApprovedScopeRowsForPlaceIds(
   supabase: SupabaseClient<Database>,
   placeIds: string[],
@@ -1833,6 +1855,31 @@ export function createContributionsSupabaseAdapter(
         if (placeIdsResult.error) {
           console.error(
             "[contributions repo] listApprovedContributorProfilesForFictionScope places:",
+            placeIdsResult.error.message,
+          )
+          return fictionEntries
+        }
+
+        const placeIds = (placeIdsResult.data ?? []).map((row) => row.id).filter(Boolean)
+        const placeEntries = await listApprovedScopeRowsForPlaceIds(supabase, placeIds)
+        return [...fictionEntries, ...placeEntries]
+      },
+    ),
+
+    listApprovedContributorProfilesForFictionScopes: cache(
+      async (fictionIds: string[]): Promise<FictionContributorScopeEntry[]> => {
+        const unique = [...new Set(fictionIds.filter(Boolean))]
+        if (unique.length === 0) return []
+
+        const supabase = await getSupabase()
+        const [fictionEntries, placeIdsResult] = await Promise.all([
+          listApprovedScopeRowsForEntityIds(supabase, "fiction", unique),
+          supabase.from("places").select("id").in("fiction_id", unique),
+        ])
+
+        if (placeIdsResult.error) {
+          console.error(
+            "[contributions repo] listApprovedContributorProfilesForFictionScopes places:",
             placeIdsResult.error.message,
           )
           return fictionEntries

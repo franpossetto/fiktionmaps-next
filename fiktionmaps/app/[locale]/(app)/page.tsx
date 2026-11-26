@@ -13,14 +13,14 @@ type Props = {
 
 export default async function HomePage({ params }: Props) {
   const { locale } = await params
-  const [cities, fictions, cityIdsWithPlaces, catalog] = await Promise.all([
+  const fictionsPromise = getActiveFictionsCached()
+  const [cities, fictions, cityIdsWithPlaces, catalog, placeCounts] = await Promise.all([
     getAllCitiesCached(),
-    getActiveFictionsCached(),
+    fictionsPromise,
     listCityIdsWithPlacesCached(),
     listMapSearchCatalogCached(),
+    fictionsPromise.then((list) => getPlaceCountsByFictionIdsCached(list.map((f) => f.id))),
   ])
-
-  const placeCounts = await getPlaceCountsByFictionIdsCached(fictions.map((f) => f.id))
 
   // First city (by catalog sort) with places for each fiction — map deep links need a city shard.
   const citySlugById = new Map(cities.map((c) => [c.id, c.slug]))

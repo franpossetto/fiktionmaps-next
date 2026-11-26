@@ -171,6 +171,13 @@ export interface ContributionsRepositoryPort {
   sumApprovedFppAwardedByUser(userId: string): Promise<number>
   /** One row per approved contribution on the fiction and its places; callers aggregate FPP by profile id. */
   listApprovedContributorProfilesForFictionScope(fictionId: string): Promise<FictionContributorScopeEntry[]>
+  /**
+   * Same as `listApprovedContributorProfilesForFictionScope` across many fictions,
+   * batched (fiction entity rows + places + place contribution rows).
+   */
+  listApprovedContributorProfilesForFictionScopes(
+    fictionIds: string[],
+  ): Promise<FictionContributorScopeEntry[]>
   /** One row per user; contributedAt = earliest approved contribution for this entity. */
   listApprovedContributorProfilesFirstContributionAt(
     entityType: ContributionEntityType,

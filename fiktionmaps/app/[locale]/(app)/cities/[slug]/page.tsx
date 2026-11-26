@@ -7,8 +7,7 @@ import {
   getCityFictionsCached,
 } from "@/src/cities/infrastructure/next/city.queries"
 import { getPlaceCountsByFictionIdsCached } from "@/src/places/infrastructure/next/place.queries"
-import { getFictionContributorsCached } from "@/src/contributions/infrastructure/next/contribution.queries"
-import { mergeFictionContributorRankedProfiles } from "@/src/contributions/application/get-fiction-contributors.usecase"
+import { getContributorsForFictionIdsCached } from "@/src/contributions/infrastructure/next/contribution.queries"
 import { getSiteUrl } from "@/lib/site"
 import { CityDetail } from "@/components/cities/city-detail"
 import { CityDetailRightRail } from "@/components/cities/city-detail-right-rail"
@@ -78,14 +77,12 @@ export default async function CityDetailPage({ params }: Props) {
   const activeFictions = fictions.filter((f) => f.active)
   const fictionIds = activeFictions.map((f) => f.id)
 
-  const [placeCounts, contributorsPerFiction] = await Promise.all([
+  const [placeCounts, contributors] = await Promise.all([
     fictionIds.length > 0 ? getPlaceCountsByFictionIdsCached(fictionIds) : Promise.resolve({}),
-    Promise.all(fictionIds.map((id) => getFictionContributorsCached(id))),
+    getContributorsForFictionIdsCached(fictionIds),
   ])
 
   const totalPlaces = (Object.values(placeCounts) as number[]).reduce((sum, n) => sum + n, 0)
-
-  const contributors = mergeFictionContributorRankedProfiles(contributorsPerFiction)
 
   const exploreMapHref = `/map?city=${encodeURIComponent(city.slug)}`
 

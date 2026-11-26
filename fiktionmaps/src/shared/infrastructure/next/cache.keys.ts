@@ -2,6 +2,11 @@ export const CacheKeys = {
   checkin:  (id: string) => ["checkin", id],
   city:     (id: string) => ["city", id],
   fictionContributors: (fictionId: string) => ["contribution", "fiction-contributors-fpp", fictionId],
+  fictionContributorsBatch: (fictionIdsKey: string) => [
+    "contribution",
+    "fiction-contributors-fpp-batch",
+    fictionIdsKey,
+  ],
   fictionPersons: (fictionId: string) => ["person", "fiction-persons", fictionId],
   placeContributorsDetail: (placeId: string) => ["contribution", "place-contributors-detail", placeId],
   topContributors: (limit: number) => ["top-contributors", String(limit)],

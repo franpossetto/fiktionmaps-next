@@ -93,7 +93,9 @@ export async function completeOnboardingAction(prefs: {
     )
 
     if (updated) {
-      updateTag(`user-profile-${userId}`)
+      updateTag("profiles")
+      updateTag("fiction-likes")
+      updateTag(`user-liked-fictions-${userId}`)
     }
 
     return updated ? { data: true, error: null } : { data: null, error: "Failed to update profile" }
@@ -160,7 +162,7 @@ export async function updateMyProfileAvatarAction(
       return { success: false, error: "Failed to update profile" }
     }
 
-    updateTag(`user-profile-${userId}`)
+    updateTag("profiles")
     return { success: true, avatarUrl, focus }
   } catch (e) {
     return {
@@ -193,7 +195,7 @@ export async function updateMyProfileAvatarFocusAction(input: {
     })
     if (!result.success) return result
 
-    updateTag(`user-profile-${userId}`)
+    updateTag("profiles")
     return result
   } catch (e) {
     return {
@@ -226,7 +228,7 @@ export async function updateMyProfilePersonalInfoAction(
       return { success: false, error: "Failed to update profile" }
     }
 
-    updateTag(`user-profile-${userId}`)
+    updateTag("profiles")
     return { success: true, profile: mapProfileToUserProfile(updated) }
   } catch (e) {
     return {
@@ -275,7 +277,8 @@ export async function toggleFictionLikeAction(fictionId: string): Promise<Toggle
       id,
       createFictionLikesSupabaseAdapter(createClient)
     )
-    updateTag("fictions")
+    updateTag("fiction-likes")
+    updateTag(`user-liked-fictions-${user.id}`)
     return { success: true, ...result }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed to toggle like" }
@@ -305,7 +308,6 @@ export async function setMyInterestsAction(interestIds: string[]): Promise<SetMy
 
   try {
     await setUserInterestsUseCase(user.id, ids, createUserInterestsSupabaseAdapter(createClient))
-    updateTag(`user-profile-${user.id}`)
     return { success: true }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Failed to set interests" }

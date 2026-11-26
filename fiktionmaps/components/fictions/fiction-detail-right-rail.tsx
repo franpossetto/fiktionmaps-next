@@ -1,34 +1,28 @@
+import type { ReactNode } from "react"
 import { getTranslations } from "next-intl/server"
 import { Link } from "@/i18n/navigation"
 import { MapPin } from "lucide-react"
-import { TopContributorsSection } from "@/components/contributions/top-contributors-section"
 import { FictionInterestTags } from "@/components/fictions/fiction-interest-tags"
 import type { City } from "@/src/cities/domain/city.entity"
-import type { FictionContributorRankedProfile } from "@/src/contributions/domain/contribution.entity"
 import { cn } from "@/lib/utils"
 
 export async function FictionDetailRightRail({
-  fictionId,
-  fictionTitle,
   fictionInterestTags,
-  contributors,
   initialCities,
+  contributorsSlot,
 }: {
-  fictionId: string
-  fictionTitle: string
   fictionInterestTags: { id: string; label: string }[]
-  contributors: FictionContributorRankedProfile[]
   initialCities: City[]
+  /** Deferred contributors (Suspense). */
+  contributorsSlot?: ReactNode
 }) {
   const t = await getTranslations("Fictions")
   const showInterests = fictionInterestTags.length > 0
   const showCities = initialCities.length > 0
-  const showContributors = contributors.length > 0
-  const hasRightRail = showInterests || showCities || showContributors
+  const hasRightRail = showInterests || showCities || Boolean(contributorsSlot)
   if (!hasRightRail) return null
 
   const citiesSectionBorderTop = showInterests
-  const contributorsSectionBorderTop = showInterests || showCities
 
   return (
     <div className="w-full space-y-4">
@@ -54,15 +48,7 @@ export async function FictionDetailRightRail({
         </section>
       )}
 
-      {showContributors && (
-        <TopContributorsSection
-          contributors={contributors}
-          title={t("contributorsHeading")}
-          nameFallback={t("contributorNameFallback")}
-          showBorderTop={contributorsSectionBorderTop}
-          modalContext={{ type: "fiction", fictionId, fictionTitle }}
-        />
-      )}
+      {contributorsSlot}
     </div>
   )
 }

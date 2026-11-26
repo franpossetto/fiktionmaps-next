@@ -8,12 +8,9 @@ import {
 } from "@/src/fictions/infrastructure/next/fiction.queries"
 import { getInterestCatalogCached } from "@/src/interests/infrastructure/next/interest.queries"
 import { getFictionLikeCountsCached } from "@/src/fiction-likes/infrastructure/next/fiction-likes.queries"
-import { getFictionPlacesCached, getPlaceLocationsByIdsXlCached } from "@/src/places/infrastructure/next/place.queries"
+import { getFictionPlacesCached } from "@/src/places/infrastructure/next/place.queries"
 import { getCompositeGroupsForFictionPlacesCached } from "@/src/place-relationships/infrastructure/next/place-relationship.queries"
 import { getAllCitiesCached } from "@/src/cities/infrastructure/next/city.queries"
-import { getFictionContributorsCached } from "@/src/contributions/infrastructure/next/contribution.queries"
-import { getFictionPersonsCached } from "@/src/persons/infrastructure/next/person.queries"
-import { getScenesForFictionCached } from "@/src/scenes/infrastructure/next/scene.queries"
 import { getCurrentUserHasLikedFiction } from "@/src/users/infrastructure/next/user.queries"
 import { getSiteUrl } from "@/lib/site"
 import { FictionDetail } from "@/components/fictions/fiction-detail"
@@ -21,9 +18,16 @@ import {
   FictionDetailRecommendations,
   FictionDetailRecommendationsFallback,
 } from "@/components/fictions/fiction-detail-recommendations"
+import {
+  FictionDetailContributors,
+  FictionDetailContributorsFallback,
+  FictionDetailCreditsDeferred,
+  FictionDetailCreditsFallback,
+  FictionDetailStoryDeferred,
+  FictionDetailStoryFallback,
+} from "@/components/fictions/fiction-detail-deferred"
 import { FictionDetailRightRail } from "@/components/fictions/fiction-detail-right-rail"
 import { FictionSlugDetailShell } from "@/components/fictions/fiction-slug-detail-shell"
-import { composeFictionStoryCards } from "@/components/fictions/story/compose-fiction-story-cards"
 import { getFictionSidebarSummaryText } from "@/lib/fictions/get-fiction-sidebar-summary-text"
 import { orderCitiesForFictionDetail } from "@/lib/fictions/order-cities-for-fiction-detail"
 import { listWishlistedPlaceIdsForSession } from "@/src/place-wishlists/infrastructure/next/place-wishlist.queries"
@@ -156,35 +160,33 @@ export default async function FictionSlugPage({ params }: Props) {
     ...(fiction.original_language ? { inLanguage: fiction.original_language } : {}),
   }
 
+  // Critical path: hero + places list. Credits / contributors / story / recs stream via Suspense.
+  const placesPromise = getFictionPlacesCached(fiction.id)
   const [
     initialPlaces,
     allCities,
     likeCounts,
     fictionInterestIds,
     interestCatalog,
-    fictionContributors,
-    fictionCredits,
     sidebarSummary,
     initialLiked,
-    scenes,
+    compositeGroups,
+    wishlistedPlaceIds,
   ] = await Promise.all([
-    getFictionPlacesCached(fiction.id),
+    placesPromise,
     getAllCitiesCached(),
     getFictionLikeCountsCached([fiction.id]),
     getFictionInterestsCached(fiction.id),
     getInterestCatalogCached(locale),
-    getFictionContributorsCached(fiction.id),
-    getFictionPersonsCached(fiction.id),
     getFictionSidebarSummaryText(fiction, locale),
     getCurrentUserHasLikedFiction(fiction.id),
-    getScenesForFictionCached(fiction.id),
-  ])
-
-  const placeIds = initialPlaces.map((p) => p.id)
-  const [compositeGroups, wishlistedPlaceIds, xlPlaces] = await Promise.all([
-    getCompositeGroupsForFictionPlacesCached(fiction.id, placeIds),
-    listWishlistedPlaceIdsForSession(placeIds),
-    getPlaceLocationsByIdsXlCached(placeIds),
+    placesPromise.then((places) =>
+      getCompositeGroupsForFictionPlacesCached(
+        fiction.id,
+        places.map((p) => p.id),
+      ),
+    ),
+    placesPromise.then((places) => listWishlistedPlaceIdsForSession(places.map((p) => p.id))),
   ])
 
   const labelByInterestId = new Map(interestCatalog.map((i) => [i.id, i.label]))
@@ -199,19 +201,7 @@ export default async function FictionSlugPage({ params }: Props) {
   )
   const citiesForFiction = allCities.filter((c) => cityIdsFromPlaces.has(c.id))
   const fictionCitiesOrdered = orderCitiesForFictionDetail(initialPlaces, citiesForFiction)
-
-  const xlById = new Map(xlPlaces.map((p) => [p.id, p]))
-  const phonePlaces = initialPlaces.map((place) => {
-    const hi = xlById.get(place.id)
-    if (!hi) return place
-    return { ...place, image: hi.image, imageFocus: hi.imageFocus }
-  })
-  const storyCards = await composeFictionStoryCards({
-    fiction,
-    places: phonePlaces,
-    cities: fictionCitiesOrdered,
-    scenes,
-  })
+  const contributorsBorderTop = fictionInterestTags.length > 0 || fictionCitiesOrdered.length > 0
 
   return (
     <>
@@ -228,11 +218,17 @@ export default async function FictionSlugPage({ params }: Props) {
         summaryText={sidebarSummary}
         rightAside={
           <FictionDetailRightRail
-            fictionId={fiction.id}
-            fictionTitle={fiction.title}
             fictionInterestTags={fictionInterestTags}
-            contributors={fictionContributors}
             initialCities={fictionCitiesOrdered}
+            contributorsSlot={
+              <Suspense fallback={<FictionDetailContributorsFallback />}>
+                <FictionDetailContributors
+                  fictionId={fiction.id}
+                  fictionTitle={fiction.title}
+                  showBorderTop={contributorsBorderTop}
+                />
+              </Suspense>
+            }
           />
         }
       >
@@ -245,14 +241,29 @@ export default async function FictionSlugPage({ params }: Props) {
           initialLiked={initialLiked}
           wishlistedPlaceIds={wishlistedPlaceIds}
           fictionInterestTags={fictionInterestTags}
-          credits={fictionCredits}
-          storyCards={storyCards}
+          storySlot={
+            <Suspense fallback={<FictionDetailStoryFallback />}>
+              <FictionDetailStoryDeferred
+                fiction={fiction}
+                places={initialPlaces}
+                cities={fictionCitiesOrdered}
+              />
+            </Suspense>
+          }
           recommendationsSlot={
             <Suspense fallback={<FictionDetailRecommendationsFallback />}>
               <FictionDetailRecommendations
                 fictionId={fiction.id}
                 interestIds={fictionInterestIds}
                 places={initialPlaces}
+              />
+            </Suspense>
+          }
+          creditsSlot={
+            <Suspense fallback={<FictionDetailCreditsFallback />}>
+              <FictionDetailCreditsDeferred
+                fictionId={fiction.id}
+                fictionTitle={fiction.title}
               />
             </Suspense>
           }

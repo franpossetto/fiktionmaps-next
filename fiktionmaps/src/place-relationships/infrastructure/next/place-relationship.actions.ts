@@ -36,6 +36,7 @@ import type {
 
 function touchPlaceTags(placeIds: string[]) {
   updateTag("places")
+  updateTag("place-relationships")
   for (const placeId of placeIds) {
     updateTag(`place-${placeId}`)
   }

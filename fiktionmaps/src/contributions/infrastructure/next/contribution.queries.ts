@@ -7,7 +7,10 @@ import { createAnonymousClient, createClient } from "@/lib/supabase/server"
 import type { Database } from "@/supabase/database.types"
 import { getContributionsByUserUseCase } from "@/src/contributions/application/get-contributions-by-user.usecase"
 import { listProfileContributionsPageUseCase } from "@/src/contributions/application/list-profile-contributions-page.usecase"
-import { getFictionContributorsUseCase } from "@/src/contributions/application/get-fiction-contributors.usecase"
+import {
+  getContributorsForFictionIdsUseCase,
+  getFictionContributorsUseCase,
+} from "@/src/contributions/application/get-fiction-contributors.usecase"
 import { getContributorsFirstContributionByEntityUseCase } from "@/src/contributions/application/get-contributors-first-contribution-by-entity.usecase"
 import { getStaffContributionDetailUseCase } from "@/src/contributions/application/get-staff-contribution-detail.usecase"
 import { getStaffCreateContributionsFeedPageUseCase } from "@/src/contributions/application/get-staff-create-contributions-feed-page.usecase"
@@ -157,6 +160,20 @@ export function getFictionContributorsCached(fictionId: string): Promise<Fiction
   return unstable_cache(
     () => getFictionContributorsUseCase(fictionId, anonRepo),
     CacheKeys.fictionContributors(fictionId),
+    { ...CacheConfig.medium, tags: ["contributions"] },
+  )()
+}
+
+/** Batched contributors for many fictions (city detail); avoids N per-fiction queries. */
+export function getContributorsForFictionIdsCached(
+  fictionIds: string[],
+): Promise<FictionContributorRankedProfile[]> {
+  const unique = [...new Set(fictionIds.filter(Boolean))].sort()
+  if (unique.length === 0) return Promise.resolve([])
+  if (unique.length === 1) return getFictionContributorsCached(unique[0])
+  return unstable_cache(
+    () => getContributorsForFictionIdsUseCase(unique, anonRepo),
+    CacheKeys.fictionContributorsBatch(unique.join(",")),
     { ...CacheConfig.medium, tags: ["contributions"] },
   )()
 }
